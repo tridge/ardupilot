@@ -189,7 +189,7 @@ bool AP_Land::preland_step_rally_land(const RallyLocation &ral_loc) {
  
             // Check to see if the the plane is heading toward the
             // land waypoint, with a tolerance of 3 degrees
-            if (fabs(wrap_PI(bearing - heading) <= radians(3.0f))) {
+            if (fabs(wrap_PI(bearing - heading)) <= radians(3.0f)) {
                 if(_land_heading_as_desired == false) {
                     _turns_complete++;
                 }
