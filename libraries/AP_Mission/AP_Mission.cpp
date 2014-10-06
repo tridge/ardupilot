@@ -603,6 +603,11 @@ bool AP_Mission::mavlink_to_mission_cmd(const mavlink_mission_item_t& packet, AP
         cmd.content.repeat_servo.cycle_time = packet.param4;   // time in seconds
         break;
 
+    case MAV_CMD_DO_RALLY_LAND_START:                   // MAV ID: 190
+        copy_location = true;
+        cmd.p1 = packet.param1;                             //break alt
+        break;
+
     case MAV_CMD_DO_SET_ROI:                            // MAV ID: 201
         copy_location = true;
         cmd.p1 = packet.param1;                         // 0 = no roi, 1 = next waypoint, 2 = waypoint number, 3 = fixed location, 4 = given target (not supported)
@@ -871,6 +876,11 @@ bool AP_Mission::mission_cmd_to_mavlink(const AP_Mission::Mission_Command& cmd, 
         packet.param4 = cmd.content.repeat_servo.cycle_time;    // time in milliseconds converted to seconds
         break;
 
+    case MAV_CMD_DO_RALLY_LAND_START:                   // MAV ID: 190
+        copy_location = true;
+        packet.param1 = cmd.p1;                             //break alt
+        break;
+
     case MAV_CMD_DO_SET_ROI:                            // MAV ID: 201
         copy_location = true;
         packet.param1 = cmd.p1;                         // 0 = no roi, 1 = next waypoint, 2 = waypoint number, 3 = fixed location, 4 = given target (not supported)
@@ -1119,6 +1129,11 @@ bool AP_Mission::get_next_cmd(uint16_t start_index, Mission_Command& cmd, bool i
                     cmd_index++;
                 }
             }
+        } else if (temp_cmd.id == MAV_CMD_DO_RALLY_LAND_START) {
+            //have to set this flag because there is no way to set mode to RTL
+            //from the Mission module
+            set_start_landing_flag(true);
+            return true;
         }else{
             // this is a non-jump command so return it
             cmd = temp_cmd;
