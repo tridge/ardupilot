@@ -44,7 +44,7 @@ AP_Land::AP_Land(AP_AHRS &ahrs, AP_TECS &tecs, AP_Rally &rally, AP_Mission &miss
     , _tecs(tecs)
     , _rally(rally)
     , _mission(mission)
-    , _landing_wp_index(-1)
+    , _landing_start_index(-1)
     , _preland_started(false)
     , _head_to_break_alt(false)
     , _land_break_alt_as_desired(false)
@@ -52,13 +52,14 @@ AP_Land::AP_Land(AP_AHRS &ahrs, AP_TECS &tecs, AP_Rally &rally, AP_Mission &miss
     , _land_speed_as_desired(false)
     , _turns_complete(0) 
     , _aborting_landing(false)
-    , _recovery_alt(0) {        
+    , _recovery_alt(0) 
+    , _is_landing(false) {        
 
     AP_Param::setup_object_defaults(this, var_info);
 }
 
 void AP_Land::preland_clear() {
-    _landing_wp_index = -1;
+    _landing_start_index = -1;
     _preland_started = false;
     _head_to_break_alt = false;
     _land_break_alt_as_desired = false;
@@ -67,12 +68,14 @@ void AP_Land::preland_clear() {
     _turns_complete = 0;
     _aborting_landing = false;
     _recovery_alt = 0;
+    _is_landing=false;
 }
 
 void AP_Land::preland_init() {
     preland_clear();
 
     _preland_started = true;
+    _is_landing = true;
 }
 
 bool AP_Land::abort_landing(const uint16_t recovery_alt) {
@@ -102,35 +105,57 @@ Location AP_Land::get_location_1km_beyond_land() const {
     return ret_loc;
 }
 
-int16_t AP_Land::find_nearest_landing_wp_index(const Location& base_loc) const {
+int16_t AP_Land::find_nearest_land_start_index(const Location& base_loc) {
     // Start minimum distance at appx infinity
     float min_distance = 9999.9;
     int tmp_distance;
-    int16_t land_wp_index = -1;
     
     AP_Mission::Mission_Command tmp = {0};
 
-    // Go through all WayPoints looking for landing waypoints
-    for(uint16_t i = 0; i< _mission.num_commands()+1; i++) {
+    // Go through mission looking for nearest landing start command
+    for(uint16_t i = 0; i< _mission.num_commands(); i++) {
         _mission.read_cmd_from_storage(i, tmp);
-        if(tmp.id == MAV_CMD_NAV_LAND) {
-           tmp_distance = get_distance(tmp.content.location, base_loc);
-           if(tmp_distance < min_distance) {
-              min_distance = tmp_distance;
-              land_wp_index = i;
-              break;
-           }
+        if(tmp.id == MAV_CMD_DO_RALLY_LAND_START) {
+            _mission.read_cmd_from_storage(i, tmp);
+            tmp_distance = get_distance(tmp.content.location, base_loc);
+            if(tmp_distance < min_distance) {
+                min_distance = tmp_distance;
+
+                _landing_start_index = i+1; // go to the NEXT mission item, otherwise you will keep restarting preland_init
+            }           
         }
     }
 
-    //DON'T GO TOO FAR! if the closest landing waypoint is too far away
+    //no MAV_CMD_DO_RALLY_LAND_START item?
+    if (_landing_start_index == -1) {
+        return -1;
+    }
+
+    //look for the nearest NAV_LAND that follows the RALLY_LAND_START command:
+    bool found_landing_wp = false;
+    for (uint16_t i = _landing_start_index; i < _mission.num_commands(); i++) {
+        _mission.read_cmd_from_storage(i, tmp);
+        if (tmp.id == MAV_CMD_NAV_LAND) {
+            _mission.read_cmd_from_storage(i, tmp); 
+            _landing_wp = tmp.content.location;
+            found_landing_wp = true;
+            break;
+        }
+    }
+
+    if (! found_landing_wp) {
+        return -1;
+    }
+
+    //DON'T GO TOO FAR! 
+    //if the closest landing start command waypoint is too far away
     //(based on g.rally_limit_km), then don't use it -- don't autoland.
     if (_rally.get_rally_limit_km() > 0.f && 
             min_distance > _rally.get_rally_limit_km() * 1000.0f) {
         return -1;
     }
 
-    return land_wp_index; 
+    return _landing_start_index; 
 }
 
 bool AP_Land::preland_step_rally_land(const RallyLocation &ral_loc) {
@@ -150,19 +175,15 @@ bool AP_Land::preland_step_rally_land(const RallyLocation &ral_loc) {
     ((AP_AHRS&) _ahrs).get_position(current_loc);
 
     //find the best landing waypoint (if not already found)
-    if (_landing_wp_index == -1) {
-        _landing_wp_index = 
-            find_nearest_landing_wp_index(_rally.rally_location_to_location(ral_loc));
-        if (_landing_wp_index == -1) {
-            Debug("No suitable suitable Landing Point (too far away?)");
+    if (_landing_start_index == -1) {
+        _landing_start_index = 
+            find_nearest_land_start_index(_rally.rally_location_to_location(ral_loc));
+        if (_landing_start_index == -1) {
+            Debug("No suitable suitable Landing Start Point (too far away?)");
             return false;
         }
-
-        AP_Mission::Mission_Command lnd_cmd;
-        _mission.read_cmd_from_storage(_landing_wp_index, lnd_cmd);
-        _landing_wp = lnd_cmd.content.location;
     }
-     
+
     //time to head for break altitude?
     if (_head_to_break_alt == false) {        
         //close enough to start breaking?

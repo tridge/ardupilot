@@ -200,7 +200,8 @@ public:
         _cmd_verify_fn(cmd_verify_fn),
         _mission_complete_fn(mission_complete_fn),
         _prev_nav_cmd_index(AP_MISSION_CMD_INDEX_NONE),
-        _last_change_time_ms(0)
+        _last_change_time_ms(0),
+        _start_landing_flag(false)
     {
         // load parameter defaults
         AP_Param::setup_object_defaults(this, var_info);
@@ -329,7 +330,12 @@ public:
 
     // return the last time the mission changed in milliseconds
     uint32_t last_change_time_ms(void) const { return _last_change_time_ms; }
-
+    
+    //Needed the start landing flag due to a limitation in ArduPlane: no
+    //way to set mode from libraries:
+    void set_start_landing_flag(bool v) { _start_landing_flag = v; }
+    bool get_start_landing_flag() { return _start_landing_flag; }
+ 
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -415,6 +421,10 @@ private:
 
     // last time that mission changed
     uint32_t _last_change_time_ms;
+
+    // way to signal the plane to start a rally landing, since I can't set
+    // mode to RTL from this module
+    bool _start_landing_flag;
 };
 
 #endif

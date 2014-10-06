@@ -1407,6 +1407,11 @@ static void update_navigation()
     // wp_distance is in ACTUAL meters, not the *100 meters we get from the GPS
     // ------------------------------------------------------------------------
 
+    if (mission.get_start_landing_flag() == true) {
+        mission.set_start_landing_flag(false);
+        start_rally_land();
+    }
+
     // distance and bearing calcs only
     switch(control_mode) {
     case AUTO:
@@ -1437,9 +1442,14 @@ static void update_navigation()
                         lander.speed_as_desired_for_landing()) {
                     //Done with prelanding for rally landing.  LAND!!
 
-                    //The order of these commands apears to be important.
-                    mission.set_current_cmd(lander.find_nearest_landing_wp_index(current_loc));
-                    set_mode(AUTO);
+                    int16_t land_mission_item = lander.find_nearest_land_start_index(current_loc);
+                    if (land_mission_item != -1) {
+                        //The order of these commands apears to be important.
+                        mission.set_current_cmd(land_mission_item);
+                        set_mode(AUTO);
+                    } else {
+                        gcs_send_text_P(SEVERITY_HIGH, PSTR("Unable to land! No nearby DO_LAND_START!"));
+                    }
                 }
             } 
         //did a landing abort get called for while still in RTL mode?
@@ -1538,7 +1548,8 @@ static void update_flight_stage(void)
             } else if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND && 
                        auto_state.land_complete == true) {
                 set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_FINAL);
-            } else if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND) {
+            } else if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND ||
+                        lander.is_landing()) {
                 if (! lander.aborting_landing()) {
                     set_flight_stage(AP_SpdHgtControl::FLIGHT_LAND_APPROACH);                } else {
                     //"Go Around" signaled before landing complete

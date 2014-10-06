@@ -1131,16 +1131,12 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
             }
             break;
         
-        case MAV_CMD_DO_RALLY_LAND:
+        case MAV_CMD_DO_RALLY_LAND_START:
             result = MAV_RESULT_FAILED;
-            //no reason to automated landing in manual mode:
-            if (control_mode == MANUAL) {
-                break;
+           
+            if (start_rally_land()) { 
+                result = MAV_RESULT_ACCEPTED;
             }
-            set_mode(RTL);
-
-            lander.preland_init();
-            result = MAV_RESULT_ACCEPTED;
             break;
 
         case MAV_CMD_DO_GO_AROUND:
