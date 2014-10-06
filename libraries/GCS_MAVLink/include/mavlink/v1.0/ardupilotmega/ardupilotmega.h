@@ -1,6 +1,6 @@
 /** @file
  *	@brief MAVLink comm protocol generated from ardupilotmega.xml
- *	@see http://qgroundcontrol.org/mavlink/
+ *	@see http://mavlink.org
  */
 #ifndef MAVLINK_ARDUPILOTMEGA_H
 #define MAVLINK_ARDUPILOTMEGA_H
@@ -44,7 +44,7 @@ typedef enum MAV_CMD
 	MAV_CMD_NAV_LOITER_TURNS=18, /* Loiter around this MISSION for X turns |Turns| Empty| Radius around MISSION, in meters. If positive loiter clockwise, else counter-clockwise| Desired yaw angle.| Latitude| Longitude| Altitude|  */
 	MAV_CMD_NAV_LOITER_TIME=19, /* Loiter around this MISSION for X seconds |Seconds (decimal)| Empty| Radius around MISSION, in meters. If positive loiter clockwise, else counter-clockwise| Desired yaw angle.| Latitude| Longitude| Altitude|  */
 	MAV_CMD_NAV_RETURN_TO_LAUNCH=20, /* Return to launch location |Empty| Empty| Empty| Empty| Empty| Empty| Empty|  */
-	MAV_CMD_NAV_LAND=21, /* Land at location |Empty| Empty| Empty| Desired yaw angle.| Latitude| Longitude| Altitude|  */
+	MAV_CMD_NAV_LAND=21, /* Land at location |Empty| Empty| LAND_START command index (if any).  Use this to specify the start of any pre-land commands in the mission (e.g., deploy flaps). Leave 0 if no pre-land commands are needed.| Desired yaw angle.| Latitude| Longitude| Altitude|  */
 	MAV_CMD_NAV_TAKEOFF=22, /* Takeoff from ground / hand |Minimum pitch (if airspeed sensor present), desired pitch without sensor| Empty| Empty| Yaw angle (if magnetometer present), ignored without magnetometer| Latitude| Longitude| Altitude|  */
 	MAV_CMD_NAV_ROI=80, /* Sets the region of interest (ROI) for a sensor set or the vehicle itself. This can then be used by the vehicles control system to control the vehicle attitude and the attitude of various sensors such as cameras. |Region of intereset mode. (see MAV_ROI enum)| MISSION index/ target ID. (see MAV_ROI enum)| ROI index (allows a vehicle to manage multiple ROI's)| Empty| x the location of the fixed ROI (see MAV_FRAME)| y| z|  */
 	MAV_CMD_NAV_PATHPLANNING=81, /* Control autonomous path planning on the MAV. |0: Disable local obstacle avoidance / local path planning (without resetting map), 1: Enable local path planning, 2: Enable and reset local path planning| 0: Disable full path planning (without resetting map), 1: Enable, 2: Enable and reset map/occupancy grid, 3: Enable and reset planned route, but not occupancy grid| Empty| Yaw angle at goal, in compass degrees, [0..360]| Latitude/X of goal| Longitude/Y of goal| Altitude/Z of goal|  */
@@ -66,7 +66,7 @@ typedef enum MAV_CMD
 	MAV_CMD_DO_SET_SERVO=183, /* Set a servo to a desired PWM value. |Servo number| PWM (microseconds, 1000 to 2000 typical)| Empty| Empty| Empty| Empty| Empty|  */
 	MAV_CMD_DO_REPEAT_SERVO=184, /* Cycle a between its nominal setting and a desired PWM for a desired number of cycles with a desired period. |Servo number| PWM (microseconds, 1000 to 2000 typical)| Cycle count| Cycle time (seconds)| Empty| Empty| Empty|  */
 	MAV_CMD_DO_FLIGHTTERMINATION=185, /* Terminate flight immediately |Flight termination activated if > 0.5| Empty| Empty| Empty| Empty| Empty| Empty|  */
-	MAV_CMD_DO_RALLY_LAND=190, /* Mission command to perform a landing from a rally point. |Break altitude (meters)| Landing speed (m/s)| Empty| Empty| Empty| Empty| Empty|  */
+	MAV_CMD_DO_RALLY_LAND_START=190, /* Mission command to perform a landing (usually from a rally point). |Break altitude (meters)| Landing speed (m/s)| Empty| Empty| Empty| Empty| Empty|  */
 	MAV_CMD_DO_GO_AROUND=191, /* Mission command to safely abort an autonmous landing. |Altitude (meters)| Empty| Empty| Empty| Empty| Empty| Empty|  */
 	MAV_CMD_DO_CONTROL_VIDEO=200, /* Control onboard camera system. |Camera ID (-1 for all)| Transmission: 0: disabled, 1: enabled compressed, 2: enabled raw| Transmission mode: 0: video stream, >0: single images every n seconds (decimal)| Recording: 0: disabled, 1: enabled compressed, 2: enabled raw| Empty| Empty| Empty|  */
 	MAV_CMD_DO_SET_ROI=201, /* Sets the region of interest (ROI) for a sensor set or the vehicle itself. This can then be used by the vehicles control system to control the vehicle attitude and the attitude of various sensors such as cameras. |Region of intereset mode. (see MAV_ROI enum)| MISSION index/ target ID. (see MAV_ROI enum)| ROI index (allows a vehicle to manage multiple ROI's)| Empty| x the location of the fixed ROI (see MAV_FRAME)| y| z|  */
@@ -142,6 +142,18 @@ typedef enum RALLY_FLAGS
 #endif
 
 /** @brief  */
+#ifndef HAVE_ENUM_PARACHUTE_ACTION
+#define HAVE_ENUM_PARACHUTE_ACTION
+typedef enum PARACHUTE_ACTION
+{
+	PARACHUTE_DISABLE=0, /* Disable parachute release | */
+	PARACHUTE_ENABLE=1, /* Enable parachute release | */
+	PARACHUTE_RELEASE=2, /* Release parachute | */
+	PARACHUTE_ACTION_ENUM_END=3, /*  | */
+} PARACHUTE_ACTION;
+#endif
+
+/** @brief  */
 #ifndef HAVE_ENUM_MOTOR_TEST_THROTTLE_TYPE
 #define HAVE_ENUM_MOTOR_TEST_THROTTLE_TYPE
 typedef enum MOTOR_TEST_THROTTLE_TYPE
@@ -151,17 +163,6 @@ typedef enum MOTOR_TEST_THROTTLE_TYPE
 	MOTOR_TEST_THROTTLE_PILOT=2, /* throttle pass-through from pilot's transmitter | */
 	MOTOR_TEST_THROTTLE_TYPE_ENUM_END=3, /*  | */
 } MOTOR_TEST_THROTTLE_TYPE;
-#endif
-
-/** @brief Gripper actions. */
-#ifndef HAVE_ENUM_GRIPPER_ACTIONS
-#define HAVE_ENUM_GRIPPER_ACTIONS
-typedef enum GRIPPER_ACTIONS
-{
-	GRIPPER_ACTION_RELEASE=0, /* gripper release of cargo | */
-	GRIPPER_ACTION_GRAB=1, /* gripper grabs onto cargo | */
-	GRIPPER_ACTIONS_ENUM_END=2, /*  | */
-} GRIPPER_ACTIONS;
 #endif
 
 /** @brief  */
