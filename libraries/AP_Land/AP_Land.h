@@ -55,6 +55,9 @@ public:
 
     bool aborting_landing() const { return _aborting_landing; }
 
+    //if we have started prelanding and haven't finished: 
+    bool is_landing() const { return _is_landing; }
+
     //returns altitude plane aims for when aborting a landing:
     uint16_t get_recovery_alt() const { return _recovery_alt; }
 
@@ -62,9 +65,9 @@ public:
 
     Location get_location_1km_beyond_land() const;
 
-    //return -1 if no landing waypoint could be found in the Mission or 
-    //if the landing waypoint is too far away from base_loc
-    int16_t find_nearest_landing_wp_index(const Location& base_loc) const;
+    //return -1 if no landing start command could be found in the Mission or 
+    //if the landing start waypoint is too far away from base_loc
+    int16_t find_nearest_land_start_index(const Location& base_loc) ;
     
     //Caller needs to know when to head to break altitude b/c I can't control
     //the current waypoint altitude from this library.
@@ -83,10 +86,11 @@ protected:
     const AP_Rally& _rally;
     const AP_Mission& _mission;
 
-    int16_t _landing_wp_index;
+    int16_t _landing_start_index;
     Location _landing_wp;
     Location _break_point;
 
+    bool _start_landing_flag;
     bool _preland_started;
     bool _head_to_break_alt;
     bool _land_break_alt_as_desired;
@@ -95,6 +99,7 @@ protected:
     uint8_t _turns_complete;
     bool _aborting_landing;
     uint16_t _recovery_alt;
+    bool _is_landing;
 
     //parameters
     AP_Int8 _land_wing_level;
