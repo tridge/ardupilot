@@ -112,3 +112,25 @@ static void setup_landing_glide_slope(void)
         // stay within the range of the start and end locations in altitude
         constrain_target_altitude_location(loc, prev_WP_loc);
 }
+
+//return false if unable to auto-land
+static bool start_rally_land(void) {
+    //no reason to do automated landing in manual mode:
+    if (control_mode == MANUAL) {
+        return false;
+    }
+
+    //make sure flag is clear
+    mission.set_start_landing_flag(false);
+
+    set_mode(RTL);
+
+    if (lander.find_nearest_land_start_index(rally.rally_location_to_location(rally.get_current_rally_point())) == -1) {
+        gcs_send_text_P(SEVERITY_HIGH, PSTR("Unable to auto land! Unable to determine landing point or landing mission start!"));
+        return false;
+    }
+
+    lander.preland_init();
+
+    return true;
+}
