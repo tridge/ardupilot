@@ -240,6 +240,10 @@ _options_for_frame = {
     "jsbsim": {
         "default_params_filename": "ArduPlane.parm",
     },
+    "quadplane-tilttri" : {
+        "build_target" : "sitl-tri",
+        "default_params_filename": "quadplane-tilttri.parm",
+    },
     "quadplane": {
         "default_params_filename": "quadplane.parm",
     },
