@@ -110,9 +110,14 @@ void AP_MotorsMatrix::output_to_motors()
         case THROTTLE_UNLIMITED:
         case SPOOL_DOWN:
             // set motor output based on thrust requests
+            float thrust[AP_MOTORS_MAX_NUM_MOTORS];
+            memcpy(thrust, _thrust_rpyt_out, AP_MOTORS_MAX_NUM_MOTORS * sizeof(float));
+
+            tilt_compensate(thrust, AP_MOTORS_MAX_NUM_MOTORS);
+
             for (i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++) {
                 if (motor_enabled[i]) {
-                    motor_out[i] = calc_thrust_to_pwm(_thrust_rpyt_out[i]);
+                    motor_out[i] = calc_thrust_to_pwm(thrust[i]);
                 }
             }
             break;

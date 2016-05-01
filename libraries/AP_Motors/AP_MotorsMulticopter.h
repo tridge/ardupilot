@@ -104,7 +104,10 @@ public:
     // mask. This is used to control tiltrotor motors in forward
     // flight. Thrust is in the range 0 to 1
     void                output_motor_mask(float thrust, uint8_t mask);
-        
+
+    // set a tilt factor for the motors in the given motor mask
+    void                set_motor_tilt_factor(float tilt_factor, uint8_t mask, bool equal_thrust);
+    
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo        var_info[];
 
@@ -137,6 +140,9 @@ protected:
     // convert thrust (0~1) range back to pwm range
     int16_t             calc_thrust_to_pwm(float thrust_in) const;
 
+    // compensate for tilt on a set of motor outputs
+    void                tilt_compensate(float *motor_out, uint8_t num_motors);
+    
     // flag bitmask
     struct {
         spool_up_down_mode     spool_mode       : 3;    // motor's current spool mode
@@ -175,4 +181,8 @@ protected:
     int16_t             _batt_timer;            // timer used in battery resistance calcs
     float               _lift_max;              // maximum lift ratio from battery voltage
     float               _throttle_limit;        // ratio of throttle limit between hover and maximum
+
+    uint16_t            _tilt_mask;             // mask of motors that can tilt
+    float               _tilt_factor;           // current motor tilt factor
+    bool                _tilt_equal_thrust;     // true if all tilted motors should have equal thrust
 };

@@ -22,6 +22,7 @@
 
 #include "AP_MotorsMulticopter.h"
 #include <AP_HAL/AP_HAL.h>
+
 extern const AP_HAL::HAL& hal;
 
 // parameters for the motor class
@@ -502,7 +503,8 @@ void AP_MotorsMulticopter::throttle_pass_through(int16_t pwm)
 
 // output a thrust to all motors that match a given motor mask. This
 // is used to control tiltrotor motors in forward flight. Thrust is in
-// the range 0 to 1
+// the range 0 to 1. This should only be used when the motors are at a
+// very high tilt angle
 void AP_MotorsMulticopter::output_motor_mask(float thrust, uint8_t mask)
 {
     hal.rcout->cork();
@@ -518,4 +520,75 @@ void AP_MotorsMulticopter::output_motor_mask(float thrust, uint8_t mask)
         }
     }
     hal.rcout->push();
+}
+
+/*
+  setup motor tilt factor for a given set of motors
+ */
+void AP_MotorsMulticopter::set_motor_tilt_factor(float tilt_factor, uint8_t mask, bool equal_thrust)
+{
+    _tilt_mask = mask;
+    _tilt_factor = tilt_factor;
+    _tilt_equal_thrust = equal_thrust;
+}
+
+/*
+  compensate for tilt in a set of motor outputs
+
+  Compensation is of two forms. The first is to apply _tilt_factor,
+  which is a compensation for the reduces vertical thrust when
+  tilted. This is supplied by set_motor_tilt_factor().
+
+  The second compensation is to use equal thrust on all tilted motors
+  when _tilt_equal_thrust is true. This is used when the motors are
+  tilted by a large angle to prevent the roll and yaw controllers from
+  causing instability. Typically this would be used when the motors
+  are tilted beyond 45 degrees. At this angle it is assumed that roll
+  control can be achieved using fixed wing control surfaces and yaw
+  control with the remaining multicopter motors (eg. tricopter tail).
+
+  By applying _tilt_equal_thrust the tilted motors effectively become
+  a single pitch control motor.
+ */
+void AP_MotorsMulticopter::tilt_compensate(float *thrust, uint8_t num_motors)
+{
+    if (_tilt_mask == 0) {
+        // no tilt
+        return;
+    }
+    float tilt_total = 0;
+    uint8_t tilt_count = 0;
+    
+    // apply _tilt_factor first
+    for (uint8_t i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++) {
+        if (motor_enabled[i] && (_tilt_mask & (1U<<i))) {
+            thrust[i] *= _tilt_factor;
+            tilt_total += thrust[i];
+            tilt_count++;
+        }
+    }
+
+    float largest_tilted = 0;
+
+    // now constrain and apply _tilt_equal_thrust if enabled
+    for (uint8_t i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++) {
+        if (motor_enabled[i] && (_tilt_mask & (1U<<i))) {
+            if (_tilt_equal_thrust) {
+                thrust[i] = tilt_total / tilt_count;
+            }
+            largest_tilted = MAX(largest_tilted, thrust[i]);
+        }
+    }
+
+    // if we are saturating one of the tilted motors then reduce all
+    // motors to keep them in proportion to the original thrust. This
+    // helps maintain stability when tilted at a large angle
+    if (largest_tilted > 1.0f) {
+        float scale = 1.0f / largest_tilted;
+        for (uint8_t i=0; i<AP_MOTORS_MAX_NUM_MOTORS; i++) {
+            if (motor_enabled[i]) {
+                thrust[i] *= scale;
+            }
+        }
+    }
 }

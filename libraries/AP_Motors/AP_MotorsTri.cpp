@@ -148,9 +148,11 @@ void AP_MotorsTri::output_to_motors()
         case SPOOL_DOWN:
             // set motor output based on thrust requests
             hal.rcout->cork();
-            rc_write(AP_MOTORS_MOT_1, calc_thrust_to_pwm(_thrust_right));
-            rc_write(AP_MOTORS_MOT_2, calc_thrust_to_pwm(_thrust_left));
-            rc_write(AP_MOTORS_MOT_4, calc_thrust_to_pwm(_thrust_rear));
+            float thrust[4] {_thrust_right, _thrust_left, 0, _thrust_rear};
+            tilt_compensate(thrust, 4);
+            rc_write(AP_MOTORS_MOT_1, calc_thrust_to_pwm(thrust[0]));
+            rc_write(AP_MOTORS_MOT_2, calc_thrust_to_pwm(thrust[1]));
+            rc_write(AP_MOTORS_MOT_4, calc_thrust_to_pwm(thrust[3]));
             rc_write(AP_MOTORS_CH_TRI_YAW, calc_yaw_radio_output(_pivot_angle, radians(_yaw_servo_angle_max_deg)));
             hal.rcout->push();
             break;
