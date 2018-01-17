@@ -14,26 +14,26 @@
  * 
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
+
 #pragma once
 
-#include "hwdef.h"
+#include "AP_RCProtocol.h"
 
-#ifndef HAL_BOARD_INIT_HOOK_DEFINE
-#define HAL_BOARD_INIT_HOOK_DEFINE
-#endif
+class AP_RCProtocol_Backend
+{
+    friend class AP_RCProtcol;
 
-#ifndef HAL_BOARD_INIT_HOOK_CALL
-#define HAL_BOARD_INIT_HOOK_CALL
-#endif
+public:
+    AP_RCProtocol_Backend(AP_RCProtocol &_frontend);
+    virtual void process_pulse(uint32_t width_s0, uint32_t width_s1) = 0;
+    uint16_t read(uint8_t chan);
+    bool new_input();
+    uint8_t num_channels();
+protected:
+    AP_RCProtocol &frontend;
+    unsigned int rc_input_count;
+    unsigned int last_rc_input_count;
 
-#if !defined(_FROM_ASM_)
-#ifdef __cplusplus
-extern "C" {
-#endif
-  void boardInit(void);
-  HAL_BOARD_INIT_HOOK_DEFINE
-#ifdef __cplusplus
-}
-#endif
-#endif /* _FROM_ASM_ */
-
+    uint16_t _pwm_values[MAX_RCIN_CHANNELS] = {0};
+    uint8_t  _num_channels;
+};

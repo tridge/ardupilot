@@ -18,6 +18,7 @@ def build(bld):
             'AP_Navigation',
             'AP_Parachute',
             'AP_RCMapper',
+            'AP_RCProtocol',
             'AP_SpdHgtControl',
             'AP_TECS',
             'AP_InertialNav',

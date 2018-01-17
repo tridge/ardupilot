@@ -18,6 +18,7 @@ def build(bld):
             'AP_LeakDetector',
             'AP_Motors',
             'AP_RCMapper',
+            'AP_RCProtocol',
             'AP_Proximity',
             'AP_Gripper',
             'AP_Beacon',

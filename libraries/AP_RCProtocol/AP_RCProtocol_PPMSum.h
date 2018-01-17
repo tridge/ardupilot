@@ -16,24 +16,18 @@
  */
 #pragma once
 
-#include "hwdef.h"
+#include "AP_RCProtocol.h"
 
-#ifndef HAL_BOARD_INIT_HOOK_DEFINE
-#define HAL_BOARD_INIT_HOOK_DEFINE
-#endif
+#define MAX_PPM_CHANNELS 16
 
-#ifndef HAL_BOARD_INIT_HOOK_CALL
-#define HAL_BOARD_INIT_HOOK_CALL
-#endif
-
-#if !defined(_FROM_ASM_)
-#ifdef __cplusplus
-extern "C" {
-#endif
-  void boardInit(void);
-  HAL_BOARD_INIT_HOOK_DEFINE
-#ifdef __cplusplus
-}
-#endif
-#endif /* _FROM_ASM_ */
-
+class AP_RCProtocol_PPMSum : public AP_RCProtocol_Backend {
+public:
+    AP_RCProtocol_PPMSum(AP_RCProtocol &_frontend) : AP_RCProtocol_Backend(_frontend) {}
+    void process_pulse(uint32_t width_s0, uint32_t width_s1) override;
+private:
+    // state of ppm decoder
+    struct {
+        int8_t _channel_counter;
+        uint16_t _pulse_capt[MAX_RCIN_CHANNELS];
+    } ppm_state;
+};

@@ -14,26 +14,20 @@
  * 
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
+
 #pragma once
 
-#include "hwdef.h"
+#include "AP_RCProtocol.h"
 
-#ifndef HAL_BOARD_INIT_HOOK_DEFINE
-#define HAL_BOARD_INIT_HOOK_DEFINE
-#endif
-
-#ifndef HAL_BOARD_INIT_HOOK_CALL
-#define HAL_BOARD_INIT_HOOK_CALL
-#endif
-
-#if !defined(_FROM_ASM_)
-#ifdef __cplusplus
-extern "C" {
-#endif
-  void boardInit(void);
-  HAL_BOARD_INIT_HOOK_DEFINE
-#ifdef __cplusplus
-}
-#endif
-#endif /* _FROM_ASM_ */
-
+class AP_RCProtocol_SBUS : public AP_RCProtocol_Backend {
+public:
+    AP_RCProtocol_SBUS(AP_RCProtocol &_frontend) : AP_RCProtocol_Backend(_frontend) {}
+    void process_pulse(uint32_t width_s0, uint32_t width_s1) override;
+private:
+    bool sbus_decode(const uint8_t frame[25], uint16_t *values, uint16_t *num_values,
+                    bool *sbus_failsafe, bool *sbus_frame_drop, uint16_t max_values);
+    struct {
+        uint16_t bytes[25]; // including start bit, parity and stop bits
+        uint16_t bit_ofs;
+    } sbus_state;
+};

@@ -14,6 +14,7 @@ def build(bld):
             'AP_Mount',
             'AP_Navigation',
             'AP_RCMapper',
+            'AP_RCProtocol',
             'AP_RSSI',
             'AC_PID',
             'AP_Stats',
