@@ -43,7 +43,10 @@
 
 extern const AP_HAL::HAL& hal;
 
-#define SBUS_DEBUG 0
+// set to 2 for sawtooth output on all channels
+// set to 1 for console print when channel 9 changes and toggle of GPIO55 across call to uart.write
+// on ChibiOS, the latency from write call to uart start bit is about 20 +/-5 usec
+#define SBUS_DEBUG 2
 
 // SBUS1 constant definitions
 // pulse widths measured using FrSky Sbus/PWM converter
@@ -120,6 +123,10 @@ AP_SBusOut::update()
                 lastch9 = pwmval;
                 hal.console->printf("channel 9 pwm: %04d\n", pwmval);
             }
+#if SBUS_DEBUG==2
+            static uint16_t pwmcntr = 0;
+            value = pwmcntr++;
+#endif
 #endif
 
             while (offset >= 8) {
