@@ -125,7 +125,8 @@ AP_SBusOut::update()
             }
 #if SBUS_DEBUG==2
             static uint16_t pwmcntr = 0;
-            value = pwmcntr++;
+            value = pwmcntr;
+            pwmcntr+=5;
 #endif
 #endif
 
