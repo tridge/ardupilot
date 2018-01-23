@@ -103,6 +103,10 @@ AP_SBusOut::update()
         uint8_t offset = 0;
         uint16_t value;
 
+#if SBUS_DEBUG==2
+        static uint16_t framecntr = 0;
+#endif
+
         /* construct sbus frame representing channels 1 through 16 (max) */
         uint8_t nchan = MIN(NUM_SERVO_CHANNELS, SBUS_CHANNELS);
         for (unsigned i = 0; i < nchan; ++i) {
@@ -117,17 +121,18 @@ AP_SBusOut::update()
                 value = 0x07ff;
             }
 
-#if SBUS_DEBUG
+#if SBUS_DEBUG==1
+            // announce changes in channel 9
             static uint16_t lastch9 = 0;
             if ((i==8) && (pwmval != lastch9)) {
                 lastch9 = pwmval;
                 hal.console->printf("channel 9 pwm: %04d\n", pwmval);
             }
-#if SBUS_DEBUG==2
-            static uint16_t pwmcntr = 0;
-            value = pwmcntr;
-            pwmcntr+=5;
 #endif
+#if SBUS_DEBUG==2
+            // inject sawtooth signal on all 16 channels
+            // generate 3 unique sawtooths, offset in time and amplitude by 512=2048/4 frames
+            value = (framecntr + (i%3)*512) & 0x7FF;
 #endif
 
             while (offset >= 8) {
@@ -141,6 +146,12 @@ AP_SBusOut::update()
             offset += 11;
         }
 
+#if SBUS_DEBUG==2
+            framecntr+=32;
+            if (framecntr >= 2048) {
+                framecntr = 0;
+            }
+#endif
 #if SBUS_DEBUG
         hal.gpio->pinMode(55, HAL_GPIO_OUTPUT);
         hal.gpio->write(55, 1);
