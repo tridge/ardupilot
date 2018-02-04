@@ -1267,7 +1267,10 @@ void GCS::send_mission_item_reached_message(uint16_t mission_index)
 
 void GCS::setup_uarts(AP_SerialManager &serial_manager)
 {
-    for (uint8_t i = 1; i < MAVLINK_COMM_NUM_BUFFERS; i++) {
+#ifndef GCS_SETUP_UART_FIRST
+#define GCS_SETUP_UART_FIRST 1
+#endif
+    for (uint8_t i = GCS_SETUP_UART_FIRST; i < MAVLINK_COMM_NUM_BUFFERS; i++) {
         chan(i).setup_uart(serial_manager, AP_SerialManager::SerialProtocol_MAVLink, i);
     }
 }
