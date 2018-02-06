@@ -508,6 +508,9 @@ void AP_Baro::init(void)
         ADD_BACKEND(AP_Baro_ICM20789::probe(*this,
                                             std::move(hal.i2c_mgr->get_device(HAL_BARO_20789_I2C_BUS, HAL_BARO_20789_I2C_ADDR_PRESS)),
                                             std::move(hal.spi->get_device("icm20789"))));
+#elif HAL_BARO_DEFAULT == HAL_BARO_LPS22H_SPI
+	ADD_BACKEND(AP_Baro_LPS2XH::probe(*this,
+                                      std::move(hal.spi->get_device(HAL_BARO_LPS22H_NAME))));
 #endif
 
     // can optionally have baro on I2C too

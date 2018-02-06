@@ -105,6 +105,7 @@
 #define HAL_BARO_LPS25H     13
 #define HAL_BARO_20789_I2C_I2C  14
 #define HAL_BARO_20789_I2C_SPI  15
+#define HAL_BARO_LPS22H_SPI	16
 
 /* Compass driver types */
 #define HAL_COMPASS_HMC5843             1
