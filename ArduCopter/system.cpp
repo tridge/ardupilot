@@ -50,7 +50,7 @@ void Copter::init_ardupilot()
 
     // time per loop - this gets updated in the main loop() based on
     // actual loop rate
-    G_Dt = 1.0/400;
+    G_Dt = 1.0 / scheduler.get_loop_rate_hz();
 
     // initialise stats module
     g2.stats.init();
@@ -610,7 +610,7 @@ void Copter::allocate_motors(void)
     AP_Param::load_object_from_eeprom(wp_nav, wp_nav->var_info);
 
     circle_nav = new AC_Circle(inertial_nav, *ahrs_view, *pos_control);
-    if (wp_nav == nullptr) {
+    if (circle_nav == nullptr) {
         AP_HAL::panic("Unable to allocate CircleNav");
     }
     AP_Param::load_object_from_eeprom(circle_nav, circle_nav->var_info);
