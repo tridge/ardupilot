@@ -445,14 +445,14 @@ class revo_mini(chibios):
         )
         env.CHIBIOS_FATFS_FLAG = 'USE_FATFS=no'
 
-class FishDrone(chibios):
-    name = 'FishDrone'
+class fishdrone(chibios):
+    name = 'fishdrone'
     def __init__(self):
-        super(FishDrone, self).__init__()
+        super(fishdrone, self).__init__()
         self.with_uavcan = True
 
     def configure_env(self, cfg, env):
-        super(FishDrone, self).configure_env(cfg, env)
+        super(fishdrone, self).configure_env(cfg, env)
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_CHIBIOS_FISHDRONE',
         )
