@@ -147,7 +147,7 @@ private:
     ParametersG2 g2;
 
     // main loop scheduler
-    AP_Scheduler scheduler;
+    AP_Scheduler scheduler{FUNCTOR_BIND_MEMBER(&Sub::fast_loop, void)};
 
     // AP_Notify instance
     AP_Notify notify;
@@ -347,9 +347,6 @@ private:
     // Flag indicating if we are currently using input hold
     bool input_hold_engaged;
 
-    // loop performance monitoring:
-    AP::PerfInfo perf_info;
-
     // 3D Location vectors
     // Current location of the Sub (altitude is relative to home)
     Location_Class current_loc;
@@ -397,16 +394,6 @@ private:
 
     AC_WPNav wp_nav;
     AC_Circle circle_nav;
-
-    // Performance monitoring
-    int16_t pmTest1;
-
-    // System Timers
-    // --------------
-    // Time in microseconds of main control loop
-    uint32_t fast_loopTimer;
-    // Counter of main loop executions.  Used for performance monitoring and failsafe processing
-    uint16_t mainLoop_count;
 
     // Reference to the relay object
     AP_Relay relay;
@@ -461,7 +448,6 @@ private:
 
     void compass_accumulate(void);
     void compass_cal_update(void);
-    void perf_update(void);
     void fast_loop();
     void fifty_hz_loop();
     void update_batt_compass(void);

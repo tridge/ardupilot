@@ -445,6 +445,27 @@ class revo_mini(chibios):
         )
         env.CHIBIOS_FATFS_FLAG = 'USE_FATFS=no'
 
+class FishDrone(chibios):
+    name = 'FishDrone'
+    def __init__(self):
+        super(FishDrone, self).__init__()
+        self.with_uavcan = True
+
+    def configure_env(self, cfg, env):
+        super(FishDrone, self).configure_env(cfg, env)
+        env.DEFINES.update(
+            CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_CHIBIOS_FISHDRONE',
+        )
+
+class crazyflie2(chibios):
+    name = 'crazyflie2'
+    def configure_env(self, cfg, env):
+        super(crazyflie2, self).configure_env(cfg, env)
+        env.DEFINES.update(
+            CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_CHIBIOS_CRAZYFLIE2',
+        )
+        env.CHIBIOS_FATFS_FLAG = 'USE_FATFS=no'
+
 class mini_pix(chibios):
     name = 'mini-pix'
     def configure_env(self, cfg, env):
@@ -452,7 +473,6 @@ class mini_pix(chibios):
         env.DEFINES.update(
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_CHIBIOS_MINIPIX',
         )
-        env.CHIBIOS_FATFS_FLAG = 'USE_FATFS=no'
 
 class linux(Board):
     def configure_env(self, cfg, env):
@@ -535,6 +555,9 @@ class navio2(linux):
 
 class edge(linux):
     toolchain = 'arm-linux-gnueabihf'
+
+    def __init__(self):
+        self.with_uavcan = True
 
     def configure_env(self, cfg, env):
         super(edge, self).configure_env(cfg, env)

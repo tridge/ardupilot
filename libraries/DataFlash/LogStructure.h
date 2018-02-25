@@ -92,6 +92,7 @@ const struct UnitStructure log_Units[] = {
     // { 'N', "N" },          // Newton
     { 'o', "m/s/s" },         // metres per second per second
     { 'O', "degC" },          // degrees Celsius. Not SI, but Kelvin is too cumbersome for most users
+    { '%', "%" },             // percent
     { 'S', "satellites" },    // number of satellites
     { 's', "s" },             // seconds
     { 'q', "rpm" },           // rounds per minute. Not SI, but sometimes more intuitive than Hertz
@@ -1010,6 +1011,17 @@ struct PACKED log_Proximity {
     float closest_dist;
 };
 
+struct PACKED log_Performance {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint16_t num_long_running;
+    uint16_t num_loops;
+    uint32_t max_time;
+    uint16_t ins_error_count;
+    uint32_t mem_avail;
+    uint16_t load;
+};
+
 struct PACKED log_SRTL {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -1222,6 +1234,8 @@ Format characters in the format string for binary log messages
       "BCN", "QBBfffffff",  "TimeUS,Health,Cnt,D0,D1,D2,D3,PosX,PosY,PosZ", "s--mmmmmmm", "F--BBBBBBB" }, \
     { LOG_PROXIMITY_MSG, sizeof(log_Proximity), \
       "PRX", "QBfffffffffff", "TimeUS,Health,D0,D45,D90,D135,D180,D225,D270,D315,DUp,CAn,CDis", "s-mmmmmmmmmhm", "F-BBBBBBBBB00" }, \
+    { LOG_PERFORMANCE_MSG, sizeof(log_Performance),                     \
+      "PM",  "QHHIHIH", "TimeUS,NLon,NLoop,MaxT,INSErr,Mem,Load", "s----b%", "F----0A" }, \
     { LOG_SRTL_MSG, sizeof(log_SRTL), \
       "SRTL", "QBHHBfff", "TimeUS,Active,NumPts,MaxPts,Action,N,E,D", "s----mmm", "F----000" }
 
@@ -1530,8 +1544,11 @@ enum LogMessages {
     LOG_ISBH_MSG,
     LOG_ISBD_MSG,
     LOG_ASP2_MSG,
-
+    LOG_PERFORMANCE_MSG,
+    _LOG_LAST_MSG_
 };
+
+static_assert(_LOG_LAST_MSG_ <= 255, "Too many message formats");
 
 enum LogOriginType {
     ekf_origin = 0,

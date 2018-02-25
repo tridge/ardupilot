@@ -137,7 +137,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(twentyfive_hz_logging, 25,    110),
     SCHED_TASK_CLASS(DataFlash_Class,      &copter.DataFlash,           periodic_tasks, 400, 300),
     SCHED_TASK_CLASS(AP_InertialSensor,    &copter.ins,                 periodic,       400,  50),
-    SCHED_TASK(perf_update,           0.1,    75),
+    SCHED_TASK_CLASS(AP_Scheduler,         &copter.scheduler,           update_logging, 0.1,  75),
     SCHED_TASK(read_receiver_rssi,    10,     75),
     SCHED_TASK(rpm_update,            10,    200),
     SCHED_TASK(compass_cal_update,   100,    100),
@@ -187,62 +187,13 @@ void Copter::setup()
     init_ardupilot();
 
     // initialise the main loop scheduler
-    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks));
-
-    // setup initial performance counters
-    perf_info.reset(scheduler.get_loop_rate_hz());
-    fast_loopTimer = AP_HAL::micros();
-}
-
-void Copter::perf_update(void)
-{
-    if (should_log(MASK_LOG_PM))
-        Log_Write_Performance();
-    if (scheduler.debug()) {
-        gcs().send_text(MAV_SEVERITY_WARNING, "PERF: %u/%u max=%lu min=%lu avg=%lu sd=%lu",
-                          (unsigned)perf_info.get_num_long_running(),
-                          (unsigned)perf_info.get_num_loops(),
-                          (unsigned long)perf_info.get_max_time(),
-                          (unsigned long)perf_info.get_min_time(),
-                          (unsigned long)perf_info.get_avg_time(),
-                          (unsigned long)perf_info.get_stddev_time());
-    }
-    perf_info.reset(scheduler.get_loop_rate_hz());
-    pmTest1 = 0;
+    scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);
 }
 
 void Copter::loop()
 {
-    // wait for an INS sample
-    ins.wait_for_sample();
-
-    uint32_t timer = micros();
-
-    // check loop time
-    perf_info.check_loop_time(timer - fast_loopTimer);
-
-    // used by PI Loops
-    G_Dt                    = (float)(timer - fast_loopTimer) / 1000000.0f;
-    fast_loopTimer          = timer;
-
-    // for mainloop failure monitoring
-    mainLoop_count++;
-
-    // Execute the fast loop
-    // ---------------------
-    fast_loop();
-
-    // tell the scheduler one tick has passed
-    scheduler.tick();
-
-    // run all the tasks that are due to run. Note that we only
-    // have to call this once per loop, as the tasks are scheduled
-    // in multiples of the main loop tick. So if they don't run on
-    // the first call to the scheduler they won't run on a later
-    // call until scheduler.tick() is called again
-    const uint32_t loop_us = scheduler.get_loop_period_us();
-    const uint32_t time_available = (timer + loop_us) - micros();
-    scheduler.run(time_available > loop_us ? 0u : time_available);
+    scheduler.loop();
+    G_Dt = scheduler.get_last_loop_time_s();
 }
 
 
@@ -471,7 +422,9 @@ void Copter::one_hz_loop()
     // log terrain data
     terrain_logging();
 
+#if ADSB_ENABLED == ENABLED
     adsb.set_is_flying(!ap.land_complete);
+#endif
 
     // update error mask of sensors and subsystems. The mask uses the
     // MAV_SYS_STATUS_* values from mavlink. If a bit is set then it

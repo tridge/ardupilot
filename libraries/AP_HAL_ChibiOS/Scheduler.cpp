@@ -96,12 +96,24 @@ void Scheduler::init()
                      this);                  /* Thread parameter.      */
 }
 
+
 void Scheduler::delay_microseconds(uint16_t usec)
 {
     if (usec == 0) { //chibios faults with 0us sleep
         return;
     }
-    chThdSleepMicroseconds(usec); //Suspends Thread for desired microseconds
+    uint32_t ticks;
+    if (usec >= 4096) {
+        // we need to use 64 bit calculations for tick conversions
+        ticks = US2ST64(usec);
+    } else {
+        ticks = US2ST(usec);
+    }
+    if (ticks == 0) {
+        // calling with ticks == 0 causes a hard fault on ChibiOS
+        ticks = 1;
+    }
+    chThdSleep(ticks); //Suspends Thread for desired microseconds
 }
 
 /*
@@ -132,10 +144,22 @@ static void set_normal_priority()
  */
 void Scheduler::delay_microseconds_boost(uint16_t usec)
 {
-    delay_microseconds(usec); //Suspends Thread for desired microseconds
     set_high_priority();
-    delay_microseconds(APM_MAIN_PRIORITY_BOOST_USEC);
+    delay_microseconds(usec); //Suspends Thread for desired microseconds
     set_normal_priority();
+    _called_boost = true;
+}
+
+/*
+  return true if delay_microseconds_boost() has been called since last check
+ */
+bool Scheduler::check_called_boost(void)
+{
+    if (!_called_boost) {
+        return false;
+    }
+    _called_boost = false;
+    return true;
 }
 
 void Scheduler::delay(uint16_t ms)

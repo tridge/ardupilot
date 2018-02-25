@@ -220,6 +220,20 @@ void AP_Notify::add_backends(void)
     ADD_BACKEND(new ToneAlarm_Linux());
   #endif
 
+#elif CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
+# ifdef HAL_HAVE_PIXRACER_LED
+    ADD_BACKEND(new PixRacerLED());
+# else
+    ADD_BACKEND(new AP_BoardLED());
+# endif
+    ADD_BACKEND(new ToshibaLED_I2C(TOSHIBA_LED_I2C_BUS_EXTERNAL));
+    ADD_BACKEND(new ToshibaLED_I2C(TOSHIBA_LED_I2C_BUS_INTERNAL));
+    ADD_BACKEND(new Display());
+#elif CONFIG_HAL_BOARD == HAL_BOARD_F4LIGHT
+    ADD_BACKEND(new ToshibaLED_I2C(TOSHIBA_LED_I2C_BUS_EXTERNAL));
+    ADD_BACKEND(new Display());
+    ADD_BACKEND(new Buzzer());
+//    ADD_BACKEND(new AP_BoardLED2()); // needs AP_BoardLED2 in master
 #else
     ADD_BACKEND(new AP_BoardLED());
     ADD_BACKEND(new ToshibaLED_I2C(TOSHIBA_LED_I2C_BUS_EXTERNAL));

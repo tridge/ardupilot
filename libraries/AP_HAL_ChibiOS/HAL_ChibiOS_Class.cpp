@@ -145,10 +145,16 @@ static THD_FUNCTION(main_loop,arg)
         g_callbacks->loop();
 
         /*
-          give up 250 microseconds of time, to ensure drivers get a
-          chance to run.
+          give up 250 microseconds of time if the INS loop hasn't
+          called delay_microseconds_boost(), to ensure low priority
+          drivers get a chance to run. Calling
+          delay_microseconds_boost() means we have already given up
+          time from the main loop, so we don't need to do it again
+          here
          */
-        hal.scheduler->delay_microseconds(250);
+        if (!schedulerInstance.check_called_boost()) {
+            hal.scheduler->delay_microseconds(250);
+        }
     }
     thread_running = false;
 }
@@ -162,7 +168,6 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
      * - Kernel initialization, the main() function becomes a thread and the
      *   RTOS is active.
      */
-    hrt_init();
     //STDOUT Initialistion
     SerialConfig stdoutcfg =
     {

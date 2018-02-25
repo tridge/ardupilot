@@ -330,20 +330,6 @@ private:
     // This is the time between calls to the DCM algorithm and is the Integration time for the gyros.
     float G_Dt;
 
-    // Performance monitoring
-    // Timer used to accrue data and trigger recording of the performance monitoring log message
-    int32_t perf_mon_timer;
-    // The maximum main loop execution time, in microseconds, recorded in the current performance monitoring interval
-    uint32_t G_Dt_max;
-
-    // System Timers
-    // Time in microseconds of start of main control loop.
-    uint32_t fast_loopTimer_us;
-    // Number of milliseconds used in last main loop cycle
-    uint32_t delta_us_fast_loop;
-    // Counter of main loop executions.  Used for performance monitoring and failsafe processing
-    uint16_t mainLoop_count;
-
     // set if we are driving backwards
     bool in_reverse;
 
@@ -560,7 +546,6 @@ private:
     bool set_mode(Mode &new_mode, mode_reason_t reason);
     bool mavlink_set_mode(uint8_t mode);
     void startup_INS_ground(void);
-    void resetPerfData(void);
     void check_usb_mux(void);
     void print_mode(AP_HAL::BetterStream *port, uint8_t mode);
     void notify_mode(const Mode *new_mode);
