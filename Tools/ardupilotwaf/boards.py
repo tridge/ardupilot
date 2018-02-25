@@ -445,6 +445,18 @@ class revo_mini(chibios):
         )
         env.CHIBIOS_FATFS_FLAG = 'USE_FATFS=no'
 
+class LinJ(chibios):
+    name = 'LinJ'
+    def __init__(self):
+        super(LinJ, self).__init__()
+        self.with_uavcan = True
+
+    def configure_env(self, cfg, env):
+        super(LinJ, self).configure_env(cfg, env)
+        env.DEFINES.update(
+            CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_CHIBIOS_LINJ',
+        )
+
 class crazyflie2(chibios):
     name = 'crazyflie2'
     def configure_env(self, cfg, env):
