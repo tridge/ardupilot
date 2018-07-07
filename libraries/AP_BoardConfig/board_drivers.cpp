@@ -264,6 +264,9 @@ void AP_BoardConfig::board_autodetect(void)
 #elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V54)
     state.board_type.set_and_notify(VRX_BOARD_BRAIN54);
     hal.console->printf("Detected VR Brain 5.4\n");
+#elif defined(HAL_CHIBIOS_KAKUTEF7)
+    state.board_type.set_and_notify(HAL_CHIBIOS_KAKUTEF7);
+    hal.console->printf("Detected KAKUTEF7\n");
 #endif
 
 }
