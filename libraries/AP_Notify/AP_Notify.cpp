@@ -120,9 +120,9 @@ const AP_Param::GroupInfo AP_Notify::var_info[] = {
 
 
     // @Param: LED_OVERRIDE
-    // @DisplayName: Setup for MAVLink LED override
-    // @Description: This sets up the board RGB LED for override by MAVLink. Normal notify LED control is disabled
-    // @Values: 0:Disable,1:Enable
+    // @DisplayName: Specifies colour source for the RGBLed
+    // @Description: Specifies the source for the colours and brightness for the LED
+    // @Values: 0:Standard,1:MAVLink,2:OutbackChallenge
     // @User: Advanced
     AP_GROUPINFO("LED_OVERRIDE", 2, AP_Notify, _rgb_led_override, 0),
 
