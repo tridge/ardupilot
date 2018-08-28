@@ -441,6 +441,7 @@ template float Vector2<float>::closest_distance_between_radial_and_point_squared
 template float Vector2<float>::closest_distance_between_radial_and_point(const Vector2<float> &w, const Vector2<float> &p);
 template float Vector2<float>::closest_distance_between_lines_squared(const Vector2<float> &a1,const Vector2<float> &a2,const Vector2<float> &b1,const Vector2<float> &b2);
 
+template Vector2<float> Vector2<float>::perpendicular(const Vector2<float> &pos_delta, const Vector2<float> &v1);
 
 template bool Vector2<long>::operator ==(const Vector2<long> &v) const;
 
