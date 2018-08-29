@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cmath>
+#include <ostream>
 
 template <typename T>
 struct Vector2
@@ -57,6 +58,11 @@ struct Vector2
 
     // test for inequality
     bool operator !=(const Vector2<T> &v) const;
+
+    // method for gtest to pretty-print a vector:
+    friend void PrintTo(const Vector2<T> &v, std::ostream *os) {
+        *os << "(" << v.x << "," << v.y << ")";
+    }
 
     // negation
     Vector2<T> operator -(void) const;
