@@ -119,27 +119,36 @@ bool AP_InertialSensor_IMUF::wait_ready(uint32_t timeout_ms)
 
 bool AP_InertialSensor_IMUF::init()
 {
+    for (uint8_t i=0; i<100; i++) {
+        printf("waiting %u\n", i);
+        hal.scheduler->delay(100);
+    }
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
     rccEnableCRC(FALSE);
 
-    hal.scheduler->delay(3000);
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
 
     // reset IMUF
     hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
     hal.scheduler->delay(550);
-    
+
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
+
     // set reset high to start IMUF
     hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
     hal.scheduler->delay(1000);
 
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
+
     if (!wait_ready(2000)) {
         printf("IMUF not ready\n");
-        return false;
     }
 
     printf("IMUF sending setup\n");
     dev->get_semaphore()->take_blocking();
     struct IMUFCommand cmd {}, reply {};
 
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
     cmd.command = IMUF_COMMAND_SETUP;
     cmd.param[0] = 32; // gyro+accel+temp+crc
     cmd.param[1] = (6<<16) | 300; // 1kHz, 300 window
@@ -153,8 +162,10 @@ bool AP_InertialSensor_IMUF::init()
     cmd.param[9] = 0; // unknown
     cmd.crc = crc_block((const uint32_t *)&cmd, 11);
 
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
     bool ret = false;
     while (true) {
+        printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
         cmd.command = IMUF_COMMAND_SETUP;
         cmd.crc = crc_block((const uint32_t *)&cmd, 11);
 
@@ -187,7 +198,12 @@ bool AP_InertialSensor_IMUF::init()
         printf("reply2: cmd=%u 0x%08x 0x%08x\n", reply.command, reply.crc, crc2);
         if (crc2 == reply.crc && reply.command == IMUF_COMMAND_SETUP) {
             printf("setup OK\n");
-            break;
+            while (true) {
+                palToggleLine(HAL_GPIO_PIN_LED0);
+                hal.scheduler->delay(50);
+                palToggleLine(HAL_GPIO_PIN_LED0);
+                read_sensor();
+            }
         }
         ret = false;
         hal.scheduler->delay(100);
@@ -216,6 +232,7 @@ void AP_InertialSensor_IMUF::read_sensor(void)
         printf("crc2 0x%08x crc 0x%08x\n", crc2, data.crc);
         return;
     }
+    printf("IMUF accel %.2f %.2f %.2f\n", data.accel[0], data.accel[1], data.accel[2]);
     Vector3f gyro(data.gyro[0], data.gyro[1], data.gyro[2]);
     _rotate_and_correct_gyro(gyro_instance, gyro);
     _notify_new_gyro_raw_sample(gyro_instance, gyro);
