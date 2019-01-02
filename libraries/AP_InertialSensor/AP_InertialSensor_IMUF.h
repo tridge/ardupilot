@@ -45,6 +45,7 @@ private:
      */
     bool init();
     void read_sensor();
+    bool wait_ready(uint32_t timeout_ms);
 
     AP_HAL::OwnPtr<AP_HAL::Device> dev;
 

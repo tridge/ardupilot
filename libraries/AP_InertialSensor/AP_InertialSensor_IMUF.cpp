@@ -21,13 +21,19 @@
 #include <utility>
 
 
-
+#define IMUF_BL_ERASE_ALL         22
+#define IMUF_BL_REPORT_INFO       24
+#define IMUF_BL_WRITE_FIRMWARE    29
+#define IMUF_BL_PREPARE_PROGRAM   30
+#define IMUF_BL_END_PROGRAM       31
+#define IMUF_BL_LISTENING         32
 #define IMUF_COMMAND_NONE          0
 #define IMUF_COMMAND_CALIBRATE    99
 #define IMUF_COMMAND_LISTENING   108
 #define IMUF_COMMAND_REPORT_INFO 121
 #define IMUF_COMMAND_SETUP       122
 #define IMUF_COMMAND_SETPOINT    126
+#define IMUF_COMMAND_RESTART     127
 
 extern const AP_HAL::HAL& hal;
 
@@ -98,13 +104,24 @@ struct PACKED IMUFCommand {
    uint32_t tail;
 };
 
+bool AP_InertialSensor_IMUF::wait_ready(uint32_t timeout_ms)
+{
+    hal.scheduler->delay_microseconds(100);
+    uint32_t start_ms = AP_HAL::millis();
+    while (AP_HAL::millis() - start_ms < timeout_ms) {
+        if (hal.gpio->read(HAL_IMUF_READY_PIN)) {
+            return true;
+        }
+        hal.scheduler->delay_microseconds(100);
+    }
+    return hal.gpio->read(HAL_IMUF_READY_PIN) == 1;
+}
+
 bool AP_InertialSensor_IMUF::init()
 {
     rccEnableCRC(FALSE);
 
-    uint8_t xx[4] = { 50, 10, 243, 147 };
-
-    printf("xx_crc=0x%08x\n", crc_block((const uint32_t *)xx, 1));
+    hal.scheduler->delay(3000);
 
     // reset IMUF
     hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
@@ -114,15 +131,8 @@ bool AP_InertialSensor_IMUF::init()
     hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
     hal.scheduler->delay(1000);
 
-    uint32_t start_ms = AP_HAL::millis();
-    while (AP_HAL::millis() - start_ms < 2000) {
-        if (hal.gpio->read(HAL_IMUF_READY_PIN)) {
-            break;
-        }
-    }
-    if (!hal.gpio->read(HAL_IMUF_READY_PIN)) {
+    if (!wait_ready(2000)) {
         printf("IMUF not ready\n");
-        dev->get_semaphore()->give();
         return false;
     }
 
@@ -143,20 +153,35 @@ bool AP_InertialSensor_IMUF::init()
     cmd.param[9] = 0; // unknown
     cmd.crc = crc_block((const uint32_t *)&cmd, 11);
 
-    const uint16_t tries = 100;
     bool ret = false;
-    for (uint16_t i=0; i<tries; i++) {
+    while (true) {
+        cmd.command = IMUF_COMMAND_SETUP;
+        cmd.crc = crc_block((const uint32_t *)&cmd, 11);
+
         ret = dev->transfer((const uint8_t *)&cmd, sizeof(cmd), (uint8_t *)&reply, sizeof(reply));
         if (!ret) {
             break;
         }
         uint32_t crc2 = crc_block((const uint32_t *)&reply, 11);
-        printf("crcs: 0x%08x 0x%08x\n", reply.crc, crc2);
-        if (reply.crc == crc2) {
+        printf("reply: cmd=%u 0x%08x 0x%08x\n", reply.command, reply.crc, crc2);
+        if (!wait_ready(1000)) {
+            printf("not ready\n");
+            break;
+        }
+        cmd.command = IMUF_COMMAND_NONE;
+        cmd.crc = crc_block((const uint32_t *)&cmd, 11);
+        ret = dev->transfer((const uint8_t *)&cmd, sizeof(cmd), (uint8_t *)&reply, sizeof(reply));
+        if (!ret) {
+            break;
+        }
+        crc2 = crc_block((const uint32_t *)&reply, 11);
+        printf("reply2: cmd=%u 0x%08x 0x%08x\n", reply.command, reply.crc, crc2);
+        if (crc2 == reply.crc && reply.command == IMUF_COMMAND_SETUP) {
+            printf("setup OK\n");
             break;
         }
         ret = false;
-        hal.scheduler->delay(10);
+        hal.scheduler->delay(100);
     }
     dev->get_semaphore()->give();
     printf("IMUF init done: %u 0x%08x 0x%x 0x%x\n", ret, cmd.crc, reply.command, reply.crc);
