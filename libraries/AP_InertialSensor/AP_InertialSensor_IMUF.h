@@ -44,6 +44,7 @@ private:
       initialise driver
      */
     bool init();
+    bool imuf_send_receive(uint32_t imufCommand);
     void read_sensor();
     bool wait_ready(uint32_t timeout_ms);
 
