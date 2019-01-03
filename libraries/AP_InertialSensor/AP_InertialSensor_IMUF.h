@@ -47,8 +47,9 @@ private:
     bool imuf_send_receive(uint32_t imufCommand);
     void read_sensor();
     bool wait_ready(uint32_t timeout_ms);
+    void reset();
 
-    AP_HAL::OwnPtr<AP_HAL::Device> dev;
+    AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev;
 
     uint8_t accel_instance;
     uint8_t gyro_instance;
