@@ -97,6 +97,35 @@ static uint32_t crc_block(const uint32_t *data, uint8_t len)
     return CRC->DR;
 }
 
+
+static void imuf_reset(bool bootloaderMode)
+{
+    printf("RESET!\n");
+
+    hal.gpio->pinMode(HAL_IMUF_RESET_PIN, 1);
+
+    if(bootloaderMode) {
+        hal.gpio->pinMode(HAL_IMUF_READY_PIN, 1);
+        hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
+    }
+
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
+
+    for(uint32_t x = 0; x<40; x++) {
+        palToggleLine(HAL_GPIO_PIN_LED0);
+        hal.scheduler->delay(20);
+    }
+    palClearLine(HAL_GPIO_PIN_LED0);
+    
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
+    printf("RESET COMPLETE!\n");
+    if(bootloaderMode) {
+        hal.gpio->write(HAL_IMUF_READY_PIN, 0);
+        hal.gpio->pinMode(HAL_IMUF_READY_PIN, 0);
+    }
+}
+
+
 struct PACKED IMUFCommand {
    uint32_t command;
    uint32_t param[10];
@@ -117,29 +146,112 @@ bool AP_InertialSensor_IMUF::wait_ready(uint32_t timeout_ms)
     return hal.gpio->read(HAL_IMUF_READY_PIN) == 1;
 }
 
+bool AP_InertialSensor_IMUF::imuf_send_receive(uint32_t imufCommand)
+{
+    struct IMUFCommand cmd {}, reply {};
+
+    printf("IMUF sending setup\n");
+
+    printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
+    cmd.command = imufCommand;
+    cmd.param[0] = 0;
+    cmd.param[1] = 0;
+    cmd.param[2] = 0;
+    cmd.param[3] = 0;
+    cmd.param[4] = 0;
+    cmd.param[5] = 0;
+    cmd.param[6] = 0;
+    cmd.param[7] = 0;
+    cmd.param[8] = 0;
+    cmd.param[9] = 0;
+    cmd.crc = crc_block((const uint32_t *)&cmd, 11);
+
+    hal.gpio->pinMode(HAL_IMUF_READY_PIN, 0);
+    if (!wait_ready(1000)) {
+        printf("not ready\n");
+        hal.scheduler->delay(500);
+        return false;
+    }
+
+    dev->set_chip_select(true);
+    bool ret = dev->transfer((const uint8_t *)&cmd, sizeof(cmd), (uint8_t *)&reply, sizeof(reply));
+    dev->set_chip_select(false);
+    if (!ret) {
+        printf("transfer failed\n");
+        hal.scheduler->delay(500);
+        return false;
+    }
+    uint32_t crc2 = crc_block((const uint32_t *)&reply, 11);
+    printf("reply: cmd=%u cmdr=%u crc=0x%08x crc2=0x%08x crcr=0x%08x\n", cmd.command, reply.command, cmd.crc, crc2, reply.crc);
+    return true;
+
+}
+
 bool AP_InertialSensor_IMUF::init()
 {
-    for (uint8_t i=0; i<100; i++) {
+    for (uint8_t i=0; i<40; i++) {
         printf("waiting %u\n", i);
         hal.scheduler->delay(100);
     }
+
     printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
     rccEnableCRC(FALSE);
 
     printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
 
+    dev->get_semaphore()->take_blocking();
+    for (uint8_t attempt = 0; attempt < 40; attempt++)
+    {
+        //rest IMU-f to known state
+        if (attempt)
+        {
+            imuf_reset(false);
+            hal.scheduler->delay(300 * attempt);
+        }
+
+        if (imuf_send_receive(IMUF_COMMAND_REPORT_INFO))
+        {
+            printf("WOOHOO!\n");
+        }
+        else
+        {
+             printf(":(\n");
+        }
+    }
+
     // reset IMUF
+    hal.gpio->pinMode(HAL_IMUF_RESET_PIN, 1);
+    hal.gpio->pinMode(HAL_IMUF_READY_PIN, 1);
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
+
+
+    hal.scheduler->delay(550);
+
     hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
     hal.scheduler->delay(550);
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
+    hal.scheduler->delay(550);
+
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
+    hal.scheduler->delay(550);
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
+    hal.scheduler->delay(550);
+
+    hal.gpio->pinMode(HAL_IMUF_RESET_PIN, 1);
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
+    hal.scheduler->delay(550);
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
+    hal.scheduler->delay(550);
+    hal.gpio->write(HAL_IMUF_RESET_PIN, 0);
 
     printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
 
     // set reset high to start IMUF
-    hal.gpio->write(HAL_IMUF_RESET_PIN, 1);
     hal.scheduler->delay(1000);
 
     printf("%s(%u)\n", __FILE__, __LINE__); hal.scheduler->delay(500);
 
+    hal.gpio->pinMode(HAL_IMUF_READY_PIN, 0);
     if (!wait_ready(2000)) {
         printf("IMUF not ready\n");
     }
@@ -173,14 +285,16 @@ bool AP_InertialSensor_IMUF::init()
         hal.scheduler->delay(50);
         palToggleLine(HAL_GPIO_PIN_LED0);
 
+        dev->set_chip_select(true);
         ret = dev->transfer((const uint8_t *)&cmd, sizeof(cmd), (uint8_t *)&reply, sizeof(reply));
+        dev->set_chip_select(false);
         if (!ret) {
             printf("transfer failed\n");
             hal.scheduler->delay(500);
             continue;
         }
         uint32_t crc2 = crc_block((const uint32_t *)&reply, 11);
-        printf("reply: cmd=%u 0x%08x 0x%08x\n", reply.command, reply.crc, crc2);
+        printf("reply: cmd=%u cmdr=%u crc=0x%08x crc2=0x%08x crcr=0x%08x\n", cmd.command, reply.command, cmd.crc, crc2, reply.crc);
         if (!wait_ready(1000)) {
             printf("not ready\n");
             hal.scheduler->delay(500);
@@ -188,7 +302,9 @@ bool AP_InertialSensor_IMUF::init()
         }
         cmd.command = IMUF_COMMAND_NONE;
         cmd.crc = crc_block((const uint32_t *)&cmd, 11);
+        dev->set_chip_select(true);
         ret = dev->transfer((const uint8_t *)&cmd, sizeof(cmd), (uint8_t *)&reply, sizeof(reply));
+        dev->set_chip_select(false);
         if (!ret) {
             printf("transfer failed\n");
             hal.scheduler->delay(500);
@@ -224,9 +340,12 @@ void AP_InertialSensor_IMUF::read_sensor(void)
         float temp;
         uint32_t crc;
     } data;
+    dev->set_chip_select(true);
     if (!dev->transfer(nullptr, 0, (uint8_t *)&data, sizeof(data))) {
         return;
+        dev->set_chip_select(false);
     }
+    dev->set_chip_select(false);
     uint32_t crc2 = crc_block((uint32_t *)&data, 7);
     if (crc2 != data.crc) {
         printf("crc2 0x%08x crc 0x%08x\n", crc2, data.crc);
