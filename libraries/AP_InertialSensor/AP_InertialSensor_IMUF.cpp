@@ -405,13 +405,6 @@ void AP_InertialSensor_IMUF::read_sensor(void)
         return;
     }
 
-    uint32_t crc2 = crc_block((uint32_t *)&data, 7);
-    if (crc2 != data.crc) {
-        printf("read data crc2 0x%08x crc 0x%08x\n", crc2, data.crc);
-        return;
-    }
-    printf("IMUF accel %.2f %.2f %.2f\n", data.accel[0], data.accel[1], data.accel[2]);
-
     Vector3f gyro(data.gyro[0], data.gyro[1], data.gyro[2]);
     _rotate_and_correct_gyro(gyro_instance, gyro);
     _notify_new_gyro_raw_sample(gyro_instance, gyro);
