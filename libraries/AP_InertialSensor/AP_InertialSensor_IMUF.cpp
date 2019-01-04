@@ -306,15 +306,15 @@ bool AP_InertialSensor_IMUF::init()
         if (imuf_send_receive(&cmd, &reply)) //imuf_send_receive returns true is reply is valid
         {
             if(reply.param[1] > IMUF_FIRMWARE_MIN_VERSION) { //make sure version is compatible. 106 to current (110) is okay to use)
-                printf("IMU-f version is safe. Version %d Found!\n", reply.param[0]);
-                setup_contract(&cmd, reply.param[0]); //setup and start the IMU-f
+                printf("IMU-f version is safe. Version %d Found!\n", reply.param[1]);
+                setup_contract(&cmd, reply.param[1]); //setup and start the IMU-f
                 if (imuf_send_receive(&cmd, &reply))
                 {
                     dev->get_semaphore()->give();
                     return true;
                 }
             } else {
-                printf("IMU-f needs to be updated. Version %d Found!\n", reply.param[0]);
+                printf("IMU-f needs to be updated. Version %d Found!\n", reply.param[1]);
             }
         }
     }
