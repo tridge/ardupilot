@@ -40,14 +40,22 @@ private:
                            AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev,
                            enum Rotation rotation = ROTATION_NONE);
 
+    struct PACKED IMUFCommand {
+        uint32_t command;
+        uint32_t param[10];
+        uint32_t crc;
+        uint32_t tail;
+    };
     /*
       initialise driver
      */
     bool init();
-    bool imuf_send_receive(uint32_t imufCommand);
+    bool imuf_send_receive(IMUFCommand* cmd, IMUFCommand* reply);
     void read_sensor();
     bool wait_ready(uint32_t timeout_ms);
     void reset();
+    void setup_whoami_command(IMUFCommand* cmd);
+    void setup_contract(IMUFCommand* cmd, uint32_t imufVersion);
 
     AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev;
 
