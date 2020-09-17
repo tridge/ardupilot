@@ -105,6 +105,7 @@ void NavEKF2_core::setWindMagStateLearningMode()
     bool setMagInhibit = !magCalRequested || magCalDenied;
     if (!inhibitMagStates && setMagInhibit) {
         inhibitMagStates = true;
+        resetMagBodyVariances();
     } else if (inhibitMagStates && !setMagInhibit) {
         inhibitMagStates = false;
         if (magFieldLearned) {
