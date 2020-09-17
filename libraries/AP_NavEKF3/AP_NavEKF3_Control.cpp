@@ -114,6 +114,8 @@ void NavEKF3_core::setWindMagStateLearningMode()
     if (!inhibitMagStates && setMagInhibit) {
         inhibitMagStates = true;
         updateStateIndexLim();
+        // we need to learn variances from scratch
+        resetMagBodyVariances();
     } else if (inhibitMagStates && !setMagInhibit) {
         inhibitMagStates = false;
         updateStateIndexLim();

@@ -782,6 +782,9 @@ private:
     // check for new magnetometer data and update store measurements if available
     void readMagData();
 
+    // reset body mag variances
+    void resetMagBodyVariances(void);
+
     // try changing compasses on compass failure or timeout
     void tryChangeCompass(void);
 
@@ -1088,6 +1091,7 @@ private:
     float tasTestRatio;             // sum of squares of true airspeed innovation divided by fail threshold
     bool inhibitWindStates;         // true when wind states and covariances are to remain constant
     bool inhibitMagStates;          // true when magnetic field states are inactive
+    bool lastInhibitMagStates;      // previous inhibitMagStates
     bool inhibitDelVelBiasStates;   // true when IMU delta velocity bias states are inactive
     bool inhibitDelAngBiasStates;   // true when IMU delta angle bias states are inactive
     bool gpsNotAvailable;           // bool true when valid GPS data is not available

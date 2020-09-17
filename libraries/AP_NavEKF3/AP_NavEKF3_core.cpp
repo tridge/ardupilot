@@ -1022,12 +1022,15 @@ void NavEKF3_core::CovariancePrediction()
         }
     }
 
-    if (!inhibitMagStates) {
+    if (!inhibitMagStates && lastInhibitMagStates) {
+        resetMagBodyVariances();
+    } else if (!inhibitMagStates) {
         float magEarthVar = sq(dt * constrain_float(frontend->_magEarthProcessNoise, 0.0f, 1.0f));
         float magBodyVar  = sq(dt * constrain_float(frontend->_magBodyProcessNoise, 0.0f, 1.0f));
         for (uint8_t i=6; i<=8; i++) processNoiseVariance[i] = magEarthVar;
         for (uint8_t i=9; i<=11; i++) processNoiseVariance[i] = magBodyVar;
     }
+    lastInhibitMagStates = inhibitMagStates;
 
     if (!inhibitWindStates) {
         float windVelVar  = sq(dt * constrain_float(frontend->_windVelProcessNoise, 0.0f, 1.0f) * (1.0f + constrain_float(frontend->_wndVarHgtRateScale, 0.0f, 1.0f) * fabsf(hgtRate)));
@@ -1726,9 +1729,6 @@ void NavEKF3_core::resetMagFieldStates()
     P[19][19] = P[18][18];
     P[20][20] = P[18][18];
     P[21][21] = P[18][18];
-
-    // prevent reset of variances in ConstrainVariances()
-    inhibitMagStates = false;
 
     // record the fact we have initialised the magnetic field states
     recordMagReset();
