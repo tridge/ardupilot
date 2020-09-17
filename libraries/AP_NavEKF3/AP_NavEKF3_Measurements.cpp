@@ -248,6 +248,16 @@ void NavEKF3_core::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f
 *                      MAGNETOMETER                     *
 ********************************************************/
 
+// reset variances for mag body state
+void NavEKF3_core::resetMagBodyVariances(void)
+{
+    zeroCols(P,19,21);
+    zeroRows(P,19,21);
+    P[19][19] = sq(frontend->_magNoise);
+    P[20][20] = P[19][19];
+    P[21][21] = P[19][19];
+}
+
 // try changing compass, return true if a new compass is found
 void NavEKF3_core::tryChangeCompass(void)
 {
@@ -278,6 +288,9 @@ void NavEKF3_core::tryChangeCompass(void)
             magStateResetRequest = true;
             // declare the field unlearned so that the reset request will be obeyed
             magFieldLearned = false;
+
+            // reset body state variances
+            resetMagBodyVariances();
             return;
         }
     }
