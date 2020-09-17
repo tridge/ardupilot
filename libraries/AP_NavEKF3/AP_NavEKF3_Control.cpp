@@ -91,12 +91,6 @@ void NavEKF3_core::setWindMagStateLearningMode()
         manoeuvring = false;
     }
 
-    if (finalInflightYawInit && !finalInflightMagInit) {
-        // if we have done yaw init, and we're using a mag, then force
-        // mag init. This can happen with the 2nd flight
-        finalInflightMagInit = true;
-    }
-
     // Determine if learning of magnetic field states has been requested by the user
     bool magCalRequested =
         ((effectiveMagCal == MagCal::WHEN_FLYING) && inFlight) || // when flying
@@ -114,8 +108,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
     if (!inhibitMagStates && setMagInhibit) {
         inhibitMagStates = true;
         updateStateIndexLim();
-        // we need to learn variances from scratch
-        resetMagBodyVariances();
+        // variances will be reset in CovariancePrediction
     } else if (inhibitMagStates && !setMagInhibit) {
         inhibitMagStates = false;
         updateStateIndexLim();
@@ -172,6 +165,7 @@ void NavEKF3_core::setWindMagStateLearningMode()
     if (onGround) {
         finalInflightYawInit = false;
         finalInflightMagInit = false;
+        magFieldLearned = false;
     }
 
     updateStateIndexLim();
