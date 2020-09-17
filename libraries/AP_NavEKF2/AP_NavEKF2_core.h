@@ -661,6 +661,9 @@ private:
     // check for new magnetometer data and update store measurements if available
     void readMagData();
 
+    // reset body mag variances
+    void resetMagBodyVariances(void);
+
     // try changing compasses on compass failure or timeout
     void tryChangeCompass(void);
 
