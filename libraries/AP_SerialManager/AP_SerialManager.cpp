@@ -553,6 +553,7 @@ const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum
             }
             found_instance++;
         }
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Inside find_protocol_instance for loop");
     }
 
     // if we got this far we did not find the uart
@@ -566,6 +567,7 @@ AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, 
 {
     const struct UARTState *_state = find_protocol_instance(protocol, instance);
     if (_state == nullptr) {
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD UARTState is nullptr");
         return nullptr;
     }
     const uint8_t serial_idx = _state - &state[0];
@@ -701,6 +703,7 @@ uint32_t AP_SerialManager::map_baudrate(int32_t rate)
 // protocol_match - returns true if the protocols match
 bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum SerialProtocol protocol2) const
 {
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Inside protocol_match");
     // check for obvious match
     if (protocol1 == protocol2) {
         return true;
@@ -717,7 +720,7 @@ bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum Serial
         ((protocol2 == SerialProtocol_GPS) || (protocol2 == SerialProtocol_GPS2))) {
         return true;
     }
-
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Protocol match failed");
     return false;
 }
 
