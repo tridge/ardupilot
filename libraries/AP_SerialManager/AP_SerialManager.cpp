@@ -544,19 +544,15 @@ void AP_SerialManager::init()
 const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum SerialProtocol protocol, uint8_t instance) const
 {
     uint8_t found_instance = 0;
-    hal.console->printf("UART STATE FIND PROTOCOL INSTANCE: PROTOCOL: %d\n", protocol);
 
     // search for matching protocol
     for(uint8_t i=0; i<SERIALMANAGER_NUM_PORTS; i++) {
-        auto tmp = (enum SerialProtocol)state[i].protocol.get();
-        hal.console->printf("PROTOCOL2, %d", tmp);
         if (protocol_match(protocol, (enum SerialProtocol)state[i].protocol.get())) {
             if (found_instance == instance) {
                 return &state[i];
             }
             found_instance++;
         }
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Inside find_protocol_instance for loop");
     }
 
     // if we got this far we did not find the uart
@@ -570,7 +566,6 @@ AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, 
 {
     const struct UARTState *_state = find_protocol_instance(protocol, instance);
     if (_state == nullptr) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD UARTState is nullptr");
         return nullptr;
     }
     const uint8_t serial_idx = _state - &state[0];
