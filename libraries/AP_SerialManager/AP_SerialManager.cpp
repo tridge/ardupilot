@@ -544,9 +544,12 @@ void AP_SerialManager::init()
 const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum SerialProtocol protocol, uint8_t instance) const
 {
     uint8_t found_instance = 0;
+    hal.console->printf("UART STATE FIND PROTOCOL INSTANCE: PROTOCOL: %d\n", protocol);
 
     // search for matching protocol
     for(uint8_t i=0; i<SERIALMANAGER_NUM_PORTS; i++) {
+        auto tmp = (enum SerialProtocol)state[i].protocol.get();
+        hal.console->printf("PROTOCOL2, %d", tmp);
         if (protocol_match(protocol, (enum SerialProtocol)state[i].protocol.get())) {
             if (found_instance == instance) {
                 return &state[i];
@@ -704,6 +707,7 @@ uint32_t AP_SerialManager::map_baudrate(int32_t rate)
 bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum SerialProtocol protocol2) const
 {
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Inside protocol_match");
+    hal.console->printf("Protocol1: %d Protocol2: %d\n",protocol1, protocol2);
     // check for obvious match
     if (protocol1 == protocol2) {
         return true;
