@@ -564,6 +564,9 @@ const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum
 //  returns uart on success, nullptr if a serial port cannot be found
 AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, uint8_t instance) const
 {
+    #ifdef HAL_EXTERNAL_AHRS_ENABLED
+    hal.console->printf("EXTERNAL AHRS IS ENABLED");
+    #endif
     const struct UARTState *_state = find_protocol_instance(protocol, instance);
     if (_state == nullptr) {
         return nullptr;
@@ -701,8 +704,6 @@ uint32_t AP_SerialManager::map_baudrate(int32_t rate)
 // protocol_match - returns true if the protocols match
 bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum SerialProtocol protocol2) const
 {
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Inside protocol_match");
-    hal.console->printf("Protocol1: %d Protocol2: %d\n",protocol1, protocol2);
     // check for obvious match
     if (protocol1 == protocol2) {
         return true;
@@ -719,7 +720,6 @@ bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum Serial
         ((protocol2 == SerialProtocol_GPS) || (protocol2 == SerialProtocol_GPS2))) {
         return true;
     }
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Protocol match failed");
     return false;
 }
 

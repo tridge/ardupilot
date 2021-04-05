@@ -71,7 +71,7 @@ void AP_ExternalAHRS::init(void)
         // min 50Hz
         rate.set(50);
     }
-
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EXTERNAL AHRS INIT!!!!!!");
     switch (DevType(devtype)) {
     case DevType::VecNav:
         backend = new AP_ExternalAHRS_VectorNav(this, state);
