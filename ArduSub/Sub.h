@@ -66,6 +66,7 @@
 #include <AP_JSButton/AP_JSButton.h>   // Joystick/gamepad button function assignment
 #include <AP_LeakDetector/AP_LeakDetector.h> // Leak detector
 #include <AP_TemperatureSensor/TSYS01.h>
+#include <AP_Proximity/AP_Proximity.h>
 
 // Local modules
 #include "defines.h"
@@ -91,10 +92,6 @@
 
 #if GRIPPER_ENABLED == ENABLED
 #include <AP_Gripper/AP_Gripper.h>             // gripper stuff
-#endif
-
-#if PROXIMITY_ENABLED == ENABLED
-#include <AP_Proximity/AP_Proximity.h>
 #endif
 
 #if AVOIDANCE_ENABLED == ENABLED
@@ -428,7 +425,6 @@ private:
     void rpm_update();
 #endif
     void Log_Write_Control_Tuning();
-    void Log_Write_Performance();
     void Log_Write_Attitude();
     void Log_Write_MotBatt();
     void Log_Write_Data(LogDataID id, int32_t value);
@@ -467,7 +463,6 @@ private:
     void auto_wp_start(const Vector3f& destination);
     void auto_wp_start(const Location& dest_loc);
     void auto_wp_run();
-    void auto_spline_run();
     void auto_circle_movetoedge_start(const Location &circle_center, float radius_m);
     void auto_circle_start();
     void auto_circle_run();
@@ -581,7 +576,6 @@ private:
     void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
     void do_circle(const AP_Mission::Mission_Command& cmd);
     void do_loiter_time(const AP_Mission::Mission_Command& cmd);
-    void do_spline_wp(const AP_Mission::Mission_Command& cmd);
 #if NAV_GUIDED == ENABLED
     void do_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
     void do_guided_limits(const AP_Mission::Mission_Command& cmd);
@@ -599,13 +593,11 @@ private:
     bool verify_surface(const AP_Mission::Mission_Command& cmd);
     bool verify_RTL(void);
     bool verify_circle(const AP_Mission::Mission_Command& cmd);
-    bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
 #if NAV_GUIDED == ENABLED
     bool verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
 #endif
     bool verify_nav_delay(const AP_Mission::Mission_Command& cmd);
 
-    void auto_spline_start(const Location& destination, bool stopped_at_start, AC_WPNav::spline_segment_end_type seg_end_type, const Location& next_destination);
     void log_init(void);
     void accel_cal_update(void);
     void read_airspeed();

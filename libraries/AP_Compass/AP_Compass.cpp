@@ -1725,12 +1725,6 @@ uint8_t Compass::get_num_enabled(void) const
 }
 
 void
-Compass::set_use_for_yaw(uint8_t i, bool use)
-{
-    _use_for_yaw[Priority(i)].set(use);
-}
-
-void
 Compass::set_declination(float radians, bool save_to_eeprom)
 {
     if (save_to_eeprom) {
@@ -2019,6 +2013,17 @@ void Compass::handle_external(const AP_ExternalAHRS::mag_data_message_t &pkt)
     }
 }
 #endif // HAL_EXTERNAL_AHRS_ENABLED
+
+// force save of current calibration as valid
+void Compass::force_save_calibration(void)
+{
+    for (StateIndex i(0); i<COMPASS_MAX_INSTANCES; i++) {
+        if (_state[i].dev_id != 0) {
+            _state[i].dev_id.save();
+        }
+    }
+}
+
 
 // singleton instance
 Compass *Compass::_singleton;

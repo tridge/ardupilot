@@ -76,6 +76,10 @@ void Copter::Log_Write_Attitude()
         logger.Write_PID(LOG_PIDP_MSG, attitude_control->get_rate_pitch_pid().get_pid_info());
         logger.Write_PID(LOG_PIDY_MSG, attitude_control->get_rate_yaw_pid().get_pid_info());
         logger.Write_PID(LOG_PIDA_MSG, pos_control->get_accel_z_pid().get_pid_info() );
+        if (should_log(MASK_LOG_NTUN) && (flightmode->requires_GPS() || landing_with_GPS())) {
+            logger.Write_PID(LOG_PIDN_MSG, pos_control->get_vel_xy_pid().get_pid_info_x());
+            logger.Write_PID(LOG_PIDE_MSG, pos_control->get_vel_xy_pid().get_pid_info_y());
+        }
     }
 }
 
@@ -618,7 +622,7 @@ void Copter::Log_Write_Vehicle_Startup_Messages()
 {
     // only 200(?) bytes are guaranteed by AP_Logger
     logger.Write_MessageF("Frame: %s/%s", motors->get_frame_string(), motors->get_type_string());
-    logger.Write_Mode((uint8_t)control_mode, control_mode_reason);
+    logger.Write_Mode((uint8_t)flightmode->mode_number(), control_mode_reason);
     ahrs.Log_Write_Home_And_Origin();
     gps.Write_AP_Logger_Log_Startup_messages();
 }
@@ -631,7 +635,6 @@ void Copter::log_init(void)
 #else // LOGGING_ENABLED
 
 void Copter::Log_Write_Control_Tuning() {}
-void Copter::Log_Write_Performance() {}
 void Copter::Log_Write_Attitude(void) {}
 void Copter::Log_Write_EKF_POS() {}
 void Copter::Log_Write_MotBatt() {}

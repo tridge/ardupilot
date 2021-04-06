@@ -69,7 +69,8 @@ public:
         ArduCopter,
         Rover,
         ArduPlane,
-        ArduSub
+        ArduSub,
+        Blimp
     };
 
     int gps_pipe(uint8_t index);
@@ -124,6 +125,8 @@ public:
                                 Location &loc,
                                 float &yaw_degrees);
     
+    uint8_t get_instance() const { return _instance; }
+
 private:
     void _parse_command_line(int argc, char * const argv[]);
     void _set_param_default(const char *parm);
@@ -310,6 +313,7 @@ private:
     const char *defaults_path = HAL_PARAM_DEFAULTS_PATH;
 
     const char *_home_str;
+    char *_gps_fifo[2];
 };
 
 #endif // defined(HAL_BUILD_AP_PERIPH)

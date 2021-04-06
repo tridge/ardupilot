@@ -20,6 +20,7 @@
 #include "Util.h"
 #include <ch.h>
 #include "RCOutput.h"
+#include "UARTDriver.h"
 #include "hwdef/common/stm32_util.h"
 #include "hwdef/common/watchdog.h"
 #include "hwdef/common/flash.h"
@@ -356,14 +357,14 @@ void Util::thread_info(ExpandingString &str)
       }
 #if HAL_ENABLE_THREAD_STATISTICS
       str.printf("%-13.13s PRI=%3u sp=%p STACK=%4u/%4u MIN=%4u AVG=%4u MAX=%4u\n",
-                 tp->name, unsigned(tp->prio), tp->wabase,
-                 stack_free(tp->wabase), total_stack, RTC2US(STM32_HSECLK, tp->stats.best),
-                 RTC2US(STM32_HSECLK, uint32_t(tp->stats.cumulative / uint64_t(tp->stats.n))),
-                 RTC2US(STM32_HSECLK, tp->stats.worst));
+                 tp->name, unsigned(tp->realprio), tp->wabase,
+                 unsigned(stack_free(tp->wabase)), unsigned(total_stack), unsigned(RTC2US(STM32_HSECLK, tp->stats.best)),
+                 unsigned(RTC2US(STM32_HSECLK, uint32_t(tp->stats.cumulative / uint64_t(tp->stats.n)))),
+                 unsigned(RTC2US(STM32_HSECLK, tp->stats.worst)));
       chTMObjectInit(&tp->stats); // reset counters to zero
 #else
       str.printf("%-13.13s PRI=%3u sp=%p STACK=%u/%u\n",
-                 tp->name, unsigned(tp->prio), tp->wabase,
+                 tp->name, unsigned(tp->realprio), tp->wabase,
                  unsigned(stack_free(tp->wabase)), unsigned(total_stack));
 #endif
   }
@@ -374,7 +375,9 @@ void Util::thread_info(ExpandingString &str)
 // request information on dma contention
 void Util::dma_info(ExpandingString &str)
 {
+#ifndef HAL_NO_SHARED_DMA
     ChibiOS::Shared_DMA::dma_info(str);
+#endif
 }
 #endif
 
@@ -508,3 +511,11 @@ void Util::apply_persistent_params(void) const
     }
 }
 #endif // HAL_ENABLE_SAVE_PERSISTENT_PARAMS
+
+// request information on uart I/O
+void Util::uart_info(ExpandingString &str)
+{
+#if !defined(HAL_NO_UARTDRIVER)    
+    ChibiOS::UARTDriver::uart_info(str);
+#endif
+}

@@ -41,10 +41,11 @@
 #include <AP_ESC_Telem/AP_ESC_Telem.h>
 #include <AP_GyroFFT/AP_GyroFFT.h>
 #include <AP_VisualOdom/AP_VisualOdom.h>
-#include <AP_RCTelemetry/AP_VideoTX.h>
+#include <AP_VideoTX/AP_VideoTX.h>
 #include <AP_MSP/AP_MSP.h>
 #include <AP_Frsky_Telem/AP_Frsky_Parameters.h>
 #include <AP_ExternalAHRS/AP_ExternalAHRS.h>
+#include <AP_VideoTX/AP_SmartAudio.h>
 
 class AP_Vehicle : public AP_HAL::HAL::Callbacks {
 
@@ -182,6 +183,7 @@ public:
     */
     virtual bool start_takeoff(float alt) { return false; }
     virtual bool set_target_location(const Location& target_loc) { return false; }
+    virtual bool set_target_posvel_NED(const Vector3f& target_pos, const Vector3f& target_vel) { return false; }
     virtual bool set_target_velocity_NED(const Vector3f& vel_ned) { return false; }
     virtual bool set_target_angle_and_climbrate(float roll_deg, float pitch_deg, float yaw_deg, float climb_rate_ms, bool use_yaw_rate, float yaw_rate_degs) { return false; }
 
@@ -317,6 +319,10 @@ protected:
 
 #if HAL_EXTERNAL_AHRS_ENABLED
     AP_ExternalAHRS externalAHRS;
+#endif
+    
+#if HAL_SMARTAUDIO_ENABLED
+    AP_SmartAudio smartaudio;
 #endif
 
     static const struct AP_Param::GroupInfo var_info[];

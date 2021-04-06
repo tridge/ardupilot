@@ -223,11 +223,11 @@ public:
     void send_power_status(void);
     void send_battery_status(const uint8_t instance) const;
     bool send_battery_status();
-    void send_distance_sensor() const;
+    void send_distance_sensor();
     // send_rangefinder sends only if a downward-facing instance is
     // found.  Rover overrides this!
     virtual void send_rangefinder() const;
-    void send_proximity() const;
+    void send_proximity();
     virtual void send_nav_controller_output() const = 0;
     virtual void send_pid_tuning() = 0;
     void send_ahrs2();
@@ -247,6 +247,7 @@ public:
     void send_battery2();
     void send_opticalflow();
     virtual void send_attitude() const;
+    virtual void send_attitude_quaternion() const;
     void send_autopilot_version() const;
     void send_extended_sys_state() const;
     void send_local_position() const;
@@ -384,11 +385,17 @@ protected:
 
     virtual MAV_RESULT handle_command_component_arm_disarm(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_do_set_home(const mavlink_command_long_t &packet);
-
+    MAV_RESULT handle_command_do_aux_function(const mavlink_command_long_t &packet);
     void handle_mission_request_list(const mavlink_message_t &msg);
     void handle_mission_request(const mavlink_message_t &msg) const;
     void handle_mission_request_int(const mavlink_message_t &msg) const;
     void handle_mission_clear_all(const mavlink_message_t &msg) const;
+
+    // Note that there exists a relatively new mavlink DO command,
+    // MAV_CMD_DO_SET_MISSION_CURRENT which provides an acknowledgement
+    // that the command has been received, rather than the GCS having to
+    // rely on getting back an identical sequence number as some currently
+    // do.
     virtual void handle_mission_set_current(AP_Mission &mission, const mavlink_message_t &msg);
     void handle_mission_count(const mavlink_message_t &msg);
     void handle_mission_write_partial_list(const mavlink_message_t &msg);
@@ -468,6 +475,8 @@ protected:
 
     MAV_RESULT handle_command_preflight_can(const mavlink_command_long_t &packet);
 
+    virtual MAV_RESULT handle_command_do_set_mission_current(const mavlink_command_long_t &packet);
+
     MAV_RESULT handle_command_battery_reset(const mavlink_command_long_t &packet);
     void handle_command_long(const mavlink_message_t &msg);
     MAV_RESULT handle_command_accelcal_vehicle_pos(const mavlink_command_long_t &packet);
@@ -483,6 +492,7 @@ protected:
     MAV_RESULT handle_command_do_set_roi(const mavlink_command_long_t &packet);
     virtual MAV_RESULT handle_command_do_set_roi(const Location &roi_loc);
     MAV_RESULT handle_command_do_gripper(const mavlink_command_long_t &packet);
+    MAV_RESULT handle_command_do_sprayer(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_do_set_mode(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_get_home_position(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_do_fence_enable(const mavlink_command_long_t &packet);
@@ -558,18 +568,6 @@ private:
                                                          // parameters for
                                                          // queued send
     uint32_t                    _queued_parameter_send_time_ms;
-
-    /// Count the number of reportable parameters.
-    ///
-    /// Not all parameters can be reported via MAVlink.  We count the number
-    // that are
-    /// so that we can report to a GCS the number of parameters it should
-    // expect when it
-    /// requests the full set.
-    ///
-    /// @return         The number of reportable parameters.
-    ///
-    uint16_t                    packet_drops;
 
     // number of extra ms to add to slow things down for the radio
     uint16_t         stream_slowdown_ms;
@@ -850,6 +848,11 @@ private:
     uint32_t last_mavlink_stats_logged;
 
     uint8_t last_battery_status_idx;
+
+    // if we've ever sent a DISTANCE_SENSOR message out of an
+    // orientation we continue to send it out, even if it is not
+    // longer valid.
+    uint8_t proximity_ever_valid_bitmask;
 
     // true if we should NOT do MAVLink on this port (usually because
     // someone's doing SERIAL_CONTROL over mavlink)

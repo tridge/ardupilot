@@ -19,6 +19,7 @@
 #include "UARTDriver.h"
 #include <AP_GPS/AP_GPS.h>
 #include <AP_GPS/AP_GPS_UBLOX.h>
+#include <AP_Common/NMEA.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <time.h>
@@ -66,15 +67,17 @@ ssize_t SITL_State::gps_read(int fd, void *buf, size_t count)
 /*
   setup GPS input pipe
  */
-const char * gps_fifo[2] = {"/tmp/ap_gps0", "/tmp/ap_gps1"}; 
 int SITL_State::gps_pipe(uint8_t idx)
 {
     int fd[2];
+    if (_gps_fifo[idx] == nullptr) {
+        UNUSED_RESULT(asprintf(&_gps_fifo[idx], "/tmp/gps_fifo%d", (int)(ARRAY_SIZE(_gps_fifo)*_instance + idx)));
+    }
     if (gps_state[idx].client_fd != 0) {
         return gps_state[idx].client_fd;
     }
     pipe(fd);
-    if (mkfifo(gps_fifo[idx], 0666) < 0) {
+    if (mkfifo(_gps_fifo[idx], 0666) < 0) {
         printf("MKFIFO failed with %s\n", strerror(errno));
     }
     
@@ -96,8 +99,12 @@ void SITL_State::_gps_write(const uint8_t *p, uint16_t size, uint8_t instance)
     if (instance == 1 && _sitl->gps_disable[instance]) {
         return;
     }
+    if (_gps_fifo[instance] == nullptr) {
+        printf("GPS FIFO path not set\n");
+        return;
+    }
     // also write to external fifo
-    int fd = open(gps_fifo[instance], O_WRONLY | O_NONBLOCK);
+    int fd = open(_gps_fifo[instance], O_WRONLY | O_NONBLOCK);
     if (fd >= 0) {
         write(fd, p, size);
         close(fd);
@@ -647,37 +654,19 @@ void SITL_State::_update_gps_mtk19(const struct gps_data *d, uint8_t instance)
 }
 
 /*
-  NMEA checksum
- */
-uint8_t SITL_State::_gps_nmea_checksum(const char *s)
-{
-    uint8_t cs = 0;
-    const uint8_t *b = (const uint8_t *)s;
-    for (uint16_t i=1; s[i]; i++) {
-        cs ^= b[i];
-    }
-    return cs;
-}
-
-/*
   formatted print of NMEA message, with checksum appended
  */
 void SITL_State::_gps_nmea_printf(uint8_t instance, const char *fmt, ...)
 {
-    char *s = nullptr;
-    uint8_t csum;
-    char trailer[6];
-
     va_list ap;
 
     va_start(ap, fmt);
-    vasprintf(&s, fmt, ap);
+    char *s = nmea_vaprintf(fmt, ap);
     va_end(ap);
-    csum = _gps_nmea_checksum(s);
-    snprintf(trailer, sizeof(trailer), "*%02X\r\n", (unsigned)csum);
-    _gps_write((const uint8_t*)s, strlen(s), instance);
-    _gps_write((const uint8_t*)trailer, 5, instance);
-    free(s);
+    if (s != nullptr) {
+        _gps_write((const uint8_t*)s, strlen(s), instance);
+        free(s);
+    }
 }
 
 

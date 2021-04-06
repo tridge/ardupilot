@@ -148,6 +148,9 @@ enum class LogEvent : uint8_t {
     STANDBY_ENABLE = 74,
     STANDBY_DISABLE = 75,
 
+    FENCE_FLOOR_ENABLE = 80,
+    FENCE_FLOOR_DISABLE = 81,
+
     SURFACED = 163,
     NOT_SURFACED = 164,
     BOTTOMED = 165,
@@ -290,7 +293,6 @@ public:
     void Write_Event(LogEvent id);
     void Write_Error(LogErrorSubsystem sub_system,
                      LogErrorCode error_code);
-    void Write_GPS(uint8_t instance);
     void Write_IMU();
     bool Write_ISBH(uint16_t seqno,
                         AP_InertialSensor::IMU_SENSOR_TYPE sensor_type,
@@ -328,7 +330,9 @@ public:
                           uint8_t sequence,
                           const RallyLocation &rally_point);
     void Write_Beacon(AP_Beacon &beacon);
+#if HAL_PROXIMITY_ENABLED
     void Write_Proximity(AP_Proximity &proximity);
+#endif
     void Write_SRTL(bool active, uint16_t num_points, uint16_t max_points, uint8_t action, const Vector3f& point);
     void Write_OABendyRuler(uint8_t type, bool active, float target_yaw, float target_pitch, bool ignore_chg, float margin, const Location &final_dest, const Location &oa_dest);
     void Write_OADijkstra(uint8_t state, uint8_t error_id, uint8_t curr_point, uint8_t tot_points, const Location &final_dest, const Location &oa_dest);
@@ -551,6 +555,9 @@ private:
         LISTING, // actively sending log_entry packets
         SENDING, // actively sending log_sending packets
     } transfer_activity = TransferActivity::IDLE;
+
+    // last time we handled a log-transfer-over-mavlink message:
+    uint32_t _last_mavlink_log_transfer_message_handled_ms;
 
     // next log list entry to send
     uint16_t _log_next_list_entry;

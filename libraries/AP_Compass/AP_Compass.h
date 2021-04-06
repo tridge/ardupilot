@@ -212,8 +212,6 @@ public:
     bool use_for_yaw(uint8_t i) const;
     bool use_for_yaw(void) const;
 
-    void set_use_for_yaw(uint8_t i, bool use);
-
     /// Sets the local magnetic field declination.
     ///
     /// @param  radians             Local field declination.
@@ -354,7 +352,10 @@ public:
 #if HAL_EXTERNAL_AHRS_ENABLED
     void handle_external(const AP_ExternalAHRS::mag_data_message_t &pkt);
 #endif
-    
+
+    // force save of current calibration as valid
+    void force_save_calibration(void);
+
 private:
     static Compass *_singleton;
 

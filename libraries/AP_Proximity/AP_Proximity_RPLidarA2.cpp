@@ -26,8 +26,10 @@
  *
  */
 
-#include <AP_HAL/AP_HAL.h>
 #include "AP_Proximity_RPLidarA2.h"
+
+#if HAL_PROXIMITY_ENABLED
+#include <AP_HAL/AP_HAL.h>
 #include <ctype.h>
 #include <stdio.h>
 
@@ -311,7 +313,7 @@ void AP_Proximity_RPLidarA2::parse_response_data()
                 Debug(2, "                                       D%02.2f A%03.1f Q%02d", distance_m, angle_deg, quality);
 #endif
                 _last_distance_received_ms = AP_HAL::millis();
-                if (!ignore_reading(angle_deg)) {
+                if (!ignore_reading(angle_deg, distance_m)) {
                     const AP_Proximity_Boundary_3D::Face face = boundary.get_face(angle_deg);
 
                     if (face != _last_face) {
@@ -358,3 +360,5 @@ void AP_Proximity_RPLidarA2::parse_response_data()
             break;
     }
 }
+
+#endif // HAL_PROXIMITY_ENABLED

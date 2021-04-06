@@ -6,7 +6,6 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_RSSI/AP_RSSI.h>
-#include <AP_GPS/AP_GPS.h>
 
 #include "AP_Logger.h"
 #include "AP_Logger_File.h"
@@ -124,58 +123,6 @@ bool AP_Logger_Backend::Write_Parameter(const AP_Param *ap,
     ap->copy_name_token(token, &name[0], sizeof(name), true);
     return Write_Parameter(name, ap->cast_to_float(type));
 }
-
-// Write an GPS packet
-void AP_Logger::Write_GPS(uint8_t i)
-{
-    const AP_GPS &gps = AP::gps();
-    const uint64_t time_us = AP_HAL::micros64();
-    const struct Location &loc = gps.location(i);
-
-    float yaw_deg=0, yaw_accuracy_deg=0;
-    gps.gps_yaw_deg(i, yaw_deg, yaw_accuracy_deg);
-
-    const struct log_GPS pkt {
-        LOG_PACKET_HEADER_INIT(LOG_GPS_MSG),
-        time_us       : time_us,
-        instance      : i,
-        status        : (uint8_t)gps.status(i),
-        gps_week_ms   : gps.time_week_ms(i),
-        gps_week      : gps.time_week(i),
-        num_sats      : gps.num_sats(i),
-        hdop          : gps.get_hdop(i),
-        latitude      : loc.lat,
-        longitude     : loc.lng,
-        altitude      : loc.alt,
-        ground_speed  : gps.ground_speed(i),
-        ground_course : gps.ground_course(i),
-        vel_z         : gps.velocity(i).z,
-        yaw           : yaw_deg,
-        used          : (uint8_t)(gps.primary_sensor() == i)
-    };
-    WriteBlock(&pkt, sizeof(pkt));
-
-    /* write auxiliary accuracy information as well */
-    float hacc = 0, vacc = 0, sacc = 0;
-    gps.horizontal_accuracy(i, hacc);
-    gps.vertical_accuracy(i, vacc);
-    gps.speed_accuracy(i, sacc);
-    struct log_GPA pkt2{
-        LOG_PACKET_HEADER_INIT(LOG_GPA_MSG),
-        time_us       : time_us,
-        instance      : i,
-        vdop          : gps.get_vdop(i),
-        hacc          : (uint16_t)MIN((hacc*100), UINT16_MAX),
-        vacc          : (uint16_t)MIN((vacc*100), UINT16_MAX),
-        sacc          : (uint16_t)MIN((sacc*100), UINT16_MAX),
-        yaw_accuracy  : yaw_accuracy_deg,
-        have_vv       : (uint8_t)gps.have_vertical_velocity(i),
-        sample_ms     : gps.last_message_time_ms(i),
-        delta_ms      : gps.last_message_delta_time_ms(i)
-    };
-    WriteBlock(&pkt2, sizeof(pkt2));
-}
-
 
 // Write an RCIN packet
 void AP_Logger::Write_RCIN(void)
@@ -599,6 +546,7 @@ void AP_Logger::Write_Beacon(AP_Beacon &beacon)
     WriteBlock(&pkt_beacon, sizeof(pkt_beacon));
 }
 
+#if HAL_PROXIMITY_ENABLED
 // Write proximity sensor distances
 void AP_Logger::Write_Proximity(AP_Proximity &proximity)
 {
@@ -607,35 +555,61 @@ void AP_Logger::Write_Proximity(AP_Proximity &proximity)
         return;
     }
 
-    AP_Proximity::Proximity_Distance_Array dist_array {};
-    proximity.get_horizontal_distances(dist_array);
+    AP_Proximity::Proximity_Distance_Array dist_array{}; // raw distances stored here
+    AP_Proximity::Proximity_Distance_Array filt_dist_array{}; //filtered distances stored here
+    for (uint8_t i = 0; i < proximity.get_num_layers(); i++) {
+        const bool active = proximity.get_active_layer_distances(i, dist_array, filt_dist_array);
+        if (!active) {
+            // nothing on this layer
+            continue;
+        }
+        float dist_up;
+        if (!proximity.get_upward_distance(dist_up)) {
+            dist_up = 0.0f;
+        }
 
-    float dist_up;
-    if (!proximity.get_upward_distance(dist_up)) {
-        dist_up = 0.0f;
+        float closest_ang = 0.0f;
+        float closest_dist = 0.0f;
+        proximity.get_closest_object(closest_ang, closest_dist);
+
+        const struct log_Proximity pkt_proximity{
+                LOG_PACKET_HEADER_INIT(LOG_PROXIMITY_MSG),
+                time_us         : AP_HAL::micros64(),
+                instance        : i,
+                health          : (uint8_t)proximity.get_status(),
+                dist0           : filt_dist_array.distance[0],
+                dist45          : filt_dist_array.distance[1],
+                dist90          : filt_dist_array.distance[2],
+                dist135         : filt_dist_array.distance[3],
+                dist180         : filt_dist_array.distance[4],
+                dist225         : filt_dist_array.distance[5],
+                dist270         : filt_dist_array.distance[6],
+                dist315         : filt_dist_array.distance[7],
+                distup          : dist_up,
+                closest_angle   : closest_ang,
+                closest_dist    : closest_dist
+        };
+        WriteBlock(&pkt_proximity, sizeof(pkt_proximity));
+
+        if (proximity.get_raw_log_enable()) {
+            const struct log_Proximity_raw pkt_proximity_raw{
+                LOG_PACKET_HEADER_INIT(LOG_RAW_PROXIMITY_MSG),
+                time_us         : AP_HAL::micros64(),
+                instance        : i,
+                raw_dist0       : dist_array.distance[0],
+                raw_dist45      : dist_array.distance[1],
+                raw_dist90      : dist_array.distance[2],
+                raw_dist135     : dist_array.distance[3],
+                raw_dist180     : dist_array.distance[4],
+                raw_dist225     : dist_array.distance[5],
+                raw_dist270     : dist_array.distance[6],
+                raw_dist315     : dist_array.distance[7],
+            };
+            WriteBlock(&pkt_proximity_raw, sizeof(pkt_proximity_raw));
+        }
     }
-
-    float close_ang = 0.0f, close_dist = 0.0f;
-    proximity.get_closest_object(close_ang, close_dist);
-
-    const struct log_Proximity pkt_proximity{
-            LOG_PACKET_HEADER_INIT(LOG_PROXIMITY_MSG),
-            time_us         : AP_HAL::micros64(),
-            health          : (uint8_t)proximity.get_status(),
-            dist0           : dist_array.distance[0],
-            dist45          : dist_array.distance[1],
-            dist90          : dist_array.distance[2],
-            dist135         : dist_array.distance[3],
-            dist180         : dist_array.distance[4],
-            dist225         : dist_array.distance[5],
-            dist270         : dist_array.distance[6],
-            dist315         : dist_array.distance[7],
-            distup          : dist_up,
-            closest_angle   : close_ang,
-            closest_dist    : close_dist
-    };
-    WriteBlock(&pkt_proximity, sizeof(pkt_proximity));
 }
+#endif
 
 void AP_Logger::Write_SRTL(bool active, uint16_t num_points, uint16_t max_points, uint8_t action, const Vector3f& breadcrumb)
 {
@@ -655,6 +629,10 @@ void AP_Logger::Write_SRTL(bool active, uint16_t num_points, uint16_t max_points
 
 void AP_Logger::Write_OABendyRuler(uint8_t type, bool active, float target_yaw, float target_pitch, bool resist_chg, float margin, const Location &final_dest, const Location &oa_dest)
 {
+    int32_t oa_dest_alt, final_alt;
+    bool got_oa_dest = oa_dest.get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, oa_dest_alt);
+    bool got_final_dest = final_dest.get_alt_cm(Location::AltFrame::ABOVE_ORIGIN, final_alt);
+    
     const struct log_OABendyRuler pkt{
         LOG_PACKET_HEADER_INIT(LOG_OA_BENDYRULER_MSG),
         time_us     : AP_HAL::micros64(),
@@ -667,10 +645,10 @@ void AP_Logger::Write_OABendyRuler(uint8_t type, bool active, float target_yaw, 
         margin      : margin,
         final_lat   : final_dest.lat,
         final_lng   : final_dest.lng,
-        final_alt   : final_dest.alt,
+        final_alt   : got_final_dest ? final_alt : final_dest.alt,
         oa_lat      : oa_dest.lat,
         oa_lng      : oa_dest.lng,
-        oa_alt      : oa_dest.alt
+        oa_alt      : got_oa_dest ? oa_dest_alt : oa_dest.alt
     };
     WriteBlock(&pkt, sizeof(pkt));
 }

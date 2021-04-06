@@ -529,9 +529,9 @@ const AP_Param::Info Sub::var_info[] = {
     GOBJECT(barometer, "BARO", AP_Baro),
 
     // GPS driver
-    // @Group: GPS_
+    // @Group: GPS
     // @Path: ../libraries/AP_GPS/AP_GPS.cpp
-    GOBJECT(gps, "GPS_", AP_GPS),
+    GOBJECT(gps, "GPS", AP_GPS),
 
     // Leak detector
     // @Group: LEAK
@@ -630,7 +630,7 @@ const AP_Param::Info Sub::var_info[] = {
  */
 const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
-#if PROXIMITY_ENABLED == ENABLED
+#if HAL_PROXIMITY_ENABLED
     // @Group: PRX
     // @Path: ../libraries/AP_Proximity/AP_Proximity.cpp
     AP_SUBGROUPINFO(proximity, "PRX", 2, ParametersG2, AP_Proximity),

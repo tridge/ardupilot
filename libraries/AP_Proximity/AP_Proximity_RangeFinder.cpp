@@ -13,8 +13,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <AP_HAL/AP_HAL.h>
 #include "AP_Proximity_RangeFinder.h"
+
+#if HAL_PROXIMITY_ENABLED
+#include <AP_HAL/AP_HAL.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <AP_RangeFinder/AP_RangeFinder.h>
@@ -48,7 +50,7 @@ void AP_Proximity_RangeFinder::update(void)
                 const float distance_m = sensor->distance_cm() * 0.01f;
                 _distance_min = sensor->min_distance_cm() * 0.01f;
                 _distance_max = sensor->max_distance_cm() * 0.01f;
-                if ((distance_m <= _distance_max) && (distance_m >= _distance_min)) {
+                if ((distance_m <= _distance_max) && (distance_m >= _distance_min) && !check_obstacle_near_ground(angle, distance_m)) {
                     boundary.set_face_attributes(face, angle, distance_m);
                     // update OA database
                     database_push(angle, distance_m);
@@ -90,3 +92,5 @@ bool AP_Proximity_RangeFinder::get_upward_distance(float &distance) const
     }
     return false;
 }
+
+#endif // HAL_PROXIMITY_ENABLED

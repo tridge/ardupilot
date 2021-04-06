@@ -358,6 +358,8 @@ void RCOutput::bdshot_finish_dshot_gcr_transaction(void *p)
 #endif
     uint8_t curr_telem_chan = group->bdshot.curr_telem_chan;
 
+    // the DMA buffer is either the regular outbound one because we are sharing UP and CH
+    // or the input channel buffer
     const stm32_dma_stream_t *dma =
         group->has_shared_ic_up_dma() ? group->dma : group->bdshot.ic_dma[curr_telem_chan];
     // record the transaction size before the stream is released
@@ -369,12 +371,10 @@ void RCOutput::bdshot_finish_dshot_gcr_transaction(void *p)
 
     group->dshot_state = DshotState::RECV_COMPLETE;
 
-    // if using input capture DMA then clean up
-    if (group->ic_dma_enabled()) {
-        group->bdshot.ic_dma_handle[curr_telem_chan]->unlock_from_IRQ();
-    }
+    // if using input capture DMA and sharing the UP and CH channels then clean up
+    // by assigning the source back to UP
 #if STM32_DMA_SUPPORTS_DMAMUX
-    else if (group->has_shared_ic_up_dma()) {
+    if (group->has_shared_ic_up_dma()) {
         dmaSetRequestSource(group->dma, group->dma_up_channel);
     }
 #endif
@@ -382,7 +382,8 @@ void RCOutput::bdshot_finish_dshot_gcr_transaction(void *p)
     // rotate to the next input channel
     group->bdshot.prev_telem_chan = group->bdshot.curr_telem_chan;
     group->bdshot.curr_telem_chan = bdshot_find_next_ic_channel(*group);
-    group->dma_handle->unlock_from_IRQ();
+    // tell the waiting process we've done the DMA
+    chEvtSignalI(group->dshot_waiter, group->dshot_event_mask);
 #ifdef HAL_GPIO_LINE_GPIO56
     TOGGLE_PIN_DEBUG(56);
 #endif
@@ -480,7 +481,10 @@ void RCOutput::dma_up_irq_callback(void *p, uint32_t flags)
         TOGGLE_PIN_DEBUG(55);
     } else {
         // non-bidir case
-        chVTSetI(&group->dma_timeout, chTimeUS2I(group->dshot_pulse_time_us + 40), dma_unlock, p);
+        // this prevents us ever having two dshot pulses too close together
+        // dshot mandates a minimum pulse separation of 40us, WS2812 mandates 50us so we
+        // pick the higher value
+        chVTSetI(&group->dma_timeout, chTimeUS2I(50), dma_unlock, p);
     }
 
     chSysUnlockFromISR();

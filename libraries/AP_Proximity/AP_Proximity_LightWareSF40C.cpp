@@ -13,11 +13,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "AP_Proximity_LightWareSF40C.h"
+
+#if HAL_PROXIMITY_ENABLED
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/utility/sparse-endian.h>
 #include <AP_Math/crc.h>
-#include "AP_Proximity_LightWareSF40C.h"
 
 extern const AP_HAL::HAL& hal;
 
@@ -335,11 +337,10 @@ void AP_Proximity_LightWareSF40C::process_message()
             }
 
             // check reading is not within an ignore zone
-            if (!ignore_reading(angle_deg)) {
+            const float dist_m = dist_cm * 0.01f;
+            if (!ignore_reading(angle_deg, dist_m)) {
                 // check distance reading is valid
                 if ((dist_cm >= dist_min_cm) && (dist_cm <= dist_max_cm)) {
-                    const float dist_m = dist_cm * 0.01f;
-
                     // update shortest distance for this face
                     if (!_face_distance_valid || dist_m < _face_distance) {
                         _face_distance = dist_m;
@@ -419,3 +420,5 @@ uint16_t AP_Proximity_LightWareSF40C::buff_to_uint16(uint8_t b0, uint8_t b1) con
     uint16_t leval = (uint16_t)b0 | (uint16_t)b1 << 8;
     return leval;
 }
+
+#endif // HAL_PROXIMITY_ENABLED

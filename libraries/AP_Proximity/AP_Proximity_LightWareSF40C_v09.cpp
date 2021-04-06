@@ -13,8 +13,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <AP_HAL/AP_HAL.h>
 #include "AP_Proximity_LightWareSF40C_v09.h"
+
+#if HAL_PROXIMITY_ENABLED
+#include <AP_HAL/AP_HAL.h>
 #include <ctype.h>
 #include <stdio.h>
 
@@ -323,7 +325,7 @@ bool AP_Proximity_LightWareSF40C_v09::process_reply()
         {
             float angle_deg = strtof(element_buf[0], NULL);
             float distance_m = strtof(element_buf[1], NULL);
-            if (!ignore_reading(angle_deg)) {
+            if (!ignore_reading(angle_deg, distance_m)) {
                 _last_distance_received_ms = AP_HAL::millis();
                 success = true;
                 // Get location on 3-D boundary based on angle to the object
@@ -360,3 +362,5 @@ void AP_Proximity_LightWareSF40C_v09::clear_buffers()
     element_num = 0;
     memset(element_buf, 0, sizeof(element_buf));
 }
+
+#endif // HAL_PROXIMITY_ENABLED

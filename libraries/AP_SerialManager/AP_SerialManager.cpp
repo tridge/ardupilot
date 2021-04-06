@@ -564,6 +564,9 @@ const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum
 //  returns uart on success, nullptr if a serial port cannot be found
 AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, uint8_t instance) const
 {
+    if (protocol == 36) {
+        hal.console->printf("Got checking for protocol 36\n");
+    }
     const struct UARTState *_state = find_protocol_instance(protocol, instance);
     if (_state == nullptr) {
         return nullptr;
@@ -717,7 +720,6 @@ bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum Serial
         ((protocol2 == SerialProtocol_GPS) || (protocol2 == SerialProtocol_GPS2))) {
         return true;
     }
-
     return false;
 }
 

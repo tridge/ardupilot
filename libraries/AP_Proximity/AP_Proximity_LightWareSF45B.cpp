@@ -16,10 +16,12 @@
    http://support.lightware.co.za/sf45/#/commands
  */
 
+#include "AP_Proximity_LightWareSF45B.h"
+#if HAL_PROXIMITY_ENABLED
+
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/utility/sparse-endian.h>
-#include "AP_Proximity_LightWareSF45B.h"
 
 extern const AP_HAL::HAL& hal;
 
@@ -168,7 +170,7 @@ void AP_Proximity_LightWareSF45B::process_message()
         }
 
         // check reading is valid
-        if (!ignore_reading(angle_deg) && (distance_m >= distance_min()) && (distance_m <= distance_max())) {
+        if (!ignore_reading(angle_deg, distance_m) && (distance_m >= distance_min()) && (distance_m <= distance_max())) {
             // update shortest distance for this face
             if (!_face_distance_valid || (distance_m < _face_distance)) {
                 _face_yaw_deg = angle_deg;
@@ -197,3 +199,5 @@ uint8_t AP_Proximity_LightWareSF45B::convert_angle_to_minisector(float angle_deg
 {
     return wrap_360(angle_deg + (PROXIMITY_SF45B_COMBINE_READINGS_DEG * 0.5f)) / PROXIMITY_SF45B_COMBINE_READINGS_DEG;
 }
+
+#endif // HAL_PROXIMITY_ENABLED

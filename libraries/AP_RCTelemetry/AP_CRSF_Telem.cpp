@@ -14,7 +14,7 @@
 */
 
 #include "AP_CRSF_Telem.h"
-#include "AP_VideoTX.h"
+#include <AP_VideoTX/AP_VideoTX.h>
 #include <AP_HAL/utility/sparse-endian.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_Common/AP_FWVersion.h>
@@ -392,7 +392,12 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
         vtx->is_in_pitmode, vtx->power, vtx->pitmode);
     AP_VideoTX& apvtx = AP::vtx();
 
-    apvtx.set_enabled(vtx->is_vtx_available);
+    // the user may have a VTX connected but not want AP to control it
+    // (for instance because they are using myVTX on the transmitter)
+    if (!apvtx.get_enabled()) {
+        return;
+    }
+
     apvtx.set_band(vtx->band);
     apvtx.set_channel(vtx->channel);
     if (vtx->is_in_user_frequency_mode) {
@@ -421,16 +426,23 @@ void AP_CRSF_Telem::process_vtx_frame(VTXFrame* vtx) {
         apvtx.set_options(apvtx.get_options() & ~uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     }
     // make sure the configured values now reflect reality
-    apvtx.set_defaults();
+    if (!apvtx.set_defaults() && (_vtx_power_change_pending || _vtx_freq_change_pending || _vtx_options_change_pending)) {
+        AP::vtx().announce_vtx_settings();
+    }
 
     _vtx_power_change_pending = _vtx_freq_change_pending = _vtx_options_change_pending = false;
 }
 
-void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx) {
+void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx)
+{
     vtx->frequency = be16toh(vtx->frequency);
     debug("VTXTelemetry: Freq: %d, PitMode: %d, Power: %d", vtx->frequency, vtx->pitmode, vtx->power);
 
     AP_VideoTX& apvtx = AP::vtx();
+
+    if (!apvtx.get_enabled()) {
+        return;
+    }
 
     apvtx.set_frequency_mhz(vtx->frequency);
 
@@ -449,7 +461,9 @@ void AP_CRSF_Telem::process_vtx_telem_frame(VTXTelemetryFrame* vtx) {
         apvtx.set_options(apvtx.get_options() & ~uint8_t(AP_VideoTX::VideoOptions::VTX_PITMODE));
     }
     // make sure the configured values now reflect reality
-    apvtx.set_defaults();
+    if (!apvtx.set_defaults() && (_vtx_power_change_pending || _vtx_freq_change_pending || _vtx_options_change_pending)) {
+        AP::vtx().announce_vtx_settings();
+    }
 
     _vtx_power_change_pending = _vtx_freq_change_pending = _vtx_options_change_pending = false;
 }
@@ -546,14 +560,26 @@ void AP_CRSF_Telem::update_vtx_params()
 {
     AP_VideoTX& vtx = AP::vtx();
 
-    _vtx_freq_change_pending = vtx.update_band() || vtx.update_channel() || _vtx_freq_change_pending;
+    if (!vtx.get_enabled()) {
+        return;
+    }
+
+    _vtx_freq_change_pending = vtx.update_band() || vtx.update_channel() || vtx.update_frequency() || _vtx_freq_change_pending;
     _vtx_power_change_pending = vtx.update_power() || _vtx_power_change_pending;
     _vtx_options_change_pending = vtx.update_options() || _vtx_options_change_pending;
 
     if (_vtx_freq_change_pending || _vtx_power_change_pending || _vtx_options_change_pending) {
+        // make the desired frequency match the desired band and channel
+        if (_vtx_freq_change_pending) {
+            if (vtx.update_band() || vtx.update_channel()) {
+                vtx.update_configured_frequency();
+            } else {
+                vtx.update_configured_channel_and_band();
+            }
+        }
+
         debug("update_params(): freq %d->%d, chan: %d->%d, band: %d->%d, pwr: %d->%d, opts: %d->%d",
-            vtx.get_frequency_mhz(),
-            AP_VideoTX::get_frequency_mhz(vtx.get_configured_band(), vtx.get_configured_channel()),
+            vtx.get_frequency_mhz(),  vtx.get_configured_frequency_mhz(),
             vtx.get_channel(), vtx.get_configured_channel(),
             vtx.get_band(), vtx.get_configured_band(),
             vtx.get_power_mw(), vtx.get_configured_power_mw(),
@@ -563,11 +589,6 @@ void AP_CRSF_Telem::update_vtx_params()
         _telem.ext.command.destination = AP_RCProtocol_CRSF::CRSF_ADDRESS_VTX;
         _telem.ext.command.origin = AP_RCProtocol_CRSF::CRSF_ADDRESS_FLIGHT_CONTROLLER;
         _telem.ext.command.command_id = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX;
-
-        // make the desired frequency match the desired band and channel
-        if (_vtx_freq_change_pending) {
-            vtx.set_frequency_mhz(AP_VideoTX::get_frequency_mhz(vtx.get_configured_band(), vtx.get_configured_channel()));
-        }
 
         uint8_t len = 5;
         if (_vtx_freq_change_pending && _vtx_freq_update) {
@@ -588,25 +609,22 @@ void AP_CRSF_Telem::update_vtx_params()
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_POWER;
             if (vtx.get_configured_power_mw() < 26) {
                 vtx.set_configured_power_mw(25);
-                _telem.ext.command.payload[1] = 0;
             } else if (vtx.get_configured_power_mw() < 201) {
                 if (vtx.get_configured_power_mw() < 101) {
                     vtx.set_configured_power_mw(100);
                 } else {
                     vtx.set_configured_power_mw(200);
                 }
-                _telem.ext.command.payload[1] = 1;
             } else if (vtx.get_configured_power_mw() < 501) {
                 if (vtx.get_configured_power_mw() < 401) {
                     vtx.set_configured_power_mw(400);
                 } else {
                     vtx.set_configured_power_mw(500);
                 }
-                _telem.ext.command.payload[1] = 2;
             } else {
                 vtx.set_configured_power_mw(800);
-                _telem.ext.command.payload[1] = 3;
             }
+            _telem.ext.command.payload[1] = vtx.get_configured_power_level();
             _vtx_dbm_update = true;
         } else if (_vtx_options_change_pending) {
             _telem.ext.command.payload[0] = AP_RCProtocol_CRSF::CRSF_COMMAND_VTX_PITMODE;

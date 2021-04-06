@@ -54,11 +54,16 @@ float Plane::get_speed_scaler(void)
  */
 bool Plane::stick_mixing_enabled(void)
 {
+#if AC_FENCE == ENABLED
+    const bool stickmixing = fence_stickmixing();
+#else
+    const bool stickmixing = true;
+#endif
     if (control_mode->does_auto_throttle() && plane.control_mode->does_auto_navigation()) {
         // we're in an auto mode. Check the stick mixing flag
         if (g.stick_mixing != STICK_MIXING_DISABLED &&
             g.stick_mixing != STICK_MIXING_VTOL_YAW &&
-            geofence_stickmixing() &&
+            stickmixing &&
             failsafe.state == FAILSAFE_NONE &&
             !rc_failsafe_active()) {
             // we're in an auto mode, and haven't triggered failsafe
@@ -431,7 +436,7 @@ void Plane::stabilize()
     if (get_throttle_input() == 0 &&
         fabsf(relative_altitude) < 5.0f && 
         fabsf(barometer.get_climb_rate()) < 0.5f &&
-        gps.ground_speed() < 3) {
+        ahrs.groundspeed() < 3) {
         // we are low, with no climb rate, and zero throttle, and very
         // low ground speed. Zero the attitude controller
         // integrators. This prevents integrator buildup pre-takeoff.
@@ -440,7 +445,7 @@ void Plane::stabilize()
         yawController.reset_I();
 
         // if moving very slowly also zero the steering integrator
-        if (gps.ground_speed() < 1) {
+        if (ahrs.groundspeed() < 1) {
             steerController.reset_I();            
         }
     }

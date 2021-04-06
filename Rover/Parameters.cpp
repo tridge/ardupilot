@@ -349,9 +349,9 @@ const AP_Param::Info Rover::var_info[] = {
 #endif
 
     // GPS driver
-    // @Group: GPS_
+    // @Group: GPS
     // @Path: ../libraries/AP_GPS/AP_GPS.cpp
-    GOBJECT(gps, "GPS_", AP_GPS),
+    GOBJECT(gps, "GPS", AP_GPS),
 
 #if AP_AHRS_NAVEKF_AVAILABLE
 #if HAL_NAVEKF2_AVAILABLE
@@ -496,9 +496,11 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Path: ../libraries/AC_Fence/AC_Fence.cpp
     AP_SUBGROUPINFO(fence, "FENCE_", 17, ParametersG2, AC_Fence),
 
+#if HAL_PROXIMITY_ENABLED
     // @Group: PRX
     // @Path: ../libraries/AP_Proximity/AP_Proximity.cpp
     AP_SUBGROUPINFO(proximity, "PRX", 18, ParametersG2, AP_Proximity),
+#endif
 
     // @Group: AVOID_
     // @Path: ../libraries/AC_Avoidance/AC_Avoid.cpp
@@ -701,7 +703,9 @@ ParametersG2::ParametersG2(void)
     wheel_rate_control(wheel_encoder),
     attitude_control(rover.ahrs),
     smart_rtl(),
+#if HAL_PROXIMITY_ENABLED
     proximity(),
+#endif
     avoid(),
     follow(),
     windvane(),
