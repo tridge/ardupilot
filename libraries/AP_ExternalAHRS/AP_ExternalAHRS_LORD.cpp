@@ -41,11 +41,29 @@ AP_ExternalAHRS_LORD::AP_ExternalAHRS_LORD(AP_ExternalAHRS *_frontend,
     uart = sm.find_serial(AP_SerialManager::SerialProtocol_AHRS, 0);
     if (!uart) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ExternalAHRS no UART");
+        hal.console->printf("LORD IS NOT CONNECTED ANYMORE\n");
         return;
     }
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD ExternalAHRS initialised");
+
     baudrate = sm.find_baudrate(AP_SerialManager::SerialProtocol_AHRS, 0);
     port_num = sm.find_portnum(AP_SerialManager::SerialProtocol_AHRS, 0);
+    uart->begin(baudrate);
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD ExternalAHRS with baud: %lu, on port %d", baudrate, port_num);
+
+}
+
+void AP_ExternalAHRS_LORD::testing() {
+    uint8_t buffer[512];
+    if (!uart) {
+        hal.console->printf("Uart died\n");
+        return;
+    }
+//    hal.console->printf("Opened on portnum: %d\n",port_num);
+    uint32_t n = uart->read(buffer, 512);
+    for (uint8_t i = 0; i < n; i++)
+        hal.console->printf("%02x",buffer[i]);
+    hal.console->printf("\n");
 }
 
 int8_t AP_ExternalAHRS_LORD::get_port(void) const

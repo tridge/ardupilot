@@ -564,9 +564,9 @@ const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum
 //  returns uart on success, nullptr if a serial port cannot be found
 AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, uint8_t instance) const
 {
-    #ifdef HAL_EXTERNAL_AHRS_ENABLED
-    hal.console->printf("EXTERNAL AHRS IS ENABLED");
-    #endif
+    if (protocol == 36) {
+        hal.console->printf("Got checking for protocol 36\n");
+    }
     const struct UARTState *_state = find_protocol_instance(protocol, instance);
     if (_state == nullptr) {
         return nullptr;

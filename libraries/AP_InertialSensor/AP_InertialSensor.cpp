@@ -947,6 +947,7 @@ AP_InertialSensor::detect_backends(void)
 
 #if HAL_EXTERNAL_AHRS_ENABLED
     // if enabled, make the first IMU the external AHRS
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "External AHRS Enabled");
     if (int8_t serial_port = AP::externalAHRS().get_port() >= 0) {
         ADD_BACKEND(new AP_InertialSensor_ExternalAHRS(*this, serial_port));
     }
@@ -1012,7 +1013,6 @@ AP_InertialSensor::detect_backends(void)
                                                     hal.spi->get_device("bmi055_g"),
                                                     ROTATION_ROLL_180_YAW_90));
         break;
-        
     case AP_BoardConfig::PX4_BOARD_SP01:
         _fast_sampling_mask.set_default(1);
         ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device(HAL_INS_MPU9250_EXT_NAME), ROTATION_NONE));
