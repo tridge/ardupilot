@@ -24,6 +24,7 @@
 
 class AP_ExternalAHRS_LORD: public AP_ExternalAHRS_backend {
 public:
+
     AP_ExternalAHRS_LORD(AP_ExternalAHRS *frontend, AP_ExternalAHRS::state_t &state);
 
     // get serial port number, -1 for not enabled
@@ -38,10 +39,13 @@ public:
 
     // check for new data
     void update() override {
-        testing();
+
     };
 
 private:
+
+    void update_thread();
+
     typedef struct {
         Vector3f accel;
         Vector3f gyro;
@@ -50,13 +54,47 @@ private:
     AP_HAL::UARTDriver *uart;
     int8_t port_num;
     uint32_t baudrate;
-    void testing();
     LORDpacketData_t processLORDPacket(const uint8_t*);
     LORDpacketData_t insData(const uint8_t*);
     Vector3f populateVector3f(const uint8_t*,uint8_t);
     uint64_t get8ByteField(const uint8_t*,uint8_t);
     uint32_t get4ByteField(const uint8_t*,uint8_t);
     uint16_t get2ByteField(const uint8_t*,uint8_t);
+
+    struct LORD_Packet {
+        uint8_t header[4];
+        uint8_t* payload;
+        uint8_t checksum[2];
+    };
+
+    //LORD VARIABLES
+    //shared ring buffer
+    static const uint32_t bufferSize = 1024;
+    ByteBuffer buffer{bufferSize};
+    uint8_t tempData[bufferSize];
+    //packet parsing state variables
+    struct LORD_Packet currPacket;
+    enum SearchPhase { sync, payloadSize, payloadAndChecksum };
+    SearchPhase currPhase = sync;
+    int searchBytes = 1;
+    //sync bytes phase
+    const uint8_t syncByte1 = 0x75;
+    const uint8_t syncByte2 = 0x65;
+    uint8_t nextSyncByte = syncByte1;
+
+    //new
+    bool portOpened = false;
+    bool packetReady = false;
+    Vector3f accelNew;
+    Vector3f gyroNew;
+    float test = -2;
+
+    //LORD METHODS
+    void readIMU();
+    void buildPacket();
+    bool validPacket();
+    void getCurrPacket();
+    void accelGyroData(uint8_t * fieldData, float arr[]);
 
 };
 
