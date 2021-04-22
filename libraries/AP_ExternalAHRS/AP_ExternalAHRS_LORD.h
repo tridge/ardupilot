@@ -46,20 +46,8 @@ private:
 
     void update_thread();
 
-    typedef struct {
-        Vector3f accel;
-        Vector3f gyro;
-    } LORDpacketData_t;
-
     AP_HAL::UARTDriver *uart;
-    int8_t port_num;
     uint32_t baudrate;
-    LORDpacketData_t processLORDPacket(const uint8_t*);
-    LORDpacketData_t insData(const uint8_t*);
-    Vector3f populateVector3f(const uint8_t*,uint8_t);
-    uint64_t get8ByteField(const uint8_t*,uint8_t);
-    uint32_t get4ByteField(const uint8_t*,uint8_t);
-    uint16_t get2ByteField(const uint8_t*,uint8_t);
 
     struct LORD_Packet {
         uint8_t header[4];
@@ -67,12 +55,12 @@ private:
         uint8_t checksum[2];
     };
 
-    //LORD VARIABLES
     //shared ring buffer
     static const uint32_t bufferSize = 1024;
     ByteBuffer buffer{bufferSize};
     uint8_t tempData[bufferSize];
-    //packet parsing state variables
+
+    //packet building state variables
     struct LORD_Packet currPacket;
     enum SearchPhase { sync, payloadSize, payloadAndChecksum };
     SearchPhase currPhase = sync;
@@ -82,20 +70,21 @@ private:
     const uint8_t syncByte2 = 0x65;
     uint8_t nextSyncByte = syncByte1;
 
-    //new
+    //variables for final data to be output
     bool portOpened = false;
     bool packetReady = false;
     Vector3f accelNew;
     Vector3f gyroNew;
-    float test = -2;
 
-    //LORD METHODS
     void readIMU();
     void buildPacket();
     bool validPacket();
-    void getCurrPacket();
-    void accelGyroData(uint8_t * fieldData, float arr[]);
 
+    void parsePacket();
+    Vector3f populateVector3f(const uint8_t*,uint8_t,float);
+    uint64_t get8ByteField(const uint8_t*,uint8_t);
+    uint32_t get4ByteField(const uint8_t*,uint8_t);
+    uint16_t get2ByteField(const uint8_t*,uint8_t);
 };
 
 
