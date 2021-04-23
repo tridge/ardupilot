@@ -63,12 +63,22 @@ void AP_ExternalAHRS_LORD::update_thread()
     while(true) {
         if(packetReady) {
             packetReady = false;
-            AP_ExternalAHRS::ins_data_message_t ins;
 
-            ins.accel = accelNew;
-            ins.gyro = gyroNew;
+            {
+                AP_ExternalAHRS::ins_data_message_t ins;
 
-            AP::ins().handle_external(ins);
+                ins.accel = accelNew;
+                ins.gyro = gyroNew;
+
+                AP::ins().handle_external(ins);
+            }
+
+            {
+                AP_ExternalAHRS::mag_data_message_t mag;
+                mag.field = magNew;
+
+                AP::compass().handle_external(mag);
+            }
         }
 
         readIMU();
@@ -166,6 +176,9 @@ void AP_ExternalAHRS_LORD::parsePacket() {
                 break;
             case 05:
                 gyroNew = populateVector3f(currPacket.payload, i, 1);
+                break;
+            case 06:
+                magNew = populateVector3f(currPacket.payload, i, 1000);
                 break;
         }
     }

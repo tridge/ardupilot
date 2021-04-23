@@ -75,6 +75,7 @@ private:
     bool packetReady = false;
     Vector3f accelNew;
     Vector3f gyroNew;
+    Vector3f magNew;
 
     void readIMU();
     void buildPacket();
