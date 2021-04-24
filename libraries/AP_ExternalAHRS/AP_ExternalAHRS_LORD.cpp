@@ -36,7 +36,9 @@ AP_ExternalAHRS_LORD::AP_ExternalAHRS_LORD(AP_ExternalAHRS *_frontend,
                                                      AP_ExternalAHRS::state_t &_state) :
     AP_ExternalAHRS_backend(_frontend, _state)
 {
-    uart = hal.serial(1);
+    auto &sm = AP::serialmanager();
+    uart = sm.find_serial(AP_SerialManager::SerialProtocol_AHRS, 0);
+    // uart = hal.serial(1);
 
     if (!uart) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ExternalAHRS no UART");
