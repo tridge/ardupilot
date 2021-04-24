@@ -76,6 +76,7 @@ private:
     Vector3f accelNew;
     Vector3f gyroNew;
     Vector3f magNew;
+    float pressureNew;
 
     void readIMU();
     void buildPacket();

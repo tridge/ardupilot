@@ -79,6 +79,12 @@ void AP_ExternalAHRS_LORD::update_thread()
 
                 AP::compass().handle_external(mag);
             }
+
+            {
+                AP_ExternalAHRS::baro_data_message_t baro;
+                baro.pressure_pa = pressureNew;
+                AP::baro().handle_external(baro);
+            }
         }
 
         readIMU();
@@ -168,18 +174,25 @@ bool AP_ExternalAHRS_LORD::validPacket() {
 // NEW PACKET PARSING CODE
 void AP_ExternalAHRS_LORD::parsePacket() {
     uint8_t payloadLen = currPacket.header[3];
+    uint8_t dataSet = currPacket.header[2];
     for (uint8_t i = 0; i < payloadLen; i += currPacket.payload[i]) {
         uint8_t fieldDesc = currPacket.payload[i+1];
-        switch (fieldDesc) {
-            case 04:
-                accelNew = populateVector3f(currPacket.payload, i, 9.8);
-                break;
-            case 05:
-                gyroNew = populateVector3f(currPacket.payload, i, 1);
-                break;
-            case 06:
-                magNew = populateVector3f(currPacket.payload, i, 1000);
-                break;
+        if (dataSet == 0x80) {
+            switch (fieldDesc) {
+                case 0x04:
+                    accelNew = populateVector3f(currPacket.payload, i, 9.8);
+                    break;
+                case 0x05:
+                    gyroNew = populateVector3f(currPacket.payload, i, 1);
+                    break;
+                case 0x06:
+                    magNew = populateVector3f(currPacket.payload, i, 1000);
+                    break;
+                case 0x17:
+                    uint32_t tmp = get4ByteField(currPacket.payload, i, 100);
+                    pressureNew = *reinterpret_cast<float*>(&tmp);
+                    break;
+            }
         }
     }
 }
