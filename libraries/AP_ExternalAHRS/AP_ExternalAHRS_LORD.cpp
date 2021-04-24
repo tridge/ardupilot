@@ -36,7 +36,7 @@ AP_ExternalAHRS_LORD::AP_ExternalAHRS_LORD(AP_ExternalAHRS *_frontend,
                                                      AP_ExternalAHRS::state_t &_state) :
     AP_ExternalAHRS_backend(_frontend, _state)
 {
-    uart = hal.serial(4);
+    uart = hal.serial(1);
 
     if (!uart) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ExternalAHRS no UART");
@@ -97,7 +97,7 @@ void AP_ExternalAHRS_LORD::readIMU() {
 
 //use all available bytes to continue building packets where we left off last loop
 void AP_ExternalAHRS_LORD::buildPacket() {
-    while(buffer.available() >= searchBytes) {
+    while(buffer.available() >= (uint32_t)searchBytes) {
         switch (currPhase) {
             case sync: {
                 bool good = buffer.read_byte(tempData);

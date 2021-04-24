@@ -51,7 +51,7 @@ private:
 
     struct LORD_Packet {
         uint8_t header[4];
-        uint8_t* payload;
+        uint8_t payload[512];
         uint8_t checksum[2];
     };
 
