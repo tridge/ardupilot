@@ -189,8 +189,9 @@ void AP_ExternalAHRS_LORD::parsePacket() {
                     magNew = populateVector3f(currPacket.payload, i, 1000);
                     break;
                 case 0x17:
-                    uint32_t tmp = get4ByteField(currPacket.payload, i, 100);
+                    uint32_t tmp = get4ByteField(currPacket.payload, i+2);
                     pressureNew = *reinterpret_cast<float*>(&tmp);
+                    pressureNew *= 100;
                     break;
             }
         }
