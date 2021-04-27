@@ -175,29 +175,52 @@ bool AP_ExternalAHRS_LORD::validPacket() {
 
 // NEW PACKET PARSING CODE
 void AP_ExternalAHRS_LORD::parsePacket() {
+    uint8_t dataSet = currPacket.header[2];
+    switch (dataSet) {
+        case 0x80:
+            parseIMU();
+            break;
+        case 0x81:
+            parseGNSS();
+            break;
+        case 0x82:
+            parseEFD();
+            break;
+    }
+}
+
+void AP_ExternalAHRS_LORD::parseIMU() {
     uint8_t payloadLen = currPacket.header[3];
     uint8_t dataSet = currPacket.header[2];
     for (uint8_t i = 0; i < payloadLen; i += currPacket.payload[i]) {
         uint8_t fieldDesc = currPacket.payload[i+1];
-        if (dataSet == 0x80) {
-            switch (fieldDesc) {
-                case 0x04:
-                    accelNew = populateVector3f(currPacket.payload, i, 9.8);
-                    break;
-                case 0x05:
-                    gyroNew = populateVector3f(currPacket.payload, i, 1);
-                    break;
-                case 0x06:
-                    magNew = populateVector3f(currPacket.payload, i, 1000);
-                    break;
-                case 0x17:
-                    uint32_t tmp = get4ByteField(currPacket.payload, i+2);
-                    pressureNew = *reinterpret_cast<float*>(&tmp);
-                    pressureNew *= 100;
-                    break;
-            }
+        switch (fieldDesc) {
+            case 0x04:
+                accelNew = populateVector3f(currPacket.payload, i, 9.8);
+                break;
+            case 0x05:
+                gyroNew = populateVector3f(currPacket.payload, i, 1);
+                break;
+            case 0x06:
+                magNew = populateVector3f(currPacket.payload, i, 1000);
+                break;
+            case 0x12:
+
+            case 0x17:
+                uint32_t tmp = get4ByteField(currPacket.payload, i+2);
+                pressureNew = *reinterpret_cast<float*>(&tmp);
+                pressureNew *= 100;
+                break;
         }
     }
+}
+
+void AP_ExternalAHRS_LORD::parseGNSS() {
+
+}
+
+void AP_ExternalAHRS_LORD::parseEFD() {
+
 }
 
 int8_t AP_ExternalAHRS_LORD::get_port(void) const

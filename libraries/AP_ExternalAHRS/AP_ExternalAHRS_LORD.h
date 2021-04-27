@@ -77,13 +77,20 @@ private:
     Vector3f gyroNew;
     Vector3f magNew;
     float pressureNew;
+    Quaternion quatNew;
+    double GPSweek
+    
 
     void readIMU();
     void buildPacket();
     bool validPacket();
 
     void parsePacket();
+    void parseIMU();
+    void parseGNSS();
+    void parseEFD();
     Vector3f populateVector3f(const uint8_t*,uint8_t,float);
+    Quaternion populateQuaternion(const uint8_t*,uint8_t);
     uint64_t get8ByteField(const uint8_t*,uint8_t);
     uint32_t get4ByteField(const uint8_t*,uint8_t);
     uint16_t get2ByteField(const uint8_t*,uint8_t);
