@@ -78,7 +78,8 @@ private:
     Vector3f magNew;
     float pressureNew;
     Quaternion quatNew;
-    double GPSweek
+    uint16_t GPSweek;
+    double GPSTOW;
     
 
     void readIMU();

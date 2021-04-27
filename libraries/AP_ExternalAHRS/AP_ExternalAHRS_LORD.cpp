@@ -191,7 +191,6 @@ void AP_ExternalAHRS_LORD::parsePacket() {
 
 void AP_ExternalAHRS_LORD::parseIMU() {
     uint8_t payloadLen = currPacket.header[3];
-    uint8_t dataSet = currPacket.header[2];
     for (uint8_t i = 0; i < payloadLen; i += currPacket.payload[i]) {
         uint8_t fieldDesc = currPacket.payload[i+1];
         switch (fieldDesc) {
@@ -204,8 +203,16 @@ void AP_ExternalAHRS_LORD::parseIMU() {
             case 0x06:
                 magNew = populateVector3f(currPacket.payload, i, 1000);
                 break;
-            case 0x12:
+            case 0x0A: // Quat
+                quatNew = populateQuaternion(currPacket.payload, i);
+                break;
+            case 0x0C: // Euler
 
+                break;
+            case 0x12:
+                // TOW & GPSWeek
+
+                break;
             case 0x17:
                 uint32_t tmp = get4ByteField(currPacket.payload, i+2);
                 pressureNew = *reinterpret_cast<float*>(&tmp);
@@ -263,6 +270,16 @@ Vector3f AP_ExternalAHRS_LORD::populateVector3f(const uint8_t* pkt, uint8_t offs
     data.y = *reinterpret_cast<float*>( &tmp[1] );
     data.z = *reinterpret_cast<float*>( &tmp[2] );
     return data * multiplier;
+}
+
+Quaternion AP_ExternalAHRS_LORD::populateQuaternion(const uint8_t* pkt, uint8_t offset) {
+    // uint32_t tmp[4];
+    // for (uint8_t j = 0; j < 3; j++) {
+    //     tmp[j] = get4ByteField(pkt, offset + j * 4 + 2);
+    // }
+    Quaternion x;
+    x.initialise();
+    return x;
 }
 
 uint64_t AP_ExternalAHRS_LORD::get8ByteField(const uint8_t* pkt, uint8_t offset) {
