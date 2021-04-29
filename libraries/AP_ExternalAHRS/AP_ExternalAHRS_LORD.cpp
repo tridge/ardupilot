@@ -63,30 +63,14 @@ void AP_ExternalAHRS_LORD::update_thread()
     }
 
     while(true) {
-        if(packetReady) {
-            packetReady = false;
-
-            {
-                AP_ExternalAHRS::ins_data_message_t ins;
-
-                ins.accel = accelNew;
-                ins.gyro = gyroNew;
-
-                AP::ins().handle_external(ins);
-            }
-
-            {
-                AP_ExternalAHRS::mag_data_message_t mag;
-                mag.field = magNew;
-
-                AP::compass().handle_external(mag);
-            }
-
-            {
-                AP_ExternalAHRS::baro_data_message_t baro;
-                baro.pressure_pa = pressureNew;
-                AP::baro().handle_external(baro);
-            }
+        if(IMUPacketReady) {
+            handleIMUPacket();
+        }
+        if(GNSSPacketReady) {
+            handleGNSSPacket();
+        }
+        if(EFDPacketReady) {
+            handleEFDPacket();
         }
 
         readIMU();
@@ -95,7 +79,6 @@ void AP_ExternalAHRS_LORD::update_thread()
     }
 }
 
-//LORD METHODS
 
 //read all available bytes into ring buffer.
 void AP_ExternalAHRS_LORD::readIMU() {
@@ -145,7 +128,6 @@ void AP_ExternalAHRS_LORD::buildPacket() {
                 if (validPacket()) {
                     parsePacket();
                     buffer.read(tempData, searchBytes);
-                    packetReady = true;
                 }
                 currPhase = sync;
                 searchBytes = 1;
@@ -190,6 +172,8 @@ void AP_ExternalAHRS_LORD::parsePacket() {
 }
 
 void AP_ExternalAHRS_LORD::parseIMU() {
+    IMUPacketReady = true;
+
     uint8_t payloadLen = currPacket.header[3];
     for (uint8_t i = 0; i < payloadLen; i += currPacket.payload[i]) {
         uint8_t fieldDesc = currPacket.payload[i+1];
@@ -223,14 +207,56 @@ void AP_ExternalAHRS_LORD::parseIMU() {
 }
 
 void AP_ExternalAHRS_LORD::parseGNSS() {
+    GNSSPacketReady = true;
 
 }
 
 void AP_ExternalAHRS_LORD::parseEFD() {
+    EFDPacketReady = true;
 
 }
 
-int8_t AP_ExternalAHRS_LORD::get_port(void) const
+void AP_ExternalAHRS_LORD::handleIMUPacket() {
+    IMUPacketReady = false;
+
+    {
+        WITH_SEMAPHORE(state.sem);
+        state.accel = accelNew;
+        state.gyro = gyroNew;
+    }
+
+    {
+        AP_ExternalAHRS::ins_data_message_t ins;
+
+        ins.accel = accelNew;
+        ins.gyro = gyroNew;
+
+        AP::ins().handle_external(ins);
+    }
+
+    {
+        AP_ExternalAHRS::mag_data_message_t mag;
+        mag.field = magNew;
+
+        AP::compass().handle_external(mag);
+    }
+
+    {
+        AP_ExternalAHRS::baro_data_message_t baro;
+        baro.pressure_pa = pressureNew;
+        AP::baro().handle_external(baro);
+    }
+}
+
+void AP_ExternalAHRS_LORD::handleGNSSPacket() {
+    GNSSPacketReady = false;
+}
+
+void AP_ExternalAHRS_LORD::handleEFDPacket() {
+    EFDPacketReady = false;
+}
+
+    int8_t AP_ExternalAHRS_LORD::get_port(void) const
 {
     return 4;
 };

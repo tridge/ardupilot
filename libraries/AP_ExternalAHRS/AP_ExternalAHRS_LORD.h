@@ -48,6 +48,7 @@ private:
 
     AP_HAL::UARTDriver *uart;
     uint32_t baudrate;
+    bool portOpened = false;
 
     struct LORD_Packet {
         uint8_t header[4];
@@ -71,8 +72,9 @@ private:
     uint8_t nextSyncByte = syncByte1;
 
     //variables for final data to be output
-    bool portOpened = false;
-    bool packetReady = false;
+    bool IMUPacketReady = false;
+    bool GNSSPacketReady = false;
+    bool EFDPacketReady = false;
     Vector3f accelNew;
     Vector3f gyroNew;
     Vector3f magNew;
@@ -90,6 +92,9 @@ private:
     void parseIMU();
     void parseGNSS();
     void parseEFD();
+    void handleIMUPacket();
+    void handleGNSSPacket();
+    void handleEFDPacket();
     Vector3f populateVector3f(const uint8_t*,uint8_t,float);
     Quaternion populateQuaternion(const uint8_t*,uint8_t);
     uint64_t get8ByteField(const uint8_t*,uint8_t);
