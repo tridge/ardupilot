@@ -955,7 +955,7 @@ AP_InertialSensor::detect_backends(void)
 
 #if defined(HAL_INS_PROBE_LIST)
     // IMUs defined by IMU lines in hwdef.dat
-    HAL_INS_PROBE_LIST;
+    //HAL_INS_PROBE_LIST;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_SITL
     for (uint8_t i=0; i<AP::sitl()->imu_count; i++) {
         ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, i==1?INS_SITL_SENSOR_B:INS_SITL_SENSOR_A));

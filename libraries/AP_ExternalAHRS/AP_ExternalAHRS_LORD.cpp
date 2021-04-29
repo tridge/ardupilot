@@ -37,8 +37,9 @@ AP_ExternalAHRS_LORD::AP_ExternalAHRS_LORD(AP_ExternalAHRS *_frontend,
     AP_ExternalAHRS_backend(_frontend, _state)
 {
     auto &sm = AP::serialmanager();
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD about to try to use serial manager!!!");
     uart = sm.find_serial(AP_SerialManager::SerialProtocol_AHRS, 0);
+    // uart = hal.serial(1);
+
     if (!uart) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ExternalAHRS no UART");
         hal.console->printf("LORD IS NOT CONNECTED ANYMORE\n");
@@ -46,29 +47,192 @@ AP_ExternalAHRS_LORD::AP_ExternalAHRS_LORD(AP_ExternalAHRS *_frontend,
     }
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD ExternalAHRS initialised");
 
-    baudrate = sm.find_baudrate(AP_SerialManager::SerialProtocol_AHRS, 0);
-    port_num = sm.find_portnum(AP_SerialManager::SerialProtocol_AHRS, 0);
-    uart->begin(baudrate);
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "LORD ExternalAHRS with baud: %lu, on port %d", baudrate, port_num);
+    if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_ExternalAHRS_LORD::update_thread, void), "AHRS", 2048, AP_HAL::Scheduler::PRIORITY_SPI, 0)) {
+        AP_HAL::panic("Failed to start ExternalAHRS update thread");
+    }
+
+    baudrate = 115200;
+}
+
+void AP_ExternalAHRS_LORD::update_thread()
+{
+    if(!portOpened) {
+        portOpened = true;
+        uart->begin(baudrate);
+        hal.scheduler->delay(1000);
+    }
+
+    while(true) {
+        if(packetReady) {
+            packetReady = false;
+
+            {
+                AP_ExternalAHRS::ins_data_message_t ins;
+
+                ins.accel = accelNew;
+                ins.gyro = gyroNew;
+
+                AP::ins().handle_external(ins);
+            }
+
+            {
+                AP_ExternalAHRS::mag_data_message_t mag;
+                mag.field = magNew;
+
+                AP::compass().handle_external(mag);
+            }
+
+            {
+                AP_ExternalAHRS::baro_data_message_t baro;
+                baro.pressure_pa = pressureNew;
+                AP::baro().handle_external(baro);
+            }
+        }
+
+        readIMU();
+        buildPacket();
+        hal.scheduler->delay(1);
+    }
+}
+
+//LORD METHODS
+
+//read all available bytes into ring buffer.
+void AP_ExternalAHRS_LORD::readIMU() {
+    uint32_t amountRead = uart -> read(tempData, bufferSize);
+    buffer.write(tempData, amountRead);
+}
+
+//use all available bytes to continue building packets where we left off last loop
+void AP_ExternalAHRS_LORD::buildPacket() {
+    while(buffer.available() >= (uint32_t)searchBytes) {
+        switch (currPhase) {
+            case sync: {
+                bool good = buffer.read_byte(tempData);
+                if(!good) break;
+                if (tempData[0] == nextSyncByte) {
+                    if (nextSyncByte == syncByte2) {
+                        nextSyncByte = syncByte1;
+                        currPacket.header[0] = 0x75;
+                        currPacket.header[1] = 0x65;
+                        currPhase = payloadSize;
+                        searchBytes = 2;
+                    } else {
+                        nextSyncByte = syncByte2;
+                    }
+                } else {
+                    nextSyncByte = syncByte1;
+                }
+            }
+                break;
+            case payloadSize: {
+                buffer.peekbytes(tempData, searchBytes);
+                currPacket.header[2] = tempData[0];
+                currPacket.header[3] = tempData[1];
+                searchBytes = tempData[1] + 4; //next time we need to peek the second half of the header (which we already peeked) + payload + checksum
+                currPhase = payloadAndChecksum;
+            }
+                break;
+            case payloadAndChecksum: {
+                buffer.peekbytes(tempData, searchBytes);
+                //copy in the payload and checksum, skip second half of header
+                for (int i = 2; i < searchBytes - 2; i++) {
+                    currPacket.payload[i - 2] = tempData[i];
+                }
+                currPacket.checksum[0] = tempData[searchBytes - 2];
+                currPacket.checksum[1] = tempData[searchBytes - 1];
+                //if checksum is good we can move read pointer, otherwise we leave all those bytes and start after the last sync bytes
+                if (validPacket()) {
+                    parsePacket();
+                    buffer.read(tempData, searchBytes);
+                    packetReady = true;
+                }
+                currPhase = sync;
+                searchBytes = 1;
+            }
+                break;
+        }
+    }
+}
+
+//gets checksum and compares it to curr packet
+bool AP_ExternalAHRS_LORD::validPacket() {
+    uint8_t checksumByte1 = 0;
+    uint8_t checksumByte2 = 0;
+
+    for (int i = 0; i < 4; i++) {
+        checksumByte1 += currPacket.header[i];
+        checksumByte2 += checksumByte1;
+    }
+
+    for (int i = 0; i < currPacket.header[3]; i++) {
+        checksumByte1 += currPacket.payload[i];
+        checksumByte2 += checksumByte1;
+    }
+
+    return (currPacket.checksum[0] == checksumByte1 && currPacket.checksum[1] == checksumByte2);
+}
+
+// NEW PACKET PARSING CODE
+void AP_ExternalAHRS_LORD::parsePacket() {
+    uint8_t dataSet = currPacket.header[2];
+    switch (dataSet) {
+        case 0x80:
+            parseIMU();
+            break;
+        case 0x81:
+            parseGNSS();
+            break;
+        case 0x82:
+            parseEFD();
+            break;
+    }
+}
+
+void AP_ExternalAHRS_LORD::parseIMU() {
+    uint8_t payloadLen = currPacket.header[3];
+    for (uint8_t i = 0; i < payloadLen; i += currPacket.payload[i]) {
+        uint8_t fieldDesc = currPacket.payload[i+1];
+        switch (fieldDesc) {
+            case 0x04:
+                accelNew = populateVector3f(currPacket.payload, i, 9.8);
+                break;
+            case 0x05:
+                gyroNew = populateVector3f(currPacket.payload, i, 1);
+                break;
+            case 0x06:
+                magNew = populateVector3f(currPacket.payload, i, 1000);
+                break;
+            case 0x0A: // Quat
+                quatNew = populateQuaternion(currPacket.payload, i);
+                break;
+            case 0x0C: // Euler
+
+                break;
+            case 0x12:
+                // TOW & GPSWeek
+
+                break;
+            case 0x17:
+                uint32_t tmp = get4ByteField(currPacket.payload, i+2);
+                pressureNew = *reinterpret_cast<float*>(&tmp);
+                pressureNew *= 100;
+                break;
+        }
+    }
+}
+
+void AP_ExternalAHRS_LORD::parseGNSS() {
 
 }
 
-void AP_ExternalAHRS_LORD::testing() {
-    uint8_t buffer[512];
-    if (!uart) {
-        hal.console->printf("Uart died\n");
-        return;
-    }
-//    hal.console->printf("Opened on portnum: %d\n",port_num);
-    uint32_t n = uart->read(buffer, 512);
-    for (uint8_t i = 0; i < n; i++)
-        hal.console->printf("%02x",buffer[i]);
-    hal.console->printf("\n");
+void AP_ExternalAHRS_LORD::parseEFD() {
+
 }
 
 int8_t AP_ExternalAHRS_LORD::get_port(void) const
 {
-    return -1;
+    return 4;
 };
 
 bool AP_ExternalAHRS_LORD::healthy(void) const
@@ -95,36 +259,8 @@ void AP_ExternalAHRS_LORD::send_status_report(mavlink_channel_t chan) const
 {
     return;
 }
-/*
-LORDpacketData_t AP_ExternalAHRS_LORD::processLORDPacket(const uint8_t*) {
-    uint8_t pktDesc = pkt[2];
-    switch (pktDesc) {
-        case 0x80:
-            return insData(pkt);
-        default:
-            LORDpacketData_t nullPacket = { -999, -999, -999, -999, -999, -999 };
-            return nullPacket;
-    }
-}
 
-LORDpacketData_t AP_ExternalAHRS_LORD::insData(const uint8_t*) {
-    LORDpacketData_t data;
-    uint8_t payloadLen = pkt[3];
-    for (uint8_t i = 4; i < payloadLen; i += pkt[i]) {
-        uint8_t fieldDesc = pkt[i+1];
-        switch (fieldDesc) {
-            case 04:
-                data.accel = populateVector3f(pkt, i);
-                break;
-            case 05:
-                data.gyro = populateVector3f(pkt, i);
-                break;
-        }
-    }
-    return data;
-}
-
-Vector3f AP_ExternalAHRS_LORD::populateVector3f(const uint8_t*,uint8_t) {
+Vector3f AP_ExternalAHRS_LORD::populateVector3f(const uint8_t* pkt, uint8_t offset, float multiplier) {
     Vector3f data;
     uint32_t tmp[3];
     for (uint8_t j = 0; j < 3; j++) {
@@ -133,29 +269,49 @@ Vector3f AP_ExternalAHRS_LORD::populateVector3f(const uint8_t*,uint8_t) {
     data.x = *reinterpret_cast<float*>( &tmp[0] );
     data.y = *reinterpret_cast<float*>( &tmp[1] );
     data.z = *reinterpret_cast<float*>( &tmp[2] );
-    return data;
+    return data * multiplier;
 }
 
-uint64_t AP_ExternalAHRS_LORD::get8ByteField(const uint8_t*,uint8_t) {
+Quaternion AP_ExternalAHRS_LORD::populateQuaternion(const uint8_t* pkt, uint8_t offset) {
+    // uint32_t tmp[4];
+    // for (uint8_t j = 0; j < 3; j++) {
+    //     tmp[j] = get4ByteField(pkt, offset + j * 4 + 2);
+    // }
+    Quaternion x;
+    x.initialise();
+    return x;
+}
+
+uint64_t AP_ExternalAHRS_LORD::get8ByteField(const uint8_t* pkt, uint8_t offset) {
     uint64_t res = 0;
-    for (int i = 0; i < 2; i++)
-        res = res << 32 | get4ByteField(pkt,offset + 4 * i);
+    // for (int i = 0; i < 2; i++)
+    //     res = res << 32 | get4ByteField(pkt,offset + 4 * i);
+    memmove(&res, pkt+offset, 8);
+    if (char(1) == 1)
+        res = ((res & 0xff) << 56) | ((res & 0xff00000000000000) >> 56) | ((res & 0xff00) << 40) | ((res & 0xff000000000000) >> 40) | ((res & 0xff0000) << 24) | ((res & 0xff0000000000) >> 24) | ((res & 0xff000000) << 8) | ((res & 0xff00000000) >> 8);
     return res;
 }
 
-uint32_t AP_ExternalAHRS_LORD::get4ByteField(const uint8_t*,uint8_t) {
+uint32_t AP_ExternalAHRS_LORD::get4ByteField(const uint8_t* pkt, uint8_t offset) {
     uint32_t res = 0;
-    for (int i = 0; i < 2; i++)
-        res = res << 16 | get2ByteField(pkt, offset + 2 * i);
+    // for (int i = 0; i < 2; i++)
+    //     res = res << 16 | get2ByteField(pkt, offset + 2 * i);
+    memmove(&res, pkt+offset, 4);
+    if (char(1) == 1) // Is the device little endian (need to convert big endian packet field to little endian)
+        res = ((res & 0xff) << 24) | ((res & 0xff000000) >> 24) | ((res & 0xff00) << 8) | ((res & 0xff0000) >> 8);
     return res;
 }
 
-uint16_t AP_ExternalAHRS_LORD::get2ByteField(const uint8_t*,uint8_t) {
+uint16_t AP_ExternalAHRS_LORD::get2ByteField(const uint8_t* pkt, uint8_t offset) {
     uint16_t res = 0;
-    for (int i = 0; i < 2; i++)
-        res = res << 8 | pkt[offset + i];
+    // for (int i = 0; i < 2; i++)
+    //     res = res << 8 | pkt[offset + i];
+    memmove(&res, pkt+offset, 2);
+    if (char(1) == 1)
+        res = ((res & 0xff) << 8) | ((res & 0xff00) >> 8);
     return res;
 }
-*/
+
+
 
 #endif  // HAL_EXTERNAL_AHRS_ENABLED

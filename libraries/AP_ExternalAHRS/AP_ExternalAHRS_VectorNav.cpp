@@ -106,7 +106,8 @@ AP_ExternalAHRS_VectorNav::AP_ExternalAHRS_VectorNav(AP_ExternalAHRS *_frontend,
     AP_ExternalAHRS_backend(_frontend, _state)
 {
     auto &sm = AP::serialmanager();
-    uart = sm.find_serial(AP_SerialManager::SerialProtocol_AHRS, 0);
+    //uart = sm.find_serial(AP_SerialManager::SerialProtocol_AHRS, 0);
+    uart = hal.serial(4);
     if (!uart) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ExternalAHRS no UART");
         return;
