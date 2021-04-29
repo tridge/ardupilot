@@ -67,6 +67,12 @@ void AP_ExternalAHRS_LORD::update_thread()
             packetReady = false;
 
             {
+                WITH_SEMAPHORE(state.sem);
+                state.accel = accelNew;
+                state.gyro = gyroNew;
+            }
+
+            {
                 AP_ExternalAHRS::ins_data_message_t ins;
 
                 ins.accel = accelNew;
