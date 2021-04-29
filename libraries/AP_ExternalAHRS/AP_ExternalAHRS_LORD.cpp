@@ -228,6 +228,8 @@ void AP_ExternalAHRS_LORD::handleIMUPacket() {
         WITH_SEMAPHORE(state.sem);
         state.accel = accelNew;
         state.gyro = gyroNew;
+        state.quat = quatNew;            
+        state.have_quaternion = true;
     }
 
     {
@@ -314,12 +316,17 @@ Vector3f AP_ExternalAHRS_LORD::populateVector3f(const uint8_t* pkt, uint8_t offs
 }
 
 Quaternion AP_ExternalAHRS_LORD::populateQuaternion(const uint8_t* pkt, uint8_t offset) {
-    // uint32_t tmp[4];
-    // for (uint8_t j = 0; j < 3; j++) {
-    //     tmp[j] = get4ByteField(pkt, offset + j * 4 + 2);
-    // }
+    uint32_t tmp[4];
+    for (uint8_t j = 0; j < 3; j++) {
+        tmp[j] = get4ByteField(pkt, offset + j * 4 + 2);
+    }
+
     Quaternion x;
-    x.initialise();
+    x.q1 = *reinterpret_cast<float*>( &tmp[0] );
+    x.q2 = *reinterpret_cast<float*>( &tmp[1] );
+    x.q3 = *reinterpret_cast<float*>( &tmp[2] );
+    x.q4 = *reinterpret_cast<float*>( &tmp[3] );
+
     return x;
 }
 
