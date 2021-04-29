@@ -178,33 +178,35 @@ void AP_ExternalAHRS_LORD::parseIMU() {
     for (uint8_t i = 0; i < payloadLen; i += currPacket.payload[i]) {
         uint8_t fieldDesc = currPacket.payload[i+1];
         switch (fieldDesc) {
-            case 0x04:
+            case 0x04: {
                 accelNew = populateVector3f(currPacket.payload, i, 9.8);
-                break;
-            case 0x05:
+                }break;
+            case 0x05: {
                 gyroNew = populateVector3f(currPacket.payload, i, 1);
-                break;
-            case 0x06:
+                }break;
+            case 0x06: {
                 magNew = populateVector3f(currPacket.payload, i, 1000);
-                break;
-            case 0x0A: // Quat
+                }break;
+            case 0x0A: { // Quat
                 quatNew = populateQuaternion(currPacket.payload, i);
-                break;
-            case 0x0C: // Euler
+                }break;
+            case 0x0C: { // Euler
 
-                break;
-            case 0x12:
+                }break;
+            case 0x12: {
                 // TOW & GPSWeek
-                auto temp = get8ByteField(currPacket.payload, i + 2);
-                GPSTOW = *reinterpret_cast<double *>(&temp);
-                GPSweek = get2ByteField(currPacket.payload, i + 10);
-                break;
-
-            case 0x17:
-                uint32_t tmp = get4ByteField(currPacket.payload, i+2);
-                pressureNew = *reinterpret_cast<float*>(&tmp);
+                uint16_t timestamp_flags = get4ByteField(currPacket.payload, i+14);
+                if (timestamp_flags >= 4) {
+                    auto temp = get8ByteField(currPacket.payload, i + 2);
+                    GPSTOW = *reinterpret_cast<double *>(&temp);
+                    GPSweek = get2ByteField(currPacket.payload, i + 10);
+                }
+                }break;
+            case 0x17: {
+                uint32_t tmp = get4ByteField(currPacket.payload, i + 2);
+                pressureNew = *reinterpret_cast<float *>(&tmp);
                 pressureNew *= 100;
-                break;
+                }break;
         }
     }
 }
@@ -253,7 +255,10 @@ void AP_ExternalAHRS_LORD::handleIMUPacket() {
     {
         AP_ExternalAHRS::gps_data_message_t gps;
         gps.gps_week = GPSweek;
-        gps.ms_tow = GPSTOW;
+        gps.ms_tow = (uint32_t)(GPSTOW * 1000);
+
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "GPSweek: %d", gps.gps_week);
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ms_tow: %d", (int)gps.ms_tow);
         AP::gps().handle_external(gps);
     }
 }
