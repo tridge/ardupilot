@@ -195,8 +195,11 @@ void AP_ExternalAHRS_LORD::parseIMU() {
                 break;
             case 0x12:
                 // TOW & GPSWeek
-
+                auto temp = get8ByteField(currPacket.payload, i + 2);
+                GPSTOW = *reinterpret_cast<double *>(&temp);
+                GPSweek = get2ByteField(currPacket.payload, i + 10);
                 break;
+
             case 0x17:
                 uint32_t tmp = get4ByteField(currPacket.payload, i+2);
                 pressureNew = *reinterpret_cast<float*>(&tmp);
@@ -245,6 +248,13 @@ void AP_ExternalAHRS_LORD::handleIMUPacket() {
         AP_ExternalAHRS::baro_data_message_t baro;
         baro.pressure_pa = pressureNew;
         AP::baro().handle_external(baro);
+    }
+
+    {
+        AP_ExternalAHRS::gps_data_message_t gps;
+        gps.gps_week = GPSweek;
+        gps.ms_tow = GPSTOW;
+        AP::gps().handle_external(gps);
     }
 }
 
