@@ -560,7 +560,7 @@ void GCS_MAVLINK::send_ahrs2()
     Location loc {};
     // we want one or both of these, use | to avoid short-circuiting:
     if (uint8_t(ahrs.get_secondary_attitude(euler)) |
-        uint8_t(ahrs.get_secondary_position(loc))) {
+        uint8_t(ahrs.get_location_EKF3(loc))) {
         mavlink_msg_ahrs2_send(chan,
                                euler.x,
                                euler.y,
@@ -568,6 +568,16 @@ void GCS_MAVLINK::send_ahrs2()
                                loc.alt*1.0e-2f,
                                loc.lat,
                                loc.lng);
+    }
+    if (ahrs.get_location_EKF3_corrected(loc)) {
+        mavlink_msg_ahrs3_send(chan,
+                               euler.x,
+                               euler.y,
+                               euler.z,
+                               loc.alt*1.0e-2f,
+                               loc.lat,
+                               loc.lng,
+                               0, 0, 0, 0);
     }
 #endif
 }
