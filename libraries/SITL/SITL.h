@@ -157,6 +157,12 @@ public:
     // throttle when motors are active
     float throttle;
 
+    // height above ground
+    float height_agl;
+
+    // distance for a pitch270 rangefinder
+    float rangefinder_pitch_270_distance = -1;
+
     static const struct AP_Param::GroupInfo var_info[];
     static const struct AP_Param::GroupInfo var_info2[];
     static const struct AP_Param::GroupInfo var_info3[];
