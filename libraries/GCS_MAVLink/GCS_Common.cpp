@@ -569,6 +569,16 @@ void GCS_MAVLINK::send_ahrs2()
                                loc.lat,
                                loc.lng);
     }
+    if (ahrs.get_location_EKF3(loc)) {
+        mavlink_msg_ahrs3_send(chan,
+                               euler.x,
+                               euler.y,
+                               euler.z,
+                               loc.alt*1.0e-2f,
+                               loc.lat,
+                               loc.lng,
+                               0, 0, 0, 0);
+    }
 #endif
 }
 
