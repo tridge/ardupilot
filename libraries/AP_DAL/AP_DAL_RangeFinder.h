@@ -58,6 +58,7 @@ public:
     }
 
     uint16_t distance_cm() const { return _RRNI.distance_cm; }
+    uint32_t sample_ms() const { return _RRNI.sample_ms; }
 
     const Vector3f &get_pos_offset() const { return _RRNI.pos_offset; }
 
