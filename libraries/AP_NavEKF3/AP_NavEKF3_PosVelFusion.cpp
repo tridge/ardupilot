@@ -4,6 +4,7 @@
 #include "AP_NavEKF3_core.h"
 #include <GCS_MAVLink/GCS.h>
 #include <AP_DAL/AP_DAL.h>
+#include <AP_Logger/AP_Logger.h>
 
 /********************************************************
 *                   RESET FUNCTIONS                     *
@@ -65,6 +66,7 @@ void NavEKF3_core::ResetVelocity(resetDataSource velResetSource)
     // Calculate the velocity jump due to the reset
     velResetNE.x = stateStruct.velocity.x - velResetNE.x;
     velResetNE.y = stateStruct.velocity.y - velResetNE.y;
+    velResetSumNE += velResetNE;
 
     // store the time of the reset
     lastVelReset_ms = imuSampleTime_ms;
@@ -90,6 +92,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
     } else  {
         // Use GPS data as first preference if fresh data is available
         if ((imuSampleTime_ms - lastTimeGpsReceived_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::GPS) {
+            lastGpsPosPassTime_ms = imuSampleTime_ms;
             // correct for antenna position
             gps_elements gps_corrected = gpsDataNew;
             CorrectGPSForAntennaOffset(gps_corrected);
@@ -106,6 +109,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
             P[7][7] = P[8][8] = sq(MAX(gpsPosAccuracy,frontend->_gpsHorizPosNoise));
 #if EK3_FEATURE_BEACON_FUSION
         } else if ((imuSampleTime_ms - rngBcn.last3DmeasTime_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::RNGBCN) {
+            rngBcn.lastPassTime_ms = imuSampleTime_ms;
             // use the range beacon data as a second preference
             stateStruct.position.x = rngBcn.receiverPos.x;
             stateStruct.position.y = rngBcn.receiverPos.y;
@@ -115,6 +119,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 #endif
 #if EK3_FEATURE_EXTERNAL_NAV
         } else if ((imuSampleTime_ms - extNavDataDelayed.time_ms < 250 && posResetSource == resetDataSource::DEFAULT) || posResetSource == resetDataSource::EXTNAV) {
+            lastExtNavPosPassTime_ms = imuSampleTime_ms;
             // use external nav data as the third preference
             stateStruct.position.x = extNavDataDelayed.pos.x;
             stateStruct.position.y = extNavDataDelayed.pos.y;
@@ -141,7 +146,6 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 
     // clear the timeout flags and counters
     posTimeout = false;
-    lastPosPassTime_ms = imuSampleTime_ms;
 }
 
 #if EK3_FEATURE_POSITION_RESET
@@ -150,7 +154,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 // Returns true if the set was successful
 bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
-    if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
+    if ((imuSampleTime_ms - lastGpsPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
         (PV_AidingMode == AID_NONE)
         || !validOrigin) {
         return false;
@@ -335,7 +339,7 @@ bool NavEKF3_core::resetHeightDatum(void)
     stateStruct.position.z = 0.0f;
     // adjust the height of the EKF origin so that the origin plus baro height before and after the reset is the same
     if (validOrigin) {
-        if (!gpsGoodToAlign) {
+        if (!gpsGoodToAlign || frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS) {
             // if we don't have GPS lock then we shouldn't be doing a
             // resetHeightDatum, but if we do then the best option is
             // to maintain the old error
@@ -409,6 +413,7 @@ void NavEKF3_core::CorrectExtNavForSensorOffset(ext_nav_elements &ext_nav_data)
     ext_nav_data.pos.x -= posOffsetEarth.x;
     ext_nav_data.pos.y -= posOffsetEarth.y;
     ext_nav_data.pos.z -= posOffsetEarth.z;
+
 #endif
 }
 
@@ -470,6 +475,9 @@ void NavEKF3_core::SelectVelPosFusion()
     // Check for data at the fusion time horizon
     extNavDataToFuse = storedExtNav.recall(extNavDataDelayed, imuDataDelayed.time_ms);
     if (extNavDataToFuse) {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        printf("w2 %.1f %.1f %.1f %.1f\n",extNavDataDelayed.pos.x,extNavDataDelayed.pos.y,extNavDataDelayed.pos.z,extNavDataDelayed.posErr);
+#endif
         CorrectExtNavForSensorOffset(extNavDataDelayed);
     }
     extNavVelToFuse = storedExtNavVel.recall(extNavVelDelayed, imuDataDelayed.time_ms);
@@ -490,13 +498,12 @@ void NavEKF3_core::SelectVelPosFusion()
 
     // get data that has now fallen behind the fusion time horizon
     gpsDataToFuse = storedGPS.recall(gpsDataDelayed,imuDataDelayed.time_ms) && !waitingForGpsChecks;
-
     if (gpsDataToFuse) {
         CorrectGPSForAntennaOffset(gpsDataDelayed);
         // calculate innovations and variances for reporting purposes only
         CalculateVelInnovationsAndVariances(gpsDataDelayed.vel, frontend->_gpsHorizVelNoise, frontend->gpsNEVelVarAccScale, gpsVelInnov, gpsVelVarInnov);
-        // record time innovations were calculated (for timeout checks)
-        gpsVelInnovTime_ms = dal.millis();
+        // record time GPS data was retrieved from the buffer (for timeout checks)
+        gpsRetrieveTime_ms = dal.millis();
     }
 
     // detect position source changes.  Trigger position reset if position source is valid
@@ -531,12 +538,28 @@ void NavEKF3_core::SelectVelPosFusion()
         velPosObs[3] = posxy.x;
         velPosObs[4] = posxy.y;
 #if EK3_FEATURE_EXTERNAL_NAV
-    } else if (extNavDataToFuse && (PV_AidingMode == AID_ABSOLUTE) && (posxy_source == AP_NavEKF_Source::SourceXY::EXTNAV)) {
-        // use external nav system for horizontal position
-        extNavUsedForPos = true;
-        fusePosData = true;
+    } else if (extNavDataToFuse && (PV_AidingMode == AID_ABSOLUTE)) {
+        uint32_t delta_ms = imuSampleTime_ms - lastExtNavPosPassTime_ms;
+        posObsIsLongInterval = delta_ms > 2000;
         velPosObs[3] = extNavDataDelayed.pos.x;
         velPosObs[4] = extNavDataDelayed.pos.y;
+
+        if (delta_ms > 25000) {
+            ResetPositionNE(velPosObs[3],velPosObs[4]);
+            zeroRows(P,7,8);
+            zeroCols(P,7,8);
+            P[7][7] = P[8][8] = sq(extNavDataDelayed.posErr);
+            posTimeout = false;
+            lastExtNavPosPassTime_ms = imuSampleTime_ms;
+            fusePosData = false;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "15 second timeout reset");
+#endif
+        } else if (posxy_source == AP_NavEKF_Source::SourceXY::EXTNAV) {
+            // use external nav system for horizontal position
+            fusePosData = true;
+        }
+        extNavUsedForPos = true;
 #endif // EK3_FEATURE_EXTERNAL_NAV
     }
 
@@ -626,7 +649,42 @@ void NavEKF3_core::SelectVelPosFusion()
 
     // perform fusion
     if (fuseVelData || fusePosData || fuseHgtData) {
+        const Vector2F posBeforeFusion = Vector2F(stateStruct.position.x, stateStruct.position.y);
+        const Vector2F velBeforeFusion = Vector2F(stateStruct.velocity.x, stateStruct.velocity.y);
+
         FuseVelPosNED();
+
+        if (fusePosData && posObsIsLongInterval) {
+            // Handle resulting position and velocity change as if a reset had occurred
+            // becasue infrequent position updates such as from terrain contour matching
+            // can produce big position jumps that the control loops need to handle.
+            // Velocity changes will be smaller, but the accumulated effect of updates
+            // may be useful for terrain conmtour matching so has been accuulated and
+            // reported, but not used to modify the output observer to reduce velocty noise.
+            // TODO revisit assumptions regarding the role of accumulated velocity changes
+            // on terrain contour matching.
+
+            posResetNE.x = stateStruct.position.x - posBeforeFusion.x;
+            posResetNE.y = stateStruct.position.y - posBeforeFusion.y;
+
+            velResetSumNE.x += stateStruct.velocity.x - velBeforeFusion.x;
+            velResetSumNE.y += stateStruct.velocity.y - velBeforeFusion.y;
+
+            // Add the position offset to the output observer states
+            for (uint8_t i=0; i<imu_buffer_length; i++) {
+                storedOutput[i].position.x += posResetNE.x;
+                storedOutput[i].position.y += posResetNE.y;
+            }
+            outputDataNew.position.x += posResetNE.x;
+            outputDataNew.position.y += posResetNE.y;
+            outputDataDelayed.position.x += posResetNE.x;
+            outputDataDelayed.position.y += posResetNE.y;
+
+            lastPosReset_ms = imuSampleTime_ms;
+
+            posObsIsLongInterval = false;
+        }
+
         // clear the flags to prevent repeated fusion of the same data
         fuseVelData = false;
         fuseHgtData = false;
@@ -694,14 +752,18 @@ void NavEKF3_core::FuseVelPosNED()
                 R_OBS[2] = sq(constrain_ftype(frontend->_gpsVertVelNoise,  0.05f, 5.0f)) + sq(frontend->gpsDVelVarAccScale  * accNavMag);
             }
             R_OBS[1] = R_OBS[0];
-            // Use GPS reported position accuracy if available and floor at value set by GPS position noise parameter
+#if EK3_FEATURE_EXTERNAL_NAV
+            if (extNavUsedForPos) {
+                R_OBS[3] = sq(MAX(extNavDataDelayed.posErr, 0.01f));
+            } else if (gpsPosAccuracy > 0.0f) {
+                R_OBS[3] = sq(constrain_ftype(gpsPosAccuracy, frontend->_gpsHorizPosNoise, 100.0f));
+            }
+#else
             if (gpsPosAccuracy > 0.0f) {
                 R_OBS[3] = sq(constrain_ftype(gpsPosAccuracy, frontend->_gpsHorizPosNoise, 100.0f));
-#if EK3_FEATURE_EXTERNAL_NAV
-            } else if (extNavUsedForPos) {
-                R_OBS[3] = sq(constrain_ftype(extNavDataDelayed.posErr, 0.01f, 10.0f));
+            }
 #endif
-            } else {
+            else {
                 R_OBS[3] = sq(constrain_ftype(frontend->_gpsHorizPosNoise, 0.1f, 10.0f)) + sq(posErr);
             }
             R_OBS[4] = R_OBS[3];
@@ -770,17 +832,51 @@ void NavEKF3_core::FuseVelPosNED()
             posTestRatio = (sq(innovVelPos[3]) + sq(innovVelPos[4])) / maxPosInnov2;
             if (posTestRatio < 1.0f || (PV_AidingMode == AID_NONE)) {
                 posCheckPassed = true;
-                lastPosPassTime_ms = imuSampleTime_ms;
+                posTimeout = false;
+#if EK3_FEATURE_EXTERNAL_NAV
+                if (extNavUsedForPos) {
+                    lastExtNavPosPassTime_ms = imuSampleTime_ms;
+                } else {
+                    lastGpsPosPassTime_ms = imuSampleTime_ms;
+                }
+#else
+                lastGpsPosPassTime_ms = imuSampleTime_ms;
+#endif
             } else if ((frontend->_gpsGlitchRadiusMax <= 0) && (PV_AidingMode != AID_NONE)) {
                 // Handle the special case where the glitch radius parameter has been set to a non-positive number.
                 // The innovation variance is increased to limit the state update to an amount corresponding
                 // to a test ratio of 1.
                 posCheckPassed = true;
-                lastPosPassTime_ms = imuSampleTime_ms;
                 varInnovVelPos[3] *= posTestRatio;
                 varInnovVelPos[4] *= posTestRatio;
                 posCheckPassed = true;
-                lastPosPassTime_ms = imuSampleTime_ms;
+                lastGpsPosPassTime_ms = imuSampleTime_ms;
+            } else if (posObsIsLongInterval && (PV_AidingMode != AID_NONE) && frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::EXTNAV) {
+                // reset to observation rather than reject if this happens twice in a row
+                if (posObsRejectCount >= 1) {
+#if EK3_FEATURE_EXTERNAL_NAV
+                    if (extNavUsedForPos) {
+                        lastExtNavPosPassTime_ms = imuSampleTime_ms;
+                    } else {
+                        lastGpsPosPassTime_ms = imuSampleTime_ms;
+                    }
+#else
+                    lastGpsPosPassTime_ms = imuSampleTime_ms;
+#endif
+                    ResetPositionNE(velPosObs[3],velPosObs[4]);
+                    zeroRows(P,7,8);
+                    zeroCols(P,7,8);
+                    P[7][7] = R_OBS[3];
+                    P[8][8] = R_OBS[4];
+                    posTimeout = false;
+                    posCheckPassed = true;
+                    posObsRejectCount = 0;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "5 sigma innovation reset to %.1fm N %.1fm E",velPosObs[3],velPosObs[4]);
+#endif
+                } else {
+                    posObsRejectCount++;
+                }
             }
 
             // Use position data if healthy or timed out or bad IMU data
@@ -789,7 +885,7 @@ void NavEKF3_core::FuseVelPosNED()
             if (posCheckPassed || posTimeout || badIMUdata) {
                 // if timed out or outside the specified uncertainty radius, reset to the external sensor
                 // if velocity drift is being constrained, dont reset until gps passes quality checks
-                const bool posVarianceIsTooLarge = (frontend->_gpsGlitchRadiusMax > 0) && (P[8][8] + P[7][7]) > sq(ftype(frontend->_gpsGlitchRadiusMax));
+                const bool posVarianceIsTooLarge = (frontend->_gpsGlitchRadiusMax > 0 && (P[8][8] + P[7][7]) > sq(ftype(frontend->_gpsGlitchRadiusMax)) && !posObsIsLongInterval);
                 if ((posTimeout || posVarianceIsTooLarge) && (!velAiding || gpsGoodToAlign)) {
                     // reset the position to the current external sensor position
                     ResetPosition(resetDataSource::DEFAULT);
@@ -807,7 +903,7 @@ void NavEKF3_core::FuseVelPosNED()
                     posTestRatio = 0.0f;
 
                     // Reset velocity if it has timed out
-                    if (velTimeout) {
+                    if (velTimeout && !posObsIsLongInterval) {
                         ResetVelocity(resetDataSource::DEFAULT);
 
                         // Don't fuse the same data we have used to reset states.
@@ -851,7 +947,7 @@ void NavEKF3_core::FuseVelPosNED()
                 // The innovation variance is increased to limit the state update to an amount corresponding
                 // to a test ratio of 1.
                 posCheckPassed = true;
-                lastPosPassTime_ms = imuSampleTime_ms;
+                lastGpsPosPassTime_ms = imuSampleTime_ms;
                 for (uint8_t i = 0; i<=imax; i++) {
                     varInnovVelPos[i] *= velTestRatio;
                 }
@@ -899,7 +995,7 @@ void NavEKF3_core::FuseVelPosNED()
                 // The innovation variance is increased to limit the state update to an amount corresponding
                 // to a test ratio of 1.
                 posCheckPassed = true;
-                lastPosPassTime_ms = imuSampleTime_ms;
+                lastGpsPosPassTime_ms = imuSampleTime_ms;
                 varInnovVelPos[5] *= hgtTestRatio;
                 hgtCheckPassed = true;
                 lastHgtPassTime_ms = imuSampleTime_ms;
@@ -1128,17 +1224,24 @@ void NavEKF3_core::selectHeightForFusion()
     readRangeFinder();
     rangeDataToFuse = storedRange.recall(rangeDataDelayed,imuDataDelayed.time_ms);
 
+    if (rangeDataToFuse) {
+        const Vector3F unitVecBodyFrame = Vector3F(0.0, 0, 1);
+        const Vector3F unitVecEarthFrame = prevTnb.mul_transpose(unitVecBodyFrame);
+        rangeDataCosine = unitVecEarthFrame.z;
+        rangeDataToFuse = rangeDataCosine > cosF(radians(45.0F)); // don't use if more than 45 deg from vertical
+    }
+
     // correct range data for the body frame position offset relative to the IMU
     // the corrected reading is the reading that would have been taken if the sensor was
     // co-located with the IMU
     const auto *_rng = dal.rangefinder();
-    if (_rng && rangeDataToFuse) {
+    if (rangeDataToFuse && _rng) {
         auto *sensor = _rng->get_backend(rangeDataDelayed.sensor_idx);
         if (sensor != nullptr) {
             Vector3F posOffsetBody = sensor->get_pos_offset().toftype() - accelPosOffset;
             if (!posOffsetBody.is_zero()) {
                 Vector3F posOffsetEarth = prevTnb.mul_transpose(posOffsetBody);
-                rangeDataDelayed.rng += posOffsetEarth.z / prevTnb.c.z;
+                rangeDataDelayed.rng += posOffsetEarth.z / rangeDataCosine;
             }
         }
     }
@@ -1192,7 +1295,7 @@ void NavEKF3_core::selectHeightForFusion()
             } else if (frontend->sources.getPosZSource() == AP_NavEKF_Source::SourceZ::GPS) {
                 activeHgtSource = AP_NavEKF_Source::SourceZ::GPS;
             }
-        } else if (belowLowerSwHgt && trustTerrain && (prevTnb.c.z >= 0.7f)) {
+        } else if (belowLowerSwHgt && trustTerrain && (rangeDataCosine > M_SQRT1_2)) {
             // reliable terrain and range finder so start using range finder height
             activeHgtSource = AP_NavEKF_Source::SourceZ::RANGEFINDER;
         }
@@ -1269,9 +1372,9 @@ void NavEKF3_core::selectHeightForFusion()
         if (rangeDataToFuse && (activeHgtSource == AP_NavEKF_Source::SourceZ::RANGEFINDER)) {
         // using range finder data
         // correct for tilt using a flat earth model
-        if (prevTnb.c.z >= 0.7) {
+        if (rangeDataCosine >= M_SQRT1_2) {
             // calculate height above ground
-            hgtMea  = MAX(rangeDataDelayed.rng * prevTnb.c.z, rngOnGnd);
+            hgtMea  = MAX(rangeDataDelayed.rng * rangeDataCosine, rngOnGnd);
             // correct for terrain position relative to datum
             hgtMea -= terrainState;
             velPosObs[5] = -hgtMea;
@@ -1280,7 +1383,7 @@ void NavEKF3_core::selectHeightForFusion()
             // set the observation noise
             posDownObsNoise = sq(constrain_ftype(frontend->_rngNoise, 0.1f, 10.0f));
             // add uncertainty created by terrain gradient and vehicle tilt
-            posDownObsNoise += sq(rangeDataDelayed.rng * frontend->_terrGradMax) * MAX(0.0f , (1.0f - sq(prevTnb.c.z)));
+            posDownObsNoise += sq(rangeDataDelayed.rng * frontend->_terrGradMax) * MAX(0.0f , (1.0f - sq(rangeDataCosine)));
         } else {
             // disable fusion if tilted too far
             fuseHgtData = false;

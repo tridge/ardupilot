@@ -158,6 +158,11 @@ public:
     // If false returned, do not use for flight control
     bool getPosD(float &posD) const;
 
+    // Get the last calculated NE position in m relative to the reference point with accumulated position corrections and resets removed
+    // Return false If a calculated solution is not available
+    // Do not use for flight control
+    bool getDeadReckonPosNE(Vector2f &posNE, Vector2f &deltaNE) const;
+
     // return NED velocity in m/s
     void getVelNED(Vector3f &vel) const;
 
@@ -217,6 +222,13 @@ public:
     // The getFilterStatus() function provides a more detailed description of data health and must be checked if data is to be used for flight control
     bool getLLH(Location &loc) const;
 
+    // Return the last calculated latitude, longitude and height in WGS-84 with position corrections and reset changes removed
+    // If a calculated location isn't available, return a raw GPS measurement
+    // The status will return true if a calculation or raw measurement is available
+    // Do not use for flight control
+    bool getDeadReckonLLH(struct Location &loc, Vector2f &delta) const;
+    void resetVelIntegral();
+
     // return the latitude and longitude and height used to set the NED origin
     // All NED positions calculated by the filter are relative to this location
     // Returns false if the origin has not been set
@@ -253,6 +265,9 @@ public:
 
    // return the innovation consistency test ratios for the velocity, position, magnetometer and true airspeed measurements
     bool getVariances(float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar, Vector2f &offset) const;
+
+    // return the variances for the velocity and position state vectors in m**2 and (m/s)**2
+    bool getVelPosStateVariances(Vector3f &velStateVar, Vector3f &posStateVar) const;
 
     // get a particular source's velocity innovations
     // returns true on success and results are placed in innovations and variances arguments
@@ -399,6 +414,10 @@ public:
     // returns the time of the last reset or 0 if no reset has ever occurred
     uint32_t getLastVelNorthEastReset(Vector2f &vel) const;
 
+    // return the accumulated amount of NE velocity change due to the last velocity reset in metres/sec
+    // returns the time of the last reset or 0 if no reset has ever occurred
+    uint32_t getLastVelNorthEastResetSum(Vector2f &vel) const;
+
     // report any reason for why the backend is refusing to initialise
     const char *prearm_failure_reason(void) const;
 
@@ -450,6 +469,10 @@ public:
 
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const { return yawEstimator; }
+
+    bool getGpsGoodToAlign(void) const {
+        return gpsGoodToAlign;
+    }
 
 private:
     EKFGSF_yaw *yawEstimator;
@@ -548,6 +571,8 @@ private:
         Vector24 statesArray;
         struct state_elements stateStruct;
     };
+
+    Vector3F velIntegral;
 
     struct output_elements {
         QuaternionF quat;           // quaternion defining rotation from local NED earth frame to body frame
@@ -1091,7 +1116,8 @@ private:
     uint32_t lastBaroReceived_ms;   // time last time we received baro height data
     uint16_t hgtRetryTime_ms;       // time allowed without use of height measurements before a height timeout is declared
     uint32_t lastVelPassTime_ms;    // time stamp when GPS velocity measurement last passed innovation consistency check (msec)
-    uint32_t lastPosPassTime_ms;    // time stamp when GPS position measurement last passed innovation consistency check (msec)
+    uint32_t lastGpsPosPassTime_ms; // time stamp when GPS position measurement last passed innovation consistency check (msec)
+    uint32_t lastExtNavPosPassTime_ms; // time stamp when external nav position measurement last passed innovation consistency check (msec)
     uint32_t lastHgtPassTime_ms;    // time stamp when height measurement last passed innovation consistency check (msec)
     uint32_t lastTasPassTime_ms;    // time stamp when airspeed measurement last passed innovation consistency check (msec)
     uint32_t lastTasFailTime_ms;    // time stamp when airspeed measurement last failed innovation consistency check (msec)
@@ -1147,6 +1173,7 @@ private:
     baro_elements baroDataDelayed;  // Baro data at the fusion time horizon
     range_elements rangeDataNew;    // Range finder data at the current time horizon
     range_elements rangeDataDelayed;// Range finder data at the fusion time horizon
+    ftype rangeDataCosine;          // Cosine of the range finder axis along the NED down axis
     tas_elements tasDataNew;        // TAS data at the current time horizon
     tas_elements tasDataDelayed;    // TAS data at the fusion time horizon
     mag_elements magDataDelayed;    // Magnetometer data at the fusion time horizon
@@ -1176,6 +1203,7 @@ private:
     Vector2F posResetNE;            // Change in North/East position due to last in-flight reset in metres. Returned by getLastPosNorthEastReset
     uint32_t lastPosReset_ms;       // System time at which the last position reset occurred. Returned by getLastPosNorthEastReset
     Vector2F velResetNE;            // Change in North/East velocity due to last in-flight reset in metres/sec. Returned by getLastVelNorthEastReset
+    Vector2F velResetSumNE;         // Accumulated velResetNE (m/s)
     uint32_t lastVelReset_ms;       // System time at which the last velocity reset occurred. Returned by getLastVelNorthEastReset
     ftype posResetD;                // Change in Down position due to last in-flight reset in metres. Returned by getLastPosDowntReset
     uint32_t lastPosResetD_ms;      // System time at which the last position reset occurred. Returned by getLastPosDownReset
@@ -1235,7 +1263,7 @@ private:
     bool gpsAccuracyGoodForAltitude; // true when the GPS accuracy is considered to be good enough to use it as an altitude source.
     Vector3F gpsVelInnov;           // gps velocity innovations
     Vector3F gpsVelVarInnov;        // gps velocity innovation variances
-    uint32_t gpsVelInnovTime_ms;    // system time that gps velocity innovations were recorded (to detect timeouts)
+    uint32_t gpsRetrieveTime_ms;    // system time that GPS data was retrieved from the buffer (to detect timeouts)
 
     // variables added for optical flow fusion
     EKF_obs_buffer_t<of_elements> storedOF;    // OF data buffer
@@ -1584,6 +1612,10 @@ private:
     AP_NavEKF_Source::SourceYaw yaw_source_last;    // yaw source on previous iteration (used to detect a change)
     bool yaw_source_reset;                          // true when the yaw source has changed but the yaw has not yet been reset
 
+    // customisations for long internval position measurements
+    bool posObsIsLongInterval; // true when the time between position observations is long enough to require special consideration
+    uint8_t posObsRejectCount;
+
     // logging functions shared by cores:
     void Log_Write_XKF1(uint64_t time_us) const;
     void Log_Write_XKF2(uint64_t time_us) const;
@@ -1597,4 +1629,5 @@ private:
     void Log_Write_State_Variances(uint64_t time_us);
     void Log_Write_Timing(uint64_t time_us);
     void Log_Write_GSF(uint64_t time_us);
+    void Log_Write_Debug(uint64_t time_us);
 };

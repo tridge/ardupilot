@@ -116,6 +116,9 @@ void NavEKF3_core::getAccelBias(Vector3f &accelBias) const
 void NavEKF3_core::getRotationBodyToNED(Matrix3f &mat) const
 {
     outputDataNew.quat.rotation_matrix(mat);
+#if APM_BUILD_TYPE(APM_BUILD_Replay)
+    return;
+#endif
     mat = mat * dal.get_rotation_vehicle_body_to_autopilot_body();
 }
 
@@ -156,6 +159,15 @@ uint32_t NavEKF3_core::getLastVelNorthEastReset(Vector2f &vel) const
     vel = velResetNE.tofloat();
     return lastVelReset_ms;
 }
+
+// return the accumulated amount of NE velocity change due to velocity resets in metres/sec
+// returns the time of the last reset or 0 if no reset has ever occurred
+uint32_t NavEKF3_core::getLastVelNorthEastResetSum(Vector2f &vel) const
+{
+    vel = velResetSumNE.tofloat();
+    return lastVelReset_ms;
+}
+
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
 // returns true if wind state estimation is active
@@ -230,7 +242,8 @@ bool NavEKF3_core::getPosNE(Vector2f &posNE) const
         // In constant position mode the EKF position states are at the origin, so we cannot use them as a position estimate
         if(validOrigin) {
             auto &gps = dal.gps();
-            if ((gps.status(selected_gps) >= AP_DAL_GPS::GPS_OK_FIX_2D)) {
+            if (frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::GPS &&
+                (gps.status(selected_gps) >= AP_DAL_GPS::GPS_OK_FIX_2D && !frontend->_gps_disabled)) {
                 // If the origin has been set and we have GPS, then return the GPS position relative to the origin
                 const Location &gpsloc = gps.location(selected_gps);
                 posNE = public_origin.get_distance_NE_ftype(gpsloc).tofloat();
@@ -252,6 +265,19 @@ bool NavEKF3_core::getPosNE(Vector2f &posNE) const
             posNE.zero();
             return false;
         }
+    }
+    return false;
+}
+
+// Get the last calculated NE position in m relative to the reference point with accumulated position corrections and resets removed
+// Return false If a calculated solution is not available
+// Do not use for flight control
+bool NavEKF3_core::getDeadReckonPosNE(Vector2f &posNE, Vector2f &deltaNE) const
+{
+    if (PV_AidingMode != AID_NONE) {
+        posNE = (velIntegral.xy() + posOffsetNED.xy() + public_origin.get_distance_NE_ftype(EKF_origin)).tofloat();
+        deltaNE = (velIntegral.xy() - stateStruct.position.xy()).tofloat();
+        return true;
     }
     return false;
 }
@@ -351,10 +377,33 @@ bool NavEKF3_core::getLLH(Location &loc) const
     }
 }
 
-bool NavEKF3_core::getGPSLLH(Location &loc) const
+// Return the last calculated latitude, longitude and height in WGS-84 with position corrections and reset changes removed
+// If a calculated location isn't available, return a raw GPS measurement
+// The status will return true if a calculation or raw measurement is available
+// Do not use for flight control
+bool NavEKF3_core::getDeadReckonLLH(struct Location &loc, Vector2f &delta) const
 {
+    if (getLLH(loc)) {
+        delta.x = (float)(velIntegral.x-stateStruct.position.x);
+        delta.y = (float)(velIntegral.y-stateStruct.position.y);
+        loc.offset(delta.x,delta.y);
+        return true;
+    }
+    return false;
+}
+
+void NavEKF3_core::resetVelIntegral()
+{
+    velIntegral = stateStruct.position;
+}
+
+bool NavEKF3_core::getGPSLLH(struct Location &loc) const
+{
+    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS) {
+        return false;
+    }
     const auto &gps = dal.gps();
-    if ((gps.status(selected_gps) >= AP_DAL_GPS::GPS_OK_FIX_3D)) {
+    if ((gps.status(selected_gps) >= AP_DAL_GPS::GPS_OK_FIX_3D) && !frontend->_gps_disabled) {
         loc = gps.location(selected_gps);
         return true;
     }
@@ -486,6 +535,23 @@ bool NavEKF3_core::getVariances(float &velVar, float &posVar, float &hgtVar, Vec
     return true;
 }
 
+// return the variances for the velocity and position state vectors in m**2 and (m/s)**2
+bool NavEKF3_core::getVelPosStateVariances(Vector3f &velStateVar, Vector3f &posStateVar) const
+{
+    if (PV_AidingMode == AID_NONE) {
+        return false;
+    }
+
+    velStateVar.x = P[4][4];
+    velStateVar.y = P[5][5];
+    velStateVar.z = P[6][6];
+    posStateVar.x = P[7][7];
+    posStateVar.y = P[8][8];
+    posStateVar.z = P[9][9];
+
+    return true;
+}
+
 // get a particular source's velocity innovations
 // returns true on success and results are placed in innovations and variances arguments
 bool NavEKF3_core::getVelInnovationsAndVariancesForSource(AP_NavEKF_Source::SourceXY source, Vector3f &innovations, Vector3f &variances) const
@@ -493,7 +559,7 @@ bool NavEKF3_core::getVelInnovationsAndVariancesForSource(AP_NavEKF_Source::Sour
     switch (source) {
     case AP_NavEKF_Source::SourceXY::GPS:
         // check for timeouts
-        if (dal.millis() - gpsVelInnovTime_ms > 500) {
+        if (dal.millis() - gpsRetrieveTime_ms > 500) {
             return false;
         }
         innovations = gpsVelInnov.tofloat();

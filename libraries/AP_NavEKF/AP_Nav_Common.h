@@ -40,6 +40,7 @@ union nav_filter_status {
         bool initalized         : 1; // 16 - true if the EKF has ever been healthy
         bool rejecting_airspeed : 1; // 17 - true if we are rejecting airspeed data
         bool dead_reckoning     : 1; // 18 - true if we are dead reckoning (e.g. no position or velocity source)
+        bool using_extnav       : 1; // 19 - true if we are using esxternal nav position
     } flags;
     uint32_t value;
 };

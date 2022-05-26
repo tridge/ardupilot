@@ -350,6 +350,26 @@ void NavEKF3_core::Log_Write_State_Variances(uint64_t time_us)
     }
 }
 
+void NavEKF3_core::Log_Write_Debug(uint64_t time_us)
+{
+    if (core_index != frontend->primary) {
+        // log only primary instance for now
+        return;
+    }
+
+    AP::logger().WriteStreaming("DBG1",
+                                "TimeUS,C,PN,PE,PDRN,PDRE",
+                                "s#----",
+                                "F-----",
+                                "QBffff",
+                                time_us,
+                                DAL_CORE(core_index),
+                                stateStruct.position.x,
+                                stateStruct.position.y,
+                                velIntegral.x,
+                                velIntegral.y);
+}
+
 void NavEKF3::Log_Write()
 {
     // only log if enabled
@@ -399,6 +419,10 @@ void NavEKF3_core::Log_Write(uint64_t time_us)
 #if EK3_FEATURE_BEACON_FUSION
     // write range beacon fusion debug packet if the range value is non-zero
     Log_Write_Beacon(time_us);
+#endif
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    Log_Write_Debug(time_us);
 #endif
 
 #if EK3_FEATURE_BODY_ODOM

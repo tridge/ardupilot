@@ -24,9 +24,11 @@
 #include <AP_Param/AP_Param.h>
 #include <AP_NavEKF/AP_Nav_Common.h>
 #include <AP_NavEKF/AP_NavEKF_Source.h>
+#include <AP_NavTerrain/AP_NavTerrain.h>
 
 class NavEKF3_core;
 class EKFGSF_yaw;
+class AP_NavTerrain;
 
 class NavEKF3 {
     friend class NavEKF3_core;
@@ -71,12 +73,19 @@ public:
     // If false returned, do not use for flight control
     bool getPosNE(Vector2f &posNE) const;
 
+    // Get the last calculated NE position in m relative to the reference point with accumulated position corrections and resets removed
+    // Return false If a calculated solution is not available
+    // Do not use for flight control
+    bool getDeadReckonPosNE(uint8_t c, Vector2f &posNE, Vector2f &deltaNE) const;
+
     // Write the last calculated D position relative to the reference point (m)
     // If a calculated solution is not available, use the best available data and return false
     // If false returned, do not use for flight control
+    bool getPosD(uint8_t c, float &posD) const;
     bool getPosD(float &posD) const;
 
     // return NED velocity in m/s
+    void getVelNED(uint8_t c, Vector3f &vel) const;
     void getVelNED(Vector3f &vel) const;
 
     // return estimate of true airspeed vector in body frame in m/s
@@ -120,6 +129,7 @@ public:
     // return the NED wind speed estimates in m/s (positive is air
     // moving in the direction of the axis) returns true if wind state
     // estimation is active
+    bool getWind(uint8_t c, Vector3f &wind) const;
     bool getWind(Vector3f &wind) const;
 
     // return earth magnetic field estimates in measurement units / 1000
@@ -139,7 +149,16 @@ public:
     // If a calculated location isn't available, return a raw GPS measurement
     // The status will return true if a calculation or raw measurement is available
     // The getFilterStatus() function provides a more detailed description of data health and must be checked if data is to be used for flight control
-    bool getLLH(Location &loc) const;
+    bool getLLH(uint8_t c, struct Location &loc) const;
+    bool getLLH(struct Location &loc) const;
+
+    // Return the last calculated latitude, longitude and height in WGS-84 with position corrections and reset changes removed
+    // If a calculated location isn't available, return a raw GPS measurement
+    // The status will return true if a calculation or raw measurement is available
+    // Do not use for flight control
+    bool getDeadReckonLLH(uint8_t core, struct Location &loc, Vector2f &delta) const;
+
+    bool resetVelIntegral(uint8_t c);
 
     // Return the latitude and longitude and height used to set the NED origin
     // All NED positions calculated by the filter are relative to this location
@@ -165,7 +184,7 @@ public:
     void getEulerAngles(Vector3f &eulers) const;
 
     // return the transformation matrix from XYZ (body) to NED axes
-    void getRotationBodyToNED(Matrix3f &mat) const;
+    void getRotationBodyToNED(int8_t instance, Matrix3f &mat) const;
 
     // return the quaternions defining the rotation from XYZ (body) to NED axes
     void getQuaternionBodyToNED(int8_t instance, Quaternion &quat) const;
@@ -173,11 +192,20 @@ public:
     // return the quaternions defining the rotation from NED to XYZ (autopilot) axes
     void getQuaternion(Quaternion &quat) const;
 
+    // return the quaternions defining the rotation from NED to XYZ (autopilot) axes
+    void getQuaternion(uint8_t c, Quaternion &quat) const;
+
     // return the innovations
     bool getInnovations(Vector3f &velInnov, Vector3f &posInnov, Vector3f &magInnov, float &tasInnov, float &yawInnov) const;
 
     // return the innovation consistency test ratios
     bool getVariances(float &velVar, float &posVar, float &hgtVar, Vector3f &magVar, float &tasVar, Vector2f &offset) const;
+
+    // return the variances for the velocity and position state vectors in m**2 and (m/s)**2
+    bool getVelPosStateVariances(uint8_t c, Vector3f &velStateVar, Vector3f &posStateVar) const;
+
+    // return the variances for the velocity and position state vectors in m**2 and (m/s)**2
+    bool getVelPosStateVariances(Vector3f &velStateVar, Vector3f &posStateVar) const;
 
     // get a source's velocity innovations
     // returns true on success and results are placed in innovations and variances arguments
@@ -251,6 +279,7 @@ public:
      * resetTime_ms : system time of the last position reset request (mSec)
      *
     */
+    void writeExtNavData(uint8_t c, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
     void writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms);
 
     /*
@@ -311,6 +340,10 @@ public:
     // returns the time of the last reset or 0 if no reset has ever occurred
     uint32_t getLastPosDownReset(float &posDelta);
 
+    // return the accumulated amount of NE velocity change due to the last velocity reset in metres/sec
+    // returns the time of the last reset or 0 if no reset has ever occurred
+    uint32_t getLastVelNorthEastResetSum(uint8_t c, Vector2f &vel) const;
+
     // set and save the _baroAltNoise parameter
     void set_baro_alt_noise(float noise) { _baroAltNoise.set_and_save(noise); };
 
@@ -336,6 +369,9 @@ public:
 
     // set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary
     void setPosVelYawSourceSet(uint8_t source_set_idx);
+
+    // set position, velocity and yaw sources to either 0=primary, 1=secondary, 2=tertiary
+    uint8_t getPosVelYawSourceSet(void) { return sources.getPosVelYawSourceSet(); };
 
     // write EKF information to on-board logs
     void Log_Write();
@@ -364,6 +400,21 @@ public:
 
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const;
+
+    bool using_gps(uint8_t c) const;
+    bool using_gps() const;
+    bool getGpsGoodToAlign(void) const;
+
+    bool using_extnav(uint8_t c) const;
+
+    // force GPS disable on EKF3 only
+    void force_gps_disable(bool gps_disable);
+
+    // true when we will not use GPS due to AUX switch disable
+    bool gps_is_disabled(void) const {
+        return _gps_disabled;
+    }
+    
 
 private:
     uint8_t num_cores; // number of allocated cores
@@ -459,6 +510,7 @@ private:
 #define FLOW_USE_NONE    0
 #define FLOW_USE_NAV     1
 #define FLOW_USE_TERRAIN 2
+#define FLOW_USE_NOGPS   3
 
     // Tuning parameters
     const float gpsNEVelVarAccScale = 0.05f;       // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration
@@ -468,7 +520,7 @@ private:
     const uint16_t magDelay_ms = 60;               // Magnetometer measurement delay (msec)
     const uint16_t tasDelay_ms = 100;              // Airspeed measurement delay (msec)
     const uint16_t tiltDriftTimeMax_ms = 15000;    // Maximum number of ms allowed without any form of tilt aiding (GPS, flow, TAS, etc)
-    const uint16_t posRetryTimeUseVel_ms = 10000;  // Position aiding retry time with velocity measurements (msec)
+    const uint16_t posRetryTimeUseVel_ms = 30000;  // Position aiding retry time with velocity measurements (msec)
     const uint16_t posRetryTimeNoVel_ms = 7000;    // Position aiding retry time without velocity measurements (msec)
     const uint16_t hgtRetryTimeMode0_ms = 10000;   // Height retry time with vertical velocity measurement (msec)
     const uint16_t hgtRetryTimeMode12_ms = 5000;   // Height retry time without vertical velocity measurement (msec)
@@ -570,4 +622,9 @@ private:
 
     // position, velocity and yaw source control
     AP_NavEKF_Source sources;
+
+    AP_NavTerrain nav_terrain;
+
+    // true when we should not use GPS due to AUX switch disable
+    bool _gps_disabled;
 };

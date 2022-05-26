@@ -44,6 +44,10 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
         magYawResetTimer_ms = imuSampleTime_ms;
     }
 
+    if (frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS) {
+        return;
+    }
+
     // Check for significant change in GPS position if disarmed which indicates bad GPS
     // This check can only be used when the vehicle is stationary
     const auto &gps = dal.gps();
@@ -227,6 +231,7 @@ void NavEKF3_core::calcGpsGoodToAlign(void)
     // continuous period of 5s without pass required to set unhealthy
     if (!gpsGoodToAlign && imuSampleTime_ms - lastGpsVelFail_ms > 10000) {
         gpsGoodToAlign = true;
+        waitingForGpsChecks = false;
     } else if (gpsGoodToAlign && imuSampleTime_ms - lastGpsVelPass_ms > 5000) {
         gpsGoodToAlign = false;
     }

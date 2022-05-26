@@ -5,6 +5,7 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <AP_NavTerrain/AP_NavTerrain.h>
 
 #include "AP_DAL/AP_DAL.h"
 
@@ -582,9 +583,9 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
 
     // @Param: FLOW_USE
     // @DisplayName: Optical flow use bitmask
-    // @Description: Controls if the optical flow data is fused into the 24-state navigation estimator OR the 1-state terrain height estimator.
+    // @Description: Controls if the optical flow data is fused into the 24-state navigation estimator OR the 1-state terrain height estimator OR into the 24 state navigation estimator when required to reduce drift after loss of GPS signal.
     // @User: Advanced
-    // @Values: 0:None,1:Navigation,2:Terrain
+    // @Values: 0:None,1:Navigation,2:Terrain,3:NoGPS
     // @RebootRequired: True
     AP_GROUPINFO("FLOW_USE", 54, NavEKF3, _flowUse, FLOW_USE_DEFAULT),
 
@@ -741,10 +742,15 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
 
+    // @Group: TNAV_
+    // @Path: ../libraries/AP_NavTerrain/AP_NavTerrain.cpp
+    AP_SUBGROUPINFO(nav_terrain, "TNAV_", 62, NavEKF3, AP_NavTerrain),
+
     AP_GROUPEND
 };
 
-NavEKF3::NavEKF3()
+NavEKF3::NavEKF3() :
+    nav_terrain(*this)
 {
     AP_Param::setup_object_defaults(this, var_info);
     AP_Param::setup_object_defaults(this, var_info2);
@@ -827,6 +833,8 @@ bool NavEKF3::InitialiseFilter(void)
         for (uint8_t i = 0; i < num_cores; i++) {
             new (&core[i]) NavEKF3_core(this);
         }
+
+        nav_terrain.init();
     }
 
     // Set up any cores that have been created
@@ -1010,6 +1018,8 @@ void NavEKF3::UpdateFilter(void)
 
     // align position of inactive sources to ahrs
     sources.align_inactive_sources();
+
+    nav_terrain.update();
 }
 
 /*
@@ -1188,9 +1198,27 @@ bool NavEKF3::getPosNE(Vector2f &posNE) const
     return core[primary].getPosNE(posNE);
 }
 
+// Get the last calculated NE position in m relative to the reference point with accumulated position corrections and resets removed
+// Return false If a calculated solution is not available
+// Do not use for flight control
+bool NavEKF3::getDeadReckonPosNE(uint8_t c, Vector2f &posNE, Vector2f &deltaNE) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    return core[c].getDeadReckonPosNE(posNE, deltaNE);
+}
+
 // Write the last calculated D position relative to the reference point (m).
 // If a calculated solution is not available, use the best available data and return false
 // If false returned, do not use for flight control
+bool NavEKF3::getPosD(uint8_t c, float &posD) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    return core[c].getPosD(posD);
+}
 bool NavEKF3::getPosD(float &posD) const
 {
     if (!core) {
@@ -1200,6 +1228,12 @@ bool NavEKF3::getPosD(float &posD) const
 }
 
 // return NED velocity in m/s
+void NavEKF3::getVelNED(uint8_t c, Vector3f &vel) const
+{
+    if (c < num_cores) {
+        core[c].getVelNED(vel);
+    }
+}
 void NavEKF3::getVelNED(Vector3f &vel) const
 {
     if (core) {
@@ -1316,6 +1350,16 @@ bool NavEKF3::getWind(Vector3f &wind) const
     return core[primary].getWind(wind);
 }
 
+// return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
+// returns true if wind state estimation is active
+bool NavEKF3::getWind(uint8_t c, Vector3f &wind) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    return core[c].getWind(wind);
+}
+
 // return earth magnetic field estimates in measurement units / 1000
 void NavEKF3::getMagNED(Vector3f &magNED) const
 {
@@ -1365,12 +1409,38 @@ bool NavEKF3::getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const
 // If a calculated location isn't available, return a raw GPS measurement
 // The status will return true if a calculation or raw measurement is available
 // The getFilterStatus() function provides a more detailed description of data health and must be checked if data is to be used for flight control
-bool NavEKF3::getLLH(Location &loc) const
+bool NavEKF3::getLLH(uint8_t c, struct Location &loc) const
 {
-    if (!core) {
+    if (c >= num_cores) {
         return false;
     }
-    return core[primary].getLLH(loc);
+    return core[c].getLLH(loc);
+}
+
+bool NavEKF3::getLLH(Location &loc) const
+{
+    return getLLH(primary, loc);
+}
+
+// Return the last calculated latitude, longitude and height in WGS-84 with position corrections and reset changes removed
+// If a calculated location isn't available, return a raw GPS measurement
+// The status will return true if a calculation or raw measurement is available
+// Do not use for flight control
+bool NavEKF3::getDeadReckonLLH(uint8_t c, struct Location &loc, Vector2f &delta) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    return core[c].getDeadReckonLLH(loc, delta);
+}
+
+bool NavEKF3::resetVelIntegral(uint8_t c)
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    core[c].resetVelIntegral();
+    return true;
 }
 
 // Return the latitude and longitude and height used to set the NED origin
@@ -1454,10 +1524,11 @@ void NavEKF3::getEulerAngles(Vector3f &eulers) const
 }
 
 // return the transformation matrix from XYZ (body) to NED axes
-void NavEKF3::getRotationBodyToNED(Matrix3f &mat) const
+void NavEKF3::getRotationBodyToNED(int8_t instance, Matrix3f &mat) const
 {
+    if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
-        core[primary].getRotationBodyToNED(mat);
+        core[instance].getRotationBodyToNED(mat);
     }
 }
 
@@ -1473,6 +1544,12 @@ void NavEKF3::getQuaternionBodyToNED(int8_t instance, Quaternion &quat) const
 }
 
 // return the quaternions defining the rotation from NED to XYZ (autopilot) axes
+void NavEKF3::getQuaternion(uint8_t c, Quaternion &quat) const
+{
+    if (c < num_cores) {
+        core[c].getQuaternion(quat);
+    }
+}
 void NavEKF3::getQuaternion(Quaternion &quat) const
 {
     if (core) {
@@ -1498,6 +1575,23 @@ bool NavEKF3::getVariances(float &velVar, float &posVar, float &hgtVar, Vector3f
     }
 
     return core[primary].getVariances(velVar, posVar, hgtVar, magVar, tasVar, offset);
+}
+
+// return the variances for the velocity and position state vectors in m**2 and (m/s)**2
+bool NavEKF3::getVelPosStateVariances(uint8_t c, Vector3f &velStateVar, Vector3f &posStateVar) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    return core[c].getVelPosStateVariances(velStateVar, posStateVar);
+}
+bool NavEKF3::getVelPosStateVariances(Vector3f &velStateVar, Vector3f &posStateVar) const
+{
+    if (core == nullptr) {
+        return false;
+    }
+
+    return core[primary].getVelPosStateVariances(velStateVar, posStateVar);
 }
 
 // get a source's velocity innovations
@@ -1598,6 +1692,12 @@ void NavEKF3::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t tim
  * resetTime_ms : system time of the last position reset request (mSec)
  *
 */
+void NavEKF3::writeExtNavData(uint8_t c, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
+{
+    if (c <= num_cores) {
+        core[c].writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
+    }
+}
 void NavEKF3::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint16_t delay_ms, uint32_t resetTime_ms)
 {
     AP::dal().writeExtNavData(pos, quat, posErr, angErr, timeStamp_ms, delay_ms, resetTime_ms);
@@ -1964,6 +2064,16 @@ uint32_t NavEKF3::getLastPosDownReset(float &posDelta)
     return lastPosReset_ms;
 }
 
+// return the accumulated amount of NE velocity change due to the last velocity reset in metres/sec
+// returns the time of the last reset or 0 if no reset has ever occurred
+uint32_t NavEKF3::getLastVelNorthEastResetSum(uint8_t c, Vector2f &vel) const
+{
+    if (!core || c >= num_cores) {
+        return 0;
+    }
+    return core[c].getLastVelNorthEastResetSum(vel);
+}
+
 // update the yaw reset data to capture changes due to a lane switch
 void NavEKF3::updateLaneSwitchYawResetData(uint8_t new_primary, uint8_t old_primary)
 {
@@ -2079,4 +2189,45 @@ const EKFGSF_yaw *NavEKF3::get_yawEstimator(void) const
         return core[primary].get_yawEstimator();
     }
     return nullptr;
+}
+
+bool NavEKF3::using_gps(uint8_t c) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    nav_filter_status status {};
+    core[c].getFilterStatus(status);
+    return status.flags.using_gps;
+}
+bool NavEKF3::using_gps() const
+{
+    nav_filter_status status {};
+    core[primary].getFilterStatus(status);
+    return status.flags.using_gps;
+}
+
+bool NavEKF3::getGpsGoodToAlign() const
+{
+    if (!core) {
+        return false;
+    }
+    return core[primary].getGpsGoodToAlign();
+}
+
+bool NavEKF3::using_extnav(uint8_t c) const
+{
+    if (c >= num_cores) {
+        return false;
+    }
+    nav_filter_status status {};
+    core[c].getFilterStatus(status);
+    return status.flags.using_extnav;
+}
+
+// force GPS disable on EKF3 only
+void NavEKF3::force_gps_disable(bool gps_disable)
+{
+    AP::dal().log_event3(gps_disable?AP_DAL::Event::EK3GPSDisable:AP_DAL::Event::EK3GPSEnable);
+    _gps_disabled = gps_disable;
 }

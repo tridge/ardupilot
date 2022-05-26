@@ -142,7 +142,7 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
     }
 #endif
 #if EK3_FEATURE_EXTERNAL_NAV
-    if (frontend->sources.ext_nav_enabled() && !storedExtNav.init(extnav_buffer_length)) {
+    if (!storedExtNav.init(extnav_buffer_length)) {
         return false;
     }
     if (frontend->sources.ext_nav_enabled() && !storedExtNavVel.init(extnav_buffer_length)) {
@@ -201,7 +201,8 @@ void NavEKF3_core::InitialiseVariables()
     prevBetaDragStep_ms = imuSampleTime_ms;
     lastBaroReceived_ms = imuSampleTime_ms;
     lastVelPassTime_ms = 0;
-    lastPosPassTime_ms = 0;
+    lastGpsPosPassTime_ms = 0;
+    lastExtNavPosPassTime_ms = 0;
     lastHgtPassTime_ms = 0;
     lastTasPassTime_ms = 0;
     lastSynthYawTime_ms = 0;
@@ -323,6 +324,7 @@ void NavEKF3_core::InitialiseVariables()
     airDataFusionWindOnly = false;
     posResetNE.zero();
     velResetNE.zero();
+    velResetSumNE.zero();
     posResetD = 0.0f;
     hgtInnovFiltState = 0.0f;
     imuDataDownSampledNew.delAng.zero();
@@ -439,6 +441,7 @@ void NavEKF3_core::InitialiseVariables()
 #if EK3_FEATURE_EXTERNAL_NAV
     storedExtNav.reset();
     storedExtNavVel.reset();
+    posObsRejectCount = 0;
 #endif
 
     // initialise pre-arm message
@@ -499,7 +502,7 @@ bool NavEKF3_core::InitialiseFilterBootstrap(void)
     update_sensor_selection();
 
     // If we are a plane and don't have GPS lock then don't initialise
-    if (assume_zero_sideslip() && dal.gps().status(preferred_gps) < AP_DAL_GPS::GPS_OK_FIX_3D) {
+    if (assume_zero_sideslip() && (dal.gps().status(preferred_gps) < AP_DAL_GPS::GPS_OK_FIX_3D || frontend->_gps_disabled)) {
         dal.snprintf(prearm_fail_string,
                      sizeof(prearm_fail_string),
                      "EKF3 init failure: No GPS lock");
@@ -556,6 +559,7 @@ bool NavEKF3_core::InitialiseFilterBootstrap(void)
     // initialise dynamic states
     stateStruct.velocity.zero();
     stateStruct.position.zero();
+    velIntegral.zero();
 
     // initialise static process model states
     stateStruct.gyro_bias.zero();
@@ -720,7 +724,8 @@ void NavEKF3_core::UpdateFilter(bool predict)
         if (imuSampleTime_ms - last_oneHz_ms >= 1000) {
             // 1Hz tasks
             last_oneHz_ms = imuSampleTime_ms;
-            moveEKFOrigin();
+            // Disable to assist with log analyis during debug of dead reckoning behaviour
+            //moveEKFOrigin();
             checkUpdateEarthField();
         }
     }
@@ -814,7 +819,9 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     stateStruct.velocity += delVelNav;
 
     // apply a trapezoidal integration to velocities to calculate position
-    stateStruct.position += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
+    const Vector3F posDelta = (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
+    stateStruct.position += posDelta;
+    velIntegral += posDelta;
 
     // accumulate the bias delta angle and time since last reset by an OF measurement arrival
     delAngBodyOF += delAngCorrected;
@@ -2263,6 +2270,7 @@ void NavEKF3_core::moveEKFOrigin(void)
 
     // now fix all output states
     stateStruct.position.xy() += diffNE;
+    velIntegral.xy() += diffNE;
     outputDataNew.position.xy() += diffNE;
     outputDataDelayed.position.xy() += diffNE;
 

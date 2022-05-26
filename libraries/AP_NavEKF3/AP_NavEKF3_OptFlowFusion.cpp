@@ -54,7 +54,10 @@ void NavEKF3_core::SelectFlowFusion()
 
     // Fuse optical flow data into the main filter
     if (flowDataToFuse && tiltOK) {
-        const bool fuse_optflow = (frontend->_flowUse == FLOW_USE_NAV) && frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::OPTFLOW);
+        const bool gpsDataLost = (dal.millis() - gpsRetrieveTime_ms) > frontend->deadReckonDeclare_ms;
+        const bool gpsUseNotEnabled = frontend->sources.getPosXYSource() != AP_NavEKF_Source::SourceXY::GPS;
+        const bool fuse_optflow = ((frontend->_flowUse == FLOW_USE_NAV) && frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::OPTFLOW)) ||
+                                  ((frontend->_flowUse == FLOW_USE_NOGPS) && (gpsDataLost || gpsUseNotEnabled));
         // Set the flow noise used by the fusion processes
         R_LOS = sq(MAX(frontend->_flowNoise, 0.05f));
         // Fuse the optical flow X and Y axis data into the main filter sequentially
@@ -65,7 +68,7 @@ void NavEKF3_core::SelectFlowFusion()
 /*
 Estimation of terrain offset using a single state EKF
 The filter can fuse motion compensated optical flow rates and range finder measurements
-Equations generated using https://github.com/PX4/ecl/tree/master/EKF/matlab/scripts/Terrain%20Estimator
+Equations for optical flow generated using https://github.com/PX4/ecl/tree/master/EKF/matlab/scripts/Terrain%20Estimator
 */
 void NavEKF3_core::EstimateTerrainOffset(const of_elements &ofDataDelayed)
 {
@@ -104,26 +107,23 @@ void NavEKF3_core::EstimateTerrainOffset(const of_elements &ofDataDelayed)
         if (rangeDataToFuse) {
             // reset terrain state if rangefinder data not fused for 5 seconds
             if (imuSampleTime_ms - gndHgtValidTime_ms > 5000) {
-                terrainState = MAX(rangeDataDelayed.rng * prevTnb.c.z, rngOnGnd) + stateStruct.position.z;
+                terrainState = MAX(rangeDataDelayed.rng * rangeDataCosine, rngOnGnd) + stateStruct.position.z;
             }
 
+            // Observation Jacobian
+            const ftype H_RNG = 1.0f / rangeDataCosine;
+
             // predict range
-            ftype predRngMeas = MAX((terrainState - stateStruct.position[2]),rngOnGnd) / prevTnb.c.z;
-            // Copy required states to local variable names
-            ftype q0 = stateStruct.quat[0]; // quaternion at optical flow measurement time
-            ftype q1 = stateStruct.quat[1]; // quaternion at optical flow measurement time
-            ftype q2 = stateStruct.quat[2]; // quaternion at optical flow measurement time
-            ftype q3 = stateStruct.quat[3]; // quaternion at optical flow measurement time
+            ftype predRngMeas = MAX((terrainState - stateStruct.position[2]), rngOnGnd) * H_RNG;
 
             // Set range finder measurement noise variance. TODO make this a function of range and tilt to allow for sensor, alignment and AHRS errors
             ftype R_RNG = frontend->_rngNoise;
 
-            // calculate Kalman gain
-            ftype SK_RNG = sq(q0) - sq(q1) - sq(q2) + sq(q3);
-            ftype K_RNG = Popt/(SK_RNG*(R_RNG + Popt/sq(SK_RNG)));
+            // Calculate innovation variance S using S = H * P * H.T + R
+            varInnovRng = MAX(R_RNG + H_RNG * Popt * H_RNG, R_RNG);
 
-            // Calculate the innovation variance for data logging
-            varInnovRng = (R_RNG + Popt/sq(SK_RNG));
+            // calculate Kalman gain using K = (P * H.T) / S
+            ftype K_RNG = Popt * H_RNG / varInnovRng;
 
             // constrain terrain height to be below the vehicle
             terrainState = MAX(terrainState, stateStruct.position[2] + rngOnGnd);
@@ -142,8 +142,8 @@ void NavEKF3_core::EstimateTerrainOffset(const of_elements &ofDataDelayed)
                 // constrain the state
                 terrainState = MAX(terrainState, stateStruct.position[2] + rngOnGnd);
 
-                // correct the covariance
-                Popt = Popt - sq(Popt)/(SK_RNG*(R_RNG + Popt/sq(SK_RNG))*(sq(q0) - sq(q1) - sq(q2) + sq(q3)));
+                // correct the covariance using P_new = P - K * S * K.T
+                Popt = Popt - K_RNG * varInnovRng * K_RNG;
 
                 // prevent the state variance from becoming negative
                 Popt = MAX(Popt,0.0f);
