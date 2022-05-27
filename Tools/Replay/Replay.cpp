@@ -63,7 +63,7 @@ const AP_Param::Info ReplayVehicle::var_info[] = {
 
     // @Group: EK2_
     // @Path: ../libraries/AP_NavEKF2/AP_NavEKF2.cpp
-    GOBJECTN(ekf2, NavEKF2, "EK2_", NavEKF2),
+    GOBJECTN(ahrs.EKF2, NavEKF2, "EK2_", NavEKF2),
     
     // @Group: COMPASS_
     // @Path: ../libraries/AP_Compass/AP_Compass.cpp
@@ -75,8 +75,12 @@ const AP_Param::Info ReplayVehicle::var_info[] = {
     
     // @Group: EK3_
     // @Path: ../libraries/AP_NavEKF3/AP_NavEKF3.cpp
-    GOBJECTN(ekf3, NavEKF3, "EK3_", NavEKF3),
+    GOBJECTN(ahrs.EKF3, NavEKF3, "EK3_", NavEKF3),
 
+    // @Group: TERRAIN_
+    // @Path: ../libraries/AP_Terrain/AP_Terrain.cpp
+    GOBJECT(terrain, "TERRAIN_", AP_Terrain),
+    
     // @Group: GPS
     // @Path: ../libraries/AP_GPS/AP_GPS.cpp
     GOBJECT(gps, "GPS", AP_GPS),
@@ -256,6 +260,14 @@ void Replay::loop()
 #endif
         exit(0);
     }
+#if AP_TERRAIN_AVAILABLE
+    // update at 10Hz
+    static uint32_t counter;
+    if (counter++ == 5) {
+        counter = 0;
+        _vehicle.terrain.update();
+    }
+#endif
 }
 
 /*

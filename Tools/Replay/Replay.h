@@ -15,6 +15,7 @@
 
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Vehicle/AP_FixedWing.h>
+#include <AP_Terrain/AP_Terrain.h>
 
 #include "LogReader.h"
 
@@ -55,8 +56,11 @@ public:
     };
     AP_Logger logger{unused};
 
-    NavEKF2 ekf2;
-    NavEKF3 ekf3;
+    AP_AHRS ahrs;
+#if AP_TERRAIN_AVAILABLE
+    AP_Terrain terrain;
+    uint32_t last_terrain_update_ms;
+#endif
 
 protected:
 
@@ -87,7 +91,7 @@ private:
     const char *filename;
     ReplayVehicle &_vehicle;
 
-    LogReader reader{_vehicle.log_structure, _vehicle.ekf2, _vehicle.ekf3};
+    LogReader reader{_vehicle.log_structure, _vehicle.ahrs.EKF2, _vehicle.ahrs.EKF3};
 
     void _parse_command_line(uint8_t argc, char * const argv[]);
 
