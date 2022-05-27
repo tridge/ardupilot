@@ -25,6 +25,11 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
+
+#if APM_BUILD_TYPE(APM_BUILD_Replay)
+#include <AP_DAL/AP_DAL.h>
+#endif
+
 #include <AP_Filesystem/AP_Filesystem.h>
 #include <AP_Rally/AP_Rally.h>
 
@@ -143,6 +148,7 @@ bool AP_Terrain::height_amsl(const Location &loc, float &height, bool corrected)
         !check_bitmap(grid, info.idx_x,   info.idx_y+1) ||
         !check_bitmap(grid, info.idx_x+1, info.idx_y) ||
         !check_bitmap(grid, info.idx_x+1, info.idx_y+1)) {
+        failed_lookups++;
         return false;
     }
 
@@ -174,6 +180,8 @@ bool AP_Terrain::height_amsl(const Location &loc, float &height, bool corrected)
     if (corrected && have_reference_offset) {
         height += reference_offset;
     }
+
+    total_lookups++;
     
     return true;
 }
@@ -356,6 +364,9 @@ float AP_Terrain::lookahead(float bearing, float distance, float climb_ratio)
 void AP_Terrain::update(void)
 {
     if (!enable) { return; }
+
+    WITH_SEMAPHORE(update_sem);
+
     // just schedule any needed disk IO
     schedule_disk_io();
 
@@ -403,6 +414,16 @@ void AP_Terrain::update(void)
     } else {
         system_status = TerrainStatusDisabled;
     }
+
+#if APM_BUILD_TYPE(APM_BUILD_Replay)
+    // no threading in replay, so need to call io timer directly
+    static uint32_t last_io_timer;
+    uint32_t now_ms = AP::dal().millis();
+    if (now_ms - last_io_timer > 10) {
+        last_io_timer = now_ms;
+        io_timer();
+    }
+#endif
 }
 
 bool AP_Terrain::update_surrounding_tiles(const Location &loc)
@@ -631,7 +652,7 @@ bool AP_Terrain::projected_rangefinder(const Location &loc,
     const uint8_t max_iterations = 32;
     for (uint8_t i=0; i<max_iterations; i++) {
         float hest_amsl1, hest_amsl2;
-        const float range_delta = 0.2;
+        const float range_delta = 1.0;
         if (!projected_height_amsl(loc, Tnb, range-0.5*range_delta, hest_amsl1) ||
             !projected_height_amsl(loc, Tnb, range+0.5*range_delta, hest_amsl2)) {
             return false;
@@ -641,12 +662,12 @@ bool AP_Terrain::projected_rangefinder(const Location &loc,
         if (fabsf(err) < 0.2) {
             break;
         }
+        if (fabsf(slope) < FLT_EPSILON) {
+            return false;
+        }
         range += err / slope;
         if (i == max_iterations-1 && fabsf(err) > max_error) {
             max_error = fabsf(err);
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-            ::printf("max_error %.2f\n", max_error);
-#endif
         }
     }
     return true;

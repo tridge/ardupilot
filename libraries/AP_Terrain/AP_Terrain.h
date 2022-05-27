@@ -219,6 +219,20 @@ public:
                                float height_amsl,
                                float &range);
 
+    // blocking to allow for blocking caller
+    void io_timer(void);
+    void io_thread(void);
+
+    // get total lookups since startup
+    uint32_t get_total_lookups(void) const {
+        return total_lookups;
+    }
+
+    // get total failed lookups since startup
+    uint32_t get_failed_lookups(void) const {
+        return failed_lookups;
+    }
+    
 private:
     // allocate the terrain subsystem data
     bool allocate(void);
@@ -357,7 +371,6 @@ private:
     uint16_t get_block_crc(struct grid_block &block);
     void check_disk_read(void);
     void check_disk_write(void);
-    void io_timer(void);
     void open_file(void);
     void seek_offset(void);
     uint32_t east_blocks(struct grid_block &block) const;
@@ -484,7 +497,14 @@ private:
     // memory allocation status
     bool memory_alloc_failed;
 
+    HAL_Semaphore timer_sem;
+    HAL_Semaphore update_sem;
+
     static AP_Terrain *singleton;
+
+    // count of terrain lookups
+    uint32_t total_lookups;
+    uint32_t failed_lookups;
 };
 
 namespace AP {

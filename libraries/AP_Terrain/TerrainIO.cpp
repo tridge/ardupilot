@@ -17,6 +17,7 @@
  */
 
 #include "AP_Terrain.h"
+#include <AP_BoardConfig/AP_BoardConfig.h>
 
 #if AP_TERRAIN_AVAILABLE
 
@@ -67,7 +68,10 @@ void AP_Terrain::schedule_disk_io(void)
 
     if (!timer_setup) {
         timer_setup = true;
-        hal.scheduler->register_io_process(FUNCTOR_BIND_MEMBER(&AP_Terrain::io_timer, void));
+        if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_Terrain::io_thread, void), "terrain", 4096,
+                                          AP_HAL::Scheduler::PRIORITY_IO, 0)) {
+            AP_BoardConfig::allocation_error("cretaing terrain thread");
+        }
     }
 
     switch (disk_io_state) {
@@ -339,6 +343,7 @@ void AP_Terrain::read_block(void)
  */
 void AP_Terrain::io_timer(void)
 {
+    WITH_SEMAPHORE(timer_sem);
     if (io_failure) {
         // retry the IO every 5s to allow for remount of sdcard
         uint32_t now = AP_HAL::millis();
@@ -375,6 +380,17 @@ void AP_Terrain::io_timer(void)
         }
         read_block();
         break;
+    }
+}
+
+/*
+  thread for IO calls
+ */
+void AP_Terrain::io_thread(void)
+{
+    while (true) {
+        hal.scheduler->delay(1);
+        io_timer();
     }
 }
 
