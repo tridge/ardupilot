@@ -89,8 +89,10 @@ public:
     void            update(bool skip_ins_update=false);
     void            reset();
 
-    // get current location estimate
+    // dead-reckoning support
     bool get_location(Location &loc) const;
+    bool get_location_EKF2(Location &loc) const;
+    bool get_location_EKF3(Location &loc) const;
 
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;

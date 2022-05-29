@@ -774,6 +774,24 @@ bool AP_AHRS::_get_location(Location &loc) const
     return false;
 }
 
+bool AP_AHRS::get_location_EKF2(struct Location &loc) const
+{
+#if HAL_NAVEKF2_AVAILABLE
+    return EKF2.getLLH(loc);
+#else
+    return false;
+#endif
+}
+
+bool AP_AHRS::get_location_EKF3(struct Location &loc) const
+{
+#if HAL_NAVEKF3_AVAILABLE
+    return EKF3.getLLH(loc);
+#else
+    return false;
+#endif
+}
+
 // status reporting of estimated errors
 float AP_AHRS::get_error_rp(void) const
 {
