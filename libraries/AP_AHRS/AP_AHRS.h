@@ -94,6 +94,19 @@ public:
     bool get_location_EKF2(Location &loc) const;
     bool get_location_EKF3(Location &loc) const;
 
+    Vector3f correction;
+    void set_pos_correction(const Vector3f &c) {
+        correction = c;
+    }
+
+    bool get_location_EKF3_corrected(struct Location &loc) const {
+        if (!get_location_EKF3(loc)) {
+            return false;
+        }
+        loc.offset(correction.x, correction.y);
+        return true;
+    }
+
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;
 
