@@ -94,16 +94,26 @@ public:
     bool get_location_EKF2(Location &loc) const;
     bool get_location_EKF3(Location &loc) const;
 
-    Vector3f correction;
-    void set_pos_correction(const Vector3f &c) {
-        correction = c;
+    struct {
+        Vector3f ofs_NE;
+        Vector2f vel_NE;
+        uint32_t vel_start_ms;
+    } correction;
+
+    void set_pos_correction(const Vector3f &ofs_NE, const Vector2f &vel_NE, uint32_t vel_start_ms) {
+        correction.ofs_NE = ofs_NE;
+        correction.vel_NE = vel_NE;
+        correction.vel_start_ms = vel_start_ms;
     }
 
     bool get_location_EKF3_corrected(struct Location &loc) const {
         if (!get_location_EKF3(loc)) {
             return false;
         }
-        loc.offset(correction.x, correction.y);
+        Vector3f ofs = correction.ofs_NE;
+        const float dt = int32_t(AP_HAL::millis() - correction.vel_start_ms) * 0.001;
+        ofs.xy() += correction.vel_NE * dt;
+        loc.offset(ofs.x, ofs.y);
         return true;
     }
 
