@@ -42,6 +42,7 @@
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <SITL/SITL.h>
 #endif
+#include <AP_DAL/AP_DAL.h>
 
 #define ATTITUDE_CHECK_THRESH_ROLL_PITCH_RAD radians(10)
 #define ATTITUDE_CHECK_THRESH_YAW_RAD radians(20)
@@ -3564,7 +3565,21 @@ bool AP_AHRS::get_location_from_home_offset(Location &loc, const Vector3p &offse
     }
     loc = get_home();
     loc.offset(offset_ned);
+    return true;
+}
 
+/*
+  get corrected EKF3 position
+ */
+bool AP_AHRS::get_location_EKF3_corrected(struct Location &loc) const
+{
+    if (!get_location_EKF3(loc)) {
+        return false;
+    }
+    Vector3f ofs = correction.ofs_NE;
+    const float dt = int32_t(AP::dal().millis() - correction.vel_start_ms) * 0.001;
+    ofs.xy() += correction.vel_NE * dt;
+    loc.offset(ofs.x, ofs.y);
     return true;
 }
 

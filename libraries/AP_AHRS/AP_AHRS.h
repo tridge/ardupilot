@@ -106,16 +106,7 @@ public:
         correction.vel_start_ms = vel_start_ms;
     }
 
-    bool get_location_EKF3_corrected(struct Location &loc) const {
-        if (!get_location_EKF3(loc)) {
-            return false;
-        }
-        Vector3f ofs = correction.ofs_NE;
-        const float dt = int32_t(AP_HAL::millis() - correction.vel_start_ms) * 0.001;
-        ofs.xy() += correction.vel_NE * dt;
-        loc.offset(ofs.x, ofs.y);
-        return true;
-    }
+    bool get_location_EKF3_corrected(struct Location &loc) const;
 
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const WARN_IF_UNUSED;
