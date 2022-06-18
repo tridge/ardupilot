@@ -21,6 +21,13 @@
 void insertion_sort_uint16(uint16_t *data, uint16_t n);
 
 /*
+  in-place insertion sort for small arrays of data. This is O(n) if
+  already sorted and O(n^2) for worst case (elements are reversed)
+  sort order is smallest first
+ */
+void insertion_sort_float(float *data, uint16_t n);
+
+/*
   remove duplicates from a sorted uint16_t array, returning the new
   count
  */
@@ -42,3 +49,21 @@ uint16_t remove_list_uint16(uint16_t *data, uint16_t n, const uint16_t *rem, uin
   return number of common elements between two sorted uint16_t lists
  */
 uint16_t common_list_uint16(uint16_t *data, uint16_t n, const uint16_t *rem, uint16_t n2);
+
+/*
+  templated insertion sort
+ */
+template <typename T>
+void insertion_sort_fn(T *data, uint16_t n, int (*comparison)(const T &d1, const T &d2))
+{
+    for (uint16_t i=1; i<n; i++) {
+        T temp = data[i];
+        int16_t j = i - 1;
+
+        while (j >= 0 && comparison(data[j],temp)>0) {
+            data[j+1] = data[j];
+            j--;
+		}
+        data[j+1] = temp;
+    }
+}

@@ -36,6 +36,25 @@ void insertion_sort_uint16(uint16_t *data, uint16_t n)
 }
 
 /*
+  in-place insertion sort for small arrays of data. This is O(n) if
+  already sorted and O(n^2) for worst case (elements are reversed)
+  sort order is smallest first
+ */
+void insertion_sort_float(float *data, uint16_t n)
+{
+    for (uint16_t i=1; i<n; i++) {
+        float temp = data[i];
+        int16_t j = i - 1;
+
+        while (j >= 0 && data[j] > temp) {
+            data[j+1] = data[j];
+            j--;
+		}
+        data[j+1] = temp;
+    }
+}
+
+/*
   remove duplicates from a sorted uint16_t array, returning the new
   count
  */
