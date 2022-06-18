@@ -529,7 +529,6 @@ int32_t double_to_int32(const double v)
     return int32_t(constrain_double(v, INT32_MIN, UINT32_MAX));
 }
 
-
 int32_t float_to_int32_le(const float& value)
 {
     int32_t out;
@@ -564,4 +563,15 @@ double uint64_to_double_le(const uint64_t& value)
     // At least it's defined behavior in both c and c++.
     memcpy(&out, &value, sizeof(out));
     return out;
+}
+
+float median3f(float v1, float v2, float v3)
+{
+    if (v1 < v2 && v1 < v3) {
+        return MIN(v2, v3);
+    }
+    if (v2 < v1 && v2 < v3) {
+        return MIN(v1, v3);
+    }
+    return MIN(v1, v2);
 }
