@@ -95,19 +95,12 @@ public:
     bool get_location_EKF3(Location &loc) const;
 
     static const uint8_t max_cores = 3;
-    struct EK3_correction {
-        Vector3f ofs_NE;
-        Vector2f vel_NE;
-        uint32_t vel_start_ms;
-    } correction[max_cores];
+    struct EK3_correction correction[max_cores];
 
     void set_pos_correction(uint8_t core, const EK3_correction &_correction) {
         if (core < max_cores) {
             correction[core] = _correction;
         }
-    }
-    const EK3_correction &get_pos_correction(uint8_t core) {
-        return correction[core];
     }
 
     bool get_location_EKF3_corrected(uint8_t core, struct Location &loc) const;
