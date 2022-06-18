@@ -82,3 +82,11 @@ struct ekf_timing {
 };
 
 #define N_MODELS_EKFGSF 5U
+
+// for terrain correction
+struct EK3_correction {
+    Vector3f ofs_NE;
+    Vector2f vel_NE;
+    uint32_t vel_start_ms;
+};
+
