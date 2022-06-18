@@ -94,18 +94,23 @@ public:
     bool get_location_EKF2(Location &loc) const;
     bool get_location_EKF3(Location &loc) const;
 
-    struct {
+    static const uint8_t max_cores = 3;
+    struct EK3_correction {
         Vector3f ofs_NE;
         Vector2f vel_NE;
         uint32_t vel_start_ms;
-    } correction;
+    } correction[max_cores];
 
-    void set_pos_correction(const Vector3f &ofs_NE, const Vector2f &vel_NE, uint32_t vel_start_ms) {
-        correction.ofs_NE = ofs_NE;
-        correction.vel_NE = vel_NE;
-        correction.vel_start_ms = vel_start_ms;
+    void set_pos_correction(uint8_t core, const EK3_correction &_correction) {
+        if (core < max_cores) {
+            correction[core] = _correction;
+        }
+    }
+    const EK3_correction &get_pos_correction(uint8_t core) {
+        return correction[core];
     }
 
+    bool get_location_EKF3_corrected(uint8_t core, struct Location &loc) const;
     bool get_location_EKF3_corrected(struct Location &loc) const;
 
     // get latest altitude estimate above ground level in meters and validity flag

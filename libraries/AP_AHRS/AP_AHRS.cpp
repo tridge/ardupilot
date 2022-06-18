@@ -3571,16 +3571,57 @@ bool AP_AHRS::get_location_from_home_offset(Location &loc, const Vector3p &offse
 /*
   get corrected EKF3 position
  */
-bool AP_AHRS::get_location_EKF3_corrected(struct Location &loc) const
+bool AP_AHRS::get_location_EKF3_corrected(uint8_t core, struct Location &loc) const
 {
-    if (!get_location_EKF3(loc)) {
+    if (!EKF3.getLLH(core, loc)) {
         return false;
     }
-    Vector3f ofs = correction.ofs_NE;
-    const float dt = int32_t(AP::dal().millis() - correction.vel_start_ms) * 0.001;
-    ofs.xy() += correction.vel_NE * dt;
+    const auto &c = correction[core];
+    Vector3f ofs = c.ofs_NE;
+    const float dt = int32_t(AP::dal().millis() - c.vel_start_ms) * 0.001;
+    ofs.xy() += c.vel_NE * dt;
     loc.offset(ofs.x, ofs.y);
     return true;
+}
+
+/*
+  get corrected EKF3 position
+ */
+bool AP_AHRS::get_location_EKF3_corrected(struct Location &loc) const
+{
+    Location orgn;
+    if (!get_origin(orgn)) {
+        return false;
+    }
+    if (EKF3.activeCores() >= 3) {
+        // 3-way median
+        Vector3f offsets[3];
+        for (uint8_t core=0; core<3; core++) {
+            const auto &c = correction[core];
+            Location cloc;
+            if (!EKF3.getLLH(core, cloc)) {
+                // can't do median
+                goto primary;
+            }
+            const float dt = int32_t(AP::dal().millis() - c.vel_start_ms) * 0.001;
+            Vector3f ofs = c.ofs_NE;
+            ofs.xy() += c.vel_NE * dt;
+            cloc.offset(ofs.x, ofs.y);
+            offsets[core] = orgn.get_distance_NED(cloc);
+        }
+        loc = orgn;
+        Vector3f offset{
+            median3f(offsets[0].x, offsets[1].x, offsets[2].x),
+            median3f(offsets[0].y, offsets[1].y, offsets[2].y),
+            median3f(offsets[0].z, offsets[1].z, offsets[2].z)
+        };
+        loc.offset(offset.x, offset.y);
+        loc.alt -= offset.z*100;
+        return true;
+    }
+
+primary:
+    return get_location_EKF3_corrected(EKF3.getPrimaryCoreIndex(), loc);
 }
 
 // singleton instance
