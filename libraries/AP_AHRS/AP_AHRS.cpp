@@ -748,10 +748,7 @@ bool AP_AHRS::_get_location(Location &loc) const
 
 #if HAL_NAVEKF3_AVAILABLE
     case EKFType::THREE:
-        if (EKF3.getLLH(loc)) {
-            return true;
-        }
-        break;
+        return get_location_EKF3_corrected(loc);
 #endif
 
 #if AP_AHRS_SIM_ENABLED
