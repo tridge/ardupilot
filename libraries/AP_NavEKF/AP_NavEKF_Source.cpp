@@ -482,8 +482,10 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
     }
 
     if (optflow_required && !dal.opticalflow_enabled()) {
+#if 0
         hal.util->snprintf(failure_msg, failure_msg_len, ekf_requires_msg, "OpticalFlow");
         return false;
+#endif
     }
 
     if (rangefinder_required && (dal.rangefinder() == nullptr || !dal.rangefinder()->has_orientation(ROTATION_PITCH_270))) {
@@ -498,8 +500,11 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
         visualodom_available = vo && vo->enabled();
 #endif
         if (!visualodom_available) {
+#if 0
+            // disabled for TNAV
             hal.util->snprintf(failure_msg, failure_msg_len, ekf_requires_msg, "VisualOdom");
             return false;
+#endif
         }
     }
 
