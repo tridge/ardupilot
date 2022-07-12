@@ -3570,7 +3570,11 @@ bool AP_AHRS::get_location_from_home_offset(Location &loc, const Vector3p &offse
  */
 bool AP_AHRS::get_location_EKF3_corrected(uint8_t core, struct Location &loc) const
 {
-    if (!EKF3.getLLH(core, loc)) {
+    if (EKF3.using_gps(core)) {
+        return EKF3.getLLH(core, loc);
+    }
+    Vector2f delta;
+    if (!EKF3.getDeadReckonLLH(core, loc, delta)) {
         return false;
     }
     const auto &c = correction[core];
@@ -3587,23 +3591,18 @@ bool AP_AHRS::get_location_EKF3_corrected(uint8_t core, struct Location &loc) co
 bool AP_AHRS::get_location_EKF3_corrected(struct Location &loc) const
 {
     Location orgn;
-    if (!get_origin(orgn)) {
+    if (!EKF3.getOriginLLH(orgn)) {
         return false;
     }
     if (EKF3.activeCores() >= 3) {
         // 3-way median
         Vector3f offsets[3];
         for (uint8_t core=0; core<3; core++) {
-            const auto &c = correction[core];
             Location cloc;
-            if (!EKF3.getLLH(core, cloc)) {
+            if (!get_location_EKF3_corrected(core, cloc)) {
                 // can't do median
                 goto primary;
             }
-            const float dt = int32_t(AP::dal().millis() - c.vel_start_ms) * 0.001;
-            Vector3f ofs = c.ofs_NE;
-            ofs.xy() += c.vel_NE * dt;
-            cloc.offset(ofs.x, ofs.y);
             offsets[core] = orgn.get_distance_NED(cloc);
         }
         loc = orgn;
