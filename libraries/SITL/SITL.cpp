@@ -84,6 +84,10 @@ const AP_Param::GroupInfo SIM::var_info[] = {
     // @Units: m/s
     // @User: Advanced
     AP_GROUPINFO("WIND_TURB",     11, SIM,  wind_turbulance,  0),
+
+    // time constant for wind changes in SITL, seconds
+    AP_GROUPINFO("WIND_TC",       12, SIM,  wind_change_tc,  5),
+
     AP_GROUPINFO("SERVO_SPEED",   16, SIM,  servo_speed,  0.14),
     AP_GROUPINFO("SONAR_ROT",     17, SIM,  sonar_rot, Rotation::ROTATION_PITCH_270),
     // @Param: BATT_VOLTAGE
