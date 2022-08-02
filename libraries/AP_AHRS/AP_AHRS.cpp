@@ -648,7 +648,7 @@ void AP_AHRS::update_EKF3(void)
         EKF3.UpdateFilter();
         if (_active_EKF_type() == EKFType::THREE) {
             Vector3f eulers;
-            EKF3.getRotationBodyToNED(state.dcm_matrix);
+            EKF3.getRotationBodyToNED(-1,state.dcm_matrix);
             EKF3.getEulerAngles(eulers);
             roll  = eulers.x;
             pitch = eulers.y;
