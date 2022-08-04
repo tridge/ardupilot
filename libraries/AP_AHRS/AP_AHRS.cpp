@@ -3586,6 +3586,12 @@ bool AP_AHRS::get_location_from_home_offset(Location &loc, const Vector3p &offse
     return true;
 }
 
+// AUX switch support for disabling GPS only in EKF3
+void AP_AHRS::gps_disable_ek3(bool gps_disable)
+{
+    EKF3.force_gps_disable(gps_disable);
+}
+
 // singleton instance
 AP_AHRS *AP_AHRS::_singleton;
 
