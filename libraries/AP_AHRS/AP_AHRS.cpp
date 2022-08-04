@@ -3620,6 +3620,12 @@ primary:
     return get_location_EKF3_corrected(EKF3.getPrimaryCoreIndex(), loc);
 }
 
+// AUX switch support for disabling GPS only in EKF3
+void AP_AHRS::gps_disable_ek3(bool gps_disable)
+{
+    EKF3.force_gps_disable(gps_disable);
+}
+
 // singleton instance
 AP_AHRS *AP_AHRS::_singleton;
 
