@@ -681,6 +681,7 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
     case AUX_FUNC::GRIPPER:
 #endif
     case AUX_FUNC::GPS_DISABLE_EK3:
+    case AUX_FUNC::GPS_DISABLE_JAM:
 #if AP_INERTIALSENSOR_KILL_IMU_ENABLED
     case AUX_FUNC::KILL_IMU1:
     case AUX_FUNC::KILL_IMU2:
@@ -1397,6 +1398,10 @@ bool RC_Channel::do_aux_function(const aux_func_t ch_option, const AuxSwitchPos 
         AP::gps().set_force_disable_yaw(ch_flag == AuxSwitchPos::HIGH);
         break;
 
+    case AUX_FUNC::GPS_DISABLE_JAM:
+        AP::gps().simulate_jamming(ch_flag == AuxSwitchPos::HIGH);
+        break;
+        
 #if AP_AIRSPEED_ENABLED
     case AUX_FUNC::DISABLE_AIRSPEED_USE: {
         AP_Airspeed *airspeed = AP::airspeed();

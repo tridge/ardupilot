@@ -253,6 +253,7 @@ public:
 
 
         GPS_DISABLE_EK3 =    190, // disable GPS only for EKF3
+        GPS_DISABLE_JAM =    191, // simulate GPS jamming
 
         // inputs from 200 will eventually used to replace RCMAP
         ROLL =               201, // roll input
