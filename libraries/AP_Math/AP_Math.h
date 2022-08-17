@@ -392,3 +392,9 @@ double uint64_to_double_le(const uint64_t& value) WARN_IF_UNUSED;
 
 // median of 3 floats
 float median3f(float v1, float v2, float v3);
+
+// generate a random number with a sequence that has a zero mean and a standard deviation of 1
+float randn_float(void);
+
+// generate a vector of random numbers from a  sequence that has a zero mean and a standard deviation of 1
+Vector3f randn_vec3f(void);

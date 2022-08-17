@@ -575,3 +575,25 @@ float median3f(float v1, float v2, float v3)
     }
     return MIN(v1, v2);
 }
+
+float randn_float(void)
+{   //Box Muller method for approximating a normal distribution.
+    // rand_float generates a random number in the interval (-1,1) hence need to adjust interval to (0,1) to use the following // Box-Muller method hence the adjustment of +1 and  division by 2.
+    // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+    float x1 = (rand_float()+1.0f)/2.0f;
+    float x2 = (rand_float()+1.0f)/2.0f;
+    float randn_num = sqrt(-2.0f*log(x1))*cosf(2.0f*M_PI*x2);
+
+    return randn_num;
+}
+
+Vector3f randn_vec3f(void)
+{
+    Vector3f v = Vector3f(randn_float(),
+                          randn_float(),
+                          randn_float());
+    if (!is_zero(v.length())) {
+        v.normalize();
+    }
+    return v;
+}
