@@ -597,3 +597,27 @@ Vector3f randn_vec3f(void)
     }
     return v;
 }
+
+float NormalCDF(float value)
+{
+   return 0.5f * erfc(-value * M_SQRT1_2);
+}
+
+float NormalCDFInverse(float p)
+{
+    // Abramowitz and Stegun formula 26.2.23.
+    // use t = sqrtf(-2.0f*logf(p)) = sqrtf(logf(1/p**2))
+    p = constrain_float(p, 1E-6f, 1.0f-1E-6f);
+    const bool p_is_low = p < 0.5f;
+    const float p_low = p_is_low ? p : 1.0f - p;
+    const float t = sqrtf(-2.0f*logf(p_low));
+    const float c[3] = {2.515517f, 0.802853f, 0.010328f};
+    const float d[3] = {1.432788f, 0.189269f, 0.001308f};
+    // evaluate polynomial using Horners method for efficiency
+    float x =  t - ((c[2]*t + c[1])*t + c[0]) / (((d[2]*t + d[1])*t + d[0])*t + 1.0f);
+    if (p_is_low) {
+        return -x;
+    } else {
+        return x;
+    }
+}

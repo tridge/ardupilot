@@ -398,3 +398,9 @@ float randn_float(void);
 
 // generate a vector of random numbers from a  sequence that has a zero mean and a standard deviation of 1
 Vector3f randn_vec3f(void);
+
+// return the normal cumulative density function value for a given number of standard deviations
+float NormalCDF(float value);
+
+// return the number of standard deviations for a given cumulative probability
+float NormalCDFInverse(float p);
