@@ -38,6 +38,7 @@ private:
 
     struct log_RRNH _RRNH;
     struct log_RRNI *_RRNI;
+
     AP_DAL_RangeFinder_Backend **_backend;
 };
 
@@ -68,4 +69,5 @@ public:
 private:
 
     struct log_RRNI &_RRNI;
+
 };

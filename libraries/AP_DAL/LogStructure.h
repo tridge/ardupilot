@@ -437,3 +437,4 @@ struct log_RBOH {
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
       "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" },
+

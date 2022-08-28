@@ -19,7 +19,7 @@ AP_DAL_RangeFinder::AP_DAL_RangeFinder()
     }
     for (uint8_t i=0; i<_RRNH.num_sensors; i++) {
         _RRNI[i].instance = i;
-    }
+   }
     for (uint8_t i=0; i<_RRNH.num_sensors; i++) {
         // this avoids having to discard a const....
         _backend[i] = new AP_DAL_RangeFinder_Backend(_RRNI[i]);
@@ -95,13 +95,13 @@ AP_DAL_RangeFinder_Backend::AP_DAL_RangeFinder_Backend(struct log_RRNI &RRNI) :
 }
 
 void AP_DAL_RangeFinder_Backend::start_frame(AP_RangeFinder_Backend *backend) {
-    const log_RRNI old = _RRNI;
+    const log_RRNI old_RRNI = _RRNI;
     _RRNI.orientation = backend->orientation();
     _RRNI.status = (uint8_t)backend->status();
     _RRNI.pos_offset = backend->get_pos_offset();
     _RRNI.distance_cm = backend->distance_cm();
     _RRNI.sample_ms = backend->last_reading_ms();
-    WRITE_REPLAY_BLOCK_IFCHANGED(RRNI, _RRNI, old);
+    WRITE_REPLAY_BLOCK_IFCHANGED(RRNI, _RRNI, old_RRNI);
 }
 
 // return true if we have a range finder with the specified orientation
@@ -132,8 +132,10 @@ AP_DAL_RangeFinder_Backend *AP_DAL_RangeFinder::get_backend(uint8_t id) const
 void AP_DAL_RangeFinder::handle_message(const log_RRNH &msg)
 {
     _RRNH = msg;
-    if (_RRNH.num_sensors > 0 && _RRNI == nullptr) {
-        _RRNI = new log_RRNI[_RRNH.num_sensors];
+    if (_RRNH.num_sensors > 0) {
+        if (_RRNI == nullptr) {
+            _RRNI = new log_RRNI[_RRNH.num_sensors];
+        }
         _backend = new AP_DAL_RangeFinder_Backend *[_RRNH.num_sensors];
     }
 }
@@ -147,3 +149,4 @@ void AP_DAL_RangeFinder::handle_message(const log_RRNI &msg)
         }
     }
 }
+
