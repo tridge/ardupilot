@@ -1034,6 +1034,9 @@ private:
     bool option_set(Options option) const {
         return (_options & uint16_t(option)) != 0;
     }
+
+    // last time gps speed accuracy was too high
+    uint32_t last_high_gps_speed_accuracy_ms;
 };
 
 namespace AP {

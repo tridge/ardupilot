@@ -491,6 +491,16 @@ void AP_AHRS::update(bool skip_ins_update)
         hal.scheduler->delay_microseconds(random() % sitl->loop_time_jitter_us);
     }
 #endif
+
+    /*
+      remember when we last had bad GPS speed accuracy
+     */
+    const float speed_acc_threshold = 2.5;
+
+    float speed_acc;
+    if (AP::gps().speed_accuracy(speed_acc) && speed_acc > speed_acc_threshold) {
+        last_high_gps_speed_accuracy_ms = AP_HAL::millis();
+    }
 }
 
 /*
