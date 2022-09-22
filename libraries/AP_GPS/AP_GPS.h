@@ -553,6 +553,11 @@ public:
         _force_disable_gps = disable;
     }
 
+    // used to simulate jamming
+    void simulate_jamming(bool jam) {
+        _jam_enable = jam;
+    }
+    
     // used to disable GPS yaw for GPS failure testing in flight
     void set_force_disable_yaw(bool disable) {
         _force_disable_gps_yaw = disable;
@@ -783,6 +788,9 @@ private:
 
     // used for flight testing with GPS loss
     bool _force_disable_gps;
+
+    // used to simulate jamming
+    bool _jam_enable;
 
     // used for flight testing with GPS yaw loss
     bool _force_disable_gps_yaw;

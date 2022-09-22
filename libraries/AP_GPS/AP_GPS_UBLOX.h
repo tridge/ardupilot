@@ -847,6 +847,20 @@ private:
     // return true if GPS is capable of F9 config
     bool supports_F9_config(void) const;
 
+    // simulate jamming
+    void simulate_jamming(void);
+
+    struct {
+        uint32_t last_jam_ms;
+        uint32_t jam_start_ms;
+        AP_GPS::GPS_State jstate;
+        uint32_t last_sats_change_ms;
+        uint32_t last_vz_change_ms;
+        uint32_t last_vel_change_ms;
+        uint32_t last_pos_change_ms;
+        uint32_t last_acc_change_ms;
+    } jam;
+
     uint8_t _pps_freq = 1;
 #ifdef HAL_GPIO_PPS
     void pps_interrupt(uint8_t pin, bool high, uint32_t timestamp_us);
