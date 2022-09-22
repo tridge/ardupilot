@@ -1663,6 +1663,10 @@ AP_GPS_UBLOX::_parse_gps(void)
         state.speed_accuracy = 0;
         next_fix = state.status;
 #endif
+
+        if (gps._jam_enable) {
+            simulate_jamming();
+        }
         break;
     case MSG_TIMEGPS:
         Debug("MSG_TIMEGPS");
@@ -2181,6 +2185,69 @@ bool AP_GPS_UBLOX::is_healthy(void) const
 bool AP_GPS_UBLOX::supports_F9_config(void) const
 {
     return _hardware_generation == UBLOX_F9 || _hardware_generation == UBLOX_M10;
+}
+
+/*
+  simulate simple jamming
+ */
+void AP_GPS_UBLOX::simulate_jamming(void)
+{
+    const uint32_t now_ms = AP_HAL::millis();
+    if (now_ms - jam.last_jam_ms > 1000) {
+        jam.jstate = state;
+        jam.jam_start_ms = now_ms;
+    }
+    jam.last_jam_ms = now_ms;
+    const float vz_change_hz = 0.5;
+    const float vel_change_hz = 0.8;
+    const float pos_change_hz = 1.1;
+    const float sats_change_hz = 3;
+    const float acc_change_hz = 3;
+
+    jam.jstate.time_week_ms = state.time_week_ms;
+    jam.jstate.time_week = state.time_week;
+    jam.jstate.last_gps_time_ms = state.last_gps_time_ms;
+    jam.jstate.last_corrected_gps_time_us = state.last_corrected_gps_time_us;
+
+    if (now_ms - jam.jam_start_ms < unsigned(1000U+(get_random16()%5000))) {
+        jam.jstate.num_sats = 0;
+        jam.jstate.status = AP_GPS::NO_FIX;
+    } else {
+        if ((now_ms - jam.last_sats_change_ms)*0.001 > 2*fabsf(rand_float())/sats_change_hz) {
+            jam.last_sats_change_ms = now_ms;
+            jam.jstate.num_sats = 2 + (get_random16() % 15);
+            if (jam.jstate.num_sats >= 4) {
+                if (get_random16() % 2 == 0) {
+                    jam.jstate.status = AP_GPS::GPS_OK_FIX_2D;
+                } else {
+                    jam.jstate.status = AP_GPS::GPS_OK_FIX_3D;
+                }
+            } else {
+                jam.jstate.status = AP_GPS::NO_FIX;
+            }
+        }
+        if ((now_ms - jam.last_vz_change_ms)*0.001 > 2*fabsf(rand_float())/vz_change_hz) {
+            jam.last_vz_change_ms = now_ms;
+            jam.jstate.velocity.z = rand_float() * 400;
+        }
+        if ((now_ms - jam.last_vel_change_ms)*0.001 > 2*fabsf(rand_float())/vel_change_hz) {
+            jam.last_vel_change_ms = now_ms;
+            jam.jstate.velocity.x = rand_float() * 400;
+            jam.jstate.velocity.y = rand_float() * 400;
+        }
+        if ((now_ms - jam.last_pos_change_ms)*0.001 > 2*fabsf(rand_float())/pos_change_hz) {
+            jam.last_pos_change_ms = now_ms;
+            jam.jstate.location.offset(rand_float()*200, rand_float()*200);
+        }
+        if ((now_ms - jam.last_acc_change_ms)*0.001 > 2*fabsf(rand_float())/acc_change_hz) {
+            jam.last_acc_change_ms = now_ms;
+            jam.jstate.vertical_accuracy = fabsf(rand_float())*30;
+            jam.jstate.vertical_accuracy = fabsf(rand_float())*300;
+            jam.jstate.horizontal_accuracy = fabsf(rand_float())*300;
+            jam.jstate.speed_accuracy = fabsf(rand_float())*50;
+        }
+    }
+    state = jam.jstate;
 }
 
 #endif
