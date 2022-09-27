@@ -96,12 +96,20 @@ public:
 
     static const uint8_t max_cores = 3;
     struct EK3_correction correction[max_cores];
+    uint32_t time_tnav_started_msec;
 
-    void set_pos_correction(uint8_t core, const EK3_correction &_correction) {
+    void set_pos_correction(uint8_t core, const EK3_correction &_correction, const bool using_terrain) {
+        if (time_tnav_started_msec > 0 && !using_terrain) {
+            time_tnav_started_msec = 0;
+        } else if (time_tnav_started_msec == 0 && using_terrain) {
+            time_tnav_started_msec = AP_HAL::millis();
+        }
         if (core < max_cores) {
             correction[core] = _correction;
         }
     }
+
+    uint32_t terrain_nav_duration_msec(void) const { return time_tnav_started_msec == 0 ? 0 : AP_HAL::millis() - time_tnav_started_msec; };
 
     bool get_location_EKF3_corrected(uint8_t core, struct Location &loc) const;
     bool get_location_EKF3_corrected(struct Location &loc) const;
