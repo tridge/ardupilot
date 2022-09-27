@@ -595,6 +595,20 @@ void Plane::calc_nav_pitch()
 void Plane::calc_nav_roll()
 {
     int32_t commanded_roll = nav_controller->nav_roll_cd();
+
+    if (g2.weave_roll_deg > 0 && g2.weave_period > 0 && !mission.get_in_landing_sequence_flag() && control_mode != &mode_cruise) {
+        const uint32_t duration_msec = ahrs.terrain_nav_duration_msec();
+        if (duration_msec > 0) {
+            const float duration_sec = 1E-3f * (float)duration_msec;
+            const float period = (float)g2.weave_period;
+            const float cycle_fraction = fmodf(duration_sec, period) / period;
+            const float weave_amplitude_cd = 100.0f * (float)g2.weave_roll_deg;
+            const float fader_gain = 1.0f - MIN(fabsf((float)commanded_roll / roll_limit_cd), 1.0f);
+            const float roll_ofs_cd = fader_gain * weave_amplitude_cd * sinf(cycle_fraction * M_2PI);
+            commanded_roll += (int32_t)roll_ofs_cd;
+        }
+    }
+
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
     update_load_factor();
 }

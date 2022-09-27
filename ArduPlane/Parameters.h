@@ -585,6 +585,9 @@ public:
     AP_Int8         man_expo_pitch;
     AP_Int8         man_expo_rudder;
 
+    AP_Int8         weave_roll_deg;
+    AP_Int8         weave_period;
+
     AP_Int32        oneshot_mask;
     
     AP_Int8         axis_bitmask; // axes to be autotuned

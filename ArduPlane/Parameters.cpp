@@ -1266,6 +1266,9 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_SUBGROUPINFO(precland, "PLND_", 35, ParametersG2, AC_PrecLand),
 #endif
 
+    AP_GROUPINFO("WEAVE_ROLL_DEG", 62, ParametersG2, weave_roll_deg, 0),
+    AP_GROUPINFO("WEAVE_PERIOD", 63, ParametersG2, weave_period, 0),
+
     AP_GROUPEND
 };
 
