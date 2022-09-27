@@ -99,13 +99,17 @@ public:
     uint32_t time_tnav_started_msec;
 
     void set_pos_correction(uint8_t core, const EK3_correction &_correction, const bool using_terrain) {
+        set_terrain_nav_status(using_terrain);
+        if (core < max_cores) {
+            correction[core] = _correction;
+        }
+    }
+
+    void set_terrain_nav_status(const bool using_terrain) {
         if (time_tnav_started_msec > 0 && !using_terrain) {
             time_tnav_started_msec = 0;
         } else if (time_tnav_started_msec == 0 && using_terrain) {
             time_tnav_started_msec = AP_HAL::millis();
-        }
-        if (core < max_cores) {
-            correction[core] = _correction;
         }
     }
 
