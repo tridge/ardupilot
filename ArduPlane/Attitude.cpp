@@ -596,7 +596,12 @@ void Plane::calc_nav_roll()
 {
     int32_t commanded_roll = nav_controller->nav_roll_cd();
 
-    if (g2.weave_roll_deg > 0 && g2.weave_period > 0 && !mission.get_in_landing_sequence_flag() && control_mode != &mode_cruise) {
+    const bool mode_is_suitable = (control_mode == &mode_auto && !mission.get_in_landing_sequence_flag()) ||
+                                  control_mode == &mode_loiter ||
+                                  control_mode == &mode_guided ||
+                                  control_mode == &mode_rtl;
+
+    if (g2.weave_roll_deg > 0 && g2.weave_period > 0 && mode_is_suitable) {
         const uint32_t duration_msec = ahrs.terrain_nav_duration_msec();
         if (duration_msec > 0) {
             const float duration_sec = 1E-3f * (float)duration_msec;
