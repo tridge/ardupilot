@@ -601,7 +601,13 @@ void Plane::calc_nav_roll()
                                   control_mode == &mode_guided ||
                                   control_mode == &mode_rtl;
 
-    if (g2.weave_roll_deg > 0 && g2.weave_period > 0 && mode_is_suitable) {
+    bool weaving_is_required = true;
+    nav_filter_status nav_ekf_status;
+    if (ahrs.get_filter_status(nav_ekf_status)) {
+        weaving_is_required = !nav_ekf_status.flags.using_gps;
+    }
+
+    if (g2.weave_roll_deg > 0 && g2.weave_period > 0 && weaving_is_required && mode_is_suitable) {
         const uint32_t duration_msec = ahrs.terrain_nav_duration_msec();
         if (duration_msec > 0) {
             const float duration_sec = 1E-3f * (float)duration_msec;
