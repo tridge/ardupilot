@@ -1,0 +1,20 @@
+set altreadout 0
+set battwarn 0
+set streamrate 1
+map set showahrs2pos 1
+map set showahrs3pos 1
+map set showsimpos 0
+map set showgpspos 1
+
+@alias add gpsdisable long DO_AUX_FUNCTION 65 2
+@alias add gpsenable long DO_AUX_FUNCTION 65 0
+
+@alias add gahrs2glob g distance_lat_lon(AHRS2.lat*1.0e-7,AHRS2.lng*1.0e-7,GLOBAL_POSITION_INT.lat*1.0e-7,GLOBAL_POSITION_INT.lon*1.0e-7)
+@alias add gahrs3glob g distance_lat_lon(AHRS3.lat*1.0e-7,AHRS3.lng*1.0e-7,GLOBAL_POSITION_INT.lat*1.0e-7,GLOBAL_POSITION_INT.lon*1.0e-7)
+
+@alias add ekf param set AHRS_EKF_TYPE
+@alias add speedup param set SIM_SPEEDUP
+
+gahrs2glob
+gahrs3glob
+wp list

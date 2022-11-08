@@ -1,0 +1,109 @@
+ <graph name='Nav/ErrorCmp'>
+  <description></description>
+  <expression>NT2.BErr NT2.GErr NT2.EK3Err:2 NT2.EK3CorrErr:2</expression>
+ </graph>
+
+ <graph name='Nav/SimRPErr'>
+  <description></description>
+  <expression>SIM.Roll-XKF1[0].Roll{XKF1[0].TimeUS&lt;=SIM.TimeUS} SIM.Pitch-XKF1[0].Pitch{XKF1[0].TimeUS&lt;=SIM.TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/NTCO-dist2'>
+  <description></description>
+  <expression>distance_two(NTCO[0],NTCO[100]){NTCO[100].TimeUS&lt;=NTCO[0].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/NTCorrCmp'>
+  <description></description>
+  <expression>distance_two(NTE2[0],NTUC[0]){NTE2[0].TimeUS&lt;=NTUC[0].TimeUS} distance_two(NTE2[0],NTCO[0]){NTE2[0].TimeUS&lt;=NTCO[0].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/GPS-NTUC-0'>
+  <description></description>
+  <expression>distance_two(GPS,NTUC[0]){GPS.TimeUS&lt;=NTUC[0].TimeUS} distance_two(GPS,NTCO[0]){GPS.TimeUS&lt;=NTCO[0].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/GPS-NTCO-100'>
+  <description></description>
+  <expression>distance_two(GPS,NTUC[100]){GPS.TimeUS&lt;=NTUC[100].TimeUS} distance_two(GPS,NTCO[100]){GPS.TimeUS&lt;=NTCO[100].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/GSpdErr-0'>
+  <description></description>
+  <expression>sqrt(NKF1[0].VN**2+NKF1[0].VE**2)-sqrt(XKF1[0].VN**2+XKF1[0].VE**2)</expression>
+ </graph>
+
+ <graph name='Nav/VelErrNE-0'>
+  <description></description>
+  <expression>NKF1[0].VN-XKF1[0].VN NKF1[0].VE-XKF1[0].VE</expression>
+ </graph>
+
+ <graph name='Nav/EKF3-EKF2-WindCmp'>
+  <description></description>
+  <expression>sqrt(NKF2[0].VWN**2+NKF2[0].VWE**2) wrap_180(degrees(atan2(-NKF2[0].VWE,-NKF2[0].VWN))):2 sqrt(XKF2[0].VWN**2+XKF2[0].VWE**2) wrap_180(degrees(atan2(-XKF2[0].VWE,-XKF2[0].VWN))):2</expression>
+ </graph>
+
+ <graph name='Nav/EKF2-EKF3-GndCrsError'>
+  <description></description>
+  <expression>sqrt(NKF1[0].VN**2+NKF1[0].VE**2)-sqrt(XKF1[0].VN**2+XKF1[0].VE**2)&lt;GndSpdErr&gt; wrap_180(degrees(atan2(-NKF1[0].VE,-NKF1[0].VN))-degrees(atan2(-XKF1[0].VE,-XKF1[0].VN))):2&lt;GndCourseErr&gt;</expression>
+ </graph>
+
+ <graph name='Nav/EK2-EK3-Wind'>
+  <description></description>
+  <expression>sqrt(NKF2[0].VWN**2+NKF2[0].VWE**2)&lt;EK2_Wind_Speed&gt; wrap_180(degrees(atan2(-NKF2[0].VWE,-NKF2[0].VWN))):2&lt;EK2_Wind_Dir&gt; sqrt(XKF2[0].VWN**2+XKF2[0].VWE**2)&lt;EK3_Wind_Speed&gt; wrap_180(degrees(atan2(-XKF2[0].VWE,-XKF2[0].VWN))):2&lt;EK3_Wind_Dir&gt;</expression>
+ </graph>
+
+ <graph name='Nav/EK2-EK3-PosErr'>
+  <description></description>
+  <expression>NKF1[0].PN-XKF1[0].PN&lt;PosErrNorth&gt; NKF1[0].PE-XKF1[0].PE&lt;PosErrEast&gt;</expression>
+ </graph>
+
+ <graph name='Nav/EK2-EK3-PosError'>
+  <description></description>
+  <expression>sqrt((NKF1[0].PN-XKF1[0].PN)**2+(NKF1[0].PE-XKF1[0].PE)**2)&lt;EK2-EK3-PosError&gt;</expression>
+ </graph>
+
+ <graph name='Nav/WindCmp-100'>
+  <description></description>
+  <expression>sqrt(NKF2[100].VWN**2+NKF2[100].VWE**2) wrap_180(degrees(atan2(-NKF2[100].VWE,-NKF2[100].VWN))):2 sqrt(XKF2[100].VWN**2+XKF2[100].VWE**2) wrap_180(degrees(atan2(-XKF2[100].VWE,-XKF2[100].VWN))):2</expression>
+ </graph>
+
+ <graph name='Nav/WinsladeTerr'>
+  <description></description>
+  <expression>terrain_margin_lat_lon(TERR.Lat,TERR.Lng,TERR.CHeight+TERR.TerrH,-35.3160356,148.9767994,606) TERR.TerrH:2</expression>
+ </graph>
+
+ <graph name='Silvus/RSSI'>
+  <description></description>
+  <expression>NAMED_VALUE_FLOAT[SR_TXRSSI1].value NAMED_VALUE_FLOAT[SR_TXRSSI2].value NAMED_VALUE_FLOAT[SR_RXRSSI1].value NAMED_VALUE_FLOAT[SR_RXRSSI2].value</expression>
+ </graph>
+
+ <graph name='Nav/MD_NTCO3'>
+  <description></description>
+  <expression>distance_two(GPS,NTMD[0]){GPS.TimeUS&lt;=NTMD[0].TimeUS} distance_two(GPS,NTCO[0]){GPS.TimeUS&lt;=NTCO[0].TimeUS} distance_two(GPS,NTCO[3]){GPS.TimeUS&lt;=NTCO[3].TimeUS} distance_two(GPS,NTCO[6]){GPS.TimeUS&lt;=NTCO[6].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/MD_CO9-0'>
+  <description></description>
+  <expression>distance_two(GPS,NTMD[0]){GPS.TimeUS&lt;=NTMD[0].TimeUS} distance_two(GPS,NTCO[0]){GPS.TimeUS&lt;=NTCO[0].TimeUS} distance_two(GPS,NTCO[1]){GPS.TimeUS&lt;=NTCO[1].TimeUS} distance_two(GPS,NTCO[2]){GPS.TimeUS&lt;=NTCO[2].TimeUS} distance_two(GPS,NTCO[3]){GPS.TimeUS&lt;=NTCO[3].TimeUS} distance_two(GPS,NTCO[4]){GPS.TimeUS&lt;=NTCO[4].TimeUS} distance_two(GPS,NTCO[5]){GPS.TimeUS&lt;=NTCO[5].TimeUS} distance_two(GPS,NTCO[6]){GPS.TimeUS&lt;=NTCO[6].TimeUS} distance_two(GPS,NTCO[7]){GPS.TimeUS&lt;=NTCO[7].TimeUS} distance_two(GPS,NTCO[8]){GPS.TimeUS&lt;=NTCO[8].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/MD_CO9-100'>
+  <description></description>
+  <expression>distance_two(GPS,NTMD[100]){GPS.TimeUS&lt;=NTMD[100].TimeUS} distance_two(GPS,NTCO[100]){GPS.TimeUS&lt;=NTCO[100].TimeUS} distance_two(GPS,NTCO[101]){GPS.TimeUS&lt;=NTCO[101].TimeUS} distance_two(GPS,NTCO[102]){GPS.TimeUS&lt;=NTCO[102].TimeUS} distance_two(GPS,NTCO[103]){GPS.TimeUS&lt;=NTCO[103].TimeUS} distance_two(GPS,NTCO[104]){GPS.TimeUS&lt;=NTCO[104].TimeUS} distance_two(GPS,NTCO[105]){GPS.TimeUS&lt;=NTCO[105].TimeUS} distance_two(GPS,NTCO[106]){GPS.TimeUS&lt;=NTCO[106].TimeUS} distance_two(GPS,NTCO[107]){GPS.TimeUS&lt;=NTCO[107].TimeUS} distance_two(GPS,NTCO[108]){GPS.TimeUS&lt;=NTCO[108].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/MD-0-100'>
+  <description></description>
+  <expression>distance_two(GPS,NTMD[0]){GPS.TimeUS&lt;=NTMD[0].TimeUS} distance_two(GPS,NTMD[100]){GPS.TimeUS&lt;=NTMD[100].TimeUS}</expression>
+ </graph>
+
+ <graph name='Nav/EK2_Wind_Compare-100'>
+  <description></description>
+  <expression>NKF2[100].VWN NKF2[100].VWE NTWN[100].mWN NTWN[100].mWE</expression>
+ </graph>
+
+ <graph name='Nav/GPS_TAlt-100'>
+  <description></description>
+  <expression>NTGA[100].Alt NTGA[100].TAlt</expression>
+ </graph>
