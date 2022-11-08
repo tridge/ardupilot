@@ -201,6 +201,24 @@ public:
      */
     void set_reference_location(void);
 
+    /*
+      return height AMSL given location, attitude and a downward
+      facing rangefinder reading
+     */
+    bool projected_height_amsl(const Location &loc,
+                               const Matrix3f &Tnb,
+                               float range,
+                               float &height_amsl);
+
+    /*
+      return expected rangefinder reading given a downward facing rangefinder
+      used by SITL only
+    */
+    bool projected_rangefinder(const Location &loc,
+                               const Matrix3f &Tnb,
+                               float height_amsl,
+                               float &range);
+
 private:
     // allocate the terrain subsystem data
     bool allocate(void);

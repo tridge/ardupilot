@@ -569,6 +569,88 @@ void AP_Terrain::update_reference_offset(void)
     have_reference_offset = true;
 }
 
+/*
+  return height AMSL given location, attitude and a downward
+  facing rangefinder reading
+*/
+bool AP_Terrain::projected_height_amsl(const Location &loc,
+                                       const Matrix3f &Tnb, // Matrix that rotates a vector from body to earth frame
+                                       float range,
+                                       float &hest_amsl)
+{
+    // represent rangefinder as down vector
+    Vector3f v{0,0,range};
+
+    // rotate into earth frame
+    v = Tnb * v;
+
+    // are we underground?
+    if (v.z <= 0) {
+        return false;
+    }
+
+    // calculate ground position where rangefinder hits the ground
+    Location loc2 = loc;
+    loc2.offset(v.x,v.y);
+
+    // get height of terrain above sea level at that location
+    float ter_height;
+    if (!height_amsl(loc2, ter_height, false)) {
+        return false;
+    }
+
+    // calculate height of aircraft AMSL
+    hest_amsl = ter_height + v.z;
+
+    return true;
+}
+
+/*
+  return expected rangefinder reading given a downward facing rangefinder
+*/
+bool AP_Terrain::projected_rangefinder(const Location &loc,
+                                       const Matrix3f &Tnb,
+                                       float h_amsl,
+                                       float &range)
+{
+    // get height of terrain above sea level at current location
+    float ter_height;
+    if (!height_amsl(loc, ter_height, false)) {
+        return false;
+    }
+
+    // initial estimate
+    const float range_scale = Tnb.c.z;
+    if (!is_positive(range_scale)) {
+        return false;
+    }
+    range = (h_amsl - ter_height) / range_scale;
+    static float max_error;
+
+    // max 8 iterations to find rangefinder
+    const uint8_t max_iterations = 32;
+    for (uint8_t i=0; i<max_iterations; i++) {
+        float hest_amsl1, hest_amsl2;
+        const float range_delta = 0.2;
+        if (!projected_height_amsl(loc, Tnb, range-0.5*range_delta, hest_amsl1) ||
+            !projected_height_amsl(loc, Tnb, range+0.5*range_delta, hest_amsl2)) {
+            return false;
+        }
+        float slope = (hest_amsl2 - hest_amsl1) / range_delta;
+        float err = h_amsl - 0.5*(hest_amsl2 + hest_amsl1);
+        if (fabsf(err) < 0.2) {
+            break;
+        }
+        range += err / slope;
+        if (i == max_iterations-1 && fabsf(err) > max_error) {
+            max_error = fabsf(err);
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+            ::printf("max_error %.2f\n", max_error);
+#endif
+        }
+    }
+    return true;
+}
 
 namespace AP {
 
