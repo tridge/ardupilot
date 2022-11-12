@@ -119,7 +119,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #endif
     SCHED_TASK(parachute_check,        10,    200, 129),
 #if AP_TERRAIN_AVAILABLE
-    SCHED_TASK_CLASS(AP_Terrain, &plane.terrain, update, 10, 200, 132),
+    SCHED_TASK_CLASS(AP_Terrain, &plane.terrain, update, 100, 200, 132),
 #endif // AP_TERRAIN_AVAILABLE
     SCHED_TASK(update_is_flying_5Hz,    5,    100, 135),
 #if HAL_LOGGING_ENABLED
