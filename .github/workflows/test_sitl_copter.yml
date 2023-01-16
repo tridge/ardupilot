@@ -29,7 +29,7 @@ jobs:
         id: ccache_cache_timestamp
         run: |
           NOW=$(date -u +"%F-%T")
-          echo "::set-output name=timestamp::${NOW}"
+          echo "{timestamp}=${NOW}" >> $GITHUB_OUTPUT
       - name: ccache cache files
         uses: actions/cache@v3
         with:
@@ -81,7 +81,7 @@ jobs:
         id: ccache_cache_timestamp
         run: |
           NOW=$(date -u +"%F-%T")
-          echo "::set-output name=timestamp::${NOW}"
+          echo "{timestamp}=${NOW}" >> $GITHUB_OUTPUT
       - name: ccache cache files
         uses: actions/cache@v3
         with:
@@ -100,7 +100,7 @@ jobs:
           Tools/scripts/build_ci.sh
 
       - name: Archive buildlog artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
            name: fail-${{matrix.config}}
@@ -114,7 +114,7 @@ jobs:
            retention-days: 14
 
       - name: Archive .bin artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
            name: BIN-${{matrix.config}}
            path: /__w/ardupilot/ardupilot/logs
@@ -135,7 +135,7 @@ jobs:
         id: ccache_cache_timestamp
         run: |
           NOW=$(date -u +"%F-%T")
-          echo "::set-output name=timestamp::${NOW}"
+          echo "{timestamp}=${NOW}" >> $GITHUB_OUTPUT
       - name: ccache cache files
         uses: actions/cache@v3
         with:
@@ -175,7 +175,7 @@ jobs:
         id: ccache_cache_timestamp
         run: |
           NOW=$(date -u +"%F-%T")
-          echo "::set-output name=timestamp::${NOW}"
+          echo "{timestamp}=${NOW}" >> $GITHUB_OUTPUT
       - name: ccache cache files
         uses: actions/cache@v3
         with:
@@ -194,7 +194,7 @@ jobs:
           Tools/scripts/build_ci.sh
 
       - name: Archive buildlog artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: failure()
         with:
            name: fail-${{matrix.config}}
@@ -208,7 +208,7 @@ jobs:
            retention-days: 14
 
       - name: Archive .bin artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
            name: BIN-${{matrix.config}}
            path: /__w/ardupilot/ardupilot/logs
