@@ -124,6 +124,7 @@ public:
 
     // return current tick counter
     uint16_t ticks() const { return _tick_counter; }
+    uint32_t ticks32() const { return _tick_counter32; }
 
     // run the tasks. Call this once per 'tick'.
     // time_available is the amount of time available to run
@@ -225,6 +226,7 @@ private:
     // number of 'ticks' that have passed (number of times that
     // tick() has been called
     uint16_t _tick_counter;
+    uint32_t _tick_counter32;
 
     // tick counter at the time we last ran each task
     uint16_t *_last_run;
