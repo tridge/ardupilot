@@ -178,6 +178,13 @@ const AP_Param::GroupInfo AP_AHRS::var_info[] = {
 
     // index 17
 
+    // @Param: OPTIONS
+    // @DisplayName: Optional AHRS behaviour
+    // @Description: This controls optional AHRS behaviour. Setting DisableDCMFallback will change the AHRS behaviour for fixed wing aircraft to not fall back to DCM when the EKF stops fusing GPS measurements while there is 3D GPS lock
+    // @Bitmask: 0:DisableDCMFallback
+    // @User: Advanced
+    AP_GROUPINFO("OPTIONS",  18, AP_AHRS, _options, 0),
+    
     AP_GROUPEND
 };
 
@@ -1791,6 +1798,7 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
       wait for good GPS position on fixed wing and rover
      */
     if (ret != EKFType::DCM &&
+        !option_set(Options::DISABLE_DCM_FALLBACK) &&
         (_vehicle_class == VehicleClass::FIXED_WING ||
          _vehicle_class == VehicleClass::GROUND)) {
         if (!dcm.yaw_source_available() && !fly_forward) {
@@ -1830,9 +1838,8 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
             AP::gps().status() >= AP_GPS::GPS_OK_FIX_3D) {
             // if the EKF is not fusing GPS or doesn't have a 2D fix
             // and we have a 3D lock, then plane and rover would
-            // prefer to use the GPS position from DCM. This is a
-            // safety net while some issues with the EKF get sorted
-            // out
+            // prefer to use the GPS position from DCM.
+            // Note: This is a last resort fallback and makes the navigation highly vulnerable to GPS noise.
             return EKFType::DCM;
         }
         if (hal.util->get_soft_armed() && filt_state.flags.const_pos_mode) {
