@@ -1408,6 +1408,22 @@ bool NavEKF3::setOriginLLH(const Location &loc)
     return ret;
 }
 
+bool NavEKF3::setLatLng(const Location &loc, float posAccuracy)
+{
+    AP::dal().log_SetLatLng(loc, posAccuracy);
+
+    if (!core) {
+        return false;
+    }
+    bool ret = false;
+    for (uint8_t i=0; i<num_cores; i++) {
+        ret |= core[i].setLatLng(loc, posAccuracy);
+    }
+    // return true if any core accepts the new origin
+    return ret;
+}
+
+
 // return estimated height above ground level
 // return false if ground height is not being estimated.
 bool NavEKF3::getHAGL(float &HAGL) const
