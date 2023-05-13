@@ -82,6 +82,8 @@ public:
 
     void log_event3(Event event);
     void log_SetOriginLLH3(const Location &loc);
+    void log_SetLatLng(const Location &loc, float posAccuracy);
+
     void log_writeDefaultAirSpeed3(const float aspeed, const float uncertainty);
     void log_writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
 
@@ -340,6 +342,7 @@ private:
     struct log_REVH _REVH;
     struct log_RWOH _RWOH;
     struct log_RBOH _RBOH;
+    struct log_RSLL _RSLL;
 
     // cached variables for speed:
     uint32_t _micros;

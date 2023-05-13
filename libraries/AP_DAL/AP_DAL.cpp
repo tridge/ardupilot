@@ -352,6 +352,16 @@ void AP_DAL::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float 
     WRITE_REPLAY_BLOCK_IFCHANGED(REPH, _REPH, old);
 }
 
+void AP_DAL::log_SetLatLng(const Location &loc, float posAccuracy)
+{
+    end_frame();
+    const log_RSLL old = _RSLL;
+    _RSLL.lat = loc.lat;
+    _RSLL.lng = loc.lng;
+    _RSLL.posAccSD = posAccuracy;
+    WRITE_REPLAY_BLOCK_IFCHANGED(RSLL, _RSLL, old);
+}
+
 // log external velocity data
 void AP_DAL::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
 {
