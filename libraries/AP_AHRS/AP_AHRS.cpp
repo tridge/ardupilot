@@ -1295,9 +1295,10 @@ bool AP_AHRS::set_origin(const Location &loc)
     return false;
 }
 
-bool AP_AHRS::set_lat_lng(const Location &loc, float posErrSD) {
+bool AP_AHRS::handle_external_position_estimate(const Location &loc, uint32_t timestamp_ms, float pos_accuracy)
+{
 #if HAL_NAVEKF3_AVAILABLE
-    return EKF3.setLatLng(loc, posErrSD);
+    return EKF3.setLatLng(loc, pos_accuracy, timestamp_ms);
 #endif
     return false;
 }

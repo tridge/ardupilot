@@ -197,10 +197,10 @@ public:
     // and 1-sigma horizontal position uncertainty. This can be used when the EKF is dead reckoning to periodically
     // correct the position. If the EKF is is still using data from a postion sensor such as GPS, the position set
     // will not be performed.
-    // posErrSD is the standard deviation of the horizontal position uncertainty in metres.
+    // pos_accuracy is the standard deviation of the horizontal position uncertainty in metres.
     // The altitude element of the location is not used.
     // Returns true if the set was successful.
-    bool set_lat_lng(const Location &loc, float posErrSD);
+    bool handle_external_position_estimate(const Location &loc, uint32_t timestamp_ms, float pos_accuracy);
 
     // returns the inertial navigation origin in lat/lon/alt
     bool get_origin(Location &ret) const WARN_IF_UNUSED;
