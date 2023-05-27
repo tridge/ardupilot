@@ -5003,7 +5003,7 @@ MAV_RESULT GCS_MAVLINK::handle_command_int_external_position_estimate(const mavl
     if (timestamp_ms > processing_ms) {
         timestamp_ms -= processing_ms;
     }
-    if (!AP::ahrs().handle_external_position_estimate(loc, pos_accuracy, timestamp_ms)) {
+    if (!AP::ahrs().handle_external_position_estimate(loc, timestamp_ms, pos_accuracy)) {
         return MAV_RESULT_FAILED;
     }
     return MAV_RESULT_ACCEPTED;
