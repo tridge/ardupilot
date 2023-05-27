@@ -166,7 +166,11 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     // set the variances using the position measurement noise parameter
     P[7][7] = P[8][8] = sq(MAX(posAccuracy,frontend->_gpsHorizPosNoise));
 
-    const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc);
+    // Correct the position for time delay relative to fusion time horizon assuming a constant velocity
+    // Limit time stamp to a range between current time and 5 seconds ago
+    const uint32_t timeStampConstrained_ms = MAX(MIN(timestamp_ms, imuSampleTime_ms), imuSampleTime_ms - 5000);
+    const ftype delaySec = 1E-3F * (ftype)(imuDataDelayed.time_ms - timeStampConstrained_ms);
+    const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) - stateStruct.velocity.xy() * delaySec;
     ResetPositionNE(newPosNE.x,newPosNE.y);
 
     return true;
