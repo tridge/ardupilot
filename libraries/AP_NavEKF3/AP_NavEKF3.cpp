@@ -1408,7 +1408,7 @@ bool NavEKF3::setOriginLLH(const Location &loc)
     return ret;
 }
 
-bool NavEKF3::setLatLng(const Location &loc, float posAccuracy)
+bool NavEKF3::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
     AP::dal().log_SetLatLng(loc, posAccuracy);
 
@@ -1417,7 +1417,7 @@ bool NavEKF3::setLatLng(const Location &loc, float posAccuracy)
     }
     bool ret = false;
     for (uint8_t i=0; i<num_cores; i++) {
-        ret |= core[i].setLatLng(loc, posAccuracy);
+        ret |= core[i].setLatLng(loc, posAccuracy, timestamp_ms);
     }
     // return true if any core accepts the new origin
     return ret;

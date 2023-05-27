@@ -147,7 +147,7 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 // Sets the EKF's NE horizontal position states and their corresponding variances from a supplied WGS-84 location and uncertainty
 // The altitude element of the location is not used.
 // Returns true if the set was successful
-bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy)
+bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
     if ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
         (PV_AidingMode == AID_NONE)
