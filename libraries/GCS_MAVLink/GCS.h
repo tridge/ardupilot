@@ -1,5 +1,5 @@
-/// @file	GCS.h
-/// @brief	Interface definition for the various Ground Control System
+/// @file   GCS.h
+/// @brief  Interface definition for the various Ground Control System
 // protocols.
 #pragma once
 
@@ -136,8 +136,8 @@ private:
 #endif
 
 ///
-/// @class	GCS_MAVLINK
-/// @brief	MAVLink transport control class
+/// @class  GCS_MAVLINK
+/// @brief  MAVLink transport control class
 ///
 class GCS_MAVLINK
 {
@@ -1025,6 +1025,7 @@ public:
     static class GCS *get_singleton() {
         return _singleton;
     }
+    virtual uint8_t sysid_this_mav() const = 0;
 
     virtual uint32_t custom_mode() const = 0;
     virtual MAV_TYPE frame_type() const = 0;
@@ -1145,9 +1146,6 @@ public:
 #endif // HAL_HIGH_LATENCY2_ENABLED
 
 protected:
-
-    virtual uint8_t sysid_this_mav() const = 0;
-
     virtual GCS_MAVLINK *new_gcs_mavlink_backend(GCS_MAVLINK_Parameters &params,
                                                  AP_HAL::UARTDriver &uart) = 0;
 
@@ -1246,4 +1244,3 @@ void can_printf(const char *fmt, ...);
 #define GCS_SEND_TEXT(severity, format, args...)
 
 #endif // HAL_GCS_ENABLED
-

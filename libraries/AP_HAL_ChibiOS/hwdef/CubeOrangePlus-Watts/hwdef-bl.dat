@@ -20,4 +20,8 @@ USB_STRING_PRODUCT "CubeOrange+-BL"
 # Unused chip select for ICM45686
 PG1 ICM45686_CS CS SPEED_VERYLOW
 
-APJ_BOARD_ID 1063
+# ODID board ID
+APJ_BOARD_ID 10063
+
+# enable and enforce OpenDroneID
+define AP_OPENDRONEID_ENABLED 1

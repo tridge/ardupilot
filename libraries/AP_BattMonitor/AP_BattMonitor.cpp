@@ -309,7 +309,7 @@ AP_BattMonitor::init()
                 drivers[instance] = new AP_BattMonitor_Generator_FuelLevel(*this, state[instance], _params[instance]);
                 break;
 #endif // HAL_GENERATOR_ENABLED
-#if HAL_BATTMON_INA2XX_ENABLED
+#if AP_BATTERY_INA2XX_ENABLED
             case Type::INA2XX:
                 drivers[instance] = new AP_BattMonitor_INA2XX(*this, state[instance], _params[instance]);
                 break;

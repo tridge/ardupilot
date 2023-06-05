@@ -1,16 +1,13 @@
 #pragma once
 
+#include "AP_BattMonitor_config.h"
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/I2CDevice.h>
 #include "AP_BattMonitor_Backend.h"
 #include <AP_Param/AP_Param.h>
 #include <utility>
 
-#ifndef HAL_BATTMON_INA2XX_ENABLED
-#define HAL_BATTMON_INA2XX_ENABLED (BOARD_FLASH_SIZE > 1024)
-#endif
-
-#if HAL_BATTMON_INA2XX_ENABLED
+#if AP_BATTERY_INA2XX_ENABLED
 
 class AP_BattMonitor_INA2XX : public AP_BattMonitor_Backend
 {
@@ -33,17 +30,31 @@ public:
 private:
     AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev;
 
-    void configure(void);
-    bool read_word(const uint8_t reg, int16_t& data) const;
+    enum class DevType : uint8_t {
+        UNKNOWN = 0,
+        INA226,
+        INA228,
+        INA238,
+    };
+
+    static const uint8_t i2c_probe_addresses[];
+    uint8_t i2c_probe_next;
+
+    bool configure(DevType dtype);
+    bool read_word16(const uint8_t reg, int16_t& data) const;
+    bool read_word24(const uint8_t reg, int32_t& data) const;
     bool write_word(const uint8_t reg, const uint16_t data) const;
     void timer(void);
+    bool detect_device(void);
+
+    DevType dev_type;
+    uint32_t last_detect_ms;
 
     AP_Int8 i2c_bus;
     AP_Int8 i2c_address;
-    bool configured;
+    AP_Float max_amps;
     bool callback_registered;
     uint32_t failed_reads;
-    uint32_t last_configure_ms;
 
     struct {
         uint16_t count;
@@ -55,4 +66,4 @@ private:
     float voltage_LSB;
 };
 
-#endif // HAL_BATTMON_INA2XX_ENABLED
+#endif // AP_BATTERY_INA2XX_ENABLED

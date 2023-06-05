@@ -1,0 +1,28 @@
+# setup correct defaults for battery monitoring for cube power brick
+BATT_MONITOR 21
+BATT_I2C_ADDR 64
+BATT2_MONITOR 21
+BATT2_I2C_ADDR 65
+# setup ADSB
+ADSB_TYPE 1
+SERIAL5_BAUD 57
+SERIAL5_PROTOCOL 1
+
+# enforce OpenDroneID on DroneCAN. Note that we need to lock down key parameters
+# to ensure the integrity of the RemoteID system
+DID_ENABLE 1 @READONLY
+# If setting persistent UAS ID at first reception of Basic ID from OEM's config tool
+# set the DID_OPTIONS to 5 , otherwise set to 1. At first reception of Basic ID, the
+# UAS ID, Type, and UA Type will be set to the value in the Basic ID message and DID_OPTIONS
+# will be set to 1.
+DID_OPTIONS 5 @READONLY
+DID_MAVPORT 2 @READONLY
+DID_CANDRIVER 0 @READONLY
+SERIAL2_BAUD 57
+SERIAL2_PROTOCOL 2
+AHRS_EKF_TYPE 3 @READONLY
+GPS_TYPE 1
+GPS_TYPE2 0
+
+EK2_PRIMARY 1
+EK3_PRIMARY 1
