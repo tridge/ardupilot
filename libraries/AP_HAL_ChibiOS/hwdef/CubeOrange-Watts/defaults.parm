@@ -50,7 +50,7 @@ GPS_AUTO_SWITCH 0
 
 # safety button
 BRD_SAFETY_DEFLT 1
-BRD_SAFETYOPTION 1
+BRD_SAFETYOPTION 9
 BRD_TYPE 3
 
 # waypoint behavior
