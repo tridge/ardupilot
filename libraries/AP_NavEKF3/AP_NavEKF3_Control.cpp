@@ -56,6 +56,10 @@ void NavEKF3_core::setWindMagStateLearningMode()
 {
     // If we are on ground, or in constant position mode, or don't have the right vehicle and sensing to estimate wind, inhibit wind states
     bool setWindInhibit = (!useAirspeed() && !assume_zero_sideslip()) || onGround || (PV_AidingMode == AID_NONE);
+    if (AP_HAL::millis() - onGroundChange_ms < 10000) {
+        // keep wind inhibited for 10s after arming to allow for aircraft to settle
+        setWindInhibit = true;
+    }
     if (!inhibitWindStates && setWindInhibit) {
         inhibitWindStates = true;
         updateStateIndexLim();

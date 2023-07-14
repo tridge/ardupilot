@@ -1039,6 +1039,7 @@ private:
     ftype dt;                       // time lapsed since the last covariance prediction (sec)
     ftype hgtRate;                  // state for rate of change of height filter
     bool onGround;                  // true when the flight vehicle is definitely on the ground
+    uint32_t onGroundChange_ms;     // time we changed onGround
     bool prevOnGround;              // value of onGround from previous frame - used to detect transition
     bool inFlight;                  // true when the vehicle is definitely flying
     bool prevInFlight;              // value inFlight from previous frame - used to detect transition
