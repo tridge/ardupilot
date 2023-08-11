@@ -229,11 +229,13 @@ end
 hasBeenArmed = 0
 
 function update()
+   local now_ms = millis()
    if arming:is_armed() then
+      last_armed_ms = now_ms
       hasBeenArmed = 1
       return update, 1000
    end
-   -- don't update if the aircraft has been armed
+   -- don't update for 10s after disarm, to get logging of charge recovery
    if hasBeenArmed == 1 then
       return update, 1000
    end
