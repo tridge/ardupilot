@@ -178,8 +178,8 @@ function add_estimator(i)
    params[i] = {}
    params[i]['IDX']   = bind_add_param(id .. "IDX",     pidx+0, 0)
    params[i]['NCELL'] = bind_add_param(id .. "NCELL", pidx+1, 12)
-   params[i]['C1']    = bind_add_param(id .. "C1", pidx+2, 123.770)
-   params[i]['C2']    = bind_add_param(id .. "C2", pidx+3, 3.682)
+   params[i]['C1']    = bind_add_param(id .. "C1", pidx+2, 127.046)
+   params[i]['C2']    = bind_add_param(id .. "C2", pidx+3, 3.709)
 end
 
 local count = math.floor(BATT_SOC_COUNT:get())
@@ -229,13 +229,11 @@ end
 hasBeenArmed = 0
 
 function update()
-   local now_ms = millis()
    if arming:is_armed() then
-      last_armed_ms = now_ms
       hasBeenArmed = 1
       return update, 1000
    end
-   -- don't update for 10s after disarm, to get logging of charge recovery
+   -- don't update if the machine has been armed
    if hasBeenArmed == 1 then
       return update, 1000
    end
