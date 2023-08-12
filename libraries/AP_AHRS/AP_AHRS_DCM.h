@@ -131,6 +131,11 @@ public:
 
     void get_control_limits(float &ekfGndSpdLimit, float &controlScaleXY) const override;
 
+    // Set the NE horizontal position from a supplied WGS-84 location if dead reckoning
+    // The altitude element of the location is not used.
+    // Returns true if the set was successful
+    bool setLatLng(const Location &loc, uint32_t timestamp_ms);
+
 private:
 
     // dead-reckoning support

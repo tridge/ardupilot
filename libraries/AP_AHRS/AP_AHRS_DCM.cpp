@@ -1304,4 +1304,33 @@ void AP_AHRS_DCM::get_control_limits(float &ekfGndSpdLimit, float &ekfNavVelGain
     ekfNavVelGainScaler = 0.5;
 }
 
+bool AP_AHRS_DCM::setLatLng(const Location &loc, uint32_t timestamp_ms)
+{
+    if (_have_gps_lock || !_have_position) {
+        return false;
+    }
+
+    // Correct for time delay relative to current time assuming a constant velocity
+    // Limit time stamp to a range between current time and 5 seconds ago
+    const uint32_t now_ms = AP_HAL::millis();
+    const uint32_t timeStampConstrained_ms = MAX(MIN(timestamp_ms, now_ms), now_ms - 5000);
+    const int32_t delta_ms = int32_t(now_ms - timeStampConstrained_ms);
+    const ftype delaySec = 1E-3F * ftype(delta_ms);
+
+    if (!_have_position) {
+        _last_lat = loc.lat;
+        _last_lng = loc.lng;
+        _have_position = true;
+        _position_offset_NE.zero();
+    } else {
+        Location last_loc;
+        last_loc.lat = _last_lat;
+        last_loc.lng = _last_lng;
+        _position_offset_NE = last_loc.get_distance_NE(loc) + _last_velocity.xy() * delaySec;
+    }
+    _last_pos_ms = AP_HAL::millis();
+
+    return true;
+}
+
 #endif  // AP_AHRS_DCM_ENABLED

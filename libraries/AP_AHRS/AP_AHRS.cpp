@@ -1476,9 +1476,31 @@ bool AP_AHRS::set_origin(const Location &loc)
 #if AP_AHRS_POSITION_RESET_ENABLED
 bool AP_AHRS::handle_external_position_estimate(const Location &loc, float pos_accuracy, uint32_t timestamp_ms)
 {
-#if HAL_NAVEKF3_AVAILABLE
-    return EKF3.setLatLng(loc, pos_accuracy, timestamp_ms);
+    switch (active_EKF_type()) {
+    case EKFType::DCM:
+        EKF3.setLatLng(loc, pos_accuracy, timestamp_ms);
+        return dcm.setLatLng(loc, timestamp_ms);
+#if HAL_NAVEKF2_AVAILABLE
+    case EKFType::TWO:
+        EKF3.setLatLng(loc, pos_accuracy, timestamp_ms);
+        dcm.setLatLng(loc, timestamp_ms);
+        return false;
 #endif
+#if HAL_NAVEKF3_AVAILABLE
+    case EKFType::THREE:
+        dcm.setLatLng(loc, timestamp_ms);
+        return EKF3.setLatLng(loc, pos_accuracy, timestamp_ms);
+#endif
+#if AP_AHRS_SIM_ENABLED
+    case EKFType::SIM:
+        return false;
+#endif
+#if HAL_EXTERNAL_AHRS_ENABLED
+    case EKFType::EXTERNAL:
+        return false;
+#endif
+    }
+    // since there is no default case above, this is unreachable
     return false;
 }
 #endif
