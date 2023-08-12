@@ -750,16 +750,14 @@ AP_AHRS_DCM::drift_correction(float deltat)
         _last_lat = _gps.location().lat;
         _last_lng = _gps.location().lng;
         _last_pos_ms = AP_HAL::millis();
-        _position_offset_north = 0;
-        _position_offset_east = 0;
+        _position_offset_NE.zero();
 
         // once we have a single GPS lock, we can update using
         // dead-reckoning from then on
         _have_position = true;
     } else {
         // update dead-reckoning position estimate
-        _position_offset_north += velocity.x * _ra_deltat;
-        _position_offset_east  += velocity.y * _ra_deltat;
+        _position_offset_NE += velocity.xy() * _ra_deltat;
     }
 
     // see if this is our first time through - in which case we
@@ -1045,7 +1043,7 @@ bool AP_AHRS_DCM::get_location(Location &loc) const
     }
     loc.relative_alt = 0;
     loc.terrain_alt = 0;
-    loc.offset(_position_offset_north, _position_offset_east);
+    loc.offset(_position_offset_NE.x, _position_offset_NE.y);
     if (_have_position) {
         const uint32_t now = AP_HAL::millis();
         float dt = 0;

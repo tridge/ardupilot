@@ -249,9 +249,8 @@ private:
     int32_t _last_lng;
     uint32_t _last_pos_ms;
 
-    // position offset from last GPS lock
-    float _position_offset_north;
-    float _position_offset_east;
+    // NE position offset from last GPS lock
+    Vector2f _position_offset_NE;
 
     // whether we have a position estimate
     bool _have_position;
