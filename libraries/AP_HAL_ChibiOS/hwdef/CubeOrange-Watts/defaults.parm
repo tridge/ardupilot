@@ -216,8 +216,8 @@ SERIAL5_PROTOCOL 1
 # set the DID_OPTIONS to 5 , otherwise set to 1. At first reception of Basic ID, the
 # UAS ID, Type, and UA Type will be set to the value in the Basic ID message and DID_OPTIONS
 # will be set to 1.
-DID_ENABLE 1
-DID_OPTIONS 2 
+DID_ENABLE 1 @READONLY
+DID_OPTIONS 5 @READONLY
 DID_MAVPORT -1 @READONLY
 DID_CANDRIVER 1 @READONLY
 
