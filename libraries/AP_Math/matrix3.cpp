@@ -178,6 +178,23 @@ Matrix3<T> Matrix3<T>::operator *(const Matrix3<T> &m) const
     return temp;
 }
 
+//Multiplication by a scalar 
+template <typename T>
+Matrix3<T> operator*(const T scalar, const Matrix3<T>& matrix) {
+    Matrix3<T> result;
+    result.a.x = scalar * matrix.a.x;
+    result.a.y = scalar * matrix.a.y;
+    result.a.z = scalar * matrix.a.z;
+    result.b.x = scalar * matrix.b.x;
+    result.b.y = scalar * matrix.b.y;
+    result.b.z = scalar * matrix.b.z;
+    result.c.x = scalar * matrix.c.x;
+    result.c.y = scalar * matrix.c.y;
+    result.c.z = scalar * matrix.c.z;
+    return result;
+}
+
+
 template <typename T>
 Matrix3<T> Matrix3<T>::transposed(void) const
 {
@@ -257,6 +274,72 @@ void Matrix3<T>::from_axis_angle(const Vector3<T> &v, T theta)
     c.x = t*x*z - y*S;
     c.y = t*y*z + x*S;
     c.z = t*z*z + C;
+}
+
+//Create the skew symmetric matrix given a vector v
+template <typename T> 
+Matrix3<T> Matrix3<T>::skew_symmetric(const Vector3<T> &v)
+{
+    Matrix3<T> result;
+    result.a.x = 0;
+    result.a.y = -v.z;
+    result.a.z = v.y;
+    result.b.x = v.z;
+    result.b.y = 0;
+    result.b.z = -v.x;
+    result.c.x = -v.y;
+    result.c.y = v.x;
+    result.c.z = 0;
+
+    return result;
+}
+
+template <typename T>
+T Matrix3<T>::norm() const {
+    return sqrt(a.x*a.x + a.y*a.y + a.z*a.z + 
+                b.x*b.x + b.y*b.y + b.z*b.z + 
+                c.x*c.x + c.y*c.y + c.z*c.z);
+}
+
+//Skew to vector
+template <typename T>
+Vector3<T> Matrix3<T>::skew_to_vector(const Matrix3<T> &M)
+{
+    Vector3<T> result;
+    result.x = 0.5f*(M.c.y-M.b.z);
+    result.y = 0.5f*(M.a.z-M.c.x);
+    result.z = 0.5f*(M.b.x-M.a.y);
+    return result;
+}
+
+//Calcualte the matrix exponential given a matrix M, 
+//based of the Rodrigues formula for rotation matrices
+template <typename T>
+Matrix3<T> Matrix3<T>::from_angular_velocity(const Vector3<T> &S)
+{
+    const float theta = S.length();
+    Matrix3<T> input_matrix = Matrix3<T>::skew_symmetric(S); //example of using statics
+    T A, B;  // Declare A and B here
+
+    if (theta > 0.0000001f) {
+        A = sinF(theta) / theta;
+        B = (1.0f - cosF(theta)) / (theta * theta);
+    } else {
+        A = 1.0f;
+        B = 0.5f;
+    }
+    // Create identity matrix 
+    Matrix3<T> identity_3;  // Declare an object of Matrix3
+    identity_3.a.x = 1; identity_3.a.y = 0; identity_3.a.z = 0;  // Set the values to create an identity matrix
+    identity_3.b.x = 0; identity_3.b.y = 1; identity_3.b.z = 0;
+    identity_3.c.x = 0; identity_3.c.y = 0; identity_3.c.z = 1;
+
+    
+    //square input matrix 
+    Matrix3<T> input_matrix_squared = input_matrix*input_matrix;
+    Matrix3<T> exponential = identity_3 + input_matrix*A + input_matrix_squared*B; 
+
+    return exponential;
 }
 
 

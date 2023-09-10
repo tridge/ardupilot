@@ -11,6 +11,7 @@
 #include "definitions.h"
 #include "crc.h"
 #include "matrix3.h"
+#include "SE23.h" //SE23 class
 #include "polygon.h"
 #include "quaternion.h"
 #include "rotations.h"

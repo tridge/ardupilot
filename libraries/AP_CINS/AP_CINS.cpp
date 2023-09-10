@@ -13,6 +13,13 @@
 void AP_CINS::init(void)
 {
     state.rotation_matrix.from_euler(0,0,0);
+    //Initialise XHat and ZHat as stationary at the origin
+    state.XHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
+    state.ZHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
+    //Initialise Gains for correction terms
+    correction_terms.gain_p = -0.15f;
+    correction_terms.gain_l1 = 0.99f;
+    correction_terms.gain_l2 = 0.8f;
 }
 
 /*
@@ -55,7 +62,7 @@ void AP_CINS::update(void)
                 state.origin = loc;
             }
             const Vector3f pos = state.origin.get_distance_NED(loc);
-            update_gps(pos);
+            update_gps(pos, dangle_dt);
         }
     }
 
@@ -107,15 +114,25 @@ void AP_CINS::update(void)
 
 }
 
+
 /*
   update on new GPS sample
  */
-void AP_CINS::update_gps(const Vector3f &pos)
+void AP_CINS::update_gps(const Vector3f &pos, const float dt)
 {
-    /*
-      REPLACE: update position estimate properly
-     */
-    state.position = pos;
+    //Jump set update 
+    //compute correction terms 
+    update_correction_terms(pos, dt);
+
+    //Update XHat and ZHat using correciton terms
+    state.XHat = correction_terms.Delta * state.XHat;
+    state.ZHat = state.ZHat * correction_terms.Gamma;
+
+    //Update position estimate
+    state.rotation_matrix = state.XHat.rot();
+    state.position = state.XHat.x();
+    state.velocity_NED = state.XHat.w();
+
 }
 
 
@@ -124,13 +141,74 @@ void AP_CINS::update_gps(const Vector3f &pos)
  */
 void AP_CINS::update_imu(const Vector3f &gyro_rads, const Vector3f &accel_mss, const float dt)
 {
-    // rotate state estimate
-    state.rotation_matrix.rotate(gyro_rads * dt);
+    /*
+    Normal time update, based of the CINS Disc alg developed by Dr Pieter Van goor and Pat Wiltshire  
+    */
+    //Integrate Dynamics using the Matrix exponential 
+    //Create Zero vector 
+    Vector3f zero_vector;
+    zero_vector.zero();
+    Vector3f gravity_vector;
+    gravity_vector = Vector3f(0,0,GRAVITY_MSS);
 
-    // rotate accel vector into earth frame
-    Vector3f accel_ef = state.rotation_matrix * accel_mss;
-    accel_ef.z += GRAVITY_MSS;
+    //Update XHat (Observer Dynamics)
+    state.XHat = (SE23::exponential(zero_vector, zero_vector, gravity_vector*dt, -dt)*state.XHat) * SE23::exponential(gyro_rads*dt, zero_vector, accel_mss*dt, dt);
+    //Update ZHat (Auxilary Dynamics)
+    state.ZHat = SE23::exponential(zero_vector, zero_vector, gravity_vector*dt, -dt) * state.ZHat;
 
-    state.velocity_NED += accel_ef * dt;
-    state.position += state.velocity_NED * dt;
+    //Return states 
+    state.rotation_matrix = state.XHat.rot(); 
+    state.velocity_NED = state.XHat.w();
+    state.position = state.XHat.x();
+}
+
+
+/*
+Compute correction terms for the jump set. This will be called in update GPS. It will generate a 
+Delta and Gamma which is then applied to the dynamics. This allows the update_gps to output, rotation_matrix
+velocity_NED and position. 
+*/
+
+void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
+    //Collect position estimate from XHat and ZHat
+    Vector3f pos_est = state.XHat.x();
+    Vector3f pos_z = state.ZHat.x();
+    //Create Components of correction terms 
+    Vector3f pos_tz = pos - pos_z;
+    Vector3f pos_ez = pos_est - pos_z;
+    Vector3f pos_te = pos - pos_est;
+
+    //Gamma 
+    Matrix3f R_gamma;
+    R_gamma.identity();
+    Vector3f V_gamma_1 = pos_tz * correction_terms.gain_l1;
+    Vector3f V_gamma_2 = pos_tz * correction_terms.gain_l2;
+    float alpha_gamma = -1*state.ZHat.alpha();
+    correction_terms.Gamma = SE23f(R_gamma, V_gamma_1, V_gamma_2, alpha_gamma);
+
+    //Delta
+    Matrix3f R_delta;
+    Vector3f maucross_mauhat = Matrix3f::skew_symmetric(pos_te) * pos_ez;
+    float mautrans_mauhat = pos_tz * pos_ez; //Dotproduct 
+    float norm_maucross_mauhat = maucross_mauhat.length();
+    //Check is not too small as would lead to too large of a correction, if so dont apply correction 
+    if (abs(norm_maucross_mauhat) > 0.0001f){
+        float psi = atan2F(norm_maucross_mauhat, mautrans_mauhat);
+        R_delta = Matrix3f::from_angular_velocity(maucross_mauhat * (correction_terms.gain_p*psi /norm_maucross_mauhat));
+    }
+    else {
+        R_delta.identity();
+    }
+    //Create V_delta
+    //prelimaries
+    Vector3f Q = R_delta * pos_ez;
+    Vector3f Q_1 = Q * correction_terms.gain_l1;
+    Vector3f Q_2 = Q * correction_terms.gain_l2;
+    //Calculate components of V_delta
+    Vector3f V_delta_1 = V_gamma_1 - Q_1 -(V_gamma_2 - Q_2)*alpha_gamma;
+    Vector3f V_delta_2 = V_gamma_2 - Q_2;
+    //Assign Delta
+    SE23f Delta = SE23f(R_delta, V_delta_1, V_delta_2, 0.0f);
+    //Rebase delta
+    correction_terms.Delta = (state.ZHat * Delta) * SE23::inverse_ZHat(state.ZHat);
 }
