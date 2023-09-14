@@ -9,7 +9,7 @@ SE23 SE23::operator *(const SE23& rhs) {
     rot_result.normalize();
     Vector3f x_result = _x + _rot * rhs._x + _w*rhs._alpha;
     Vector3f w_result = _w + _rot * rhs._w;
-    float alpha_result = 0;
+    float alpha_result = _alpha + rhs._alpha;
     return(SE23(rot_result, x_result, w_result, alpha_result));
 }
 //Calculates the matrix exponential of SE23
@@ -43,19 +43,10 @@ SE23 SE23::exponential(const Vector3f &S, const Vector3f &x,const Vector3f &w, f
     return(SE23(result_rot, V*x + V_2*w*alpha, V*w, alpha)); 
 }
 
-//Multiplication by a scalar 
-SE23 SE23::operator*(const float scalar) {
-    Matrix3f result_rot = _rot * scalar;
-    Vector3f result_x = _x * scalar;
-    Vector3f result_w = _w * scalar;
-    float result_alpha = _alpha * scalar;
-    return(SE23(result_rot, result_x, result_w, result_alpha));
-}
-
 //Inverse of the ZHat Matrix used in CINS 
 SE23 SE23::inverse_ZHat(const SE23& ZHat){
     Matrix3f result_rot = ZHat._rot;
-    Vector3f result_x = -ZHat._x - ZHat._w*ZHat._alpha;
+    Vector3f result_x = -ZHat._x + ZHat._w*ZHat._alpha;
     Vector3f result_w = -ZHat._w ;
     float result_alpha = -1.0f* ZHat._alpha;
     return(SE23(result_rot, result_x, result_w, result_alpha));

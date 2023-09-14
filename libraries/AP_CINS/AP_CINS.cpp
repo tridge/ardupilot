@@ -17,7 +17,7 @@ void AP_CINS::init(void)
     state.XHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
     state.ZHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
     //Initialise Gains for correction terms
-    correction_terms.gain_p = -0.15f;
+    correction_terms.gain_p = -0.01f;
     correction_terms.gain_l1 = 0.99f;
     correction_terms.gain_l2 = 0.8f;
 }
@@ -187,14 +187,15 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
     correction_terms.Gamma = SE23f(R_gamma, V_gamma_1, V_gamma_2, alpha_gamma);
 
     //Delta
+    //R_delta is incorrect, why? TODO
     Matrix3f R_delta;
     Vector3f maucross_mauhat = Matrix3f::skew_symmetric(pos_te) * pos_ez;
     float mautrans_mauhat = pos_tz * pos_ez; //Dotproduct 
     float norm_maucross_mauhat = maucross_mauhat.length();
     //Check is not too small as would lead to too large of a correction, if so dont apply correction 
-    if (abs(norm_maucross_mauhat) > 0.0001f){
+    if (fabsF(norm_maucross_mauhat) > 0.00001f){
         float psi = atan2F(norm_maucross_mauhat, mautrans_mauhat);
-        R_delta = Matrix3f::from_angular_velocity(maucross_mauhat * (correction_terms.gain_p*psi /norm_maucross_mauhat));
+        R_delta = Matrix3f::from_angular_velocity(maucross_mauhat * ((correction_terms.gain_p*psi )/norm_maucross_mauhat));
     }
     else {
         R_delta.identity();

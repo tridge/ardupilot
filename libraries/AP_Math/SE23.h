@@ -23,18 +23,6 @@ public:
     //SE23(const Matrix3f& rot, const Vector3f& x, const Vector3f& w, float alpha);
     // Matrix multiplication
     SE23 operator *(const SE23& rhs);
-    //Multiplication by a scalar
-    SE23 operator*(const float scalar);
-    //Matrix Addition 
-    SE23 operator +(const SE23& rhs) const
-    {
-        return SE23(_rot + rhs._rot, _x + rhs._x, _w + rhs._w, _alpha + rhs._alpha);
-    }
-    //Matrix Subtraction
-    SE23 operator -(const SE23& rhs) const
-    {
-        return SE23(_rot - rhs._rot, _x - rhs._x, _w - rhs._w, _alpha - rhs._alpha);
-    }
     //Matrix Exponential
     static SE23 exponential(const Vector3f &S, const Vector3f &x,const Vector3f &w, float alpha); //needs to be static 
     //Inverse of the ZHat Matrix used in CINS
