@@ -100,7 +100,7 @@ void AP_CINS::update(void)
                                 AP_HAL::micros64(),
                                 degrees(roll_rad),
                                 degrees(pitch_rad),
-                                degrees(yaw_rad),
+                                wrap_360(degrees(yaw_rad)),
                                 state.velocity_NED.x,
                                 state.velocity_NED.y,
                                 state.velocity_NED.z,
@@ -111,7 +111,8 @@ void AP_CINS::update(void)
                                 state.location.lng,
                                 state.location.alt*0.01);
 
-
+    state.accel = accel;
+    state.gyro = gyro;
 }
 
 
