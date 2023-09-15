@@ -41,6 +41,7 @@ void AP_ExternalAHRS_CINS::update(void)
     state.gyro = cins.get_gyro();
     state.quat = cins.get_quat();
     state.location = cins.get_location();
+    state.velocity = cins.get_velocity();
     state.have_origin = cins.get_origin(state.origin);
     state.have_quaternion = true;
     state.have_location = state.have_origin;
