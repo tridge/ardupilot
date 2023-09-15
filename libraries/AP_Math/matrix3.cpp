@@ -303,7 +303,7 @@ Matrix3<T> Matrix3<T>::skew_symmetric(const Vector3<T> &v)
 
 template <typename T>
 T Matrix3<T>::norm() const {
-    return sqrt(a.x*a.x + a.y*a.y + a.z*a.z + 
+    return sqrtF(a.x*a.x + a.y*a.y + a.z*a.z +
                 b.x*b.x + b.y*b.y + b.z*b.z + 
                 c.x*c.x + c.y*c.y + c.z*c.z);
 }
@@ -313,9 +313,9 @@ template <typename T>
 Vector3<T> Matrix3<T>::skew_to_vector(const Matrix3<T> &M)
 {
     Vector3<T> result;
-    result.x = 0.5f*(M.c.y-M.b.z);
-    result.y = 0.5f*(M.a.z-M.c.x);
-    result.z = 0.5f*(M.b.x-M.a.y);
+    result.x = 0.5*(M.c.y-M.b.z);
+    result.y = 0.5*(M.a.z-M.c.x);
+    result.z = 0.5*(M.b.x-M.a.y);
     return result;
 }
 
