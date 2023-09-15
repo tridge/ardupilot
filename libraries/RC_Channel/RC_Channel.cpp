@@ -700,6 +700,7 @@ void RC_Channel::init_aux_function(const aux_func_t ch_option, const AuxSwitchPo
     case AUX_FUNC::CAMERA_MANUAL_FOCUS:
     case AUX_FUNC::CAMERA_AUTO_FOCUS:
     case AUX_FUNC::CAMERA_LENS:
+    case AUX_FUNC::AHRS_TYPE:
         run_aux_function(ch_option, ch_flag, AuxFuncTriggerSource::INIT);
         break;
     default:
@@ -1612,6 +1613,14 @@ bool RC_Channel::do_aux_function(const aux_func_t ch_option, const AuxSwitchPos 
         // used to test emergency yaw reset
         AP::ahrs().request_yaw_reset();
         break;
+
+    case AUX_FUNC::AHRS_TYPE: {
+#if HAL_NAVEKF3_AVAILABLE && HAL_EXTERNAL_AHRS_ENABLED
+        AP::ahrs().set_ekf_type(ch_flag==AuxSwitchPos::HIGH? 11 : 3);
+#endif
+        break;
+    }
+        
 
 #if HAL_TORQEEDO_ENABLED
     // clear torqeedo error
