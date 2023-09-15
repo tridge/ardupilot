@@ -282,4 +282,6 @@ private:
     // pre-calculated trig cache:
     float _sin_yaw;
     float _cos_yaw;
+
+    uint32_t last_log_ms;
 };

@@ -112,6 +112,20 @@ AP_AHRS_DCM::update()
 
     // remember the last origin for fallback support
     IGNORE_RETURN(AP::ahrs().get_origin(last_origin));
+
+    const uint32_t now_ms = AP_HAL::millis();
+    if (now_ms - last_log_ms >= 100) {
+        // log DCM at 10Hz
+        last_log_ms = now_ms;
+        AP::logger().WriteStreaming("DCM", "TimeUS,Roll,Pitch,Yaw",
+                                    "sddd",
+                                    "F000",
+                                    "Qfff",
+                                    AP_HAL::micros64(),
+                                    degrees(roll),
+                                    degrees(pitch),
+                                    wrap_360(degrees(yaw)));
+    }
 }
 
 void AP_AHRS_DCM::get_results(AP_AHRS_Backend::Estimates &results)
