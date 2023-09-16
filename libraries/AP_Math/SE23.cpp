@@ -38,7 +38,7 @@ SE23 SE23::exponential(const Vector3f &S, const Vector3f &x,const Vector3f &w, f
     //Create intermeadiatries for results
     Matrix3f result_rot = identity_3 + input_matrix*A + input_matrix*input_matrix*B;
     Matrix3f V = identity_3 + input_matrix*B + input_matrix*input_matrix*C;
-    Matrix3f V_2 = identity_3*0.5f + input_matrix*D + input_matrix*input_matrix*E; 
+    Matrix3f V_2 = identity_3*0.5f + input_matrix*D + input_matrix*input_matrix*E;
     //Assign results
     return(SE23(result_rot, V*x + V_2*w*alpha, V*w, alpha)); 
 }

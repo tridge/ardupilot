@@ -32,6 +32,10 @@ public:
     const Vector3f& w();
     float alpha();
 
+    void init(Matrix3f &rot) {
+        _rot = rot;
+    }
+
 private:
     Matrix3f _rot;
     Vector3f _x;
