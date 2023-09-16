@@ -29,6 +29,10 @@ void AP_CINS::update(void)
 {
     auto &dal = AP::dal();
 
+    if (!done_yaw_init) {
+        done_yaw_init = init_yaw();
+    }
+
     // get delta angle
     const uint8_t gyro_index = dal.ins().get_primary_gyro();
     Vector3f delta_angle;
@@ -213,4 +217,40 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
     SE23f Delta = SE23f(R_delta, V_delta_1, V_delta_2, 0.0f);
     //Rebase delta
     correction_terms.Delta = (state.ZHat * Delta) * SE23::inverse_ZHat(state.ZHat);
+}
+
+/*
+  initialise yaw from compass, if available
+ */
+bool AP_CINS::init_yaw(void)
+{
+    auto &dal = AP::dal();
+    const auto &compass = dal.compass();
+    if (compass.get_num_enabled() == 0) {
+        return false;
+    }
+    const uint8_t mag_idx = compass.get_first_usable();
+    if (!compass.healthy(mag_idx)) {
+        return false;
+    }
+    const auto &field = compass.get_field(mag_idx);
+    const float declination = compass.get_declination();
+    if (is_zero(declination)) {
+        // wait for declination
+        return false;
+    }
+
+    const float cos_pitch_sq = 1.0f-(state.rotation_matrix.c.x*state.rotation_matrix.c.x);
+    const float headY = field.y * state.rotation_matrix.c.z - field.z * state.rotation_matrix.c.y;
+
+    // Tilt compensated magnetic field X component:
+    const float headX = field.x * cos_pitch_sq - state.rotation_matrix.c.x * (field.y * state.rotation_matrix.c.y + field.z * state.rotation_matrix.c.z);
+
+    // magnetic heading
+    const float yaw = wrap_PI(atan2f(-headY,headX) + declination);
+
+    state.rotation_matrix.from_euler(0,0,yaw);
+    state.XHat.init(state.rotation_matrix);
+
+    return true;
 }
