@@ -27,8 +27,8 @@
 void AP_CINS::init(void)
 {
     //Initialise XHat and ZHat as stationary at the origin
-    state.XHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
-    state.ZHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
+    state.XHat = SE23F(Matrix3F(1,0,0,0,1,0,0,0,1),Vector3F(0,0,0),Vector3F(0,0,0),0.0f);
+    state.ZHat = SE23F(Matrix3F(1,0,0,0,1,0,0,0,1),Vector3F(0,0,0),Vector3F(0,0,0),0.0f);
 
     state.rotation_matrix.from_euler(radians(CINS_INITIAL_ROLL),radians(CINS_INITIAL_PITCH),radians(CINS_INITIAL_YAW));
     state.XHat.init(state.rotation_matrix);
@@ -60,7 +60,7 @@ void AP_CINS::update(void)
         return;
     }
     // turn delta angle into a gyro in radians/sec
-    Vector3f gyro = delta_angle / dangle_dt;
+    Vector3F gyro = (delta_angle / dangle_dt).toftype();
 
     // get delta velocity
     Vector3f delta_velocity;
@@ -70,7 +70,7 @@ void AP_CINS::update(void)
         return;
     }
     // turn delta velocity into a accel vector
-    const Vector3f accel = delta_velocity / dvel_dt;
+    const Vector3F accel = (delta_velocity / dvel_dt).toftype();
 
     // see if we have new GPS data
     const auto &gps = dal.gps();
@@ -85,8 +85,8 @@ void AP_CINS::update(void)
                 state.have_origin = true;
                 state.origin = loc;
             }
-            const Vector3f pos = state.origin.get_distance_NED(loc);
-            update_gps(pos, gps_dt);
+            const Vector3d pos = state.origin.get_distance_NED_double(loc);
+            update_gps(pos.toftype(), gps_dt);
         }
     }
 
@@ -116,7 +116,7 @@ void AP_CINS::update(void)
     // @Field: Lat: latitude
     // @Field: Lon: longitude
     // @Field: Alt: altitude AMSL
-    float roll_rad, pitch_rad, yaw_rad;
+    ftype roll_rad, pitch_rad, yaw_rad;
     state.rotation_matrix.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
 
     AP::logger().WriteStreaming("CINS", "TimeUS,Roll,Pitch,Yaw,VN,VE,VD,PN,PE,PD,Lat,Lon,Alt",
@@ -145,7 +145,7 @@ void AP_CINS::update(void)
 /*
   update on new GPS sample
  */
-void AP_CINS::update_gps(const Vector3f &pos, const float gps_dt)
+void AP_CINS::update_gps(const Vector3F &pos, const ftype gps_dt)
 {
     //Jump set update 
     //compute correction terms 
@@ -161,20 +161,20 @@ void AP_CINS::update_gps(const Vector3f &pos, const float gps_dt)
     state.velocity_NED = state.XHat.w();
 
     // use AHRS3 for debugging
-    float roll_rad, pitch_rad, yaw_rad;
-    const auto rot = state.rotation_matrix * AP::ahrs().get_rotation_vehicle_body_to_autopilot_body();
+    ftype roll_rad, pitch_rad, yaw_rad;
+    const auto rot = state.rotation_matrix * AP::ahrs().get_rotation_vehicle_body_to_autopilot_body().toftype();
     rot.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
     const mavlink_ahrs3_t pkt {
-      roll : roll_rad,
-      pitch : pitch_rad,
-      yaw : yaw_rad,
-      altitude : -state.position.z,
-      lat: state.location.lat,
-      lng: state.location.lng,
-      v1 : 0,
-      v2 : 0,
-      v3 : 0,
-      v4 : 0
+    roll : float(roll_rad),
+    pitch : float(pitch_rad),
+    yaw : float(yaw_rad),
+    altitude : float(-state.position.z),
+    lat: state.location.lat,
+    lng: state.location.lng,
+    v1 : 0,
+    v2 : 0,
+    v3 : 0,
+    v4 : 0
     };
     gcs().send_to_active_channels(MAVLINK_MSG_ID_AHRS3, (const char *)&pkt);
 }
@@ -183,17 +183,17 @@ void AP_CINS::update_gps(const Vector3f &pos, const float gps_dt)
 /*
   update from IMU data
  */
-void AP_CINS::update_imu(const Vector3f &gyro_rads, const Vector3f &accel_mss, const float dt)
+void AP_CINS::update_imu(const Vector3F &gyro_rads, const Vector3F &accel_mss, const ftype dt)
 {
     /*
     Normal time update, based of the CINS Disc alg developed by Dr Pieter Van goor and Pat Wiltshire  
     */
     //Integrate Dynamics using the Matrix exponential 
     //Create Zero vector 
-    Vector3f zero_vector;
+    Vector3F zero_vector;
     zero_vector.zero();
-    Vector3f gravity_vector;
-    gravity_vector = Vector3f(0,0,GRAVITY_MSS);
+    Vector3F gravity_vector;
+    gravity_vector = Vector3F(0,0,GRAVITY_MSS);
 
     //Update XHat (Observer Dynamics)
     state.XHat = (SE23::exponential(zero_vector, zero_vector, gravity_vector*dt, -dt)*state.XHat) * SE23::exponential(gyro_rads*dt, zero_vector, accel_mss*dt, dt);
@@ -213,48 +213,48 @@ Delta and Gamma which is then applied to the dynamics. This allows the update_gp
 velocity_NED and position. 
 */
 
-void AP_CINS::update_correction_terms(const Vector3f &pos, const float gps_dt)
+void AP_CINS::update_correction_terms(const Vector3F &pos, const ftype gps_dt)
 {
     //Collect position estimate from XHat and ZHat
-    Vector3f pos_est = state.XHat.x();
-    Vector3f pos_z = state.ZHat.x();
+    Vector3F pos_est = state.XHat.x();
+    Vector3F pos_z = state.ZHat.x();
     //Create Components of correction terms 
-    Vector3f pos_tz = pos - pos_z;
-    Vector3f pos_ez = pos_est - pos_z;
-    Vector3f pos_te = pos - pos_est;
+    Vector3F pos_tz = pos - pos_z;
+    Vector3F pos_ez = pos_est - pos_z;
+    Vector3F pos_te = pos - pos_est;
 
     //Gamma 
-    Matrix3f R_gamma;
+    Matrix3F R_gamma;
     R_gamma.identity();
-    Vector3f V_gamma_1 = pos_tz * correction_terms.gain_l1*gps_dt;
-    Vector3f V_gamma_2 = pos_tz * correction_terms.gain_l2*gps_dt;
+    Vector3F V_gamma_1 = pos_tz * correction_terms.gain_l1*gps_dt;
+    Vector3F V_gamma_2 = pos_tz * correction_terms.gain_l2*gps_dt;
     float alpha_gamma = -1*state.ZHat.alpha();
-    correction_terms.Gamma = SE23f(R_gamma, V_gamma_1, V_gamma_2, alpha_gamma);
+    correction_terms.Gamma = SE23F(R_gamma, V_gamma_1, V_gamma_2, alpha_gamma);
 
     //Delta
     //R_delta is incorrect, why? TODO
-    Matrix3f R_delta;
-    Vector3f maucross_mauhat = Matrix3f::skew_symmetric(pos_te) * pos_ez;
+    Matrix3F R_delta;
+    Vector3F maucross_mauhat = Matrix3F::skew_symmetric(pos_te) * pos_ez;
     float mautrans_mauhat = pos_tz * pos_ez; //Dotproduct 
     float norm_maucross_mauhat = maucross_mauhat.length();
     //Check is not too small as would lead to too large of a correction, if so dont apply correction 
     if (fabsF(norm_maucross_mauhat) > 0.00001f){
         float psi = atan2F(norm_maucross_mauhat, mautrans_mauhat);
-        R_delta = Matrix3f::from_angular_velocity(maucross_mauhat * ((correction_terms.gain_p*psi*gps_dt )/norm_maucross_mauhat));
+        R_delta = Matrix3F::from_angular_velocity(maucross_mauhat * ((correction_terms.gain_p*psi*gps_dt )/norm_maucross_mauhat));
     }
     else {
         R_delta.identity();
     }
     //Create V_delta
     //prelimaries
-    Vector3f Q = R_delta * pos_ez;
-    Vector3f Q_1 = Q * correction_terms.gain_l1*gps_dt;
-    Vector3f Q_2 = Q * correction_terms.gain_l2*gps_dt;
+    Vector3F Q = R_delta * pos_ez;
+    Vector3F Q_1 = Q * correction_terms.gain_l1*gps_dt;
+    Vector3F Q_2 = Q * correction_terms.gain_l2*gps_dt;
     //Calculate components of V_delta
-    Vector3f V_delta_1 = V_gamma_1 - Q_1 -(V_gamma_2 - Q_2)*alpha_gamma;
-    Vector3f V_delta_2 = V_gamma_2 - Q_2;
+    Vector3F V_delta_1 = V_gamma_1 - Q_1 -(V_gamma_2 - Q_2)*alpha_gamma;
+    Vector3F V_delta_2 = V_gamma_2 - Q_2;
     //Assign Delta
-    SE23f Delta = SE23f(R_delta, V_delta_1, V_delta_2, 0.0f);
+    SE23F Delta = SE23F(R_delta, V_delta_1, V_delta_2, 0.0f);
     //Rebase delta
     correction_terms.Delta = (state.ZHat * Delta) * SE23::inverse_ZHat(state.ZHat);
 }
@@ -264,11 +264,11 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float gps_dt)
  */
 bool AP_CINS::init_yaw(void)
 {
-    float mag_yaw, dt;
+    ftype mag_yaw, dt;
     if (!get_compass_yaw(mag_yaw, dt)) {
         return false;
     }
-    float roll_rad, pitch_rad, yaw_rad;
+    ftype roll_rad, pitch_rad, yaw_rad;
     state.rotation_matrix.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
 
     state.rotation_matrix.from_euler(roll_rad,pitch_rad,mag_yaw);
@@ -280,7 +280,7 @@ bool AP_CINS::init_yaw(void)
 /*
   get yaw from compass
  */
-bool AP_CINS::get_compass_yaw(float &yaw_rad, float &dt)
+bool AP_CINS::get_compass_yaw(ftype &yaw_rad, ftype &dt)
 {
     auto &dal = AP::dal();
     const auto &compass = dal.compass();
@@ -326,16 +326,16 @@ bool AP_CINS::get_compass_yaw(float &yaw_rad, float &dt)
  */
 void AP_CINS::update_yaw_from_compass(void)
 {
-    float mag_yaw, dt;
+    ftype mag_yaw, dt;
     if (!get_compass_yaw(mag_yaw, dt)) {
         return;
     }
-    float roll_rad, pitch_rad, yaw_rad;
+    ftype roll_rad, pitch_rad, yaw_rad;
     state.rotation_matrix.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
 
-    const float yaw_err = wrap_PI(mag_yaw - yaw_rad);
-    const Vector3f yaw_rot_ef{0,0,yaw_err*dt*CINS_MAG_GAIN};
-    const Vector3f yaw_rot_bf = state.rotation_matrix.mul_transpose(yaw_rot_ef);
+    const ftype yaw_err = wrap_PI(mag_yaw - yaw_rad);
+    const Vector3F yaw_rot_ef{0,0,yaw_err*dt*CINS_MAG_GAIN};
+    const Vector3F yaw_rot_bf = state.rotation_matrix.mul_transpose(yaw_rot_ef);
 
     state.rotation_matrix.rotate(yaw_rot_bf);
     state.XHat.init(state.rotation_matrix);
