@@ -7,6 +7,11 @@
 #include <AP_DAL/AP_DAL.h>
 #include <AP_Logger/AP_Logger.h>
 
+// gains defined for 50Hz, gets scaled on it
+#define CINS_GAIN_P (-0.01*50)
+#define CINS_GAIN_L1 (0.99*50)
+#define CINS_GAIN_L2 (0.8*50)
+
 /*
   initialise the filter
  */
@@ -16,10 +21,11 @@ void AP_CINS::init(void)
     //Initialise XHat and ZHat as stationary at the origin
     state.XHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
     state.ZHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
-    //Initialise Gains for correction terms
-    correction_terms.gain_p = -0.01f;
-    correction_terms.gain_l1 = 0.99f;
-    correction_terms.gain_l2 = 0.8f;
+
+    // Initialise Gains for correction terms assuming 50Hz
+    correction_terms.gain_p = CINS_GAIN_P/50;
+    correction_terms.gain_l1 = CINS_GAIN_L1/50;
+    correction_terms.gain_l2 = CINS_GAIN_L2/50;
 }
 
 /*
@@ -33,11 +39,19 @@ void AP_CINS::update(void)
         done_yaw_init = init_yaw();
     }
 
+    const auto &ins = dal.ins();
+    const uint16_t loop_rate = ins.get_loop_rate_hz();
+    if (loop_rate > 0) {
+        correction_terms.gain_p = CINS_GAIN_P / loop_rate;
+        correction_terms.gain_l1 = CINS_GAIN_L1 / loop_rate;
+        correction_terms.gain_l2 = CINS_GAIN_L2 / loop_rate;
+    }
+
     // get delta angle
-    const uint8_t gyro_index = dal.ins().get_primary_gyro();
+    const uint8_t gyro_index = ins.get_primary_gyro();
     Vector3f delta_angle;
     float dangle_dt;
-    if (!dal.ins().get_delta_angle(gyro_index, delta_angle, dangle_dt) || dangle_dt <= 0) {
+    if (!ins.get_delta_angle(gyro_index, delta_angle, dangle_dt) || dangle_dt <= 0) {
         // can't update, no delta angle
         return;
     }
@@ -47,7 +61,7 @@ void AP_CINS::update(void)
     // get delta velocity
     Vector3f delta_velocity;
     float dvel_dt;
-    if (!dal.ins().get_delta_velocity(gyro_index, delta_velocity, dvel_dt) || dvel_dt <= 0) {
+    if (!ins.get_delta_velocity(gyro_index, delta_velocity, dvel_dt) || dvel_dt <= 0) {
         // can't update, no delta velocity
         return;
     }
