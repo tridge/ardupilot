@@ -7,6 +7,7 @@
 #include <AP_DAL/AP_DAL.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Declination/AP_Declination.h>
+#include <GCS_MAVLink/GCS.h>
 
 // gains tested for 5Hz GPS
 #define CINS_GAIN_P (-0.01*5)
@@ -159,6 +160,23 @@ void AP_CINS::update_gps(const Vector3f &pos, const float gps_dt)
     state.position = state.XHat.x();
     state.velocity_NED = state.XHat.w();
 
+    // use AHRS3 for debugging
+    float roll_rad, pitch_rad, yaw_rad;
+    const auto rot = state.rotation_matrix * AP::ahrs().get_rotation_vehicle_body_to_autopilot_body();
+    rot.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
+    const mavlink_ahrs3_t pkt {
+      roll : roll_rad,
+      pitch : pitch_rad,
+      yaw : yaw_rad,
+      altitude : -state.position.z,
+      lat: state.location.lat,
+      lng: state.location.lng,
+      v1 : 0,
+      v2 : 0,
+      v3 : 0,
+      v4 : 0
+    };
+    gcs().send_to_active_channels(MAVLINK_MSG_ID_AHRS3, (const char *)&pkt);
 }
 
 
