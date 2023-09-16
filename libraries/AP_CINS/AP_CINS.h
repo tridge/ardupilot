@@ -38,7 +38,7 @@ public:
     }
 
 private:
-    void update_gps(const Vector3f &pos, const float dt);
+    void update_gps(const Vector3f &pos, const float gps_dt);
     void update_imu(const Vector3f &gyro_rads, const Vector3f &accel_mss, const float dt);
     void update_correction_terms(const Vector3f &pos, const float dt);
     bool init_yaw(void);

@@ -8,27 +8,33 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Declination/AP_Declination.h>
 
-// gains defined for 50Hz, gets scaled on it
-#define CINS_GAIN_P (-0.01*50)
-#define CINS_GAIN_L1 (0.99*50)
-#define CINS_GAIN_L2 (0.8*50)
+// gains tested for 5Hz GPS
+#define CINS_GAIN_P (-0.01*5)
+#define CINS_GAIN_L1 (0.99*5)
+#define CINS_GAIN_L2 (0.8*5)
 
 #define CINS_MAG_GAIN 0.1
+
+#define CINS_INITIAL_ROLL 0
+#define CINS_INITIAL_PITCH 0
+#define CINS_INITIAL_YAW 0
+
 
 /*
   initialise the filter
  */
 void AP_CINS::init(void)
 {
-    state.rotation_matrix.from_euler(0,0,0);
     //Initialise XHat and ZHat as stationary at the origin
     state.XHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
     state.ZHat = SE23f(Matrix3f(1,0,0,0,1,0,0,0,1),Vector3f(0,0,0),Vector3f(0,0,0),0.0f);
 
-    // Initialise Gains for correction terms assuming 50Hz
-    correction_terms.gain_p = CINS_GAIN_P/50;
-    correction_terms.gain_l1 = CINS_GAIN_L1/50;
-    correction_terms.gain_l2 = CINS_GAIN_L2/50;
+    state.rotation_matrix.from_euler(radians(CINS_INITIAL_ROLL),radians(CINS_INITIAL_PITCH),radians(CINS_INITIAL_YAW));
+    state.XHat.init(state.rotation_matrix);
+    
+    correction_terms.gain_p = CINS_GAIN_P;
+    correction_terms.gain_l1 = CINS_GAIN_L1;
+    correction_terms.gain_l2 = CINS_GAIN_L2;
 }
 
 /*
@@ -43,12 +49,6 @@ void AP_CINS::update(void)
     }
 
     const auto &ins = dal.ins();
-    const uint16_t loop_rate = ins.get_loop_rate_hz();
-    if (loop_rate > 0) {
-        correction_terms.gain_p = CINS_GAIN_P / loop_rate;
-        correction_terms.gain_l1 = CINS_GAIN_L1 / loop_rate;
-        correction_terms.gain_l2 = CINS_GAIN_L2 / loop_rate;
-    }
 
     // get delta angle
     const uint8_t gyro_index = ins.get_primary_gyro();
@@ -76,6 +76,8 @@ void AP_CINS::update(void)
     if (gps.status() >= AP_DAL_GPS::GPS_OK_FIX_3D) {
         const uint32_t last_gps_fix_ms = gps.last_message_time_ms(0);
         if (last_gps_update_ms != last_gps_fix_ms) {
+            // don't allow for large gain if we lose and regain GPS
+            const float gps_dt = MIN((last_gps_fix_ms - last_gps_update_ms)*0.001, 1);
             last_gps_update_ms = last_gps_fix_ms;
             const auto &loc = gps.location();
             if (!state.have_origin) {
@@ -83,7 +85,7 @@ void AP_CINS::update(void)
                 state.origin = loc;
             }
             const Vector3f pos = state.origin.get_distance_NED(loc);
-            update_gps(pos, dangle_dt);
+            update_gps(pos, gps_dt);
         }
     }
 
@@ -142,11 +144,11 @@ void AP_CINS::update(void)
 /*
   update on new GPS sample
  */
-void AP_CINS::update_gps(const Vector3f &pos, const float dt)
+void AP_CINS::update_gps(const Vector3f &pos, const float gps_dt)
 {
     //Jump set update 
     //compute correction terms 
-    update_correction_terms(pos, dt);
+    update_correction_terms(pos, gps_dt);
 
     //Update XHat and ZHat using correciton terms
     state.XHat = correction_terms.Delta * state.XHat;
@@ -193,7 +195,8 @@ Delta and Gamma which is then applied to the dynamics. This allows the update_gp
 velocity_NED and position. 
 */
 
-void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
+void AP_CINS::update_correction_terms(const Vector3f &pos, const float gps_dt)
+{
     //Collect position estimate from XHat and ZHat
     Vector3f pos_est = state.XHat.x();
     Vector3f pos_z = state.ZHat.x();
@@ -205,8 +208,8 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
     //Gamma 
     Matrix3f R_gamma;
     R_gamma.identity();
-    Vector3f V_gamma_1 = pos_tz * correction_terms.gain_l1;
-    Vector3f V_gamma_2 = pos_tz * correction_terms.gain_l2;
+    Vector3f V_gamma_1 = pos_tz * correction_terms.gain_l1*gps_dt;
+    Vector3f V_gamma_2 = pos_tz * correction_terms.gain_l2*gps_dt;
     float alpha_gamma = -1*state.ZHat.alpha();
     correction_terms.Gamma = SE23f(R_gamma, V_gamma_1, V_gamma_2, alpha_gamma);
 
@@ -219,7 +222,7 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
     //Check is not too small as would lead to too large of a correction, if so dont apply correction 
     if (fabsF(norm_maucross_mauhat) > 0.00001f){
         float psi = atan2F(norm_maucross_mauhat, mautrans_mauhat);
-        R_delta = Matrix3f::from_angular_velocity(maucross_mauhat * ((correction_terms.gain_p*psi )/norm_maucross_mauhat));
+        R_delta = Matrix3f::from_angular_velocity(maucross_mauhat * ((correction_terms.gain_p*psi*gps_dt )/norm_maucross_mauhat));
     }
     else {
         R_delta.identity();
@@ -227,8 +230,8 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
     //Create V_delta
     //prelimaries
     Vector3f Q = R_delta * pos_ez;
-    Vector3f Q_1 = Q * correction_terms.gain_l1;
-    Vector3f Q_2 = Q * correction_terms.gain_l2;
+    Vector3f Q_1 = Q * correction_terms.gain_l1*gps_dt;
+    Vector3f Q_2 = Q * correction_terms.gain_l2*gps_dt;
     //Calculate components of V_delta
     Vector3f V_delta_1 = V_gamma_1 - Q_1 -(V_gamma_2 - Q_2)*alpha_gamma;
     Vector3f V_delta_2 = V_gamma_2 - Q_2;
@@ -243,12 +246,14 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
  */
 bool AP_CINS::init_yaw(void)
 {
-    float yaw, dt;
-    if (!get_compass_yaw(yaw, dt)) {
+    float mag_yaw, dt;
+    if (!get_compass_yaw(mag_yaw, dt)) {
         return false;
     }
+    float roll_rad, pitch_rad, yaw_rad;
+    state.rotation_matrix.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
 
-    state.rotation_matrix.from_euler(0,0,yaw);
+    state.rotation_matrix.from_euler(roll_rad,pitch_rad,mag_yaw);
     state.XHat.init(state.rotation_matrix);
 
     return true;
@@ -298,8 +303,6 @@ bool AP_CINS::get_compass_yaw(float &yaw_rad, float &dt)
     return true;
 }
 
-static float cins_mag_gain = CINS_MAG_GAIN;
-
 /*
   update yaw from compass
  */
@@ -313,7 +316,7 @@ void AP_CINS::update_yaw_from_compass(void)
     state.rotation_matrix.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
 
     const float yaw_err = wrap_PI(mag_yaw - yaw_rad);
-    const Vector3f yaw_rot_ef{0,0,yaw_err*dt*cins_mag_gain};
+    const Vector3f yaw_rot_ef{0,0,yaw_err*dt*CINS_MAG_GAIN};
     const Vector3f yaw_rot_bf = state.rotation_matrix.mul_transpose(yaw_rot_ef);
 
     state.rotation_matrix.rotate(yaw_rot_bf);
