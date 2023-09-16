@@ -42,6 +42,7 @@ private:
     void update_imu(const Vector3f &gyro_rads, const Vector3f &accel_mss, const float dt);
     void update_correction_terms(const Vector3f &pos, const float dt);
     bool init_yaw(void);
+    void update_yaw_from_compass();
 
     struct {
         Vector3f accel;
@@ -70,4 +71,5 @@ private:
 
     uint32_t last_gps_update_ms;
     bool done_yaw_init;
+    uint32_t last_mag_us;
 };

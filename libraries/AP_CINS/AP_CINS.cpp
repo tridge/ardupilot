@@ -12,6 +12,8 @@
 #define CINS_GAIN_L1 (0.99*50)
 #define CINS_GAIN_L2 (0.8*50)
 
+#define CINS_MAG_GAIN 1.0
+
 /*
   initialise the filter
  */
@@ -86,6 +88,8 @@ void AP_CINS::update(void)
 
     update_imu(gyro, accel, dangle_dt);
 
+    update_yaw_from_compass();
+    
     if (state.have_origin) {
         // fill in location
         state.location = state.origin;
@@ -267,4 +271,62 @@ bool AP_CINS::init_yaw(void)
     state.XHat.init(state.rotation_matrix);
 
     return true;
+}
+
+/*
+  update yaw from compass
+ */
+void AP_CINS::update_yaw_from_compass(void)
+{
+    auto &dal = AP::dal();
+    const auto &ins = dal.ins();
+
+    if (!state.have_origin) {
+        // we need to know where we are
+        return;
+    }
+    const auto &compass = dal.compass();
+    if (compass.get_num_enabled() == 0) {
+        return;
+    }
+    const uint8_t mag_idx = compass.get_first_usable();
+    if (!compass.healthy(mag_idx)) {
+        return;
+    }
+    const uint16_t loop_rate = ins.get_loop_rate_hz();
+    if (loop_rate == 0) {
+        return;
+    }
+    const uint32_t last_us = compass.last_update_usec(mag_idx);
+    if (last_us == last_mag_us) {
+        // no new data
+        return;
+    }
+    const float dt = (last_us - last_mag_us) * 1.0e-6;
+    last_mag_us = last_us;
+    if (dt > 1.0) {
+        // too long since last update, skip this
+        return;
+    }
+
+    const auto &field = compass.get_field(mag_idx);
+
+    // convert milli-gauss to gauss
+    const auto field_ga = field*0.001;
+
+    // get expected field in milligauss
+    const Vector3f table_earth_field_ga = AP_Declination::get_earth_field_ga(state.location);
+    const Vector3f e3{0,0,1};
+
+    const Vector3f mt_e3 = table_earth_field_ga % e3;
+    const Vector3f d = state.rotation_matrix.mul_transpose(e3);
+    const Vector3f m_d = field_ga % d;
+
+    const Vector3f corr = mt_e3 % m_d;
+    const float mag_gain = CINS_MAG_GAIN * dt;
+
+    Matrix3f corr_M = Matrix3f::from_angular_velocity(corr * mag_gain);
+
+    state.rotation_matrix *= corr_M;
+    state.XHat.init(state.rotation_matrix);
 }
