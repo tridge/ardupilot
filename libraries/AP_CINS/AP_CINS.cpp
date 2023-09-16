@@ -6,13 +6,14 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_DAL/AP_DAL.h>
 #include <AP_Logger/AP_Logger.h>
+#include <AP_Declination/AP_Declination.h>
 
 // gains defined for 50Hz, gets scaled on it
 #define CINS_GAIN_P (-0.01*50)
 #define CINS_GAIN_L1 (0.99*50)
 #define CINS_GAIN_L2 (0.8*50)
 
-#define CINS_MAG_GAIN 1.0
+#define CINS_MAG_GAIN 0.1
 
 /*
   initialise the filter
@@ -242,6 +243,22 @@ void AP_CINS::update_correction_terms(const Vector3f &pos, const float dt){
  */
 bool AP_CINS::init_yaw(void)
 {
+    float yaw, dt;
+    if (!get_compass_yaw(yaw, dt)) {
+        return false;
+    }
+
+    state.rotation_matrix.from_euler(0,0,yaw);
+    state.XHat.init(state.rotation_matrix);
+
+    return true;
+}
+
+/*
+  get yaw from compass
+ */
+bool AP_CINS::get_compass_yaw(float &yaw_rad, float &dt)
+{
     auto &dal = AP::dal();
     const auto &compass = dal.compass();
     if (compass.get_num_enabled() == 0) {
@@ -251,9 +268,20 @@ bool AP_CINS::init_yaw(void)
     if (!compass.healthy(mag_idx)) {
         return false;
     }
+    if (!state.have_origin) {
+        return false;
+    }
     const auto &field = compass.get_field(mag_idx);
-    const float declination = compass.get_declination();
-    if (is_zero(declination)) {
+    const uint32_t last_us = compass.last_update_usec(mag_idx);
+    if (last_us == last_mag_us) {
+        // no new data
+        return false;
+    }
+    dt = (last_us - last_mag_us) * 1.0e-6;
+    last_mag_us = last_us;
+
+    const float declination_deg = AP_Declination::get_declination(state.location.lat*1.0e-7, state.location.lng*1.0e-7);
+    if (is_zero(declination_deg)) {
         // wait for declination
         return false;
     }
@@ -264,69 +292,30 @@ bool AP_CINS::init_yaw(void)
     // Tilt compensated magnetic field X component:
     const float headX = field.x * cos_pitch_sq - state.rotation_matrix.c.x * (field.y * state.rotation_matrix.c.y + field.z * state.rotation_matrix.c.z);
 
-    // magnetic heading
-    const float yaw = wrap_PI(atan2f(-headY,headX) + declination);
-
-    state.rotation_matrix.from_euler(0,0,yaw);
-    state.XHat.init(state.rotation_matrix);
+    // return magnetic yaw
+    yaw_rad = wrap_PI(atan2f(-headY,headX) + radians(declination_deg));
 
     return true;
 }
+
+static float cins_mag_gain = CINS_MAG_GAIN;
 
 /*
   update yaw from compass
  */
 void AP_CINS::update_yaw_from_compass(void)
 {
-    auto &dal = AP::dal();
-    const auto &ins = dal.ins();
-
-    if (!state.have_origin) {
-        // we need to know where we are
+    float mag_yaw, dt;
+    if (!get_compass_yaw(mag_yaw, dt)) {
         return;
     }
-    const auto &compass = dal.compass();
-    if (compass.get_num_enabled() == 0) {
-        return;
-    }
-    const uint8_t mag_idx = compass.get_first_usable();
-    if (!compass.healthy(mag_idx)) {
-        return;
-    }
-    const uint16_t loop_rate = ins.get_loop_rate_hz();
-    if (loop_rate == 0) {
-        return;
-    }
-    const uint32_t last_us = compass.last_update_usec(mag_idx);
-    if (last_us == last_mag_us) {
-        // no new data
-        return;
-    }
-    const float dt = (last_us - last_mag_us) * 1.0e-6;
-    last_mag_us = last_us;
-    if (dt > 1.0) {
-        // too long since last update, skip this
-        return;
-    }
+    float roll_rad, pitch_rad, yaw_rad;
+    state.rotation_matrix.to_euler(&roll_rad, &pitch_rad, &yaw_rad);
 
-    const auto &field = compass.get_field(mag_idx);
+    const float yaw_err = wrap_PI(mag_yaw - yaw_rad);
+    const Vector3f yaw_rot_ef{0,0,yaw_err*dt*cins_mag_gain};
+    const Vector3f yaw_rot_bf = state.rotation_matrix.mul_transpose(yaw_rot_ef);
 
-    // convert milli-gauss to gauss
-    const auto field_ga = field*0.001;
-
-    // get expected field in milligauss
-    const Vector3f table_earth_field_ga = AP_Declination::get_earth_field_ga(state.location);
-    const Vector3f e3{0,0,1};
-
-    const Vector3f mt_e3 = table_earth_field_ga % e3;
-    const Vector3f d = state.rotation_matrix.mul_transpose(e3);
-    const Vector3f m_d = field_ga % d;
-
-    const Vector3f corr = mt_e3 % m_d;
-    const float mag_gain = CINS_MAG_GAIN * dt;
-
-    Matrix3f corr_M = Matrix3f::from_angular_velocity(corr * mag_gain);
-
-    state.rotation_matrix *= corr_M;
+    state.rotation_matrix.rotate(yaw_rot_bf);
     state.XHat.init(state.rotation_matrix);
 }
