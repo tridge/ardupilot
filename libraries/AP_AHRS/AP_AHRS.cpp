@@ -2795,6 +2795,8 @@ bool AP_AHRS::get_variances(float &velVar, float &posVar, float &hgtVar, Vector3
 
 #if HAL_EXTERNAL_AHRS_ENABLED
     case EKFType::EXTERNAL:
+        velVar = posVar = hgtVar = tasVar = 0;
+        magVar.zero();
         return false;
 #endif
     }
