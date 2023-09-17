@@ -32,7 +32,7 @@ public:
 
     // accessors for AP_AHRS
     bool healthy(void) const override {
-        return true;
+        return state.have_origin;
     }
     bool initialised(void) const override {
         return true;
