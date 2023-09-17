@@ -776,7 +776,7 @@ bool AP_AHRS::_wind_estimate(Vector3f &wind) const
 
 #if HAL_EXTERNAL_AHRS_ENABLED
     case EKFType::EXTERNAL:
-        return external.wind_estimate(wind);
+        return dcm.wind_estimate(wind);
 #endif
     }
     return false;
@@ -860,7 +860,7 @@ bool AP_AHRS::_airspeed_estimate(float &airspeed_ret) const
 
 #if HAL_EXTERNAL_AHRS_ENABLED
     case EKFType::EXTERNAL:
-        return false;
+        return dcm.airspeed_estimate(get_active_airspeed_index(), airspeed_ret);
 #endif
     }
 
