@@ -700,6 +700,9 @@ private:
     AP_Int8 _acc_body_aligned;
     AP_Int8 _trim_option;
 
+    // High-resolution sampling mask
+    AP_Int8 _highres_sampling_mask;
+
     static AP_InertialSensor *_singleton;
     AP_AccelCal* _acal;
 
