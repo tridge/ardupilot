@@ -24,6 +24,7 @@
 #include "AP_ExternalAHRS_backend.h"
 #include "AP_ExternalAHRS_VectorNav.h"
 #include "AP_ExternalAHRS_MicroStrain5.h"
+#include "AP_ExternalAHRS_AdvancedNavigation.h"
 
 #include <GCS_MAVLink/GCS.h>
 
@@ -102,6 +103,11 @@ void AP_ExternalAHRS::init(void)
     case DevType::MicroStrain5:
         backend = new AP_ExternalAHRS_MicroStrain5(this, state);
         return;
+#endif
+#if AP_EXTERNAL_AHRS_ADNAV_ENABLED
+    case DevType::AdNav:
+        backend = new AP_ExternalAHRS_AdvancedNavigation(this, state);
+        break;
 #endif
     }
 

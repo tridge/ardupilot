@@ -49,7 +49,9 @@ public:
 #if AP_EXTERNAL_AHRS_MICROSTRAIN5_ENABLED
         MicroStrain5 = 2,
 #endif
-        // 3 reserved for AdNav
+#if AP_EXTERNAL_AHRS_ADNAV_ENABLED
+        AdNav = 3,
+#endif
         // 4 reserved for CINS
         // 5 reserved for InertialLabs
         // 6 reserved for Trimble
