@@ -316,7 +316,7 @@ protected:
     // function which instantiates an instance of the backend sensor
     // driver if the sensor is available
 
-private:
+protected:
 
     bool should_log_imu_raw() const ;
     void log_accel_raw(uint8_t instance, const uint64_t sample_us, const Vector3f &accel) __RAMFUNC__;

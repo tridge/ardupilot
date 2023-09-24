@@ -22,12 +22,11 @@ void AP_InertialSensor_Backend::Write_ACC(const uint8_t instance, const uint64_t
 // Write GYR data packet: raw gyro data
 void AP_InertialSensor_Backend::Write_GYR(const uint8_t instance, const uint64_t sample_us, const Vector3f &gyro) const
 {
-        const uint64_t now = AP_HAL::micros64();
         const struct log_GYR pkt{
             LOG_PACKET_HEADER_INIT(LOG_GYR_MSG),
-            time_us   : now,
+            time_us   : sample_us,
             instance  : instance,
-            sample_us : sample_us?sample_us:now,
+            sample_us : sample_us,
             GyrX      : gyro.x,
             GyrY      : gyro.y,
             GyrZ      : gyro.z
