@@ -398,6 +398,7 @@ void AP_InertialSensor_Invensensev3::accumulate()
 
 bool AP_InertialSensor_Invensensev3::accumulate_samples(const FIFOData *data, uint8_t n_samples)
 {
+    const uint64_t tstart = AP_HAL::micros64();
     for (uint8_t i = 0; i < n_samples; i++) {
         const FIFOData &d = data[i];
 
@@ -415,6 +416,7 @@ bool AP_InertialSensor_Invensensev3::accumulate_samples(const FIFOData *data, ui
 
         accel *= accel_scale;
         gyro *= gyro_scale;
+        Write_GYR(gyro_instance, tstart+i*125U, gyro);
 
         const float temp = d.temperature * temp_sensitivity + temp_zero;
 
@@ -468,6 +470,8 @@ static inline float uint20_to_float(uint8_t msb, uint8_t bits, uint8_t lsb)
 
 bool AP_InertialSensor_Invensensev3::accumulate_highres_samples(const FIFODataHighRes *data, uint8_t n_samples)
 {
+    const uint64_t tstart = AP_HAL::micros64();
+
     for (uint8_t i = 0; i < n_samples; i++) {
         const FIFODataHighRes &d = data[i];
 
@@ -487,6 +491,7 @@ bool AP_InertialSensor_Invensensev3::accumulate_highres_samples(const FIFODataHi
 
         accel *= accel_scale;
         gyro *= gyro_scale;
+        Write_GYR(gyro_instance, tstart+i*125U, gyro);
 
         const float temp = d.temperature * temp_sensitivity + temp_zero;
 
