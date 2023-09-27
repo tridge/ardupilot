@@ -55,6 +55,7 @@ extern const AP_HAL::HAL& hal;
 #define INV3REG_FIFO_CONFIG3  0x61
 #define INV3REG_SIGNAL_PATH_RESET 0x4b
 #define INV3REG_INTF_CONFIG0  0x4c
+#define INV3REG_INTF_CONFIG1  0x4d
 #define INV3REG_FIFO_COUNTH   0x2e
 #define INV3REG_FIFO_DATA     0x30
 #define INV3REG_BANK_SEL      0x76
@@ -66,6 +67,8 @@ extern const AP_HAL::HAL& hal;
 #define INV3REG_GYRO_CONFIG_STATIC3 0x0C
 #define INV3REG_GYRO_CONFIG_STATIC4 0x0D
 #define INV3REG_GYRO_CONFIG_STATIC5 0x0E
+#define INV3REG_INTF_CONFIG5        0x7B
+
 
 // ICM42688 bank2
 #define INV3REG_ACCEL_CONFIG_STATIC2 0x03
@@ -750,6 +753,12 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
 
     // disable gyro and accel as per 12.9 in the ICM-42688 docs
     register_write(INV3REG_PWR_MGMT0, 0x00);
+
+    // enable PIN9 as CLKIN
+    register_write_bank(1, INV3REG_INTF_CONFIG5, 0x10);
+
+    // enable RTC CLOCK
+    register_write(INV3REG_INTF_CONFIG1, 0x95); // RESERVED(0x9)<<4 | ACCEL_LP_CLK_SEL(0x0)<<3 | RTC_MODE(0x1)<<2 | CLKSEL(0x01)<<0
 
     // setup gyro for backend rate
     register_write(INV3REG_GYRO_CONFIG0, odr_config);
