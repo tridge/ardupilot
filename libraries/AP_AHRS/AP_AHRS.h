@@ -956,7 +956,8 @@ private:
 #endif
 
     enum class Options : uint16_t {
-        DISABLE_DCM_FALLBACK=(1U<<0),
+        DISABLE_DCM_FALLBACK_FW=(1U<<0),
+        DISABLE_DCM_FALLBACK_VTOL=(1U<<1),
     };
     AP_Int16 _options;
     
