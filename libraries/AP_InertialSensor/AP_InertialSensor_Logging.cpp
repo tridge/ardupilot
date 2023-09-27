@@ -20,7 +20,7 @@ void AP_InertialSensor_Backend::Write_ACC(const uint8_t instance, const uint64_t
 }
 
 // Write GYR data packet: raw gyro data
-void AP_InertialSensor_Backend::Write_GYR(const uint8_t instance, const uint64_t sample_us, const Vector3f &gyro) const
+void AP_InertialSensor_Backend::Write_GYR(const uint8_t instance, const uint64_t sample_us, const Vector3f &gyro, uint8_t hdr, uint16_t timestamp) const
 {
         const struct log_GYR pkt{
             LOG_PACKET_HEADER_INIT(LOG_GYR_MSG),
@@ -29,7 +29,9 @@ void AP_InertialSensor_Backend::Write_GYR(const uint8_t instance, const uint64_t
             sample_us : sample_us,
             GyrX      : gyro.x,
             GyrY      : gyro.y,
-            GyrZ      : gyro.z
+            GyrZ      : gyro.z,
+            hdr       : hdr,
+            timestamp : timestamp,
         };
         AP::logger().WriteBlock(&pkt, sizeof(pkt));
 }

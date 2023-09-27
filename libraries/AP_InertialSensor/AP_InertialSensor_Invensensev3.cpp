@@ -139,6 +139,8 @@ extern const AP_HAL::HAL& hal;
 #define INV3_ID_ICM42670      0x67
 #define INV3_ID_ICM45686      0xE9
 
+#define INV3_FAST_ODR_KHZ     8
+
 /*
   really nice that this sensor has an option to request little-endian
   data
@@ -158,6 +160,12 @@ struct PACKED FIFODataHighRes {
     int16_t temperature;
     uint16_t timestamp;
     uint8_t gx : 4, ax : 4, gy : 4, ay : 4, gz : 4, az : 4;
+};
+
+struct PACKED RegData {
+    int16_t temperature;
+    int16_t accel[3];
+    int16_t gyro[3];
 };
 
 #define INV3_SAMPLE_SIZE sizeof(FIFOData)
@@ -222,8 +230,6 @@ void AP_InertialSensor_Invensensev3::fifo_reset()
         register_write(INV3REG_456_FIFO_CONFIG2, 0x80);
         register_write(INV3REG_456_FIFO_CONFIG2, 0x00, true);
     } else {
-        // FIFO_MODE stop-on-full
-        register_write(INV3REG_FIFO_CONFIG, 0x80);
         // FIFO partial disable, enable accel, gyro, temperature
         register_write(INV3REG_FIFO_CONFIG1, fifo_config1);
         // little-endian, fifo count in records, last data hold for ODR mismatch
@@ -366,7 +372,7 @@ void AP_InertialSensor_Invensensev3::start()
     }
 
     // start the timer process to read samples, using the fastest rate avilable
-    periodic_handle = dev->register_periodic_callback(backend_period_us, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensensev3::read_fifo, void));
+    periodic_handle = dev->register_periodic_callback(125, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensensev3::read_fifo, void));
 }
 
 // get a startup banner to output to the GCS
@@ -411,7 +417,7 @@ bool AP_InertialSensor_Invensensev3::accumulate_samples(const FIFOData *data, ui
         // ICM42688 - HEADER_TIMESTAMP_FSYNC bit 2-3 : 10
         if ((d.header & 0xFC) != 0x68) { // ACCEL_EN | GYRO_EN | TMST_FIELD_EN
             // no or bad data
-            return false;
+            //return false;
         }
 
         Vector3f accel{float(d.accel[0]), float(d.accel[1]), float(d.accel[2])};
@@ -419,7 +425,7 @@ bool AP_InertialSensor_Invensensev3::accumulate_samples(const FIFOData *data, ui
 
         accel *= accel_scale;
         gyro *= gyro_scale;
-        Write_GYR(gyro_instance, tstart+i*125U, gyro);
+        Write_GYR(gyro_instance, tstart+uint64_t(i*1.0e6/(INV3_FAST_ODR_KHZ*1000.0)), gyro, d.header, d.timestamp);
 
         const float temp = d.temperature * temp_sensitivity + temp_zero;
 
@@ -482,7 +488,7 @@ bool AP_InertialSensor_Invensensev3::accumulate_highres_samples(const FIFODataHi
         // about with the temperature registers
         if ((d.header & 0xFC) != 0x78) { // ACCEL_EN | GYRO_EN | HIRES_EN | TMST_FIELD_EN
             // no or bad data
-            return false;
+            //return false;
         }
 
         Vector3f accel{uint20_to_float(d.accel[1], d.accel[0], d.ax),
@@ -494,7 +500,7 @@ bool AP_InertialSensor_Invensensev3::accumulate_highres_samples(const FIFODataHi
 
         accel *= accel_scale;
         gyro *= gyro_scale;
-        Write_GYR(gyro_instance, tstart+i*125U, gyro);
+        Write_GYR(gyro_instance, tstart+uint64_t(i*1.0e6/(INV3_FAST_ODR_KHZ*1000.0)), gyro, d.header, d.timestamp);
 
         const float temp = d.temperature * temp_sensitivity + temp_zero;
 
@@ -550,9 +556,12 @@ void AP_InertialSensor_Invensensev3::read_fifo()
 
     // adjust the periodic callback to be synchronous with the incoming data
     // this means that we rarely run read_fifo() without updating the sensor data
-    dev->adjust_periodic_callback(periodic_handle, backend_period_us);
+    //dev->adjust_periodic_callback(periodic_handle, backend_period_us);
 
     while (n_samples > 0) {
+        if (!block_read(reg_counth, (uint8_t*)&n_samples, 2)) {
+            goto check_registers;
+        }
         uint8_t n = MIN(n_samples, INV3_FIFO_BUFFER_LEN);
         if (!block_read(reg_data, (uint8_t*)fifo_buffer, n * fifo_sample_size)) {
             goto check_registers;
@@ -571,10 +580,13 @@ void AP_InertialSensor_Invensensev3::read_fifo()
     }
 
     if (need_reset) {
+        ::printf("FIFO_RESET\n");
         fifo_reset();
     }
     
 check_registers:
+    return;
+#if 0
     // check next register value for correctness
     dev->set_speed(AP_HAL::Device::SPEED_LOW);
     AP_HAL::Device::checkreg reg;
@@ -584,6 +596,7 @@ check_registers:
         _inc_accel_error_count(accel_instance);
     }
     dev->set_speed(AP_HAL::Device::SPEED_HIGH);
+#endif
 }
 
 bool AP_InertialSensor_Invensensev3::block_read(uint8_t reg, uint8_t *buf, uint32_t size)
@@ -727,11 +740,30 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
         fast_sampling = dev->bus_type() == AP_HAL::Device::BUS_TYPE_SPI;
 
         if (fast_sampling) {
-            backend_rate_hz = calculate_fast_sampling_backend_rate(backend_rate_hz, 8 * backend_rate_hz);
+            backend_rate_hz = calculate_fast_sampling_backend_rate(backend_rate_hz, INV3_FAST_ODR_KHZ * backend_rate_hz);
 
-            // always sample at 8kHz, then downsample accumulated
+            // always sample at 32kHz, then downsample accumulated
             // samples down to the desired filtering rate
-            odr_config = 0x03; // 8kHz
+            switch (INV3_FAST_ODR_KHZ) {
+            case 32:
+                odr_config = 0x01;
+                break;
+            case 16:
+                odr_config = 0x02;
+                break;
+            case 8:
+                odr_config = 0x03;
+                break;
+            case 4:
+                odr_config = 0x04;
+                break;
+            case 2:
+                odr_config = 0x05;
+                break;
+            case 1:
+                odr_config = 0x06;
+                break;
+            }
 
             // limited filtering on ICM-42605
             if (inv3_type == Invensensev3_Type::ICM42605) {
@@ -747,7 +779,7 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
                 aaf_bitshift = 6;
             }
             // setup downsampling for desired filter rate
-            accum.downsample_rate = 8000U / backend_rate_hz;
+            accum.downsample_rate = (INV3_FAST_ODR_KHZ * 1000U) / backend_rate_hz;
         }
     }
 
@@ -755,10 +787,10 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
     register_write(INV3REG_PWR_MGMT0, 0x00);
 
     // enable PIN9 as CLKIN
-    register_write_bank(1, INV3REG_INTF_CONFIG5, 0x10);
+    //register_write_bank(1, INV3REG_INTF_CONFIG5, 0x10);
 
     // enable RTC CLOCK
-    register_write(INV3REG_INTF_CONFIG1, 0x95); // RESERVED(0x9)<<4 | ACCEL_LP_CLK_SEL(0x0)<<3 | RTC_MODE(0x1)<<2 | CLKSEL(0x01)<<0
+    //register_write(INV3REG_INTF_CONFIG1, 0x95); // RESERVED(0x9)<<4 | ACCEL_LP_CLK_SEL(0x0)<<3 | RTC_MODE(0x1)<<2 | CLKSEL(0x01)<<0
 
     // setup gyro for backend rate
     register_write(INV3REG_GYRO_CONFIG0, odr_config);
@@ -778,6 +810,12 @@ void AP_InertialSensor_Invensensev3::set_filter_and_scaling(void)
     register_write_bank(2, INV3REG_ACCEL_CONFIG_STATIC3, (accel_aaf_deltsqr & 0xFF)); // ACCEL_AAF_DELTSQR
     register_write_bank(2, INV3REG_ACCEL_CONFIG_STATIC4, ((accel_aaf_bitshift<<4) & 0xF0) | ((accel_aaf_deltsqr>>8) & 0x0F)); // ACCEL_AAF_BITSHIFT | ACCEL_AAF_DELTSQR
 
+    // always use internal RC oscillator
+    register_write(INV3REG_INTF_CONFIG1, 0x90);
+
+    // FIFO_MODE stream to fifo
+    register_write(INV3REG_FIFO_CONFIG, 0x40);
+    
     // enable gyro and accel in low-noise modes
     register_write(INV3REG_PWR_MGMT0, 0x0F);
     hal.scheduler->delay_microseconds(300);
