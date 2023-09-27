@@ -2080,6 +2080,7 @@ class AutoTestPlane(AutoTest):
         self.fly_home_land_and_disarm()
 
     def deadreckoning_main(self, disable_airspeed_sensor=False):
+        self.set_parameter("EK3_OPTIONS", 1)
         self.reboot_sitl()
         self.wait_ready_to_arm()
         self.gpi = None
