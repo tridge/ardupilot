@@ -72,54 +72,28 @@ const AP_Param::GroupInfo AC_PID::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("PDMX", 13, AC_PID, _kpdmax, 0),
 
-#if AC_PID_ADVANCED_ENABLED
-    // @Param: ADV
-    // @DisplayName: Advanced parameters enable
-    // @Description: Advanced parameters enable
-    // @Values: 0:Disabled,1:Enabled
-    // @User: Advanced
-    AP_GROUPINFO_FLAGS("ADV", 32, AC_PID, _adv_enable, 0, AP_PARAM_FLAG_ENABLE),
-
     // @Param: D_FF
     // @DisplayName: PID Derivative FeedForward Gain
     // @Description: FF D Gain which produces an output that is proportional to the rate of change of the target
     // @Range: 0 0.02
     // @Increment: 0.0001
     // @User: Advanced
-    AP_GROUPINFO_FLAGS_DEFAULT_POINTER("D_FF", 33, AC_PID, _kdff, default_kdff),
+    AP_GROUPINFO_FLAGS_DEFAULT_POINTER("D_FF", 14, AC_PID, _kdff, default_kdff),
 
+#if AP_FILTER_ENABLED
     // @Param: NTF
-    // @DisplayName: PID Target notch Filter center frequency
-    // @Description: PID Target notch Filter center frequency in Hz.
-    // @Range: 10 495
-    // @Units: Hz
+    // @DisplayName: PID Target notch filter index
+    // @Description: PID Target notch filter index
+    // @Range: 1 8
     // @User: Advanced
-    AP_GROUPINFO("NTF", 34, AC_PID, _notch_T_center_freq_hz, 0),
+    AP_GROUPINFO("NTF", 34, AC_PID, _notch_T_filter, 0),
 
     // @Param: NEF
-    // @DisplayName: PID Error notch Filter center frequency
-    // @Description: PID Error notch Filter center frequency in Hz.
-    // @Range: 10 495
-    // @Units: Hz
+    // @DisplayName: PID Error notch filter index
+    // @Description: PID Error notch filter index
+    // @Range: 1 8
     // @User: Advanced
-    AP_GROUPINFO("NEF", 35, AC_PID, _notch_E_center_freq_hz, 0),
-
-    // @Param: NBW
-    // @DisplayName: PID notch Filter bandwidth
-    // @Description: PID notch Filter bandwidth in Hz.
-    // @Range: 5 250
-    // @Units: Hz
-    // @User: Advanced
-    AP_GROUPINFO("NBW", 36, AC_PID, _notch_bandwidth_hz, 0),
-
-    // @Param: NATT
-    // @DisplayName: PID notch Filter attenuation
-    // @Description: PID notch Filter attenuation in dB.
-    // @Range: 5 50
-    // @Units: dB
-    // @User: Advanced
-    AP_GROUPINFO("NATT", 37, AC_PID, _notch_attenuation_dB, 40),
-
+    AP_GROUPINFO("NEF", 35, AC_PID, _notch_E_filter, 0),
 #endif
 
     AP_GROUPEND
@@ -181,20 +155,31 @@ void AC_PID::slew_limit(float smax)
 
 void AC_PID::set_notch_sample_rate(float sample_rate)
 {
-#if AC_PID_ADVANCED_ENABLED
-    if (!_adv_enable) {
+#if AP_FILTER_ENABLED
+    if (_notch_T_filter == 0 && _notch_E_filter == 0) {
         return;
     }
 
-    if (!is_zero(_notch_T_center_freq_hz.get()) &&
-        (!is_equal(sample_rate, _target_notch.sample_freq_hz())
-         || !is_equal(_notch_T_center_freq_hz.get(), _target_notch.center_freq_hz()))) {
-        _target_notch.init(sample_rate, _notch_T_center_freq_hz, _notch_bandwidth_hz, _notch_attenuation_dB);
+    if (_notch_T_filter != 0) {
+        if (_target_notch == nullptr) {
+            _target_notch = new NotchFilterFloat();
+        }
+        AP_Filter* filter = AP::filters().get_filter(_notch_T_filter);
+        if (filter != nullptr && !filter->setup_notch_filter(*_target_notch, sample_rate)) {
+            delete _target_notch;
+            _notch_T_filter.set(0);
+        }
     }
-    if (!is_zero(_notch_E_center_freq_hz.get()) &&
-        (!is_equal(sample_rate, _error_notch.sample_freq_hz())
-         || !is_equal(_notch_E_center_freq_hz.get(), _error_notch.center_freq_hz()))) {
-        _error_notch.init(sample_rate, _notch_E_center_freq_hz, _notch_bandwidth_hz, _notch_attenuation_dB);
+
+    if (_notch_E_filter != 0) {
+        if (_error_notch == nullptr) {
+            _error_notch = new NotchFilterFloat();
+        }
+        AP_Filter* filter = AP::filters().get_filter(_notch_E_filter);
+        if (filter && !filter->setup_notch_filter(*_error_notch, sample_rate)) {
+            delete _error_notch;
+            _notch_E_filter.set(0);
+        }
     }
 #endif
 }
@@ -217,31 +202,27 @@ float AC_PID::update_all(float target, float measurement, float dt, bool limit, 
         _error = _target - measurement;
         _derivative = 0.0f;
         _target_derivative = 0.0f;
-#if AC_PID_ADVANCED_ENABLED
-        if (_adv_enable) {
-            if (!is_zero(_notch_T_center_freq_hz.get())) {
-                _target_notch.reset();
-                _target = _target_notch.apply(_target);
-            }
-            if (!is_zero(_notch_E_center_freq_hz.get())) {
-                _error_notch.reset();
-                _error = _error_notch.apply(_error);
-            }
+#if AP_FILTER_ENABLED
+        if (_target_notch != nullptr) {
+            _target_notch->reset();
+            _target = _target_notch->apply(_target);
+        }
+        if (_error_notch != nullptr) {
+            _error_notch->reset();
+            _error = _error_notch->apply(_error);
         }
 #endif
     } else {
         float error_last = _error;
         float target_last = _target;
         float error = _target - measurement;
-#if AC_PID_ADVANCED_ENABLED
-        if (_adv_enable) {
-            // apply notch filters before FTLD/FLTE to avoid shot noise
-            if (!is_zero(_notch_T_center_freq_hz.get())) {
-                target = _target_notch.apply(target);
-            }
-            if (!is_zero(_notch_E_center_freq_hz.get())) {
-                error = _error_notch.apply(error);
-            }
+#if AP_FILTER_ENABLED
+        // apply notch filters before FTLD/FLTE to avoid shot noise
+        if (_target_notch != nullptr) {
+            target = _target_notch->apply(target);
+        }
+        if (_error_notch != nullptr) {
+            error = _error_notch->apply(error);
         }
 #endif
         _target += get_filt_T_alpha(dt) * (target - _target);
@@ -353,11 +334,7 @@ float AC_PID::get_d() const
 
 float AC_PID::get_ff()
 {
-    _pid_info.FF = _target * _kff
-#if AC_PID_ADVANCED_ENABLED
-        + _target_derivative * _kdff
-#endif
-        ;
+    _pid_info.FF = _target * _kff + _target_derivative * _kdff;
     return  _pid_info.FF;
 }
 
@@ -379,13 +356,6 @@ void AC_PID::load_gains()
     _filt_T_hz.load();
     _filt_E_hz.load();
     _filt_D_hz.load();
-#if AC_PID_ADVANCED_ENABLED
-    _kdff.load();
-    _notch_T_center_freq_hz.load();
-    _notch_E_center_freq_hz.load();
-    _notch_bandwidth_hz.load();
-    _notch_attenuation_dB.load();
-#endif
 }
 
 // save_gains - save gains to eeprom
@@ -399,13 +369,6 @@ void AC_PID::save_gains()
     _filt_T_hz.save();
     _filt_E_hz.save();
     _filt_D_hz.save();
-#if AC_PID_ADVANCED_ENABLED
-    _kdff.save();
-    _notch_T_center_freq_hz.save();
-    _notch_E_center_freq_hz.save();
-    _notch_bandwidth_hz.save();
-    _notch_attenuation_dB.save();
-#endif
 }
 
 /// Overload the function call operator to permit easy initialisation
@@ -419,9 +382,7 @@ void AC_PID::operator()(float p_val, float i_val, float d_val, float ff_val, flo
     _filt_T_hz.set(input_filt_T_hz);
     _filt_E_hz.set(input_filt_E_hz);
     _filt_D_hz.set(input_filt_D_hz);
-#if AC_PID_ADVANCED_ENABLED
     _kdff.set(dff_val);
-#endif
 }
 
 // get_filt_T_alpha - get the target filter alpha
