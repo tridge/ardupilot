@@ -270,6 +270,7 @@ float AC_PID::update_all(float target, float measurement, float dt, bool limit, 
     _pid_info.error = _error;
     _pid_info.P = P_out;
     _pid_info.D = D_out;
+    _pid_info.FF = _target * _kff + _target_derivative * _kdff;
 
     return P_out + D_out + _integrator;
 }
@@ -334,7 +335,6 @@ float AC_PID::get_d() const
 
 float AC_PID::get_ff()
 {
-    _pid_info.FF = _target * _kff + _target_derivative * _kdff;
     return  _pid_info.FF;
 }
 
@@ -343,29 +343,25 @@ void AC_PID::reset_I()
     _integrator = 0.0;
 }
 
+// load original gains from eeprom, used by autotune to restore gains after tuning
 void AC_PID::load_gains()
 {
     _kp.load();
     _ki.load();
     _kd.load();
     _kff.load();
-    _kimax.load();
-    _kimax.set(fabsf(_kimax));
-    _kpdmax.load();
-    _kpdmax.set(fabsf(_kpdmax));
     _filt_T_hz.load();
     _filt_E_hz.load();
     _filt_D_hz.load();
 }
 
-// save_gains - save gains to eeprom
+// save original gains to eeprom, used by autotune to save gains before tuning
 void AC_PID::save_gains()
 {
     _kp.save();
     _ki.save();
     _kd.save();
     _kff.save();
-    _kimax.save();
     _filt_T_hz.save();
     _filt_E_hz.save();
     _filt_D_hz.save();
