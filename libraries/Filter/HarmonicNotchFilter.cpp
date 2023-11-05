@@ -20,6 +20,10 @@
 
 #include "HarmonicNotchFilter.h"
 #include <GCS_MAVLink/GCS.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <stdio.h>
 
 #define HNF_MAX_FILTERS HAL_HNF_MAX_FILTERS // must be even for double-notch filters
 
@@ -301,6 +305,8 @@ void HarmonicNotchFilter<T>::update(uint8_t num_centers, const float center_freq
     }
 }
 
+static int dfd = -1;
+
 /*
   apply a sample to each of the underlying filters in turn and return the output
  */
@@ -311,9 +317,21 @@ T HarmonicNotchFilter<T>::apply(const T &sample)
         return sample;
     }
 
+    if (dfd == -1) {
+        dfd = ::open("notch.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    }
+
     T output = sample;
     for (uint8_t i = 0; i < _num_enabled_filters; i++) {
+        if (!_filters[i].initialised) {
+            ::dprintf(dfd, "------- ");
+        } else {
+            ::dprintf(dfd, "%.4f ", _filters[i]._center_freq_hz);
+        }
         output = _filters[i].apply(output);
+    }
+    if (_num_enabled_filters > 0) {
+        ::dprintf(dfd, "\n");
     }
     return output;
 }
