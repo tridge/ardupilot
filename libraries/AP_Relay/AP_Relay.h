@@ -25,6 +25,9 @@ public:
     // setup the relay pin
     void        init();
 
+    // set relay to state
+    void set(uint8_t instance, bool value);
+
     // activate the relay
     void        on(uint8_t instance) { set(instance, true); }
 
@@ -57,8 +60,6 @@ private:
     uint8_t _pin_states;
     uint8_t _last_logged_pin_states;
     uint32_t _last_log_ms;
-
-    void set(uint8_t instance, bool value);
 };
 
 namespace AP {
