@@ -24,6 +24,13 @@
 
 #include <AP_Param/AP_Param.h>
 #include <Filter/LowPassFilter.h>
+#include <AP_RPM/AP_RPM_config.h>
+#include <AP_HAL/I2CDevice.h>
+#include <AP_Relay/AP_Relay.h>
+
+#if AP_ICENGINE_TCA9554_STARTER_ENABLED
+#include "AP_ICEngine_TCA9554.h"
+#endif
 
 class AP_ICEngine {
 public:
@@ -61,6 +68,9 @@ private:
     static AP_ICEngine *_singleton;
 
     const class AP_RPM &rpm;
+
+    void set_ignition(bool on);
+    void set_starter(bool on);
 
     enum ICE_State state;
 
@@ -115,7 +125,10 @@ private:
 
     // Idle Controller Slew Rate
     AP_Float idle_slew;
-    
+
+    // relay number for ignition
+    AP_Int8 ignition_relay;
+
     // height when we enter ICE_START_HEIGHT_DELAY
     float initial_height;
 
@@ -143,6 +156,11 @@ private:
     uint16_t start_chan_last_value = 1500;
     uint32_t start_chan_last_ms;
 
+#if AP_ICENGINE_TCA9554_STARTER_ENABLED
+    AP_ICEngine_TCA9554 tca9554_starter;
+#endif
+
+#if AP_RPM_ENABLED
     // redline rpm
     AP_Int32 redline_rpm;
     struct {
@@ -150,6 +168,7 @@ private:
         float governor_integrator;
         float throttle_percentage;
     } redline;
+#endif
 };
 
 
