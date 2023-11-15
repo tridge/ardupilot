@@ -17,6 +17,7 @@
 #include "AP_BattMonitor_LTC2946.h"
 #include "AP_BattMonitor_Torqeedo.h"
 #include "AP_BattMonitor_FuelLevel_Analog.h"
+#include "AP_BattMonitor_AD7091R5.h"
 
 #include <AP_HAL/AP_HAL.h>
 
@@ -324,6 +325,11 @@ AP_BattMonitor::init()
                 drivers[instance] = new AP_BattMonitor_Torqeedo(*this, state[instance], _params[instance]);
                 break;
 #endif
+#if AP_BATTERY_AD7091R5_ENABLED
+            case Type::AD7091R5:
+                drivers[instance] = new AP_BattMonitor_AD7091R5(*this, state[instance], _params[instance]);
+                break;
+#endif// AP_BATTERY_AD7091R5_ENABLED
             case Type::NONE:
             default:
                 break;
