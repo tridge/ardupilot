@@ -574,12 +574,6 @@ void AP_ICEngine::set_starter(bool on)
 }
 
 
-bool AP_ICEngine::allow_throttle_while_disarmed() const
-{
-    return option_set(Options::THROTTLE_WHILE_DISARMED) &&
-        hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED;
-}
-
 // singleton instance. Should only ever be set in the constructor.
 AP_ICEngine *AP_ICEngine::_singleton;
 namespace AP {
