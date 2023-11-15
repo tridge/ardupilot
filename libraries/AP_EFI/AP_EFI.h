@@ -22,6 +22,7 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
+#include "AP_EFI_ThrottleLinearisation.h"
 
 #include "AP_EFI_Backend.h"
 #include "AP_EFI_State.h"
@@ -84,6 +85,9 @@ public:
         DroneCAN = 5,
         CurrawongECU = 6,
         SCRIPTING  = 7,
+#if AP_EFI_SERIAL_HIRTH_ENABLED
+        Hirth      = 8, 
+#endif
     };
 
     static AP_EFI *get_singleton(void) {
@@ -106,6 +110,10 @@ protected:
     AP_Float ecu_fuel_density;
 
     EFI_State state;
+
+#if AP_EFI_THROTTLE_LINEARISATION_ENABLED
+    AP_EFI_ThrLin throttle_linearisation;
+#endif
 
 private:
     // Front End Parameters

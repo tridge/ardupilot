@@ -22,6 +22,7 @@
 #include "AP_EFI_NWPMU.h"
 #include "AP_EFI_DroneCAN.h"
 #include "AP_EFI_Currawong_ECU.h"
+#include "AP_EFI_Serial_Hirth.h"
 #include "AP_EFI_Scripting.h"
 
 #include <AP_Logger/AP_Logger.h>
@@ -38,7 +39,7 @@ const AP_Param::GroupInfo AP_EFI::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: EFI communication type
     // @Description: What method of communication is used for EFI #1
-    // @Values: 0:None,1:Serial-MS,2:NWPMU,3:Serial-Lutan,5:DroneCAN,6:Currawong-ECU,7:Scripting
+    // @Values: 0:None,1:Serial-MS,2:NWPMU,3:Serial-Lutan,5:DroneCAN,6:Currawong-ECU,7:Scripting,8:Hirth
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO_FLAGS("_TYPE", 1, AP_EFI, type, 0, AP_PARAM_FLAG_ENABLE),
@@ -64,6 +65,12 @@ const AP_Param::GroupInfo AP_EFI::var_info[] = {
     // @Range: 0 10000
     // @User: Advanced
     AP_GROUPINFO("_FUEL_DENS", 4, AP_EFI, ecu_fuel_density, 0),
+
+#if AP_EFI_THROTTLE_LINEARISATION_ENABLED   
+    // @Group: _THRLIN
+    // @Path: AP_EFI_ThrottleLinearisation.cpp
+    AP_SUBGROUPINFO(throttle_linearisation, "_THRLIN", 5, AP_EFI, AP_EFI_ThrLin),
+#endif
 
     AP_GROUPEND
 };
@@ -117,6 +124,11 @@ void AP_EFI::init(void)
         backend = new AP_EFI_Scripting(*this);
 #endif
         break;
+#if AP_EFI_SERIAL_HIRTH_ENABLED
+    case Type::Hirth:
+        backend = new AP_EFI_Serial_Hirth(*this);
+        break;
+#endif
     default:
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Unknown EFI type");
         break;
@@ -226,12 +238,14 @@ void AP_EFI::log_status(void)
 // @Field: CHT: Cylinder head temperature
 // @Field: EGT: Exhaust gas temperature
 // @Field: Lambda: Estimated lambda coefficient (dimensionless ratio)
+// @Field: CHT2: Cylinder2 head temperature
+// @Field: EGT2: Cylinder2 Exhaust gas temperature
 // @Field: IDX: Index of the publishing ECU
     AP::logger().WriteStreaming("ECYL",
-                                "TimeUS,Inst,IgnT,InjT,CHT,EGT,Lambda,IDX",
-                                "s#dsOO--",
-                                "F-0C0000",
-                                "QBfffffB",
+                                "TimeUS,Inst,IgnT,InjT,CHT,EGT,Lambda,CHT2,EGT2,IDX",
+                                "s#dsOO-OO-",
+                                "F-0C000000",
+                                "QBfffffBff",
                                 AP_HAL::micros64(),
                                 0,
                                 state.cylinder_status.ignition_timing_deg,
@@ -239,6 +253,8 @@ void AP_EFI::log_status(void)
                                 state.cylinder_status.cylinder_head_temperature,
                                 state.cylinder_status.exhaust_gas_temperature,
                                 state.cylinder_status.lambda_coefficient,
+                                state.cylinder_status.cylinder_head_temperature2,
+                                state.cylinder_status.exhaust_gas_temperature2,
                                 state.ecu_index);
 }
 #endif // LOGGING_ENABLED
