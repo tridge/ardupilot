@@ -38,6 +38,8 @@ const uint32_t VRSSI_CHANNEL = ADC_SQR3_SQ1_N(ADC_CHANNEL_IN5);
 
 static uint16_t vrssi_val = 0xFFFF;
 static uint16_t vservo_val = 0xFFFF;
+static bool sample_vrssi_enable = true;
+static bool sampling_vservo = true;
 
 /*
   initialise ADC capture
@@ -61,7 +63,7 @@ void adc_init(void)
     /* set channels 4 and 5 for 28.5us sample time */
     ADC1->SMPR2 = ADC_SMPR2_SMP_AN4(ADC_SAMPLE_28P5) | ADC_SMPR2_SMP_AN5(ADC_SAMPLE_28P5);
 
-    /* capture a single sample at a time */
+    /* capture one sample at a time */
     ADC1->SQR1 = 0;
     ADC1->SQR2 = 0;
 
@@ -71,9 +73,25 @@ void adc_init(void)
 }
 
 /*
+  capture VSERVO in mV
+ */
+void adc_enable_vrssi(void)
+{
+    sample_vrssi_enable = true;
+}
+
+/*
+  don't capture VRSSI
+ */
+void adc_disable_vrssi(void)
+{
+    sample_vrssi_enable = false;
+}
+
+/*
   capture one sample on a channel
  */
-static void adc_sample_channel(uint32_t channel)
+void adc_sample_channels()
 {
     chSysLock();
 
@@ -82,38 +100,46 @@ static void adc_sample_channel(uint32_t channel)
     }
 
     /* capture another sample */
-    ADC1->SQR3 = channel;
     ADC1->CR2 |= ADC_CR2_ADON;
+
     chSysUnlock();
 }
 
 /*
   capture VSERVO in mV
  */
-uint16_t adc_sample_vservo(void)
+uint16_t adc_vservo(void)
 {
-    adc_sample_channel(VSERVO_CHANNEL);
     return vservo_val;
 }
 
 /*
   capture VRSSI in mV
  */
-uint16_t adc_sample_vrssi(void)
+uint16_t adc_vrssi(void)
 {
-    adc_sample_channel(VRSSI_CHANNEL);
     return vrssi_val;
 }
 
 static void adc_read_sample()
 {
     if (ADC1->SR & ADC_SR_EOC) {
-        if (ADC1->SQR3 == VSERVO_CHANNEL) {
-            vservo_val = ADC1->DR;
-        } else if (ADC1->SQR3 == VRSSI_CHANNEL) {
-            vrssi_val = ADC1->DR;
-        }
+
         ADC1->SR &= ~(ADC_SR_EOC | ADC_SR_STRT);
+
+        if (sampling_vservo) {
+            vservo_val = ADC1->DR;
+            if (sample_vrssi_enable) {
+                /* capture another sample */
+                ADC1->SQR3 = VRSSI_CHANNEL;
+                ADC1->CR2 |= ADC_CR2_ADON;
+                sampling_vservo = false;
+            }
+        } else {
+            vrssi_val = ADC1->DR;
+            ADC1->SQR3 = VSERVO_CHANNEL;
+            sampling_vservo = true;
+        }
     }
 }
 
