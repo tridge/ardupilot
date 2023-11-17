@@ -25,6 +25,9 @@
 #if HAL_USE_ADC != TRUE
 #error "HAL_USE_ADC must be set"
 #endif
+// we build this file with optimisation to lower the interrupt
+// latency.
+#pragma GCC optimize("O2")
 
 extern "C" {
     extern void Vector88();
