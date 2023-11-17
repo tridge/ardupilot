@@ -1,5 +1,7 @@
 #include <AP_HAL/AP_HAL.h>
+#include "AP_EFI_config.h"
 
+#if HAL_EFI_ENABLED
 #include "AP_EFI_DroneCAN.h"
 
 #if HAL_EFI_DRONECAN_ENABLED
@@ -166,4 +168,4 @@ void AP_EFI_DroneCAN::handle_status(const uavcan::equipment::ice::reciprocating:
 }
 
 #endif // HAL_EFI_DRONECAN_ENABLED
-
+#endif // HAL_EFI_ENABLED

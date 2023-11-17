@@ -14,6 +14,10 @@
  */
 #pragma once
 
+#include "AP_EFI_config.h"
+
+#if HAL_EFI_ENABLED
+
 #include "AP_EFI.h"
 #include "AP_EFI_Backend.h"
 
@@ -108,3 +112,5 @@ private:
         RT_LAST_OFFSET = FUEL_PRESSURE_LSB
     };
 };
+
+#endif // HAL_EFI_ENABLED
