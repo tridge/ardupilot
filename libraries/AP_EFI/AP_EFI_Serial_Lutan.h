@@ -17,6 +17,10 @@
  */
 #pragma once
 
+#include "AP_EFI_config.h"
+
+#if HAL_EFI_ENABLED
+
 #include "AP_EFI.h"
 #include "AP_EFI_Backend.h"
 
@@ -81,3 +85,5 @@ private:
     uint32_t last_request_ms;
     uint32_t last_recv_ms;
 };
+
+#endif // HAL_EFI_ENABLED

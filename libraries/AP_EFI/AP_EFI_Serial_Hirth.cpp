@@ -17,7 +17,7 @@
 
 #include "AP_EFI_config.h"
 
-#if AP_EFI_SERIAL_HIRTH_ENABLED
+#if HAL_EFI_ENABLED && AP_EFI_SERIAL_HIRTH_ENABLED
 #include <AP_HAL/AP_HAL.h>
 #include <AP_EFI/AP_EFI_Serial_Hirth.h>
 #include <AP_SerialManager/AP_SerialManager.h>
@@ -387,4 +387,4 @@ void AP_EFI_Serial_Hirth::log_status(void)
 }
 #endif // HAL_LOGGING_ENABLED
 
-#endif // AP_EFI_SERIAL_HIRTH_ENABLED
+#endif // HAL_EFI_ENABLED && AP_EFI_SERIAL_HIRTH_ENABLED

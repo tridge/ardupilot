@@ -1,6 +1,6 @@
 #include "AP_EFI_config.h"
 
-#if AP_EFI_THROTTLE_LINEARISATION_ENABLED
+#if HAL_EFI_ENABLED && AP_EFI_THROTTLE_LINEARISATION_ENABLED
 
 #include "AP_EFI.h"
 #include <AP_Param/AP_Param.h>
@@ -70,5 +70,5 @@ float AP_EFI_ThrLin::linearise_throttle(float throttle_percent)
     return ret;
 }
 
-#endif // AP_EFI_THROTTLE_LINEARISATION_ENABLED
+#endif // HAL_EFI_ENABLED && AP_EFI_THROTTLE_LINEARISATION_ENABLED
 
