@@ -1,5 +1,8 @@
 #pragma once
 
+#include "AP_EFI_config.h"
+
+#if HAL_EFI_ENABLED
 #include "AP_EFI.h"
 #include "AP_EFI_Backend.h"
 
@@ -25,4 +28,4 @@ private:
     static AP_EFI_DroneCAN *driver;
 };
 #endif // AP_EFI_DRONECAN_ENABLED
-
+#endif // HAL_EFI_ENABLED
