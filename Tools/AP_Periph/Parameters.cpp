@@ -592,7 +592,7 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
 #if AP_SIM_ENABLED
     // @Group: SIM_
     // @Path: ../libraries/SITL/SITL.cpp
-    GOBJECT(sitl, "SIM_", SITL::SIM),
+    //GOBJECT(sitl, "SIM_", SITL::SIM),
 
 #if AP_AHRS_ENABLED
     // @Group: AHRS_

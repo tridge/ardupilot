@@ -2,6 +2,8 @@
 
 #ifdef HAL_PERIPH_ENABLE_NETWORKING
 
+#define HAL_PERIPH_NETWORK_NUM_PASSTHRU 2
+
 class Networking_Periph {
 public:
     friend class AP_Periph_FW;
@@ -17,22 +19,11 @@ private:
     AP_Networking networking;
 
     struct {
-        bool enabled;
-        bool timer_installed;
+        AP_Int8 ep1;
+        AP_Int8 ep2;
         AP_HAL::UARTDriver *port1;
         AP_HAL::UARTDriver *port2;
-        uint32_t start_ms;
-        uint32_t last_ms;
-        uint32_t last_port1_data_ms;
-        uint32_t baud1;
-        uint32_t baud2;
-        uint8_t timeout_s;
-        HAL_Semaphore sem;
-    } _passthru;
-
-    // timer called to implement pass-thru
-    void passthru_timer();
-
+    } passthru[HAL_PERIPH_NETWORK_NUM_PASSTHRU];
 };
 
 #endif // HAL_PERIPH_ENABLE_BATTERY_BALANCE

@@ -17,6 +17,8 @@
 
 #ifdef HAL_PERIPH_ENABLE_NETWORKING
 
+#include <AP_SerialManager/AP_SerialManager.h>
+
 extern const AP_HAL::HAL &hal;
 
 const AP_Param::GroupInfo Networking_Periph::var_info[] {
@@ -53,6 +55,12 @@ const AP_Param::GroupInfo Networking_Periph::var_info[] {
     AP_SUBGROUPINFO(networking.ports[3], "_P4_", 5, Networking_Periph, AP_Networking::Port),
 #endif
 
+    AP_GROUPINFO("PASS1_EP1", 6,  Networking_Periph, passthru[0].ep1,   -1),
+    AP_GROUPINFO("PASS1_EP2", 7,  Networking_Periph, passthru[0].ep2,   -1),
+
+    AP_GROUPINFO("PASS2_EP1", 8,  Networking_Periph, passthru[1].ep1,   -1),
+    AP_GROUPINFO("PASS2_EP2", 9,  Networking_Periph, passthru[1].ep2,   -1),
+
     AP_GROUPEND
 };
 
@@ -67,116 +75,51 @@ Networking_Periph::Networking_Periph(void)
  */
 void Networking_Periph::update_passthru(void)
 {
-    WITH_SEMAPHORE(_passthru.sem);
-    uint32_t now = AP_HAL::millis();
-    uint32_t baud1, baud2;
-    bool enabled = AP::serialmanager().get_passthru(_passthru.port1, _passthru.port2, _passthru.timeout_s,
-                                                    baud1, baud2);
-    if (enabled && !_passthru.enabled) {
-        _passthru.start_ms = now;
-        _passthru.last_ms = 0;
-        _passthru.enabled = true;
-        _passthru.last_port1_data_ms = now;
-        _passthru.baud1 = baud1;
-        _passthru.baud2 = baud2;
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Passthru enabled");
-        if (!_passthru.timer_installed) {
-            _passthru.timer_installed = true;
-            hal.scheduler->register_timer_process(FUNCTOR_BIND_MEMBER(&Networking_Periph::passthru_timer, void));
-        }
-    } else if (!enabled && _passthru.enabled) {
-        _passthru.enabled = false;
-        _passthru.port1->lock_port(0, 0);
-        _passthru.port2->lock_port(0, 0);
-        // Restore original baudrates
-        if (_passthru.baud1 != baud1) {
-            _passthru.port1->end();
-            _passthru.port1->begin(baud1);
-        }
-        if (_passthru.baud2 != baud2) {
-            _passthru.port2->end();
-            _passthru.port2->begin(baud2);
-        }
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Passthru disabled");
-    } else if (enabled &&
-               _passthru.timeout_s &&
-               now - _passthru.last_port1_data_ms > uint32_t(_passthru.timeout_s)*1000U) {
-        // timed out, disable
-        _passthru.enabled = false;
-        _passthru.port1->lock_port(0, 0);
-        _passthru.port2->lock_port(0, 0);
-        AP::serialmanager().disable_passthru();
-        // Restore original baudrates
-        if (_passthru.baud1 != baud1) {
-            _passthru.port1->end();
-            _passthru.port1->begin(baud1);
-        }
-        if (_passthru.baud2 != baud2) {
-            _passthru.port2->end();
-            _passthru.port2->begin(baud2);
-        }
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Passthru timed out");
-    }
-}
+    /*
+      see if we need to open a new port
+     */
+    auto &serial_manager = AP::serialmanager();
 
-/*
-  called at 1kHz to handle pass-thru between SERIA0_PASSTHRU port and hal.console
- */
-void Networking_Periph::passthru_timer(void)
-{
-    WITH_SEMAPHORE(_passthru.sem);
-
-    if (!_passthru.enabled) {
-        // it has been disabled after starting
-        return;
-    }
-    if (_passthru.start_ms != 0) {
-        uint32_t now = AP_HAL::millis();
-        if (now - _passthru.start_ms < 1000) {
-            // delay for 1s so the reply for the SERIAL0_PASSTHRU param set can be seen by GCS
-            return;
+    for (auto &p : passthru) {
+        if (p.port1 == nullptr && p.port2 == nullptr &&
+            p.ep1 != -1 && p.ep2 != -1 && p.ep1 != p.ep2) {
+            p.port1 = serial_manager.get_serial_by_id(p.ep1);
+            p.port2 = serial_manager.get_serial_by_id(p.ep2);
+            if (p.port1 != nullptr && p.port2 != nullptr) {
+                p.port1->begin(115200);
+                p.port2->begin(115200);
+            }
         }
-        _passthru.start_ms = 0;
-        _passthru.port1->begin(_passthru.baud1);
-        _passthru.port2->begin(_passthru.baud2);
     }
 
-    // while pass-thru is enabled lock both ports. They remain
-    // locked until disabled again, or reboot
-    const uint32_t lock_key = 0x3256AB9F;
-    _passthru.port1->lock_port(lock_key, lock_key);
-    _passthru.port2->lock_port(lock_key, lock_key);
+    for (auto &p : passthru) {
+        uint8_t buf[64];
+        if (p.port1 == nullptr || p.port2 == nullptr) {
+            continue;
+        }
+        // read from port1, and write to port2
+        auto avail = p.port1->available();
+        if (avail > 0) {
+            auto space = p.port2->txspace();
+            const uint32_t n = MIN(space, sizeof(buf));
+            const auto nbytes = p.port1->read(buf, n);
+            if (nbytes > 0) {
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "data1 %d", unsigned(nbytes));
+                p.port2->write(buf, nbytes);
+            }
+        }
 
-    // Check for requested Baud rates over USB
-    uint32_t baud = _passthru.port1->get_usb_baud();
-    if (_passthru.baud2 != baud && baud != 0) {
-        _passthru.baud2 = baud;
-        _passthru.port2->end();
-        _passthru.port2->begin_locked(baud, 0, 0, lock_key);
-    }
-
-    baud = _passthru.port2->get_usb_baud();
-    if (_passthru.baud1 != baud && baud != 0) {
-        _passthru.baud1 = baud;
-        _passthru.port1->end();
-        _passthru.port1->begin_locked(baud, 0, 0, lock_key);
-    }
-
-    uint8_t buf[64];
-
-    // read from port1, and write to port2
-    int16_t nbytes = _passthru.port1->read_locked(buf, sizeof(buf), lock_key);
-    if (nbytes > 0) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "data1 %d", nbytes);
-        _passthru.last_port1_data_ms = AP_HAL::millis();
-        _passthru.port2->write_locked(buf, nbytes, lock_key);
-    }
-
-    // read from port2, and write to port1
-    nbytes = _passthru.port2->read_locked(buf, sizeof(buf), lock_key);
-    if (nbytes > 0) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "data2 %d", nbytes);
-        _passthru.port1->write_locked(buf, nbytes, lock_key);
+        // read from port2, and write to port1
+        avail = p.port2->available();
+        if (avail > 0) {
+            auto space = p.port1->txspace();
+            const uint32_t n = MIN(space, sizeof(buf));
+            const auto nbytes = p.port2->read(buf, n);
+            if (nbytes > 0) {
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "data2 %d", unsigned(nbytes));
+                p.port1->write(buf, nbytes);
+            }
+        }
     }
 }
 #endif  // HAL_PERIPH_ENABLE_NETWORKING
