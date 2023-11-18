@@ -67,7 +67,7 @@ public:
         "GPS1",
         "none:1",
         "sim:adsb",
-        "none:3",
+        "tcp:1234",
         "none:4",
         "none:5",
         "none:6",
