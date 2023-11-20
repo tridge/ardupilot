@@ -3,6 +3,18 @@ on:
   schedule:
     - cron: '0 0 * * 6'  # every saturday at midnight
   workflow_dispatch:
+  push:
+    branches:
+      - CxPilot
+      - master
+    paths:
+      - '.github/workflows/test_environment.yml'
+      - 'Tools/scripts/environment_install/**'
+
+  pull_request:
+    paths:
+      - '.github/workflows/test_environment.yml'
+      - 'Tools/scripts/environment_install/**'
 
 
 concurrency:
@@ -102,6 +114,7 @@ jobs:
           TZ: Europe/Paris
         shell: 'script -q -e -c "bash {0}"'
         run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
           source ~/.bashrc
           git config --global --add safe.directory /__w/ardupilot/ardupilot
           ./waf configure
@@ -114,6 +127,7 @@ jobs:
           TZ: Europe/Paris
         shell: 'script -q -e -c "bash {0}"'
         run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
           source ~/.bashrc
           case ${{matrix.os}} in
             *"archlinux"*)

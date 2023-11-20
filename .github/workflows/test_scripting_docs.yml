@@ -1,15 +1,20 @@
-name: test scripting docs
+name: test scripting
 
 on:
   push:
+    branches:
+      - CxPilot
+      - master
     paths: # only run for scripting changes
       - 'libraries/AP_Scripting/tests/docs_check.py'
       - 'libraries/AP_Scripting/generator/**'
+      - '**.lua'
 
   pull_request:
     paths: # only run for scripting changes
       - 'libraries/AP_Scripting/tests/docs_check.py'
       - 'libraries/AP_Scripting/generator/**'
+      - '**.lua'
 
   workflow_dispatch:
 
@@ -18,9 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-scripting-docs:
+  test-scripting:
     runs-on: ubuntu-20.04
-    container: ardupilot/ardupilot-dev-base:latest
+    container: ardupilot/ardupilot-dev-base:v0.0.29
     steps:
       # git checkout the PR
       - uses: actions/checkout@v3
@@ -35,6 +40,7 @@ jobs:
       - name: build sitl # we don't really need to build the full code, just trigger docs re-gen with --scripting-docs, timeout after 10 seconds
         shell: bash
         run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
           PATH="/github/home/.local/bin:$PATH"
           ./waf configure --board sitl
           timeout 10 ./waf antennatracker --scripting-docs || code=$?; if [[ $code -ne 124 && $code -ne 0 ]]; then exit $code; fi
