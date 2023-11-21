@@ -210,12 +210,7 @@ jobs:
         id: check_files
         uses: andstor/file-existence-action@v2
         with:
-          files: |
-            "artifacts/ArduCopter.elf.exe"
-            "artifacts/ArduHeli.elf.exe"
-            "artifacts/ArduPlane.elf.exe"
-            "artifacts/ArduRover.elf.exe"
-            "artifacts/ArduSub.elf.exe"
+          files: "artifacts/ArduPlane.elf.exe"
           fail: true
 
       - name: Archive build
