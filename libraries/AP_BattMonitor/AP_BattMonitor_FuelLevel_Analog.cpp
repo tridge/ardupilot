@@ -26,6 +26,10 @@
 
 extern const AP_HAL::HAL& hal;
 
+// ADC Calibration for CX31021020 Rev D Voltage Divider for ADC #3
+#define CPN_ADC_5V_SLP 797.76
+#define CPN_ADC_5V_OFF 1.11
+
 const AP_Param::GroupInfo AP_BattMonitor_FuelLevel_Analog::var_info[] = {
 
     // @Param: FL_VLT_MIN
@@ -127,7 +131,8 @@ void AP_BattMonitor_FuelLevel_Analog::read()
     const uint32_t dt_us = tnow - _state.last_time_micros;
 
     // get voltage from an ADC pin
-    const float raw_voltage = _analog_source->voltage_average();
+    //const float raw_voltage = _analog_source->voltage_average();
+    const float raw_voltage = (_analog_source->read_average() - CPN_ADC_5V_OFF) / CPN_ADC_5V_SLP;
 
     // Converting sensor reading to actual volume in tank in Litres (quadratic fit)
     const float voltage = 
