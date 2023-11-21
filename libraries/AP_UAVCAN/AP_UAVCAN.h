@@ -287,7 +287,12 @@ private:
         bool servo_pending;
     } _SRV_conf[UAVCAN_SRV_NUMBER];
 
-    uint8_t _SRV_armed;
+    uint32_t _esc_send_count;
+    uint32_t _srv_send_count;
+    uint32_t _fail_send_count;
+
+    uint16_t _SRV_armed_mask;
+    uint16_t _ESC_armed_mask;
     uint32_t _SRV_last_send_us;
     HAL_Semaphore SRV_sem;
 
