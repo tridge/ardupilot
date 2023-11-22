@@ -115,6 +115,7 @@ private:
         VelCovGeodetic = 5908,
         AttEuler = 5938,
         AttEulerCov = 5939,
+        AuxAntPositions = 5942,
     };
 
     struct PACKED msg4007 // PVTGeodetic
@@ -252,6 +253,28 @@ private:
         float Cov_PitchRoll;
     };
 
+    struct PACKED AuxAntPositionSubBlock {
+        uint8_t NrSV;           // total number of satellites tracked by the antenna
+        uint8_t Error;          // aux antenna position error code
+        uint8_t AmbiguityType;  // aux antenna positions obtained with 0: fixed ambiguities, 1: float ambiguities
+        uint8_t AuxAntID;       // aux antenna ID: 1 for the first auxiliary antenna, 2 for the second, etc.
+        double DeltaEast;       // position in East direction (relative to main antenna)
+        double DeltaNorth;      // position in North direction (relative to main antenna)
+        double DeltaUp;         // position in Up direction (relative to main antenna)
+        double EastVel;         // velocity in East direction (relative to main antenna)
+        double NorthVel;        // velocity in North direction (relative to main antenna)
+        double UpVel;           // velocity in Up direction (relative to main antenna)
+    };
+
+    struct PACKED msg5942 // AuxAntPositions
+    {
+        uint32_t TOW;
+        uint16_t WNc;
+        uint8_t N;          // number of AuxAntPosition sub-blocks in this AuxAntPositions block
+        uint8_t SBLength;   // length of one sub-block in bytes
+        AuxAntPositionSubBlock ant1;    // first aux antennas position
+    };
+
     union PACKED msgbuffer {
         msg4007 msg4007u;
         msg4001 msg4001u;
@@ -260,6 +283,7 @@ private:
         msg5908 msg5908u;
         msg5938 msg5938u;
         msg5939 msg5939u;
+        msg5942 msg5942u;
         uint8_t bytes[256];
     };
 

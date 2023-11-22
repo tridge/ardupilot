@@ -122,7 +122,7 @@ AP_GPS_SBF::read(void)
                                 const char *extra_config;
                                 switch (get_type()) {
                                     case AP_GPS::GPS_Type::GPS_TYPE_SBF_DUAL_ANTENNA:
-                                        extra_config = "+AttEuler+AttCovEuler";
+                                        extra_config = "+AttEuler+AttCovEuler+AuxAntPositions";
                                         break;
                                     case AP_GPS::GPS_Type::GPS_TYPE_SBF:
                                     default:
@@ -579,6 +579,24 @@ AP_GPS_SBF::process_message(void)
                 state.have_gps_yaw_accuracy = true;
             } else {
                 state.gps_yaw_accuracy = false;
+            }
+        }
+        break;
+    }
+    case AuxAntPositions:
+    {
+        //GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: got antenna positions");
+        if (get_type() == AP_GPS::GPS_Type::GPS_TYPE_SBF_DUAL_ANTENNA) {
+            const msg5942 &temp = sbf_msg.data.msg5942u;
+            check_new_itow(temp.TOW, sbf_msg.length);
+
+            //GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: %d sub blocks", (int)temp.N);
+            if (temp.N > 0) {
+                if (temp.ant1.Error == 0) {
+                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: E:%4.2f N:%4.2f U:%4.2f", (double)temp.ant1.DeltaEast, (double)temp.ant1.DeltaNorth, (double)temp.ant1.DeltaUp);
+                } else {
+                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: Ant pos invalid Err:%d", (int)temp.ant1.Error);
+                }
             }
         }
         break;
