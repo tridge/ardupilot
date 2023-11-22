@@ -53,6 +53,14 @@ extern const AP_HAL::HAL &hal;
 #define MAV_SYSTEM_ID HAL_DEFAULT_MAV_SYSTEM_ID
 #endif
 
+#ifndef APD_ESC_SERIAL_0
+  #define APD_ESC_SERIAL_0 -1
+#endif
+
+#ifndef APD_ESC_SERIAL_1
+  #define APD_ESC_SERIAL_1 -1
+#endif
+
 /*
  *  AP_Periph parameter definitions
  *
@@ -336,13 +344,13 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     GSCALAR(hardpoint_rate, "HARDPOINT_RATE", 100),
 #endif
 
-#ifdef HAL_PERIPH_ENABLE_HWESC
+#if defined(HAL_PERIPH_ENABLE_HWESC) || defined(HAL_PERIPH_ENABLE_ESC_APD)
     // @Param: ESC_NUMBER
     // @DisplayName: ESC number
     // @Description: This is the ESC number to report as in UAVCAN ESC telemetry feedback packets.
     // @Increment: 1
     // @User: Advanced
-    GSCALAR(esc_number, "ESC_NUMBER", 0),
+    GARRAY(esc_number, 0, "ESC_NUMBER", 0),
 #endif
 
 #ifdef HAL_PERIPH_ENABLE_RC_OUT
@@ -468,6 +476,47 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @User: Advanced
     GSCALAR(disarm_delay, "DISARM_DELAY", 2000),
     
+#endif
+
+#if defined(HAL_PERIPH_ENABLE_ESC_APD)
+    // @Param: ESC_NUM_POLES
+    // @DisplayName: Number of motor poles
+    // @Description: Sets the number of motor poles to calculate the correct RPM value
+    GARRAY(pole_count, 0, "ESC_NUM_POLES", 22),
+#endif
+
+#if defined(HAL_PERIPH_ENABLE_ESC_APD)
+    // @Param: ESC_APD_SERIAL_1
+    // @DisplayName: ESC APD Serial 1
+    // @Description: Which serial port to use for APD ESC data
+    // @Range: 0 6
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    GARRAY(esc_serial_port, 0, "ESC_APD_SERIAL_1", APD_ESC_SERIAL_0),
+
+  #if APD_ESC_INSTANCES > 1
+    // @Param: ESC_NUMBER2
+    // @DisplayName: ESC number 2
+    // @Description: This is the ESC number to report as in UAVCAN ESC telemetry feedback packets.
+    // @Increment: 1
+    // @User: Advanced
+    GARRAY(esc_number, 1, "ESC_NUMBER2", 1),
+
+    // @Param: ESC_NUM_POLES2
+    // @DisplayName: Number of motor poles
+    // @Description: Sets the number of motor poles to calculate the correct RPM value
+    GARRAY(pole_count, 1, "ESC_NUM_POLES2", 22),
+
+    // @Param: ESC_APD_SERIAL_2
+    // @DisplayName: ESC APD Serial 2
+    // @Description: Which serial port to use for APD ESC data
+    // @Range: 0 6
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    GARRAY(esc_serial_port, 1, "ESC_APD_SERIAL_2", APD_ESC_SERIAL_1),
+  #endif
 #endif
 
     AP_VAREND
