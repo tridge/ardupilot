@@ -24,6 +24,7 @@
 #include <AP_HAL/AP_HAL_Boards.h>
 #include "AP_Periph.h"
 #include <stdio.h>
+#include <dronecan_msgs.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
 #include <AP_HAL_ChibiOS/hwdef/common/stm32_util.h>

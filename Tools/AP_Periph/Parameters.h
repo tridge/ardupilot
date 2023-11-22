@@ -153,6 +153,10 @@ public:
     AP_Int16 sysid_this_mav;
 #endif
 
+#ifdef HAL_PERIPH_ARM_MONITORING_ENABLE
+    AP_Int32 disarm_delay;
+#endif
+
 #ifdef HAL_PERIPH_ENABLE_EFI
     AP_Int32 efi_baudrate;
     AP_Int8 efi_port;
