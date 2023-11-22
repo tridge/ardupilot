@@ -359,6 +359,14 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @RebootRequired: True
     GSCALAR(esc_pwm_type, "ESC_PWM_TYPE",     0),
 
+    // @Param: ESC_CMD_TIMO
+    // @DisplayName: ESC Command Timeout
+    // @Description: This is the duration (ms) with which to hold the last driven ESC command before timing out and zeroing the ESC outputs. To disable zeroing of outputs in event of CAN loss, use 0. Use values greater than the expected duration between two CAN frames to ensure Periph is not starved of ESC Raw Commands.
+    // @Range: 0 10000
+    // @Units: ms
+    // @User: Advanced
+    GSCALAR(esc_command_timeout_ms, "ESC_CMD_TIMO",     200),
+
 #if HAL_WITH_ESC_TELEM && !HAL_GCS_ENABLED
     // @Param: ESC_TELEM_PORT
     // @DisplayName: ESC Telemetry Serial Port
@@ -449,6 +457,17 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Group: EFI
     // @Path: ../libraries/AP_EFI/AP_EFI.cpp
     GOBJECT(efi, "EFI", AP_EFI),
+#endif 
+
+#ifdef HAL_PERIPH_ARM_MONITORING_ENABLE
+    // @Param: DISARM_DELAY
+    // @DisplayName: ARM Command Timeout
+    // @Description: This is the duration (ms) with which if not received a signal will disarm the system default to 2 sec as ARM packet is set to 1 Hz
+    // @Range: 0 10000
+    // @Units: ms
+    // @User: Advanced
+    GSCALAR(disarm_delay, "DISARM_DELAY", 2000),
+    
 #endif
 
     AP_VAREND

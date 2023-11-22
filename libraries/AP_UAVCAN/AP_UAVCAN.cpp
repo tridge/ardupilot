@@ -456,10 +456,10 @@ void AP_UAVCAN::loop(void)
             continue;
         }
 
-        if (_SRV_armed) {
+        if (_SRV_armed_mask != 0 || _ESC_armed_mask != 0) {
             bool sent_servos = false;
 
-            if (_servo_bm > 0) {
+            if (_SRV_armed_mask != 0) {
                 // if we have any Servos in bitmask
                 uint32_t now = AP_HAL::native_micros();
                 const uint32_t servo_period_us = 1000000UL / unsigned(_servo_rate_hz.get());
@@ -474,7 +474,7 @@ void AP_UAVCAN::loop(void)
             }
 
             // if we have any ESC's in bitmask
-            if (_esc_bm > 0 && !sent_servos) {
+            if (_ESC_armed_mask != 0 && !sent_servos) {
                 SRV_send_esc();
             }
 
@@ -525,7 +525,7 @@ void AP_UAVCAN::SRV_send_actuator(void)
              * physically possible throws at [-1:1] limits.
              */
 
-            if (_SRV_conf[starting_servo].servo_pending && ((((uint32_t) 1) << starting_servo) & _servo_bm)) {
+            if (_SRV_conf[starting_servo].servo_pending && ((((uint32_t) 1) << starting_servo) & _SRV_armed_mask)) {
                 cmd.actuator_id = starting_servo + 1;
 
                 if (option_is_set(Options::USE_ACTUATOR_PWM)) {
@@ -567,7 +567,7 @@ void AP_UAVCAN::SRV_send_esc(void)
 
     // find out how many esc we have enabled and if they are active at all
     for (uint8_t i = esc_offset; i < UAVCAN_SRV_NUMBER; i++) {
-        if ((((uint32_t) 1) << i) & _esc_bm) {
+        if ((((uint32_t) 1) << i) & _ESC_armed_mask) {
             max_esc_num = i + 1;
             if (_SRV_conf[i].esc_pending) {
                 active_esc_num++;
@@ -580,7 +580,7 @@ void AP_UAVCAN::SRV_send_esc(void)
         k = 0;
 
         for (uint8_t i = esc_offset; i < max_esc_num && k < 20; i++) {
-            if ((((uint32_t) 1) << i) & _esc_bm) {
+            if ((((uint32_t) 1) << i) & _ESC_armed_mask) {
                 // TODO: ESC negative scaling for reverse thrust and reverse rotation
                 float scaled = cmd_max * (hal.rcout->scale_esc_to_unity(_SRV_conf[i].pulse) + 1.0) / 2.0;
 
@@ -611,7 +611,22 @@ void AP_UAVCAN::SRV_push_servos()
         }
     }
 
-    _SRV_armed = hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED;
+    uint16_t servo_armed_mask = _servo_bm;
+    uint16_t esc_armed_mask = _esc_bm;
+    const bool safety_off = hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED;
+    if (!safety_off) {
+        AP_BoardConfig *boardconfig = AP_BoardConfig::get_singleton();
+        if (boardconfig != nullptr) {
+            const uint16_t safety_mask = boardconfig->get_safety_mask();
+            servo_armed_mask &= safety_mask;
+            esc_armed_mask &= safety_mask;
+        } else {
+            servo_armed_mask = 0;
+            esc_armed_mask = 0;
+        }
+    }
+    _SRV_armed_mask = servo_armed_mask;
+    _ESC_armed_mask = esc_armed_mask;
 }
 
 
@@ -836,7 +851,15 @@ void AP_UAVCAN::safety_state_send()
 
     { // handle SafetyState
         ardupilot::indication::SafetyState safety_msg;
-        switch (hal.util->safety_switch_state()) {
+        auto state = hal.util->safety_switch_state();
+        if (_SRV_armed_mask != 0 || _ESC_armed_mask != 0) {
+            // if we are outputting any servos or ESCs due to
+            // BRD_SAFETY_MASK then we need to advertise safety as
+            // off, this changes LEDs to indicate unsafe and allows
+            // AP_Periph ESCs and servos to run
+            state = AP_HAL::Util::SAFETY_ARMED;
+        }
+        switch (state) {
         case AP_HAL::Util::SAFETY_ARMED:
             safety_msg.status = ardupilot::indication::SafetyState::STATUS_SAFETY_OFF;
             break;
