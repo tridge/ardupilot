@@ -535,6 +535,7 @@ AP_GPS_SBF::process_message(void)
     }
     case AttEuler:
     {
+#if 0
         if (get_type() == AP_GPS::GPS_Type::GPS_TYPE_SBF_DUAL_ANTENNA) {
             const msg5938 &temp = sbf_msg.data.msg5938u;
 
@@ -557,6 +558,7 @@ AP_GPS_SBF::process_message(void)
                 state.gps_yaw = false;
             }
         }
+#endif
         break;
     }
     case AttEulerCov:
@@ -591,9 +593,17 @@ AP_GPS_SBF::process_message(void)
             check_new_itow(temp.TOW, sbf_msg.length);
 
             //GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: %d sub blocks", (int)temp.N);
-            if (temp.N > 0) {
+            if (temp.N > 0 && temp.ant1.Error == 0 && temp.ant1.AmbiguityType == 0) {
+                // valid RTK integer fix
+                bool ok = false;
+                const float rel_heading_deg = degrees(atan2f(temp.ant1.DeltaEast, temp.ant1.DeltaNorth));
+                if (calculate_moving_base_yaw(rel_heading_deg,
+                                              Vector3f(temp.ant1.DeltaNorth, temp.ant1.DeltaEast, temp.ant1.DeltaUp).length(),
+                                              -temp.ant1.DeltaUp)) {
+                    ok = true;
+                }
                 if (temp.ant1.Error == 0) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: E:%4.2f N:%4.2f U:%4.2f", (double)temp.ant1.DeltaEast, (double)temp.ant1.DeltaNorth, (double)temp.ant1.DeltaUp);
+                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: E:%4.2f N:%4.2f U:%4.2f OK=%u", (double)temp.ant1.DeltaEast, (double)temp.ant1.DeltaNorth, (double)temp.ant1.DeltaUp, unsigned(ok));
                 } else {
                     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "SBF: Ant pos invalid Err:%d", (int)temp.ant1.Error);
                 }
@@ -643,7 +653,7 @@ AP_GPS_SBF::process_message(void)
             }
 #endif // GPS_MOVING_BASELINE
 
-        } else {
+        } else if (option_set(AP_GPS::DriverOptions::SBF_UseBaseForYaw)) {
             state.rtk_baseline_y_mm = 0;
             state.rtk_baseline_x_mm = 0;
             state.rtk_baseline_z_mm = 0;
