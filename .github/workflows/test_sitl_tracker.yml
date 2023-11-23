@@ -254,17 +254,17 @@ jobs:
            name: fail-${{matrix.config}}
            path: |
              /tmp/buildlogs
-             /__w/ardupilot/ardupilot/logs
-             /__w/ardupilot/ardupilot/ap-*.core
-             /__w/ardupilot/ardupilot/core.*
-             /__w/ardupilot/ardupilot/dumpstack.sh_*
-             /__w/ardupilot/ardupilot/dumpcore.sh_*
+             /__w/carbopilot_V2/carbopilot_V2/logs
+             /__w/carbopilot_V2/carbopilot_V2/ap-*.core
+             /__w/carbopilot_V2/carbopilot_V2/core.*
+             /__w/carbopilot_V2/carbopilot_V2/dumpstack.sh_*
+             /__w/carbopilot_V2/carbopilot_V2/dumpcore.sh_*
            retention-days: 14
 
       - name: Archive .bin artifacts
         uses: actions/upload-artifact@v3
         with:
            name: BIN-${{matrix.config}}
-           path: /__w/ardupilot/ardupilot/logs
+           path: /__w/carbopilot_V2/carbopilot_V2/logs
            retention-days: 7
 

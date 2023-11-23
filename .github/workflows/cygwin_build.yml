@@ -218,4 +218,4 @@ jobs:
         with:
            name: binaries
            path: artifacts
-           retention-days: 7
+           retention-days: 90
