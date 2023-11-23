@@ -31,7 +31,7 @@
 #ifndef AP_GPS_DEBUG_LOGGING_ENABLED
 // enable this to log all bytes from the GPS. Also needs a call to
 // log_data() in each backend
-#define AP_GPS_DEBUG_LOGGING_ENABLED 1
+#define AP_GPS_DEBUG_LOGGING_ENABLED 0
 #endif
 
 #if AP_GPS_DEBUG_LOGGING_ENABLED
