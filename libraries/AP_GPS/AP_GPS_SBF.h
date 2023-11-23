@@ -238,7 +238,7 @@ private:
         float HeadingDot;
     };
 
-    struct PACKED msg5939
+    struct PACKED msg5939 // AttEulerCoV
     {
         uint32_t TOW;
         uint16_t WNc;

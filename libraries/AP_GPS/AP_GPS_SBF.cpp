@@ -68,11 +68,10 @@ AP_GPS_SBF::AP_GPS_SBF(AP_GPS &_gps, AP_GPS::GPS_State &_state,
 
     // if we ever parse RTK observations it will always be of type NED, so set it once
     state.rtk_baseline_coords_type = RTK_BASELINE_COORDINATE_SYSTEM_NED;
-    if (option_set(AP_GPS::DriverOptions::SBF_UseBaseForYaw)) {
-        state.gps_yaw_configured = true;
-    }
 
-    if (get_type() == AP_GPS::GPS_Type::GPS_TYPE_SBF_DUAL_ANTENNA) {
+    // yaw available when option bit set or using dual antenna
+    if (option_set(AP_GPS::DriverOptions::SBF_UseBaseForYaw) ||
+        (get_type() == AP_GPS::GPS_Type::GPS_TYPE_SBF_DUAL_ANTENNA)) {
         state.gps_yaw_configured = true;
     }
 }
@@ -202,6 +201,7 @@ AP_GPS_SBF::read(void)
         }
     }
 
+    // yaw timeout after 300 milliseconds
     if ((now - state.gps_yaw_time_ms) > 300) {
         state.have_gps_yaw = false;
         state.have_gps_yaw_accuracy = false;
