@@ -137,7 +137,9 @@ void AP_BattMonitor_DroneCAN::update_interim_state(const float voltage, const fl
 
     const uint32_t tnow = AP_HAL::micros();
 
-    if (!_has_battery_info_aux || _mppt.is_detected) {
+    if (!_has_battery_info_aux ||
+        _mppt.is_detected ||
+        option_is_set(AP_BattMonitor_Params::Options::Ignore_UAVCAN_SoC)) {
         const uint32_t dt_us = tnow - _interim_state.last_time_micros;
 
         // update total current drawn since startup
