@@ -48,7 +48,8 @@ bool ESC_APD_Telem::update() {
                     // valid packet, copy the data we need and reset length
                     decoded.voltage = le16toh(received.packet.voltage) * 1e-2f;
                     decoded.temperature = convert_temperature(le16toh(received.packet.temperature));
-                    decoded.current = le16toh(received.packet.bus_current) * (1 / 12.5f);
+                    int16_t temp_current = le16toh(received.packet.bus_current);
+                    decoded.current = temp_current * (1 / 12.5f);
                     decoded.rpm = le32toh(received.packet.erpm) / pole_count;
                     decoded.power_rating_pct = le16toh(received.packet.motor_duty) * 1e-2f;
                     ret = true;
