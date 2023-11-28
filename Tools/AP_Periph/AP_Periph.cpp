@@ -25,6 +25,7 @@
 #include "AP_Periph.h"
 #include <stdio.h>
 #include <dronecan_msgs.h>
+#include <GCS_MAVLink/GCS.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
 #include <AP_HAL_ChibiOS/hwdef/common/stm32_util.h>
@@ -244,6 +245,10 @@ void AP_Periph_FW::init()
 
 #if AP_SCRIPTING_ENABLED
     scripting.init();
+#endif
+
+#ifdef AP_CUSTOM_FIRMWARE_STRING
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO,  AP_CUSTOM_FIRMWARE_STRING);
 #endif
     start_ms = AP_HAL::native_millis();
 }
