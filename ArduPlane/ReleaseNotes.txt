@@ -1,3 +1,32 @@
+Release 5.0.0-beta1 28th Nov 2023
+------------------------------
+ - AP_Periph: print version name
+ - CI: Carbonix build script added
+ - Tools: rebuild Carbonix Custom Board bootloaders
+ - ESC_APD : Correct current reading
+ - hwdef: CarbonixL496 add QMC588P check
+ - CI: disable test-scripting (Not part of Ardupilot 4.3.8 Firmware test suite.)
+ - Tools: Bug fix Arm check timeout on Periph
+ - hwdef: Volanti custom CAN node boards (Added 9 different boards which are based on CarbonixF405 and have default.parm)
+ - hwdef: Ottano custom CAN node boards (Added 9 different boards which are based on CarbonixF405 and have default.parm)
+ - hwdef: modifying CarbonixF405 board
+ - hwdef: add CarbonixCubeOrange (Create a custom board based out of CubeOrange; Add default parm , hardware def and lua script)
+ - Tools: Carbonix build script
+ - AP_Periph: add support for APD ESC telemetry
+ - Plane: improved fwd throttle during VTOL landing 
+ - AP_UAVCAN: allow BRD_SAFETY_MASK to work on CAN ESCs and servos 
+ - AP_Periph: Adds user configurable timeout for ARM and ESC pkt on CAN 
+ - CI: Carbonix disable features not required 
+ - AP_EFI: fixed build on boards without EFI support Currawong and DroneCAN
+ - CI: disable Copter.GyroFFTAverage
+ - CI: Cygwin update to master
+ - Tools: cygwin directory name changed to Private repo name
+ - CI: Update to master & limit push run of CI
+ - CI: update github action to remove deprecation warnings from logs
+ - CI: add ccache config to test_size
+ - CI: update github actions to prevent nodejs version warning
+
+
 Release 4.3.8 24th August 2023
 ------------------------------
 

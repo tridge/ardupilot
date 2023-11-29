@@ -2,7 +2,7 @@
 
 include ../CubeOrange/hwdef.dat
 
-define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.1-dev"
+define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.0-beta1"
 
 undef HAL_NAVEKF3_AVAILABLE
 undef HAL_NAVEKF2_AVAILABLE
