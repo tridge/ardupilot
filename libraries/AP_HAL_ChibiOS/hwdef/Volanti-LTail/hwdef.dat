@@ -6,7 +6,7 @@ undef HAL_PERIPH_ADSB_PORT_DEFAULT
 undef HAL_PERIPH_ADSB_BAUD_DEFAULT
 undef HAL_PERIPH_ENABLE_MAG
 
-define CAN_APP_NODE_NAME "CPN-17-Left-Tail"
+define CAN_APP_NODE_NAME "VOl-CPN-17-Left-Tail"
 
 # default ADSB off by setting 0 baudrate
 define HAL_PERIPH_ENABLE_ADSB
