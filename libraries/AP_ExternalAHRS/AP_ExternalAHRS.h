@@ -94,6 +94,8 @@ public:
         bool have_origin;
         bool have_location;
         bool have_velocity;
+
+        uint32_t last_location_update_us;
     } state;
 
     // accessors for AP_AHRS

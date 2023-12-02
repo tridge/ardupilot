@@ -159,6 +159,7 @@ void AP_ExternalAHRS_MicroStrain5::post_filter() const
 
         state.location = Location{filter_data.lat, filter_data.lon, gnss_data.msl_altitude, Location::AltFrame::ABSOLUTE};
         state.have_location = true;
+        state.last_location_update_us = AP_HAL::micros();
     }
 
     AP_ExternalAHRS::gps_data_message_t gps {
