@@ -607,6 +607,9 @@ static void handle_arming_status(CanardInstance* ins, CanardRxTransfer* transfer
         return;
     }
     hal.util->set_soft_armed(req.status == UAVCAN_EQUIPMENT_SAFETY_ARMINGSTATUS_STATUS_FULLY_ARMED);
+#ifdef HAL_PERIPH_ARM_MONITORING_ENABLE
+    periph.arm_update_status = true;
+#endif
 }
 
 #ifdef HAL_PERIPH_ENABLE_GPS
