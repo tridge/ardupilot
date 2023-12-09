@@ -611,7 +611,21 @@ void AP_SerialManager::init()
                     uart->set_unbuffered_writes(true);
                     break;
 #endif
-
+#if AP_NETWORKING_BACKEND_SLIP
+                case SerialProtocol_SLIP:
+                    uart->begin(state[i].baudrate(),
+                                         AP_SERIALMANAGER_SLIP_BUFSIZE_RX,
+                                         AP_SERIALMANAGER_SLIP_BUFSIZE_TX);
+                    break;
+#endif
+#if AP_NETWORKING_BACKEND_PPP
+                case SerialProtocol_PPP:
+                    uart->begin(state[i].baudrate(),
+                                         AP_SERIALMANAGER_PPP_BUFSIZE_RX,
+                                         AP_SERIALMANAGER_PPP_BUFSIZE_TX);
+                    break;
+#endif
+                    
                 default:
                     uart->begin(state[i].baudrate());
             }
