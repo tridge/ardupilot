@@ -49,7 +49,7 @@
    -----------------------------------------------
 */
 
-// #define LWIP_DEBUG
+//#define LWIP_DEBUG
 #define U16_F "u"
 #define X8_F  "x"
 #define X16_F  "x"
@@ -66,6 +66,18 @@
 #define MEMP_NUM_PBUF 64
 #define TCP_WND 12000
 #define TCP_SND_BUF 12000
+#define LWIP_TCPIP_CORE_LOCKING 0
+#define LWIP_COMPAT_MUTEX_ALLOWED 1
+
+#define LWIP_HAVE_SLIPIF 1
+#define SLIP_RX_FROM_ISR 0
+#define SLIP_USE_RX_THREAD 0
+#define PPP_SUPPORT 1
+#define LWIP_WND_SCALE 1
+#define TCP_RCV_SCALE 1
+
+#define TCP_DEBUG LWIP_DBG_OFF
+#define PPP_DEBUG LWIP_DBG_OFF
 
 /*
   map LWIP debugging onto ap_networking_printf to allow for easier
@@ -79,6 +91,8 @@ int ap_networking_printf(const char *fmt, ...);
 }
 #endif
 #define LWIP_PLATFORM_DIAG(x)    do {ap_networking_printf x; } while(0)
+#define AP_NETWORKING_LWIP_DEBUG_PORT 2
+#define AP_NETWORKING_LWIP_DEBUG_BAUD 921600
 
 #ifndef LWIP_IPV6
   // This uses an additional 18KB Flash
@@ -1800,9 +1814,6 @@ int ap_networking_printf(const char *fmt, ...);
 #define PPP_MINMTU                      64
 #define PPP_MRU                         1500     /* default MRU = max length of info field */
 #define PPP_MAXMRU                      1500     /* Largest MRU we allow */
-#ifndef PPP_DEFMRU
-#define PPP_DEFMRU                      296             /* Try for this */
-#endif
 #define PPP_MINMRU                      128             /* No MRUs below this */
 
 #ifndef MAXNAMELEN
@@ -1930,7 +1941,7 @@ int ap_networking_printf(const char *fmt, ...);
  * ETHARP_DEBUG: Enable debugging in etharp.c.
  */
 #ifndef ETHARP_DEBUG
-#define ETHARP_DEBUG                    LWIP_DBG_ON
+#define ETHARP_DEBUG                    LWIP_DBG_OFF
 #endif
 
 /**
@@ -2007,14 +2018,14 @@ int ap_networking_printf(const char *fmt, ...);
  * RAW_DEBUG: Enable debugging in raw.c.
  */
 #ifndef RAW_DEBUG
-#define RAW_DEBUG                       LWIP_DBG_ON
+#define RAW_DEBUG                       LWIP_DBG_OFF
 #endif
 
 /**
  * MEM_DEBUG: Enable debugging in mem.c.
  */
 #ifndef MEM_DEBUG
-#define MEM_DEBUG                       LWIP_DBG_ON
+#define MEM_DEBUG                       LWIP_DBG_OFF
 #endif
 
 /**
@@ -2028,7 +2039,7 @@ int ap_networking_printf(const char *fmt, ...);
  * SYS_DEBUG: Enable debugging in sys.c.
  */
 #ifndef SYS_DEBUG
-#define SYS_DEBUG                       LWIP_DBG_ON
+#define SYS_DEBUG                       LWIP_DBG_OFF
 #endif
 
 /**
@@ -2113,7 +2124,7 @@ int ap_networking_printf(const char *fmt, ...);
  * TCPIP_DEBUG: Enable debugging in tcpip.c.
  */
 #ifndef TCPIP_DEBUG
-#define TCPIP_DEBUG                     LWIP_DBG_ON
+#define TCPIP_DEBUG                     LWIP_DBG_OFF
 #endif
 
 /**
