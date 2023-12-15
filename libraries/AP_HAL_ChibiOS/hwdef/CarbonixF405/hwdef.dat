@@ -19,7 +19,7 @@ env AP_PERIPH 1
 # crystal frequency set to 0 to use internal clock; currently configured for external crystal 12MHZ
 OSCILLATOR_HZ 12000000
 
-define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.0-beta1"
+define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.0-beta2"
 
 #MCU F405 Flash 1024
 FLASH_SIZE_KB 1024

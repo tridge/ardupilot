@@ -1,3 +1,8 @@
+Release 5.0.0-beta2 15th Dec 2023
+------------------------------
+ - AP_Periph: fix arm_update_status missing update
+ - HWDEF : carbonix default params cleanup
+
 Release 5.0.0-beta1 28th Nov 2023
 ------------------------------
  - AP_Periph: print version name

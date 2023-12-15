@@ -21,7 +21,7 @@ env AP_PERIPH 1
 # crystal frequency
 OSCILLATOR_HZ 12000000
 
-define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.0-beta1"
+define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.0-beta2"
 
 # assume the 256k flash part
 FLASH_SIZE_KB 256
