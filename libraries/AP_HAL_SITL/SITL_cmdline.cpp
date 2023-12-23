@@ -213,7 +213,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     const char *home_str = nullptr;
     const char *model_str = nullptr;
     const char *vehicle_str = SKETCH;
-    _use_fg_view = true;
+    _use_fg_view = false;
     char *autotest_dir = nullptr;
     _fg_address = "127.0.0.1";
     const char* config = "";
@@ -302,7 +302,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         {"config",          true,   0, 'c'},
         {"fg",              true,   0, 'F'},
         {"gimbal",          false,  0, CMDLINE_GIMBAL},
-        {"disable-fgview",  false,  0, CMDLINE_FGVIEW},
+        {"enable-fgview",   false,  0, CMDLINE_FGVIEW},
         {"autotest-dir",    true,   0, CMDLINE_AUTOTESTDIR},
         {"defaults",        true,   0, CMDLINE_DEFAULTS},
         {"uartA",           true,   0, CMDLINE_UARTA},
@@ -441,7 +441,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             enable_gimbal = true;
             break;
         case CMDLINE_FGVIEW:
-            _use_fg_view = false;
+            _use_fg_view = true;
             break;
         case CMDLINE_AUTOTESTDIR:
             autotest_dir = strdup(gopt.optarg);
