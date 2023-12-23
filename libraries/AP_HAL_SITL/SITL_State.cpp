@@ -332,12 +332,13 @@ void SITL_State::_output_to_flightgear(void)
  */
 void SITL_State::_fdm_input_local(void)
 {
+    if (_sitl == nullptr) {
+        return;
+    }
     struct sitl_input input;
 
     // check for direct RC input
-    if (_sitl != nullptr) {
-        _check_rc_input();
-    }
+    _check_rc_input();
 
     // construct servos structure for FDM
     _simulator_servos(input);
@@ -400,6 +401,9 @@ void SITL_State::_fdm_input_local(void)
  */
 void SITL_State::_simulator_servos(struct sitl_input &input)
 {
+    if (_sitl == nullptr) {
+        return;
+    }
     static uint32_t last_update_usec;
 
     /* this maps the registers used for PWM outputs. The RC
