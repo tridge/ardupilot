@@ -68,11 +68,11 @@ class ChibiOS::CANIface : public AP_HAL::CANIface
     struct CriticalSectionLocker {
         CriticalSectionLocker()
         {
-            chSysSuspend();
+            chSysLock();
         }
         ~CriticalSectionLocker()
         {
-            chSysEnable();
+            chSysUnlock();
         }
     };
 
