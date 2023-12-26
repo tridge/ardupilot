@@ -55,9 +55,6 @@
 #include <AP_HAL_SITL/Semaphores.h>
 #define HAL_Semaphore HALSITL::Semaphore
 #define HAL_CountingSemaphore HALSITL::CountingSemaphore
-
-#include <AP_HAL/EventHandle.h>
-#define HAL_EventHandle AP_HAL::EventHandle
 #endif
 
 #ifndef HAL_NUM_CAN_IFACES

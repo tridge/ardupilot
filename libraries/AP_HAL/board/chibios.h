@@ -66,10 +66,6 @@
 #define HAL_CountingSemaphore ChibiOS::CountingSemaphore
 #endif
 
-#include <AP_HAL/EventHandle.h>
-#define HAL_EventHandle AP_HAL::EventHandle
-#endif
-
 /* string names for well known SPI devices */
 #define HAL_BARO_MS5611_NAME "ms5611"
 #ifndef HAL_BARO_MS5611_SPI_INT_NAME
