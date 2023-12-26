@@ -898,7 +898,7 @@ void Aircraft::smooth_sensors(void)
  */
 float Aircraft::filtered_idx(float v, uint8_t idx)
 {
-    if (sitl->servo_speed <= 0) {
+    if (sitl == nullptr || sitl->servo_speed <= 0) {
         return v;
     }
     const float cutoff = 1.0f / (2 * M_PI * sitl->servo_speed);
@@ -1053,6 +1053,9 @@ void Aircraft::add_shove_forces(Vector3f &rot_accel, Vector3f &body_accel)
 
 float Aircraft::get_local_updraft(const Vector3d &currentPos)
 {
+    if (sitl == nullptr) {
+        return 0;
+    }
     int scenario = sitl->thermal_scenario;
 
     #define MAX_THERMALS 10

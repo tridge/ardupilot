@@ -388,14 +388,16 @@ void Plane::update(const struct sitl_input &input)
     Vector3f rot_accel;
 
     update_wind(input);
-    
-    calculate_forces(input, rot_accel);
-    
-    update_dynamics(rot_accel);
-    update_external_payload(input);
 
-    // update lat/lon/altitude
-    update_position();
+    if (sitl != nullptr) {
+        calculate_forces(input, rot_accel);
+
+        update_dynamics(rot_accel);
+        update_external_payload(input);
+
+        // update lat/lon/altitude
+        update_position();
+    }
     time_advance();
 
     // update magnetic field
