@@ -17,6 +17,7 @@ namespace ChibiOS {
     class RCOutput;
     class Scheduler;
     class Semaphore;
+    class CountingSemaphore;
     class EventSource;
     class SPIBus;
     class SPIDesc;

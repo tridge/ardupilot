@@ -18,7 +18,9 @@
 #include <AP_HAL/AP_HAL.h>
 #include "Semaphores.h"
 #include <hal.h>
+#include <chsem.h>
 #include "AP_HAL_ChibiOS.h"
+#include <AP_Math/AP_Math.h>
 
 #if CH_CFG_USE_MUTEXES == TRUE
 
@@ -77,5 +79,62 @@ void Semaphore::assert_owner(void)
 {
     osalDbgAssert(check_owner(), "owner");
 }
+
+#if CH_CFG_USE_SEMAPHORES == TRUE
+CountingSemaphore::CountingSemaphore(uint8_t initial_count) :
+    AP_HAL::CountingSemaphore(initial_count)
+{
+    static_assert(sizeof(_lock) >= sizeof(semaphore_t), "invalid semaphore_t size");
+    semaphore_t *sem = (semaphore_t *)_lock;
+    chSemObjectInit(sem, initial_count);
+}
+
+bool CountingSemaphore::wait(uint32_t timeout_us)
+{
+    semaphore_t *sem = (semaphore_t *)_lock;
+    if (timeout_us == 0) {
+        return chSemWaitTimeout(sem, TIME_IMMEDIATE) == MSG_OK;
+    }
+    // loop waiting for 60ms at a time. This ensures we can wait for
+    // any amount of time even on systems with a 16 bit timer
+    while (timeout_us > 0) {
+        const uint32_t us = MIN(timeout_us, 60000U);
+        if (chSemWaitTimeout(sem, TIME_US2I(us)) == MSG_OK) {
+            return true;
+        }
+        timeout_us -= us;
+    }
+    return false;
+}
+
+bool CountingSemaphore::wait_blocking(void)
+{
+    semaphore_t *sem = (semaphore_t *)_lock;
+    return chSemWait(sem) == MSG_OK;
+}
+
+void CountingSemaphore::signal(void)
+{
+    semaphore_t *sem = (semaphore_t *)_lock;
+    chSemSignal(sem);
+}
+
+void CountingSemaphore::signal_ISR(void)
+{
+    semaphore_t *sem = (semaphore_t *)_lock;
+    chSysLockFromISR();
+    chSemSignalI(sem);
+    chSysUnlockFromISR();
+}
+
+uint8_t CountingSemaphore::get_count(void)
+{
+    semaphore_t *sem = (semaphore_t *)_lock;
+    chSysLock();
+    uint8_t ret = chSemGetCounterI(sem);
+    chSysUnlock();
+    return ret;
+}
+#endif // CH_CFG_USE_SEMAPHORES == TRUE
 
 #endif // CH_CFG_USE_MUTEXES

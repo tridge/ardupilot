@@ -37,3 +37,17 @@ protected:
     // we declare the lock as a uint32_t array, and cast inside the cpp file
     uint32_t _lock[5];
 };
+
+class ChibiOS::CountingSemaphore : public AP_HAL::CountingSemaphore {
+public:
+    CountingSemaphore(uint8_t initial_count=0);
+
+    bool wait(uint32_t timeout_ms) override;
+    bool wait_blocking(void) override;
+    void signal(void) override;
+    void signal_ISR(void) override;
+    uint8_t get_count(void) override;
+
+protected:
+    uint32_t _lock[5];
+};
