@@ -76,4 +76,151 @@ bool Semaphore::take_nonblocking()
     return false;
 }
 
+
+#if AP_COUNTSEM_NATIVE_SEM_T
+/*
+  counting semaphores using sem_t
+ */
+CountingSemaphore::CountingSemaphore(uint8_t initial_count) :
+    AP_HAL::CountingSemaphore(initial_count)
+{
+    sem_init(&_sem, 0, initial_count);
+}
+
+bool CountingSemaphore::wait(uint32_t timeout_us)
+{
+    if (hal.scheduler->in_main_thread() ||
+        Scheduler::from(hal.scheduler)->semaphore_wait_hack_required()) {
+        /*
+          when in the main thread we need to do a busy wait to ensure
+          the clock advances
+         */
+        uint64_t end_us = AP_HAL::micros64() + timeout_us;
+        do {
+            if (sem_trywait(&_sem) == 0) {
+                return true;
+            }
+            hal.scheduler->delay_microseconds(10);
+        } while (AP_HAL::micros64() < end_us);
+        return false;
+    }
+    
+    if (timeout_us == 0) {
+        return sem_trywait(&_sem) == 0;
+    }
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+        return false;
+    }
+    ts.tv_sec += timeout_us/1000000UL;
+    ts.tv_nsec += (timeout_us % 1000000U) * 1000UL;
+    if (ts.tv_nsec >= 1000000000L) {
+        ts.tv_sec++;
+        ts.tv_nsec -= 1000000000L;
+    }
+    return sem_timedwait(&_sem, &ts) == 0;
+}
+
+bool CountingSemaphore::wait_blocking(void)
+{
+    return sem_wait(&_sem) == 0;
+}
+
+void CountingSemaphore::signal(void)
+{
+    sem_post(&_sem);
+}
+
+uint8_t CountingSemaphore::get_count(void)
+{
+    int v = 0;
+    sem_getvalue(&_sem, &v);
+    if (v < 0) {
+        return 0;
+    }
+    if (v > 255) {
+        return 255;
+    }
+    return v;
+}
+
+#else
+/*
+  counting semaphores using pthread condition variables
+ */
+
+CountingSemaphore::CountingSemaphore(uint8_t initial_count) :
+    AP_HAL::CountingSemaphore(initial_count)
+{
+    pthread_cond_init(&cond, NULL);
+    count = initial_count;
+}
+
+bool CountingSemaphore::wait(uint32_t timeout_us)
+{
+    WITH_SEMAPHORE(mtx);
+    if (count == 0) {
+        if (hal.scheduler->in_main_thread() ||
+            Scheduler::from(hal.scheduler)->semaphore_wait_hack_required()) {
+            /*
+              when in the main thread we need to do a busy wait to ensure
+              the clock advances
+            */
+            uint64_t end_us = AP_HAL::micros64() + timeout_us;
+            struct timespec ts {};
+            do {
+                if (pthread_cond_timedwait(&cond, &mtx._lock, &ts) == 0) {
+                    count--;
+                    return true;
+                }
+                hal.scheduler->delay_microseconds(10);
+            } while (AP_HAL::micros64() < end_us);
+            return false;
+        }
+
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+            return false;
+        }
+        ts.tv_sec += timeout_us/1000000UL;
+        ts.tv_nsec += (timeout_us % 1000000U) * 1000UL;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec++;
+            ts.tv_nsec -= 1000000000L;
+        }
+        if (pthread_cond_timedwait(&cond, &mtx._lock, &ts) != 0) {
+            return false;
+        }
+    }
+    count--;
+    return true;
+}
+
+bool CountingSemaphore::wait_blocking(void)
+{
+    WITH_SEMAPHORE(mtx);
+    if (count == 0) {
+        if (pthread_cond_wait(&cond, &mtx._lock) != 0) {
+            return false;
+        }
+    }
+    count--;
+    return true;
+}
+
+void CountingSemaphore::signal(void)
+{
+    WITH_SEMAPHORE(mtx);
+    count++;
+    pthread_cond_signal(&cond);
+}
+
+uint8_t CountingSemaphore::get_count(void)
+{
+    WITH_SEMAPHORE(mtx);
+    return count;
+}
+
+#endif // AP_COUNTSEM_NATIVE_SEM_T
+
 #endif  // CONFIG_HAL_BOARD

@@ -9,6 +9,7 @@
 
 class HALSITL::Semaphore : public AP_HAL::Semaphore {
 public:
+    friend class HALSITL::CountingSemaphore;
     Semaphore();
     bool give() override;
     bool take(uint32_t timeout_ms) override;
@@ -23,4 +24,30 @@ protected:
     // keep track the recursion level to ensure we only disown the
     // semaphore once we're done with it
     uint8_t take_count;
+};
+
+
+#define AP_COUNTSEM_NATIVE_SEM_T !defined(__APPLE__)
+
+#if AP_COUNTSEM_NATIVE_SEM_T
+#include <semaphore.h>
+#endif
+
+class HALSITL::CountingSemaphore : public AP_HAL::CountingSemaphore {
+public:
+    CountingSemaphore(uint8_t initial_count=0);
+
+    bool wait(uint32_t timeout_us) override;
+    bool wait_blocking(void) override;
+    void signal(void) override;
+    uint8_t get_count(void) override;
+
+private:
+#if AP_COUNTSEM_NATIVE_SEM_T
+    sem_t _sem;
+#else
+    HALSITL::Semaphore mtx;
+    pthread_cond_t cond;
+    uint8_t count;
+#endif
 };
