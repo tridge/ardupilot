@@ -30,6 +30,7 @@ namespace AP_HAL {
     class EventHandle;
     class EventSource;
     class Semaphore;
+    class CountingSemaphore;
     class OpticalFlow;
     class DSP;
 

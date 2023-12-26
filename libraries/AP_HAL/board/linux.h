@@ -398,6 +398,8 @@
 #ifdef __cplusplus
 #include <AP_HAL_Linux/Semaphores.h>
 #define HAL_Semaphore Linux::Semaphore
+#define HAL_CountingSemaphore Linux::CountingSemaphore
+
 #include <AP_HAL/EventHandle.h>
 #define HAL_EventHandle AP_HAL::EventHandle
 #endif

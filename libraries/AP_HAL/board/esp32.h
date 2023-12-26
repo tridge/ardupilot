@@ -35,6 +35,7 @@
 // allow for static semaphores
 #include <AP_HAL_ESP32/Semaphores.h>
 #define HAL_Semaphore ESP32::Semaphore
+#define HAL_CountingSemaphore ESP32::CountingSemaphore
 #endif
 
 #define HAL_NUM_CAN_IFACES 0

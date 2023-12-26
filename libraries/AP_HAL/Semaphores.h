@@ -55,3 +55,24 @@ private:
 
 #define JOIN( sem, line, counter ) _DO_JOIN( sem, line, counter )
 #define _DO_JOIN( sem, line, counter ) WithSemaphore _getsem ## counter(sem, line)
+
+/*
+  a counting semaphore
+ */
+class AP_HAL::CountingSemaphore {
+public:
+    CountingSemaphore(uint8_t initial_count=0) {}
+
+    // do not allow copying
+    CLASS_NO_COPY(CountingSemaphore);
+
+    virtual bool wait(uint32_t timeout_us) WARN_IF_UNUSED = 0 ;
+    virtual bool wait_blocking() = 0;
+    virtual bool wait_nonblocking() { return wait(0); }
+    virtual uint8_t get_count(void) = 0;
+
+    virtual void signal() = 0;
+    virtual void signal_ISR() { signal(); }
+
+    virtual ~CountingSemaphore(void) {}
+};
