@@ -16,6 +16,13 @@ public:
     virtual bool send(const AP_HAL::CANFrame &frame) = 0;
     virtual bool receive(AP_HAL::CANFrame &frame) = 0;
     virtual int get_read_fd(void) const = 0;
+
+    void set_event_handle(AP_HAL::CountingSemaphore *handle) {
+        sem_handle = handle;
+    }
+
+protected:
+    AP_HAL::CountingSemaphore *sem_handle;
 };
 
 #endif // HAL_NUM_CAN_IFACES
