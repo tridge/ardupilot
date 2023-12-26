@@ -120,10 +120,8 @@ class ChibiOS::CANIface : public AP_HAL::CANIface
     bool irq_init_;
     bool initialised_;
     bool had_activity_;
-    AP_HAL::EventHandle* event_handle_;
-#if CH_CFG_USE_EVENTS == TRUE
-    static ChibiOS::EventSource evt_src_;
-#endif
+    AP_HAL::CountingSemaphore *sem_handle;
+
     const uint8_t self_index_;
 
     bool computeTimings(uint32_t target_bitrate, Timings& out_timings);
@@ -226,7 +224,7 @@ public:
 
 #if CH_CFG_USE_EVENTS == TRUE
     // setup event handle for waiting on events
-    bool set_event_handle(AP_HAL::EventHandle* handle) override;
+    bool set_event_handle(AP_HAL::CountingSemaphore *handle) override;
 #endif
 
 #if !defined(HAL_BOOTLOADER_BUILD)
