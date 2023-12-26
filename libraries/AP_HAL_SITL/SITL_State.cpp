@@ -335,7 +335,9 @@ void SITL_State::_fdm_input_local(void)
     }
 
     // construct servos structure for FDM
-    _simulator_servos(input);
+    if (_sitl != nullptr) {
+        _simulator_servos(input);
+    }
 
 #if HAL_SIM_JSON_MASTER_ENABLED
     // read servo inputs from ride along flight controllers
@@ -343,7 +345,9 @@ void SITL_State::_fdm_input_local(void)
 #endif
 
     // replace outputs from multicast
-    multicast_servo_update(input);
+    if (_sitl != nullptr) {
+        multicast_servo_update(input);
+    }
 
     // update the model
     sitl_model->update_home();
