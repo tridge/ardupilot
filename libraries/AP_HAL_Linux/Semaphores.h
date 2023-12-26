@@ -5,6 +5,7 @@
 #include <AP_HAL/AP_HAL_Macros.h>
 #include <AP_HAL/Semaphores.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 namespace Linux {
 
@@ -18,4 +19,18 @@ protected:
     pthread_mutex_t _lock;
 };
 
+
+class CountingSemaphore : public AP_HAL::CountingSemaphore {
+public:
+    CountingSemaphore(uint8_t initial_count=0);
+
+    bool wait(uint32_t timeout_ms) override;
+    bool wait_blocking(void) override;
+    void signal(void) override;
+    uint8_t get_count(void) override;
+
+protected:
+    sem_t _sem;
+};
+    
 }
