@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <pthread.h>
 
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Logger/AP_Logger.h>
