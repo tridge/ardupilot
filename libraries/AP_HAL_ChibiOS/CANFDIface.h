@@ -41,7 +41,6 @@
 #pragma once
 
 #include "AP_HAL_ChibiOS.h"
-#include "EventSource.h"
 
 #if HAL_NUM_CAN_IFACES
 
