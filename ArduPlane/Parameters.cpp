@@ -734,7 +734,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: Crash Detection
     // @Description: Automatically detect a crash during AUTO flight and perform the bitmask selected action(s). Disarm will turn off motor for safety and to help against burning out ESC and motor. Set to 0 to disable crash detection.
     // @Values: 0:Disabled
-    // @Bitmask: 0:Disarm
+    // @Bitmask: 0:Disarm, 1:Arm
     // @User: Advanced
     ASCALAR(crash_detection_enable,         "CRASH_DETECT",   0),
 

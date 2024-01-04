@@ -112,6 +112,7 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @DisplayName: Motor Spin armed
     // @Description: Point at which the motors start to spin expressed as a number from 0 to 1 in the entire output range.  Should be lower than MOT_SPIN_MIN.
     // @Values: 0.0:Low, 0.1:Default, 0.2:High
+    // @Range: 0 0.2
     // @User: Advanced
     AP_GROUPINFO("SPIN_ARM", 19, AP_MotorsMulticopter, _spin_arm, AP_MOTORS_SPIN_ARM_DEFAULT),
 
