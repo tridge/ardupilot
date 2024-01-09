@@ -2,8 +2,6 @@
 
 include ../CubeOrange/hwdef.dat
 
-define AP_CUSTOM_FIRMWARE_STRING "CarboPilot V5.0.0-beta3"
-
 undef HAL_NAVEKF3_AVAILABLE
 undef HAL_NAVEKF2_AVAILABLE
 undef HAL_EXTERNAL_AHRS_ENABLED
