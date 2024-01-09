@@ -26,7 +26,7 @@ main_boards=("CarbonixCubeOrange" "CubeOrange" "sitl")
 for board in "${main_boards[@]}"; do
   echo "Compiling Plane for $board..."
   ./Tools/scripts/build_bootloaders.py "$board"
-  ./waf configure --board "$board"
+  ./waf configure --board "$board" --define=CARBOPILOT=1
   ./waf plane
 done
 
@@ -35,7 +35,7 @@ periph_boards=("CarbonixF405" "Volanti-M1" "Volanti-M2" "Volanti-M3" "Volanti-M4
 for board in "${periph_boards[@]}"; do
   echo "Compiling AP_Periph for $board..."
   ./Tools/scripts/build_bootloaders.py "$board"
-  ./waf configure --board "$board"
+  ./waf configure --board "$board" --define=CARBOPILOT=1
   ./waf AP_Periph
 done
 
