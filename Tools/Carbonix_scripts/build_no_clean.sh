@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This file is mainly used by workflows/cx_build_compare.yml to build the firmware for a specific board without bootloader and clean.
+
 # Exit immediately if a command exits with a non-zero status
 set -e
 
@@ -9,13 +11,9 @@ BOARD=$1
 if [ "$BOARD" == "CubeOrange" ] || [ "$BOARD" == "CarbonixCubeOrange" ] || [ "$BOARD" == "sitl" ]
 then
     echo "Compiling Plane for $BOARD..."
-    ./Tools/scripts/build_bootloaders.py "$BOARD"
-    ./waf configure --board "$BOARD"
     ./waf plane
 else
     echo "Compiling AP_Periph for $BOARD..."
-    ./Tools/scripts/build_bootloaders.py "$BOARD"
-    ./waf configure --board "$BOARD"
     ./waf AP_Periph
 fi
 
