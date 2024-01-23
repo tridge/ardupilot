@@ -1,14 +1,14 @@
-Release 5.0.0-beta3 21st Dec 2023
+Release 5.0.0 23rd Jan 2024
 ------------------------------
- - Updated default CarbonixCubeOrange Param
-
-Release 5.0.0-beta2 15th Dec 2023
-------------------------------
+ - workflow: Added cx_build_compare CI for Carbonix board for build compare, triggered on Label CX_NO_CODE_CHANGE
+ - workflow: modified Carbonix build script to add CARBOPILOT=1  
+ - hwdef: Modified Carbonix boards to remove AP_CUSTOM_FIRMWARE
+ - AP_FWVersion: Added Custom Firmware Location to one define in AP_FWVersionDefine.h 
+ - Tools: Added Carbonix build no clean script
+ - Parameter Docs modified to make CarboParam working 
+ - Hwdef: Updated default CarbonixCubeOrange Param
  - AP_Periph: fix arm_update_status missing update
  - HWDEF : carbonix default params cleanup
-
-Release 5.0.0-beta1 28th Nov 2023
-------------------------------
  - AP_Periph: print version name
  - CI: Carbonix build script added
  - Tools: rebuild Carbonix Custom Board bootloaders
