@@ -30,6 +30,8 @@
 #include <uavcan/equipment/actuator/ArrayCommand.hpp>
 #include <uavcan/equipment/actuator/Command.hpp>
 #include <uavcan/equipment/actuator/Status.hpp>
+#include <uavcan/equipment/power/CircuitStatus.hpp>
+#include <uavcan/equipment/device/Temperature.hpp>
 
 #include <uavcan/equipment/esc/RawCommand.hpp>
 #include <uavcan/equipment/esc/Status.hpp>
@@ -189,6 +191,14 @@ static uavcan::Subscriber<ardupilot::equipment::trafficmonitor::TrafficReport, T
 // handler actuator status
 UC_REGISTRY_BINDER(ActuatorStatusCb, uavcan::equipment::actuator::Status);
 static uavcan::Subscriber<uavcan::equipment::actuator::Status, ActuatorStatusCb> *actuator_status_listener[HAL_MAX_CAN_PROTOCOL_DRIVERS];
+
+// handler power circuit status
+UC_REGISTRY_BINDER(PowerCktStatusCb, uavcan::equipment::power::CircuitStatus);
+static uavcan::Subscriber<uavcan::equipment::power::CircuitStatus, PowerCktStatusCb> *power_cktstatus_listener[HAL_MAX_CAN_PROTOCOL_DRIVERS];
+
+// handler device temperature and error flag status
+UC_REGISTRY_BINDER(DeviceTemperatureCb, uavcan::equipment::device::Temperature);
+static uavcan::Subscriber<uavcan::equipment::device::Temperature, DeviceTemperatureCb> *device_temperature_listener[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 
 // handler ESC status
 UC_REGISTRY_BINDER(ESCStatusCb, uavcan::equipment::esc::Status);
@@ -405,6 +415,16 @@ void AP_UAVCAN::init(uint8_t driver_index, bool enable_filters)
     actuator_status_listener[driver_index] = new uavcan::Subscriber<uavcan::equipment::actuator::Status, ActuatorStatusCb>(*_node);
     if (actuator_status_listener[driver_index]) {
         actuator_status_listener[driver_index]->start(ActuatorStatusCb(this, &handle_actuator_status));
+    }
+
+    power_cktstatus_listener[driver_index] = new uavcan::Subscriber<uavcan::equipment::power::CircuitStatus, PowerCktStatusCb>(*_node);
+    if (power_cktstatus_listener[driver_index]) {
+        power_cktstatus_listener[driver_index]->start(PowerCktStatusCb(this, &handle_power_cktstatus));
+    }
+
+    device_temperature_listener[driver_index] = new uavcan::Subscriber<uavcan::equipment::device::Temperature, DeviceTemperatureCb>(*_node);
+    if (device_temperature_listener[driver_index]) {
+        device_temperature_listener[driver_index]->start(DeviceTemperatureCb(this, &handle_device_temperature));
     }
 
     esc_status_listener[driver_index] = new uavcan::Subscriber<uavcan::equipment::esc::Status, ESCStatusCb>(*_node);
@@ -999,6 +1019,31 @@ void AP_UAVCAN::handle_actuator_status(AP_UAVCAN* ap_uavcan, uint8_t node_id, co
                                    cb.msg->force,
                                    cb.msg->speed,
                                    cb.msg->power_rating_pct);
+}
+
+/*
+  handle actuator voltage and current message
+ */
+void AP_UAVCAN::handle_power_cktstatus(AP_UAVCAN* ap_uavcan, uint8_t node_id, const PowerCktStatusCb &cb)
+{
+    // log as CSVI message
+    AP::logger().Write_PowerCktStatus(AP_HAL::native_micros64(),
+                                   cb.msg->circuit_id,
+                                   cb.msg->voltage,
+                                   cb.msg->current,
+                                   cb.msg->error_flags);
+}
+
+/*
+  handle actuator temperature message
+ */
+void AP_UAVCAN::handle_device_temperature(AP_UAVCAN* ap_uavcan, uint8_t node_id, const DeviceTemperatureCb &cb)
+{
+    // log as CSTE message
+    AP::logger().Write_DeviceTemperature(AP_HAL::native_micros64(),
+                                   cb.msg->device_id,
+                                   cb.msg->temperature,
+                                   cb.msg->error_flags);
 }
 
 /*

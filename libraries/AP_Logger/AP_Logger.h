@@ -309,6 +309,8 @@ public:
     void Write_Message(const char *message);
     void Write_MessageF(const char *fmt, ...);
     void Write_ServoStatus(uint64_t time_us, uint8_t id, float position, float force, float speed, uint8_t power_pct);
+    void Write_PowerCktStatus(uint64_t time_us, uint8_t id, float voltage, float current, uint8_t error_flags);
+    void Write_DeviceTemperature(uint64_t time_us, uint8_t id, float temperature, uint8_t error_flags);
     void Write_Compass();
     void Write_Mode(uint8_t mode, const ModeReason reason);
 
