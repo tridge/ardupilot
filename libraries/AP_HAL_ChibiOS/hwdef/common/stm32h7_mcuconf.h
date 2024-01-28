@@ -635,10 +635,9 @@
 // limit ISR count per byte
 #define STM32_I2C_ISR_LIMIT                 6
 
-// limit SDMMC clock to 12.5MHz by default. This increases
-// reliability
+// limit SDMMC clock to 50MHz by default
 #ifndef STM32_SDC_MAX_CLOCK
-#define STM32_SDC_MAX_CLOCK                 12500000
+#define STM32_SDC_MAX_CLOCK                 50000000
 #endif
 
 #ifndef STM32_WSPI_USE_QUADSPI1
