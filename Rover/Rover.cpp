@@ -359,7 +359,8 @@ void Rover::ahrs_update()
  */
 void Rover::gcs_failsafe_check(void)
 {
-    gcs().send_named_float("RovSpd", g2.attitude_control.get_desired_speed());
+    const float speed = hal.util->get_soft_armed() ? g2.attitude_control.get_desired_speed() : 0.0;
+    gcs().send_named_float("RovSpd", speed);
     gcs().send_named_float("RovTurn", g2.attitude_control.get_desired_turn_rate());
 
     if (g.fs_gcs_enabled == FS_GCS_DISABLED) {
