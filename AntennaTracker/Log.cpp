@@ -87,16 +87,16 @@ const struct LogStructure Tracker::log_structure[] = {
        "VPOS", "QLLefff", "TimeUS,Lat,Lng,Alt,VelX,VelY,VelZ", "sddmnnn", "FGGB000", true }
 };
 
+uint8_t Tracker::get_num_log_structures() const
+{
+    return ARRAY_SIZE(log_structure);
+}
+
 void Tracker::Log_Write_Vehicle_Startup_Messages()
 {
     logger.Write_Mode((uint8_t)mode->number(), ModeReason::INITIALISED);
     gps.Write_AP_Logger_Log_Startup_messages();
     logger.Write_NamedValueFloat("NAV_ALT_OFS", nav_status.altitude_offset);
-}
-
-void Tracker::log_init(void)
-{
-    logger.Init(log_structure, ARRAY_SIZE(log_structure));
 }
 
 #endif // HAL_LOGGING_ENABLED
