@@ -197,7 +197,9 @@ jobs:
         run: sudo apt-get install zip
       - name: Archive build output
         run: |
-          zip -r build-output.zip build/
+          echo build/*/bin/ | xargs -n 1 cp -v ArduPlane/ReleaseNotes.txt
+          cp -v ArduPlane/ReleaseNotes.txt build/
+          zip -r build-output.zip build/*/bin/*
       - name: Archive production artifacts
         uses: actions/upload-artifact@v3
         with:
