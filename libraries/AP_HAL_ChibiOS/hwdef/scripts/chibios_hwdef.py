@@ -2198,6 +2198,10 @@ def bootloader_path():
     this_dir = os.path.realpath(__file__)
     rootdir = os.path.relpath(os.path.join(this_dir, "../../../../.."))
     hwdef_dirname = os.path.basename(os.path.dirname(args.hwdef[0]))
+    # allow re-using of bootloader from different build:
+    use_bootloader_from_board = self.get_config('USE_BOOTLOADER_FROM_BOARD', default=None, required=False)
+    if use_bootloader_from_board is not None:
+        hwdef_dirname = use_bootloader_from_board
     bootloader_filename = "%s_bl.bin" % (hwdef_dirname,)
     bootloader_path = os.path.join(rootdir,
                                    "Tools",
