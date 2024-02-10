@@ -146,7 +146,7 @@ static const char* get_frame_type(uint8_t byte, uint8_t subtype = 0)
 # define debug(fmt, args...)	do {} while(0)
 #endif
 
-#define CRSF_FRAME_TIMEOUT_US      10000U // 10ms to account for scheduling delays
+#define CRSF_FRAME_TIMEOUT_US      50000U // 50ms to account for failure of the frame sync and long scheduling delays
 #define CRSF_INTER_FRAME_TIME_US_250HZ    4000U // At fastest, frames are sent by the transmitter every 4 ms, 250 Hz
 #define CRSF_INTER_FRAME_TIME_US_150HZ    6667U // At medium, frames are sent by the transmitter every 6.667 ms, 150 Hz
 #define CRSF_INTER_FRAME_TIME_US_50HZ    20000U // At slowest, frames are sent by the transmitter every 20ms, 50 Hz
@@ -212,17 +212,12 @@ uint16_t AP_RCProtocol_CRSF::get_link_rate(ProtocolType protocol) const {
     }
 }
 
-void AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
+bool AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
 {
     //debug("process_byte(0x%x)", byte);
     // we took too long decoding, start again - the RX will only send complete frames so this is unlikely to fail,
     // however thread scheduling can introduce longer delays even when the data has been received
     if (_frame_ofs > 0 && (timestamp_us - _start_frame_time_us) > CRSF_FRAME_TIMEOUT_US) {
-        _frame_ofs = 0;
-    }
-
-    // overflow check
-    if (_frame_ofs >= CRSF_FRAMELEN_MAX) {
         _frame_ofs = 0;
     }
 
@@ -235,11 +230,11 @@ void AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
 
     // need a header to get the length
     if (_frame_ofs < CSRF_HEADER_TYPE_LEN) {
-        return;
+        return true;
     }
 
     if (_frame.device_address != DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER) {
-        return;
+        return false;
     }
 
     // parse the length
@@ -247,9 +242,9 @@ void AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
         _frame_crc = crc8_dvb_s2(0, _frame.type);
         // check for garbage frame
         if (_frame.length > CRSF_FRAME_PAYLOAD_MAX) {
-            _frame_ofs = 0;
+            return false;
         }
-        return;
+        return true;
     }
 
     // update crc
@@ -257,31 +252,68 @@ void AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
         _frame_crc = crc8_dvb_s2(_frame_crc, byte);
     }
 
-    // overflow check
+    // overflow check, should never happen
     if (_frame_ofs > _frame.length + CSRF_HEADER_LEN) {
-        _frame_ofs = 0;
-        return;
+        return false;
     }
 
     // decode whatever we got and expect
     if (_frame_ofs == _frame.length + CSRF_HEADER_LEN) {
+        // bad CRC (payload start is +1 from frame start, so need to subtract that from frame length to get index)
+        if (_frame_crc != _frame.payload[_frame.length - 2]) {
+            return false;
+        }
+
         log_data(AP_RCProtocol::CRSF, timestamp_us, (const uint8_t*)&_frame, _frame_ofs - CSRF_HEADER_LEN);
 
         // we consumed the partial frame, reset
         _frame_ofs = 0;
-
-        // bad CRC (payload start is +1 from frame start, so need to subtract that from frame length to get index)
-        if (_frame_crc != _frame.payload[_frame.length - 2]) {
-            return;
-        }
-
         _last_frame_time_us = _last_rx_frame_time_us = timestamp_us;
+    
         // decode here
         if (decode_crsf_packet()) {
             _last_tx_frame_time_us = timestamp_us;  // we have received a frame from the transmitter
             add_input(MAX_CHANNELS, _channels, false, _link_status.rssi, _link_status.link_quality);
         }
+    } else if (_frame_ofs >= CRSF_FRAMELEN_MAX) {   // overflow check
+        return false;
     }
+
+
+    return true;
+}
+
+bool AP_RCProtocol_CRSF::skip_to_next_frame(uint32_t timestamp_us)
+{
+    // need to check from after the current device address marker (0xC8)
+    uint8_t* frame_start = (uint8_t*)memchr(&_frame + sizeof(uint8_t), DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER, _frame_ofs - 1);
+    uint8_t frame_bytes = (size_t)&_frame - (size_t)frame_start + _frame_ofs - 1;
+    const uint8_t old_ofs = _frame_ofs;
+    const uint32_t old_frame_start_us = _last_frame_time_us;
+
+    _frame_ofs = 0;
+
+    if (frame_start == nullptr) {
+        return false;
+    }
+
+    for (uint8_t ofs = 0; ofs < frame_bytes; ofs++) {
+        if (!_process_byte(timestamp_us, (uint8_t)frame_start[ofs])) {
+            // restart the processing
+            frame_start = (uint8_t*)memchr(frame_start + sizeof(uint8_t), DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER, frame_bytes - 1);
+            if (frame_start == nullptr) {
+                _frame_ofs = 0;
+                return false;
+            }
+            frame_bytes = (size_t)&_frame - (size_t)frame_start + old_ofs - 1;
+            ofs = 0;
+        }
+    }
+
+    // preserve the orginal frame time as a sanity check
+    _last_frame_time_us = old_frame_start_us;
+
+    return true;
 }
 
 void AP_RCProtocol_CRSF::update(void)
@@ -577,7 +609,10 @@ void AP_RCProtocol_CRSF::process_byte(uint8_t byte, uint32_t baudrate)
     if ((baudrate != CRSF_BAUDRATE && baudrate != CRSF_BAUDRATE_1MBIT && baudrate != CRSF_BAUDRATE_2MBIT) || _uart) {
         return;
     }
-    _process_byte(AP_HAL::micros(), byte);
+    const uint32_t now = AP_HAL::micros();
+    if (!_process_byte(now, byte)) {
+        skip_to_next_frame(now);
+    }
 }
 
 // start the uart if we have one
