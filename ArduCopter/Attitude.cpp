@@ -4,18 +4,160 @@
  *  Attitude Rate controllers and timing
  ****************************************************************/
 
-// update rate controllers and output to roll, pitch and yaw actuators
-//  called at 400hz by default
-void Copter::run_rate_controller()
+/*
+  thread for rate control
+*/
+void Copter::rate_controller_thread()
+{
+    uint8_t rate_decimation = 1;
+    ins.set_rate_loop_thread(chThdGetSelfX());
+    ins.set_rate_decimation(rate_decimation);
+
+    uint32_t last_run_us = AP_HAL::micros();
+    float max_dt = 0.0;
+    float min_dt = 1.0;
+    uint32_t now_ms = AP_HAL::millis();
+    uint32_t last_report_ms = now_ms;
+    uint32_t last_rtdt_log_ms = now_ms;
+    uint32_t last_notch_sample_ms = now_ms;
+    bool was_using_rate_thread = false;
+    uint32_t running_slow = 0;
+
+    while (true) {
+        // allow changing option at runtime
+        if (!flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD) ||
+            ap.motor_test) {
+            using_rate_thread = false;
+            if (was_using_rate_thread) {
+                // if we were using the rate thread, we need to
+                // setup the notch filter sample rate
+                const float loop_rate_hz = AP::scheduler().get_filtered_loop_rate_hz();
+                attitude_control->set_notch_sample_rate(loop_rate_hz);
+                motors->set_dt(1.0/loop_rate_hz);
+                was_using_rate_thread = false;
+            }
+            hal.scheduler->delay_microseconds(500);
+            last_run_us = AP_HAL::micros();
+            continue;
+        }
+
+        using_rate_thread = true;
+
+        // wait for an IMU sample
+        Vector3f gyro;
+        // we must use multiples of the actual sensor rate
+        const float sensor_dt = 1.0f * rate_decimation / ins.get_raw_gyro_rate_hz();
+
+        // wait for at least one gyro sample to be available
+        chEvtWaitOne(AP_InertialSensor::EVT_GYRO_SAMPLE);
+
+        if (ap.motor_test) {
+            continue;
+        }
+
+        const uint32_t now_us = AP_HAL::micros();
+        const uint32_t dt_us = now_us - last_run_us;
+        const float dt = dt_us * 1.0e-6;
+        last_run_us = now_us;
+
+        max_dt = MAX(dt, max_dt);
+        min_dt = MIN(dt, min_dt);
+
+#if HAL_LOGGING_ENABLED
+// @LoggerMessage: RTDT
+// @Description: Attitude controller time deltas
+// @Field: TimeUS: Time since system startup
+// @Field: dt: current time delta
+// @Field: dtAvg: current time delta average
+// @Field: dtMax: Max time delta since last log output
+// @Field: dtMin: Min time delta since last log output
+
+        if (now_ms - last_rtdt_log_ms >= 10) {    // 100 Hz
+            AP::logger().WriteStreaming("RTDT", "TimeUS,dt,dtAvg,dtMax,dtMin", "Qffff",
+                                                AP_HAL::micros64(),
+                                                dt, sensor_dt, max_dt, min_dt);
+            max_dt = sensor_dt;
+            min_dt = sensor_dt;
+            last_rtdt_log_ms = now_ms;
+        }
+#endif
+
+        motors->set_dt(sensor_dt);
+        // check if we are falling behind
+        if (ins.get_num_gyro_samples() > 2) {
+            running_slow++;
+        } else if (running_slow > 0) {
+            running_slow--;
+        }
+
+        // run the rate controller on all available samples
+        // it is important not to drop samples otherwise the filtering will be fubar
+        // there is no need to output to the motors more than once for every batch of samples
+        while (ins.get_next_gyro_sample(gyro)) {
+            attitude_control->rate_controller_run_dt(sensor_dt, gyro + ahrs.get_gyro_drift());
+        }
+        chEvtGetAndClearEvents(AP_InertialSensor::EVT_GYRO_SAMPLE);
+
+        /*
+          immediately output the new motor values
+         */
+        motors_output();
+
+        /*
+          update the center frequencies of notch filters
+         */
+        update_dynamic_notch_at_specified_rate();
+
+        now_ms = AP_HAL::millis();
+
+        if (now_ms - last_notch_sample_ms >= 1000 || !was_using_rate_thread) {
+            // update the PID notch sample rate at 1Hz if if we are
+            // enabled at runtime
+            last_notch_sample_ms = now_ms;
+            attitude_control->set_notch_sample_rate(1.0 / sensor_dt);
+        }
+        
+        // check that the CPU is not pegged, if it is drop the attitude rate
+        if (now_ms - last_report_ms >= 200) {
+            last_report_ms = now_ms;
+            if (running_slow > 5 || AP::scheduler().get_extra_loop_us() > 0) {
+                const uint32_t new_attitude_rate = ins.get_raw_gyro_rate_hz()/(rate_decimation+1);
+                if (new_attitude_rate > AP::scheduler().get_filtered_loop_rate_hz()) {
+                    rate_decimation = rate_decimation + 1;
+                    ins.set_rate_decimation(rate_decimation);
+                    attitude_control->set_notch_sample_rate(new_attitude_rate);
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU high, dropping rate to %luHz",
+                        new_attitude_rate);
+                }
+            } else if (rate_decimation > 1) {
+                const uint32_t new_attitude_rate = ins.get_raw_gyro_rate_hz()/(rate_decimation-1);
+                rate_decimation = rate_decimation - 1;
+                ins.set_rate_decimation(rate_decimation);
+                attitude_control->set_notch_sample_rate(new_attitude_rate);
+                gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU normal, increasing rate to %luHz",
+                    new_attitude_rate);
+            }
+        }
+
+        was_using_rate_thread = true;
+    }
+}
+
+/*
+  update rate controller when run from main thread (normal operation)
+*/
+void Copter::run_rate_controller_main()
 {
     // set attitude and position controller loop time
     const float last_loop_time_s = AP::scheduler().get_last_loop_time_s();
-    motors->set_dt(last_loop_time_s);
-    attitude_control->set_dt(last_loop_time_s);
     pos_control->set_dt(last_loop_time_s);
+    attitude_control->set_dt(last_loop_time_s);
 
-    // run low level rate controllers that only require IMU data
-    attitude_control->rate_controller_run(); 
+    if (!using_rate_thread) {
+        motors->set_dt(last_loop_time_s);
+        // only run the rate controller if we are not using the rate thread
+        attitude_control->rate_controller_run();
+    }
 }
 
 /*************************************************************
