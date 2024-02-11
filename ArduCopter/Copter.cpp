@@ -113,7 +113,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     // update INS immediately to get current gyro data populated
     FAST_TASK_CLASS(AP_InertialSensor, &copter.ins, update),
     // run low level rate controllers that only require IMU data
-    FAST_TASK(run_rate_controller),
+    FAST_TASK(run_rate_controller_main),
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
     FAST_TASK(run_custom_controller),
 #endif
@@ -121,7 +121,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     FAST_TASK(heli_update_autorotation),
 #endif //HELI_FRAME
     // send outputs to the motors library immediately
-    FAST_TASK(motors_output),
+    FAST_TASK(motors_output_main),
      // run EKF state estimator (expensive)
     FAST_TASK(read_AHRS),
 #if FRAME_CONFIG == HELI_FRAME
@@ -700,11 +700,22 @@ void Copter::one_hz_loop()
     AP_Notify::flags.flying = !ap.land_complete;
 
     // slowly update the PID notches with the average loop rate
-    attitude_control->set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
+    if (!using_rate_thread) {
+        attitude_control->set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
+    }
     pos_control->get_accel_z_pid().set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
     custom_control.set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
 #endif
+
+    // see if we should have a separate rate thread
+    if (!started_rate_thread && flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD)) {
+        if (hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Copter::rate_controller_thread, void),
+                                         "attitude",
+                                         2048, AP_HAL::Scheduler::PRIORITY_BOOST, 1)) {
+            started_rate_thread = true;
+        }
+    }
 }
 
 void Copter::init_simple_bearing()
