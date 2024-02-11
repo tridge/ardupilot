@@ -9,6 +9,8 @@
 #define AP_INERTIAL_SENSOR_ACCEL_VIBE_FILT_HZ           2.0f    // accel vibration filter hz
 #define AP_INERTIAL_SENSOR_ACCEL_PEAK_DETECT_TIMEOUT_MS 500     // peak-hold detector timeout
 
+#define AP_INERTIAL_SENSOR_RATE_LOOP_BUFFER_SIZE 8     // gyro buffer size for rate loop
+
 #include <AP_HAL/AP_HAL_Boards.h>
 
 #include <stdint.h>
@@ -22,6 +24,8 @@
 #include <AP_SerialManager/AP_SerialManager_config.h>
 #include "AP_InertialSensor_Params.h"
 #include "AP_InertialSensor_tempcal.h"
+#include <hal.h>
+#include <AP_HAL_ChibiOS/AP_HAL_ChibiOS.h>
 
 #ifndef AP_SIM_INS_ENABLED
 #define AP_SIM_INS_ENABLED AP_SIM_ENABLED
@@ -798,6 +802,22 @@ private:
     bool raw_logging_option_set(RAW_LOGGING_OPTION option) const {
         return (raw_logging_options.get() & int32_t(option)) != 0;
     }
+
+    /*
+      binary semaphore for rate loop to use to start a rate loop when
+      we hav finished filtering the primary IMU
+     */
+    thread_t *rate_loop_thread;
+    ObjectBuffer<Vector3f> _rate_loop_gyro_window{AP_INERTIAL_SENSOR_RATE_LOOP_BUFFER_SIZE};
+    uint8_t rate_decimation = 1;
+    uint8_t rate_decimation_count;
+
+public:
+    static const eventmask_t EVT_GYRO_SAMPLE = EVENT_MASK(5);
+    void set_rate_loop_thread(thread_t *t) { rate_loop_thread = t; }
+    bool get_next_gyro_sample(Vector3f& gyro) { return _rate_loop_gyro_window.pop(gyro); }
+    uint32_t get_num_gyro_samples() { return _rate_loop_gyro_window.available(); }
+    void set_rate_decimation(uint8_t rdec) { rate_decimation = rdec; }
 };
 
 namespace AP {
