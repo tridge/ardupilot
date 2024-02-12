@@ -6,7 +6,10 @@
 
 #include "AP_Airspeed_Backend.h"
 
-#include <AP_DroneCAN/AP_DroneCAN.h>
+class AP_DroneCAN;
+class CanardRxTransfer;
+class uavcan_equipment_air_data_RawAirData;
+class dronecan_sensors_hygrometer_Hygrometer;
 
 class AP_Airspeed_DroneCAN : public AP_Airspeed_Backend {
 public:
