@@ -4,10 +4,15 @@
 
 #if AP_BARO_DRONECAN_ENABLED
 
-#include <AP_DroneCAN/AP_DroneCAN.h>
+
 #if AP_TEST_DRONECAN_DRIVERS
 #include <SITL/SITL.h>
 #endif
+
+class AP_DroneCAN;
+class CanardRxTransfer;
+class uavcan_equipment_air_data_StaticPressure;
+class uavcan_equipment_air_data_StaticTemperature;
 
 class AP_Baro_DroneCAN : public AP_Baro_Backend {
 public:

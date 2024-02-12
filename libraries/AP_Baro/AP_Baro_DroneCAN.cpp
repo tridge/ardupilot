@@ -6,6 +6,7 @@
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include "AP_Baro_SITL.h"
 #include <AP_Vehicle/AP_Vehicle_Type.h>
+#include <AP_DroneCAN/AP_DroneCAN.h>
 
 extern const AP_HAL::HAL& hal;
 
