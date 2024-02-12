@@ -24,9 +24,7 @@
   #error There must be at least one relay instance if using AP_Relay
 #endif
 
-#if AP_RELAY_DRONECAN_ENABLED
-#include <AP_DroneCAN/AP_DroneCAN.h>
-#endif
+class uavcan_equipment_hardpoint_Command;
 
 /// @class	AP_Relay
 /// @brief	Class to manage the ArduPilot relay
