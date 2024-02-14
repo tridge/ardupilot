@@ -19,11 +19,38 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_RCProtocol/AP_RCProtocol.h>
 #include <AP_SerialManager/AP_SerialManager.h>
+#include <RC_Channel/RC_Channel.h>
 #include <AP_VideoTX/AP_VideoTX.h>
 #include <stdio.h>
 
 void setup();
 void loop();
+
+class RC_Channel_Example : public RC_Channel {};
+
+class RC_Channels_Example : public RC_Channels
+{
+public:
+    RC_Channel_Example obj_channels[NUM_RC_CHANNELS];
+
+    RC_Channel_Example *channel(const uint8_t chan) override {
+        if (chan >= NUM_RC_CHANNELS) {
+            return nullptr;
+        }
+        return &obj_channels[chan];
+    }
+
+protected:
+    int8_t flight_mode_channel_number() const override { return 5; }
+};
+
+#define RC_CHANNELS_SUBCLASS RC_Channels_Example
+#define RC_CHANNEL_SUBCLASS RC_Channel_Example
+
+#include <RC_Channel/RC_Channels_VarInfo.h>
+
+static RC_Channels_Example rchannels;
+static AP_SerialManager serial_manager;
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
@@ -340,6 +367,25 @@ void loop()
     // we only decode up to 18ch
     const uint16_t fport2_24ch_output[] = {1495, 1495, 986, 1495, 982, 1495, 982, 982, 1495, 2006, 982, 1495, 1495, 1495, 1495, 1495, 1495, 1495};
 
+    const uint8_t crsf_bytes[] = {0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0x00, 0xF6, 0xB7, 0x6E, 0x94, 0xFC,
+                                  0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x0F, 0x6E };
+    const uint16_t crsf_output[] = {1501, 1500, 989, 1497, 1873, 1136, 2011, 988, 988, 988, 988, 2011, 0, 0, 0, 0, 0, 0};
+    // CRSF partial frame followed by full frame
+    const uint8_t crsf_bad_bytes1[] = {0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0x00, 0xF6, 0xB7, 0x6E, 0x94, 0xFC,
+                                  0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x0F, 0x6E };
+    const uint16_t crsf_bad_output1[] = {1501, 1500, 989, 1497, 1873, 1136, 2011, 988, 988, 988, 988, 2011, 0, 0, 0, 0, 0, 0};
+    // CRSF full frame with bad CRC followed by full frame
+    const uint8_t crsf_bad_bytes2[] = {0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0x00, 0xF6, 0xB7, 0x6E, 0x94, 0xFC,
+                                  0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x0F, 0x6F,
+                                  0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0x00, 0xF6, 0xB7, 0x6E, 0x94, 0xFC,
+                                  0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x0F, 0x6E };
+    const uint16_t crsf_bad_output2[] = {1501, 1500, 989, 1497, 1873, 1136, 2011, 988, 988, 988, 988, 2011, 0, 0, 0, 0, 0, 0};
+    // CRSF with lots of start markers followed by full frame
+    const uint8_t crsf_bad_bytes3[] = {0xC8, 0x14, 0xC8, 0x20, 0xC8, 0x0C, 0xA0, 0xC8, 0x14, 0x17, 0x20, 0x03, 0x0C, 0xA0, 0x00, 0xF6, 0xB7, 0x6E, 0x94, 0xFC,
+                                  0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFE, 0x0F, 0x6E };
+    const uint16_t crsf_bad_output3[] = {1501, 1500, 989, 1497, 1873, 1136, 2011, 988, 988, 988, 988, 2011, 0, 0, 0, 0, 0, 0};
+
+
     test_protocol("SRXL", 115200, srxl_bytes, sizeof(srxl_bytes), srxl_output, ARRAY_SIZE(srxl_output), 1);
     test_protocol("SUMD", 115200, sumd_bytes, sizeof(sumd_bytes), sumd_output, ARRAY_SIZE(sumd_output), 1);
     test_protocol("SUMD2", 115200, sumd_bytes2, sizeof(sumd_bytes2), sumd_output2, ARRAY_SIZE(sumd_output2), 1);
@@ -348,7 +394,11 @@ void loop()
 
     // SBUS needs 3 repeats to pass the RCProtocol 3 frames test
     test_protocol("SBUS", 100000, sbus_bytes, sizeof(sbus_bytes), sbus_output, ARRAY_SIZE(sbus_output), 3, 0, true);
-
+    // CRSF needs 3 repeats to pass the RCProtocol 3 frames test
+    test_protocol("CRSF", 416666, crsf_bytes, sizeof(crsf_bytes), crsf_output, ARRAY_SIZE(crsf_output), 3, 0, true);
+    test_protocol("CRSF2", 416666, crsf_bad_bytes1, sizeof(crsf_bad_bytes1), crsf_bad_output1, ARRAY_SIZE(crsf_bad_output1), 3, 0, true);
+    test_protocol("CRSF3", 416666, crsf_bad_bytes2, sizeof(crsf_bad_bytes2), crsf_bad_output2, ARRAY_SIZE(crsf_bad_output2), 3, 0, true);
+    test_protocol("CRSF4", 416666, crsf_bad_bytes3, sizeof(crsf_bad_bytes3), crsf_bad_output3, ARRAY_SIZE(crsf_bad_output3), 3, 0, true);
     // DSM needs 8 repeats, 5 to guess the format, then 3 to pass the RCProtocol 3 frames test
     test_protocol("DSM1", 115200, dsm_bytes,  sizeof(dsm_bytes),  dsm_output,  ARRAY_SIZE(dsm_output), 9);
     test_protocol("DSM2", 115200, dsm_bytes2, sizeof(dsm_bytes2), dsm_output2, ARRAY_SIZE(dsm_output2), 9, 16);
