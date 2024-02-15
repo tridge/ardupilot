@@ -150,7 +150,7 @@ static const char* get_frame_type(uint8_t byte, uint8_t subtype = 0)
 #define CRSF_INTER_FRAME_TIME_US_250HZ    4000U // At fastest, frames are sent by the transmitter every 4 ms, 250 Hz
 #define CRSF_INTER_FRAME_TIME_US_150HZ    6667U // At medium, frames are sent by the transmitter every 6.667 ms, 150 Hz
 #define CRSF_INTER_FRAME_TIME_US_50HZ    20000U // At slowest, frames are sent by the transmitter every 20ms, 50 Hz
-#define CSRF_HEADER_TYPE_LEN     (CSRF_HEADER_LEN + 1)           // header length including type
+#define CRSF_HEADER_TYPE_LEN     (CRSF_HEADER_LEN + 1)           // header length including type
 
 #define CRSF_DIGITAL_CHANNEL_MIN 172
 #define CRSF_DIGITAL_CHANNEL_MAX 1811
@@ -212,24 +212,22 @@ uint16_t AP_RCProtocol_CRSF::get_link_rate(ProtocolType protocol) const {
     }
 }
 
-bool AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
+/*
+  check if a frame is valid. Return false if the frame is definately
+  invalid. Return true if we need more bytes
+ */
+bool AP_RCProtocol_CRSF::check_frame(uint32_t timestamp_us)
 {
     //debug("process_byte(0x%x)", byte);
     // we took too long decoding, start again - the RX will only send complete frames so this is unlikely to fail,
     // however thread scheduling can introduce longer delays even when the data has been received
-    if (_frame_ofs > 0 && (timestamp_us - _start_frame_time_us) > CRSF_FRAME_TIMEOUT_US) {
-        _frame_ofs = 0;
+    // extra check for overflow, should never happen
+    if (_frame_ofs >= sizeof(_frame)) {
+        return false;
     }
-
-    // start of a new frame
-    if (_frame_ofs == 0) {
-        _start_frame_time_us = timestamp_us;
-    }
-
-    add_to_buffer(_frame_ofs++, byte);
 
     // need a header to get the length
-    if (_frame_ofs < CSRF_HEADER_TYPE_LEN) {
+    if (_frame_ofs < CRSF_HEADER_TYPE_LEN) {
         return true;
     }
 
@@ -237,83 +235,65 @@ bool AP_RCProtocol_CRSF::_process_byte(uint32_t timestamp_us, uint8_t byte)
         return false;
     }
 
-    // parse the length
-    if (_frame_ofs == CSRF_HEADER_TYPE_LEN) {
-        _frame_crc = crc8_dvb_s2(0, _frame.type);
-        // check for garbage frame
-        if (_frame.length > CRSF_FRAME_PAYLOAD_MAX) {
-            return false;
-        }
-        return true;
-    }
-
-    // update crc
-    if (_frame_ofs < _frame.length + CSRF_HEADER_LEN) {
-        _frame_crc = crc8_dvb_s2(_frame_crc, byte);
-    }
-
-    // overflow check, should never happen
-    if (_frame_ofs > _frame.length + CSRF_HEADER_LEN) {
+    // check validity of the length byte if we have received it
+    if (_frame_ofs >= CRSF_HEADER_TYPE_LEN &&
+        _frame.length > CRSF_FRAME_PAYLOAD_MAX) {
         return false;
     }
 
     // decode whatever we got and expect
-    if (_frame_ofs == _frame.length + CSRF_HEADER_LEN) {
-        // bad CRC (payload start is +1 from frame start, so need to subtract that from frame length to get index)
-        if (_frame_crc != _frame.payload[_frame.length - 2]) {
+    if (_frame_ofs >= _frame.length + CRSF_HEADER_LEN) {
+        const uint8_t crc = crc8_dvb_s2_update(0, &_frame_bytes[CRSF_HEADER_LEN], _frame.length - 1);
+        if (crc != _frame.payload[_frame.length - 2]) {
             return false;
         }
 
-        log_data(AP_RCProtocol::CRSF, timestamp_us, (const uint8_t*)&_frame, _frame_ofs - CSRF_HEADER_LEN);
+        log_data(AP_RCProtocol::CRSF, timestamp_us, (const uint8_t*)&_frame, _frame.length + CRSF_HEADER_LEN);
 
-        // we consumed the partial frame, reset
-        _frame_ofs = 0;
+        // we consumed the frame
+        _frame_ofs -= _frame.length + CRSF_HEADER_LEN;
         _last_frame_time_us = _last_rx_frame_time_us = timestamp_us;
-    
+
         // decode here
         if (decode_crsf_packet()) {
             _last_tx_frame_time_us = timestamp_us;  // we have received a frame from the transmitter
             add_input(MAX_CHANNELS, _channels, false, _link_status.rssi, _link_status.link_quality);
         }
-    } else if (_frame_ofs >= CRSF_FRAMELEN_MAX) {   // overflow check
-        return false;
+        return true;
     }
 
-
+    // more bytes to come
     return true;
 }
 
-bool AP_RCProtocol_CRSF::skip_to_next_frame(uint32_t timestamp_us)
+/*
+  called when parsing or CRC fails on a frame
+ */
+void AP_RCProtocol_CRSF::skip_to_next_frame(uint32_t timestamp_us)
 {
-    // need to check from after the current device address marker (0xC8)
-    uint8_t* frame_start = (uint8_t*)memchr(&_frame + sizeof(uint8_t), DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER, _frame_ofs - 1);
-    uint8_t frame_bytes = (size_t)&_frame - (size_t)frame_start + _frame_ofs - 1;
-    const uint8_t old_ofs = _frame_ofs;
-    const uint32_t old_frame_start_us = _last_frame_time_us;
-
-    _frame_ofs = 0;
-
-    if (frame_start == nullptr) {
-        return false;
+    if (_frame_ofs <= 1) {
+        return;
     }
 
-    for (uint8_t ofs = 0; ofs < frame_bytes; ofs++) {
-        if (!_process_byte(timestamp_us, (uint8_t)frame_start[ofs])) {
-            // restart the processing
-            frame_start = (uint8_t*)memchr(frame_start + sizeof(uint8_t), DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER, frame_bytes - 1);
-            if (frame_start == nullptr) {
-                _frame_ofs = 0;
-                return false;
-            }
-            frame_bytes = (size_t)&_frame - (size_t)frame_start + old_ofs - 1;
-            ofs = 0;
-        }
+    /*
+      look for a frame header in the remaining bytes
+     */
+    const uint8_t *new_header = (const uint8_t *)memchr(&_frame_bytes[1], DeviceAddress::CRSF_ADDRESS_FLIGHT_CONTROLLER, _frame_ofs - 1);
+    if (new_header == nullptr) {
+        _frame_ofs = 0;
+        return;
     }
 
-    // preserve the orginal frame time as a sanity check
-    _last_frame_time_us = old_frame_start_us;
+    /*
+      setup the current state as the remaining bytes
+     */
+    _frame_ofs -= (new_header - _frame_bytes);
+    memmove(_frame_bytes, new_header, _frame_ofs);
 
-    return true;
+    _start_frame_time_us = timestamp_us;
+
+    // we could now have a good frame
+    check_frame(timestamp_us);
 }
 
 void AP_RCProtocol_CRSF::update(void)
@@ -610,7 +590,25 @@ void AP_RCProtocol_CRSF::process_byte(uint8_t byte, uint32_t baudrate)
         return;
     }
     const uint32_t now = AP_HAL::micros();
-    if (!_process_byte(now, byte)) {
+
+    // extra check for overflow, should never happen
+    if (_frame_ofs >= sizeof(_frame)) {
+        _frame_ofs = 0;
+    }
+
+    // check for long frame gaps
+    if (_frame_ofs > 0 && (now - _start_frame_time_us) > CRSF_FRAME_TIMEOUT_US) {
+        _frame_ofs = 0;
+    }
+
+    // start of a new frame
+    if (_frame_ofs == 0) {
+        _start_frame_time_us = now;
+    }
+    
+    _frame_bytes[_frame_ofs++] = byte;
+    
+    if (!check_frame(now)) {
         skip_to_next_frame(now);
     }
 }
