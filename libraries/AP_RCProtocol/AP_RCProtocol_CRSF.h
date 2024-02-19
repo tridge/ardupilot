@@ -297,6 +297,7 @@ private:
 
     static AP_RCProtocol_CRSF* _singleton;
 
+    void _process_byte(uint8_t byte);
     bool check_frame(uint32_t timestamp_us);
     void skip_to_next_frame(uint32_t timestamp_us);
     bool decode_crsf_packet();

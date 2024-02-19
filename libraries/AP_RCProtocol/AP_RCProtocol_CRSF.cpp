@@ -212,14 +212,20 @@ uint16_t AP_RCProtocol_CRSF::get_link_rate(ProtocolType protocol) const {
     }
 }
 
-// process a byte provided by a uart
+// process a byte provided by a uart from rc stack
 void AP_RCProtocol_CRSF::process_byte(uint8_t byte, uint32_t baudrate)
 {
-    //debug("process_byte(0x%x)", byte);
     // reject RC data if we have been configured for standalone mode
     if ((baudrate != CRSF_BAUDRATE && baudrate != CRSF_BAUDRATE_1MBIT && baudrate != CRSF_BAUDRATE_2MBIT) || _uart) {
         return;
     }
+    _process_byte(byte);
+}
+
+// process a byte provided by a uart
+void AP_RCProtocol_CRSF::_process_byte(uint8_t byte)
+{
+    //debug("process_byte(0x%x)", byte);
     const uint32_t now = AP_HAL::micros();
 
     // extra check for overflow, should never happen since it will have been handled in check_frame()
@@ -273,6 +279,9 @@ bool AP_RCProtocol_CRSF::check_frame(uint32_t timestamp_us)
     // decode whatever we got and expect
     if (_frame_ofs >= _frame.length + CRSF_HEADER_LEN) {
         const uint8_t crc = crc8_dvb_s2_update(0, &_frame_bytes[CRSF_HEADER_LEN], _frame.length - 1);
+
+        //debug("check_frame(0x%x, 0x%x)", _frame.device_address, _frame.length);
+
         if (crc != _frame.payload[_frame.length - 2]) {
             return false;
         }
@@ -340,7 +349,7 @@ void AP_RCProtocol_CRSF::update(void)
         for (uint8_t i = 0; i < n; i++) {
             int16_t b = _uart->read();
             if (b >= 0) {
-                _process_byte(AP_HAL::micros(), uint8_t(b));
+                _process_byte(uint8_t(b));
             }
         }
     }
