@@ -62,6 +62,7 @@ private:
 
     // Throttle values
     uint16_t last_throttle;
+    uint16_t throttle;
 
     uint32_t last_fuel_integration_ms;
 
