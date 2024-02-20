@@ -190,6 +190,7 @@ void AP_EFI_Serial_Hirth::send_request()
 bool AP_EFI_Serial_Hirth::send_target_values(uint16_t thr)
 {
     uint8_t computed_checksum = 0;
+    throttle = 0;
 
     // clear buffer
     memset(raw_data, 0, ARRAY_SIZE(raw_data));
@@ -199,7 +200,7 @@ bool AP_EFI_Serial_Hirth::send_target_values(uint16_t thr)
     thr = linearise_throttle(thr);
 #endif
 
-    const uint16_t throttle = thr * THROTTLE_POSITION_FACTOR;
+    throttle = thr * THROTTLE_POSITION_FACTOR;
 
     uint8_t idx = 0;
 
@@ -354,23 +355,24 @@ void AP_EFI_Serial_Hirth::log_status(void)
     // @LoggerMessage: EFIS
     // @Description: Electronic Fuel Injection data - Hirth specific Status information
     // @Field: TimeUS: Time since system startup
-    // @Field: ETS1: Status of EGT1 excess temperature error
-    // @Field: ETS2: Status of EGT2 excess temperature error
-    // @Field: CTS1: Status of CHT1 excess temperature error
-    // @Field: CTS2: Status of CHT2 excess temperature error
-    // @Field: ETSS: Status of Engine temperature sensor
-    // @Field: ATSS: Status of Air temperature sensor
-    // @Field: APSS: Status of Air pressure sensor
+    // @Field: ES1: Status of EGT1 excess temperature error
+    // @Field: ES2: Status of EGT2 excess temperature error
+    // @Field: CS1: Status of CHT1 excess temperature error
+    // @Field: CS2: Status of CHT2 excess temperature error
+    // @Field: ETS: Status of Engine temperature sensor
+    // @Field: ATS: Status of Air temperature sensor
+    // @Field: APS: Status of Air pressure sensor
     // @Field: TSS: Status of Temperature sensor
-    // @Field: CRCF: CRC failure count
-    // @Field: AckF: ACK failure count
+    // @Field: CRF: CRC failure count
+    // @Field: AKF: ACK failure count
     // @Field: Up: Uptime between 2 messages
-    // @Field: ThrO: Throttle output as received by the engine
+    // @Field: ThO: Throttle output as received by the engine
+    // @Field: ThM: Modified Throttle output sent to the engine
     AP::logger().WriteStreaming("EFIS",
-                                "TimeUS,ETS1,ETS2,CTS1,CTS2,ETSS,ATSS,APSS,TSS,CRCF,AckF,Up,ThrO",
-                                "s------------",
-                                "F------------",
-                                "QBBBBBBBBIIIf",
+                                "TimeUS,ES1,ES2,CS1,CS2,ETS,ATS,APS,TSS,CRF,AKF,Up,ThO,ThM",
+                                "s-------------",
+                                "F-------------",
+                                "QBBBBBBBBIIIfH",
                                 AP_HAL::micros64(),
                                 uint8_t(EGT_1_error_excess_temperature_status),
                                 uint8_t(EGT_2_error_excess_temperature_status),
@@ -383,7 +385,8 @@ void AP_EFI_Serial_Hirth::log_status(void)
                                 uint32_t(crc_fail_cnt),
                                 uint32_t(ack_fail_cnt),
                                 uint32_t(uptime),
-                                float(internal_state.throttle_out));
+                                float(internal_state.throttle_out),
+                                uint16_t(throttle));
 }
 #endif // HAL_LOGGING_ENABLED
 
