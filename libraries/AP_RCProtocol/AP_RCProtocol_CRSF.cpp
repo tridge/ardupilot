@@ -288,15 +288,19 @@ bool AP_RCProtocol_CRSF::check_frame(uint32_t timestamp_us)
 
         log_data(AP_RCProtocol::CRSF, timestamp_us, (const uint8_t*)&_frame, _frame.length + CRSF_HEADER_LEN);
 
-        // we consumed the frame
-        _frame_ofs -= _frame.length + CRSF_HEADER_LEN;
-        _last_frame_time_us = _last_rx_frame_time_us = timestamp_us;
-
         // decode here
         if (decode_crsf_packet()) {
             _last_tx_frame_time_us = timestamp_us;  // we have received a frame from the transmitter
             add_input(MAX_CHANNELS, _channels, false, _link_status.rssi, _link_status.link_quality);
         }
+
+        // we consumed the frame
+        const auto len = _frame.length + CRSF_HEADER_LEN;
+        _frame_ofs -= len;
+        memmove(_frame_bytes, _frame_bytes+len, _frame_ofs);
+
+        _last_frame_time_us = _last_rx_frame_time_us = timestamp_us;
+
         return true;
     }
 
