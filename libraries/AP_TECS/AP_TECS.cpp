@@ -262,7 +262,21 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Range: -5.0 0.0
     // @User: Advanced
     AP_GROUPINFO("PTCH_FF_K", 30, AP_TECS, _pitch_ff_k, 0.0),
-    
+
+    // @Param: FLARE_AOA
+    // @DisplayName: Angle of attack target during flare.
+    // @Description: During the flare, TECS will adjust the target pitch angle to be TECS_FLARE_AOA degrees above the flight path angle. The rate at which the AOA demand is applied is controlled by TECS_FLARE_TIME. The maximum pitch angle target is limited by TECS_LAND_PMAX. Set to 0 to disable this feature and use the normal TECS flare pitch demand algorithm. 
+    // @Range: 0 30.0
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_AOA", 31, AP_TECS, _flare_aoa_deg, 0.0),
+
+    // @Param: FLARE_TIME
+    // @DisplayName: Angle of attack target slew time during flare.
+    // @Description: Controls the time required for TECS to slew the demanded pitch angle from the starting value to a value TECS_FLARE_AOA above.
+    // @Range: 0.0 5.0
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_TIME", 32, AP_TECS, _flare_aoa_time, 1.0),
+
     AP_GROUPEND
 };
 
@@ -938,6 +952,24 @@ void AP_TECS::_update_pitch(void)
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
+
+    // Handle the special case where the flare is performed by adjusting pitch demand to achieve
+    // an angle of attack target.
+    Vector3f vel_NED;
+    if (!_landing.is_flaring()) {
+        _pitch_dem_at_flare_entry = _pitch_dem;
+    } else if (is_positive(_flare_aoa_deg) && _ahrs.get_velocity_NED(vel_NED)) {
+        float flare_aoa_dem_deg;
+        if (is_positive(_flare_aoa_time)) {
+            flare_aoa_dem_deg = (_DT / _flare_aoa_time)  * _flare_counter;
+            flare_aoa_dem_deg = MIN(flare_aoa_dem_deg, _flare_aoa_deg);
+        } else {
+            flare_aoa_dem_deg = _flare_aoa_deg;
+        }
+        const float flight_path_angle = atan2f(-vel_NED.z, sqrtf(sq(vel_NED.x) + sq(vel_NED.y)));
+        _pitch_dem = flight_path_angle + radians(flare_aoa_dem_deg);
+        _pitch_dem = constrain_float(_pitch_dem, _pitch_dem_at_flare_entry, _PITCHmaxf);
+    }
 
     // Rate limit the pitch demand to comply with specified vertical
     // acceleration limit

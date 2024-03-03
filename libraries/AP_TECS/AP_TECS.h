@@ -101,6 +101,10 @@ public:
         return _hgt_rate_dem;
     }
 
+    bool does_aoa_flare(void) {
+        return is_positive(_flare_aoa_deg);
+    }
+
     // set path_proportion
     void set_path_proportion(float path_proportion) override {
         _path_proportion = constrain_float(path_proportion, 0.0f, 1.0f);
@@ -189,6 +193,10 @@ private:
 
     AP_Float _pitch_ff_v0;
     AP_Float _pitch_ff_k;
+    AP_Float _flare_aoa_deg;
+    AP_Float _flare_aoa_time;
+
+    float _pitch_dem_at_flare_entry;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
