@@ -150,7 +150,7 @@ void Plane::stabilize_pitch(float speed_scaler)
       special fixed rate flare code for SA-PGB
      */
     static bool started_flare;
-    if (landing.is_flaring()) {
+    if (!TECS_controller.does_aoa_flare() && landing.is_flaring()) {
         static uint32_t flare_start_ms;
         static uint32_t flare_start_I;
         const uint32_t now_ms = AP_HAL::millis();
