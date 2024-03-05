@@ -1,3 +1,14 @@
+Release 5.1.0-beta1 5th March 2024
+------------------------------
+ - AP_Scripting: Added Lua bindings for ESC, MotorsMatrix, and EFI safety checks.
+ - AP_EFI: Added ThM to EFIS log for better engine log understanding and updated field names for 64-character length.
+ - Servo: Updated CAN servo telemetry data for MKS/Zeus servos with voltage, current, temperature, and error flags.
+ - CI: Made changes to build.zip file to include Release Notes in build folders and to save space by only including the bin folder in build_output.zip.
+ - AP_EFI: Added engine information over Mavlink with CHT2 and EGT2.
+ - Workflow: Deleted test_coverage CI due to consistent failures that do not affect the code base (SW-91). 
+ - Module: libcanard link updated to Carbonix Fork of the repo
+ - Module: libcanard bug fix cherry picked commit : ensure payload_len is zeroed on start of a new multi-frame packet
+
 Release 5.0.0 23rd Jan 2024
 ------------------------------
  - workflow: Added cx_build_compare CI for Carbonix board for build compare, triggered on Label CX_NO_CODE_CHANGE
