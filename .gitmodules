@@ -33,4 +33,4 @@
 	url = https://github.com/DroneCAN/dronecan_dsdlc
 [submodule "modules/DroneCAN/libcanard"]
 	path = modules/DroneCAN/libcanard
-	url = https://github.com/DroneCAN/libcanard
+	url = https://github.com/CarbonixUAV/libcanard
