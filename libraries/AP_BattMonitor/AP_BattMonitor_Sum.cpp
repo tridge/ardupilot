@@ -45,6 +45,7 @@ void
 AP_BattMonitor_Sum::read()
 {
     float voltage_sum = 0;
+    float voltage_min = 0;
     uint8_t voltage_count = 0;
     float current_sum = 0;
     uint8_t current_count = 0;
@@ -65,6 +66,9 @@ AP_BattMonitor_Sum::read()
         if (!_mon.healthy(i)) {
             continue;
         }
+        if (voltage_count == 0 || _mon.voltage(i) < voltage_min) {
+            voltage_min = _mon.voltage(i);
+        }
         voltage_sum += _mon.voltage(i);
         voltage_count++;
         float current;
@@ -77,7 +81,11 @@ AP_BattMonitor_Sum::read()
     const uint32_t dt_us = tnow_us - _state.last_time_micros;
 
     if (voltage_count > 0) {
-        _state.voltage = voltage_sum / voltage_count;
+        if (uint32_t(_params._options.get()) & uint32_t(AP_BattMonitor_Params::Options::Minimum_Voltage)) {
+            _state.voltage = voltage_min;
+        } else {
+            _state.voltage = voltage_sum / voltage_count;
+        }
     }
     if (current_count > 0) {
         _state.current_amps = current_sum;
