@@ -3,6 +3,9 @@ ARSPD_FBW_MIN          40
 TRIM_ARSPD_CM        5140
 TECS_LAND_ARSPD        60
 
+TECS_FLARE_AOA         25
+TECS_FLARE_TIME       1.5
+
 STICK_MIXING 2
 
 # yaw 180
@@ -156,8 +159,10 @@ GPS_POS1_X              0.9900
 GPS_TYPE                9
 HOME_RESET_ALT         -1
 INS_ACCEL_FILTER       20
-INS_GYRO_FILTER        20
+
+INS_GYRO_FILTER        10
 INS_GYR_CAL             0
+
 INS_POS1_X              0.9750
 INS_POS2_X              0.9750
 INS_POS3_X              0.9750
@@ -187,7 +192,10 @@ LOG_FILE_BUFSIZE      200
 LOG_FILE_DSRMROT        1
 LOG_FILE_MB_FREE     2000
 MIXING_GAIN             1
+
 NAVL1_PERIOD           25
+NAVL1_DAMPING           0.85
+
 NTF_LED_OVERRIDE        1
 NTF_LED_TYPES         231
 PTCH2SRV_D              0.3
@@ -226,31 +234,18 @@ RC8_TRIM              999
 RC9_MAX              2000
 RC9_MIN              1000
 RC9_TRIM                0
-RLL2SRV_D               0.25
+
+RLL2SRV_D               0.37
 RLL2SRV_FF              0.0
-RLL2SRV_I               0.12
+RLL2SRV_I               0.18
+
 RLL2SRV_IMAX         4000
 RLL2SRV_P               0
 RLL2SRV_RMAX           40
 RLL2SRV_SRMAX         135
 RLL2SRV_TCONST          1.2
-RNGFND1_ADDR            0
-RNGFND1_FUNCTION        0
-RNGFND1_GNDCLEAR       10
-RNGFND1_MAX_CM      12000
-RNGFND1_MIN_CM        100
-RNGFND1_OFFSET          0
-RNGFND1_ORIENT         25
-RNGFND1_PIN            -1
-RNGFND1_POS_X           0.8220
-RNGFND1_POS_Y           0
-RNGFND1_POS_Z           0
-RNGFND1_PWRRNG          0
-RNGFND1_RMETRIC         1
-RNGFND1_SCALING         1
-RNGFND1_STOP_PIN       -1
-RNGFND1_TYPE            8
-RNGFND_LANDING          1
+RNGFND1_TYPE            0
+RNGFND_LANDING          0
 RSSI_ANA_PIN            0
 RSSI_CHANNEL            0
 RSSI_CHAN_HIGH       2000
@@ -295,7 +290,8 @@ SERVO4_MIN           1280
 SERVO4_TRIM          1460
 STAB_PITCH_DOWN         5.9
 STALL_PREVENTION        0
-TECS_LAND_PMAX         12
+
+TECS_LAND_PMAX         25
 TECS_LAND_SINK          0.5
 TECS_LAND_SPDWGT        1
 TECS_LAND_SRC           0.2000
@@ -307,6 +303,7 @@ TECS_SINK_MAX          15
 TECS_SINK_MIN          10
 TECS_SPDWEIGHT         2.0
 TECS_TIME_CONST        6.0
+
 TERRAIN_ENABLE          1
 THROTTLE_NUDGE          0
 THR_FAILSAFE            2
