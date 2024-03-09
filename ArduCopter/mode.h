@@ -1778,7 +1778,7 @@ private:
 
 };
 
-#if AP_FOLLOW_ENABLED
+#if MODE_FOLLOW_ENABLED == ENABLED
 class ModeFollow : public ModeGuided {
 
 public:
