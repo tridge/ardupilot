@@ -26,6 +26,9 @@ local SMALL_WP_DIST = 500
 -- expected height loss for a 180 degree turn, meters
 local TURN_HEIGHT_LOSS = 180
 
+-- enable/disable WP changing
+local AUTO_WP_CHANGE = false
+
 local release_start_t = 0.0
 local last_tick_t = 0.0
 local last_mission_update_t = 0.0
@@ -149,6 +152,11 @@ end
 
 -- return true if cnum is a candidate for wp change
 function is_change_candidate(cnum)
+
+   if not AUTO_WP_CHANGE then
+      return false
+   end
+
    logit(string.format('is_change_candidate(%d)', cnum))
 
    local loc = ahrs:get_position()
