@@ -1,4 +1,4 @@
-Release 5.1.0-beta1 5th March 2024
+Release 5.1.0 12th March 2024
 ------------------------------
  - AP_Scripting: Added Lua bindings for ESC, MotorsMatrix, and EFI safety checks.
  - AP_EFI: Added ThM to EFIS log for better engine log understanding and updated field names for 64-character length.
@@ -8,6 +8,8 @@ Release 5.1.0-beta1 5th March 2024
  - Workflow: Deleted test_coverage CI due to consistent failures that do not affect the code base (SW-91). 
  - Module: libcanard link updated to Carbonix Fork of the repo
  - Module: libcanard bug fix cherry picked commit : ensure payload_len is zeroed on start of a new multi-frame packet
+ - AP_Scripting: added QUIK_MAX_REDUCE parameter to VTOL-quicktune.lua for limiting amount reduction in rate gains
+ - AP_Scripting: VTOL_Quicktune.lua Bug Fix prevent "Starting XXX tune" happening multiple times on Msg box
 
 Release 5.0.0 23rd Jan 2024
 ------------------------------
