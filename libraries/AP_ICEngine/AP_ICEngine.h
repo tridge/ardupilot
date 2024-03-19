@@ -64,6 +64,8 @@ public:
 
     static AP_ICEngine *get_singleton() { return _singleton; }
 
+    bool allow_throttle_disarmed() const;
+
 private:
     static AP_ICEngine *_singleton;
 

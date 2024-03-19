@@ -165,7 +165,21 @@ void AP_EFI_Serial_Hirth::send_request()
 
     // check for change or timeout for throttle value
     if ((new_throttle != last_throttle) || (now - last_req_send_throttle_ms > 500)) {
-        request_was_sent = send_target_values(new_throttle);
+        bool allow_throttle = hal.util->get_soft_armed();
+        if (!allow_throttle) {
+            const auto *ice = AP::ice();
+            if (ice != nullptr) {
+                allow_throttle = ice->allow_throttle_disarmed();
+            }
+        }
+        
+        if (allow_throttle) {
+            request_was_sent = send_target_values(new_throttle);
+        }
+        else {
+            request_was_sent = send_target_values(0);
+        }
+
         last_throttle = new_throttle;
         last_req_send_throttle_ms = now;
     } else {

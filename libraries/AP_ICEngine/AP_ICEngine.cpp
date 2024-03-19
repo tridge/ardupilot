@@ -355,7 +355,12 @@ void AP_ICEngine::update(void)
 
     case ICE_STARTING:
         set_ignition(true);
-        set_starter(true);
+
+        if (allow_throttle_disarmed()) {
+            set_starter(true);
+        } else {
+            set_starter(false);
+        }
 
         if (starter_start_time_ms == 0) {
             starter_start_time_ms = now;
@@ -544,6 +549,15 @@ void AP_ICEngine::update_idle_governor(int8_t &min_throttle)
     idle_governor_integrator = constrain_float(idle_governor_integrator, min_throttle_base, 40.0f);
 
     min_throttle = roundf(idle_governor_integrator);
+}
+
+/*
+  Allows throttle when disarmed and Safety Switch is not ON
+ */
+bool AP_ICEngine::allow_throttle_disarmed() const
+{
+    return option_set(Options::THROTTLE_WHILE_DISARMED) &&
+        hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED;
 }
 
 /*
