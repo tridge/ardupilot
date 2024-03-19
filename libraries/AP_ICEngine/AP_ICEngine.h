@@ -131,6 +131,9 @@ private:
     // relay number for ignition
     AP_Int8 ignition_relay;
 
+    // crank engine direction
+    AP_Int8 crank_direction;
+
     // height when we enter ICE_START_HEIGHT_DELAY
     float initial_height;
 
