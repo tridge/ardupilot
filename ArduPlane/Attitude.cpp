@@ -165,6 +165,11 @@ void Plane::stabilize_pitch(float speed_scaler)
         elev_scaled = MAX(elev_flare, elev_scaled);
     } else {
         started_flare = false;
+        float elevator_increment_deg;
+        if (landing.is_flaring() && TECS_controller.get_flare_elevator_ff(elevator_increment_deg)) {
+            elev_scaled += (int32_t)(100.0f * elevator_increment_deg);
+            elev_scaled = MIN(elev_scaled, 4500);
+        }
     }
 
     SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elev_scaled);
