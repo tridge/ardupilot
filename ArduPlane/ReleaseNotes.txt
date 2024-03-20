@@ -1,3 +1,8 @@
+Release 5.1.1 20th March 2024
+------------------------------
+- AP_ICEngine: Added a new parameter CRANK_DIR for controlling the direction of engine cranking, providing flexibility in engine configurations.
+- AP_ICEngine: Improved safety checks to allow engine operation when the safety is on, so it could be warmed up without ARMING the aircraft.
+
 Release 5.1.0 12th March 2024
 ------------------------------
  - AP_Scripting: Added Lua bindings for ESC, MotorsMatrix, and EFI safety checks.
