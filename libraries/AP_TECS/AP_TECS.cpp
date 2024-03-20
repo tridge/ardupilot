@@ -978,6 +978,18 @@ void AP_TECS::_update_pitch(void)
         const float flight_path_angle = atan2f(-vel_NED.z, sqrtf(sq(vel_NED.x) + sq(vel_NED.y)));
         _pitch_dem = flight_path_angle + radians(flare_aoa_dem_deg);
         _pitch_dem = constrain_float(_pitch_dem, _pitch_dem_at_flare_entry, _PITCHmaxf);
+
+        AP::logger().Write(
+            "TECF",
+            "TimeUS,duration,aoa_dem,fpa,elev_ff",
+            "s----",
+            "F0000",
+            "Qffff",
+            AP_HAL::micros64(),
+            (double)_flare_aoa_time,
+            (double)flare_aoa_dem_deg,
+            (double)degrees(flight_path_angle),
+            (double)_flare_elevator_increment);
     }
 
     // Rate limit the pitch demand to comply with specified vertical
