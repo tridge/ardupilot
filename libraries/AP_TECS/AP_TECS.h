@@ -105,6 +105,14 @@ public:
         return is_positive(_flare_aoa_deg);
     }
 
+    bool get_flare_elevator_ff (float &elevator_increment_deg) {
+        if (does_aoa_flare()) {
+            elevator_increment_deg = _flare_elevator_increment;
+            return true;
+        }
+        return false;
+    }
+
     // set path_proportion
     void set_path_proportion(float path_proportion) override {
         _path_proportion = constrain_float(path_proportion, 0.0f, 1.0f);
@@ -195,6 +203,7 @@ private:
     AP_Float _pitch_ff_k;
     AP_Float _flare_aoa_deg;
     AP_Float _flare_aoa_time;
+    AP_Float _flare_aoa_elev_gain_ff;
 
     float _pitch_dem_at_flare_entry;
 
@@ -415,6 +424,9 @@ private:
 
     // current time constant
     float timeConstant(void) const;
+
+    // additional elevator demanded during the flare manoeuvre
+    float _flare_elevator_increment;
 
     struct {
         float sink_rate_start;

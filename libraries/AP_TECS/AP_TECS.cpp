@@ -277,6 +277,13 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("FLARE_TIME", 32, AP_TECS, _flare_aoa_time, 1.0),
 
+    // @Param: FLARE_ELEV
+    // @DisplayName: Gain from flare AoA to elevator.
+    // @Description: Sets the gain from demanded angle of attack in flare to an additional elevator deflection. Use this to compensate for the pitch stability that requires additional elevator to trim at higher angles of attack.
+    // @Range: 0 5.0
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_ELEV", 33, AP_TECS, _flare_aoa_elev_gain_ff, 0.0),
+
     AP_GROUPEND
 };
 
@@ -958,6 +965,7 @@ void AP_TECS::_update_pitch(void)
     Vector3f vel_NED;
     if (!_landing.is_flaring()) {
         _pitch_dem_at_flare_entry = _pitch_dem;
+        _flare_elevator_increment = 0.0f;
     } else if (is_positive(_flare_aoa_deg) && _ahrs.get_velocity_NED(vel_NED)) {
         float flare_aoa_dem_deg;
         if (is_positive(_flare_aoa_time)) {
@@ -966,6 +974,7 @@ void AP_TECS::_update_pitch(void)
         } else {
             flare_aoa_dem_deg = _flare_aoa_deg;
         }
+        _flare_elevator_increment = flare_aoa_dem_deg * _flare_aoa_elev_gain_ff;
         const float flight_path_angle = atan2f(-vel_NED.z, sqrtf(sq(vel_NED.x) + sq(vel_NED.y)));
         _pitch_dem = flight_path_angle + radians(flare_aoa_dem_deg);
         _pitch_dem = constrain_float(_pitch_dem, _pitch_dem_at_flare_entry, _PITCHmaxf);
