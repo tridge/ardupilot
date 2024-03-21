@@ -605,7 +605,7 @@ bool AP_Arming::gps_checks(bool report)
         }
 
         for (uint8_t i = 0; i < gps.num_sensors(); i++) {
-#if defined(GPS_BLENDED_INSTANCE)
+#if AP_GPS_BLENDED_ENABLED
             if ((i != GPS_BLENDED_INSTANCE) &&
 #else
             if (
@@ -643,7 +643,7 @@ bool AP_Arming::gps_checks(bool report)
                          (double)distance_m);
             return false;
         }
-#if defined(GPS_BLENDED_INSTANCE)
+#if AP_GPS_BLENDED_ENABLED
         if (!gps.blend_health_check()) {
             check_failed(ARMING_CHECK_GPS, report, "GPS blending unhealthy");
             return false;
