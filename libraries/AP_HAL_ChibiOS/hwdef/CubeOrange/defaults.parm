@@ -3,8 +3,9 @@ ARSPD_FBW_MIN          40
 TRIM_ARSPD_CM        5140
 TECS_LAND_ARSPD        60
 
-TECS_FLARE_AOA         25
+TECS_FLARE_AOA         17
 TECS_FLARE_TIME       1.5
+TECS_FLARE_ELEV       2.3
 
 STICK_MIXING 2
 
@@ -16,7 +17,7 @@ AHRS_GPS_USE            2
 ARMING_CHECK            0
 ARSPD_BUS               0
 ARSPD_PIN               0
-ARSPD_RATIO             1.33
+ARSPD_RATIO             1.18
 ARSPD_TUBE_ORDER        2
 ARSPD_TYPE              1
 ARSPD_USE               1
@@ -198,7 +199,7 @@ NAVL1_DAMPING           0.85
 
 NTF_LED_OVERRIDE        1
 NTF_LED_TYPES         231
-PTCH2SRV_D              0.3
+PTCH2SRV_D              0.6
 PTCH2SRV_FF             0.0
 PTCH2SRV_I              0.2
 PTCH2SRV_IMAX        4500
@@ -299,7 +300,7 @@ TECS_LAND_TCONST        5
 TECS_OPTIONS            1
 TECS_PITCH_MAX        -10
 TECS_PITCH_MIN        -35
-TECS_SINK_MAX          15
+TECS_SINK_MAX          30
 TECS_SINK_MIN          10
 TECS_SPDWEIGHT         2.0
 TECS_TIME_CONST        6.0
