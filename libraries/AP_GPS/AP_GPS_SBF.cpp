@@ -457,7 +457,7 @@ AP_GPS_SBF::process_message(void)
 
         state.num_sats = temp.NrSV;
         if (temp.NrSV == 255) {
-            //Do-Not-Use value for NrSv field in PVTGeodetic message
+            // Do-Not-Use value for NrSV field in PVTGeodetic message
             state.num_sats = 0;
         }
 
