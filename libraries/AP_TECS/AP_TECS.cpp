@@ -273,9 +273,9 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Param: FLARE_TIME
     // @DisplayName: Angle of attack target slew time during flare.
     // @Description: Controls the time required for TECS to slew the demanded pitch angle from the starting value to a value TECS_FLARE_AOA above.
-    // @Range: 0.0 5.0
+    // @Range: 0.0 10.0
     // @User: Advanced
-    AP_GROUPINFO("FLARE_TIME", 32, AP_TECS, _flare_aoa_time, 1.0),
+    AP_GROUPINFO("FLARE_TIME", 32, AP_TECS, _flare_aoa_time, 9.0),
 
     // @Param: FLARE_ELEV
     // @DisplayName: Gain from flare AoA to elevator.
@@ -969,7 +969,7 @@ void AP_TECS::_update_pitch(void)
     } else if (is_positive(_flare_aoa_deg) && _ahrs.get_velocity_NED(vel_NED)) {
         float flare_aoa_dem_deg;
         if (is_positive(_flare_aoa_time)) {
-            flare_aoa_dem_deg = (_DT / _flare_aoa_time)  * _flare_counter;
+            flare_aoa_dem_deg = _flare_aoa_deg * (_DT / _flare_aoa_time)  * _flare_counter;
             flare_aoa_dem_deg = MIN(flare_aoa_dem_deg, _flare_aoa_deg);
         } else {
             flare_aoa_dem_deg = _flare_aoa_deg;
