@@ -964,7 +964,7 @@ void AP_TECS::_update_pitch(void)
     // an angle of attack target.
     Vector3f vel_NED;
     if (!_landing.is_flaring()) {
-        _pitch_dem_at_flare_entry = _pitch_dem;
+        _pitch_dem_at_flare_entry = _last_pitch_dem;
         _flare_elevator_increment = 0.0f;
     } else if (is_positive(_flare_aoa_deg) && _ahrs.get_velocity_NED(vel_NED)) {
         float flare_aoa_dem_deg;
