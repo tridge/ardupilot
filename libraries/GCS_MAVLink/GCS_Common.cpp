@@ -555,16 +555,25 @@ void GCS_MAVLINK::send_proximity()
 void GCS_MAVLINK::send_ahrs2()
 {
 #if AP_AHRS_ENABLED
-    const AP_AHRS &ahrs = AP::ahrs();
-    Vector3f euler;
     Location loc {};
-    // we want one or both of these, use | to avoid short-circuiting:
-    if (uint8_t(ahrs.get_secondary_attitude(euler)) |
-        uint8_t(ahrs.get_secondary_position(loc))) {
+    Quaternion quat;
+    float r, p, y;
+    const auto &ekf3 = AP::ahrs().EKF3;
+    auto &eahrs = AP::externalAHRS();
+    ekf3.getQuaternion(quat);
+    ekf3.getLLH(loc);
+    quat.to_euler(r, p, y);
+    mavlink_msg_ahrs3_send(chan,
+                           r, p, y,
+                           loc.alt*1.0e-2f,
+                           loc.lat,
+                           loc.lng,
+                           0,0,0,0);
+
+    if (eahrs.get_quaternion(quat) && eahrs.get_location(loc)) {
+        quat.to_euler(r, p, y);
         mavlink_msg_ahrs2_send(chan,
-                               euler.x,
-                               euler.y,
-                               euler.z,
+                               r, p, y,
                                loc.alt*1.0e-2f,
                                loc.lat,
                                loc.lng);
