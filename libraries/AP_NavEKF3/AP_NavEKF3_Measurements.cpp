@@ -294,12 +294,8 @@ void NavEKF3_core::readMagData()
         return;
     }
 
-    if (compass.learn_offsets_enabled() &&
-        frontend->sources.getYawSource() != AP_NavEKF_Source::SourceYaw::GPS_COMPASS_FALLBACK) {
-        /*
-          while learning offsets keep all mag states reset
-          note that compass learning is ignored with GPS with compass fallback
-        */
+    if (compass.learn_offsets_enabled()) {
+        // while learning offsets keep all mag states reset
         InitialiseVariablesMag();
         wasLearningCompass_ms = imuSampleTime_ms;
     } else if (wasLearningCompass_ms != 0 && imuSampleTime_ms - wasLearningCompass_ms > 1000) {
