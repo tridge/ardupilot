@@ -69,7 +69,7 @@ protected:
       return true if the GNSS is disabled
      */
     bool gnss_is_disabled(void) const {
-        return frontend.gnss_is_disabled;
+        return frontend.gnss_is_disabled || option_is_set(AP_ExternalAHRS::OPTIONS::GNSS_DISABLE);
     }
 
     /*

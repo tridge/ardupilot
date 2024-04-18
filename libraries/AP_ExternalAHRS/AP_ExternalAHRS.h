@@ -177,6 +177,7 @@ protected:
     enum class OPTIONS {
         VN_UNCOMP_IMU = 1U << 0,
         AN_ARSP_AID = 1U << 1,
+        GNSS_DISABLE = 1U << 2,
     };
     bool option_is_set(OPTIONS option) const { return (options.get() & int32_t(option)) != 0; }
 
