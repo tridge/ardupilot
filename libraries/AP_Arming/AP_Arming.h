@@ -5,6 +5,10 @@
 #include <AP_Param/AP_Param.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 
+#ifndef AP_ARMING_CRASHDUMP_ACK_ENABLED
+#define AP_ARMING_CRASHDUMP_ACK_ENABLED AP_CRASHDUMP_ENABLED
+#endif
+
 class AP_Arming {
 public:
 
@@ -204,6 +208,10 @@ protected:
     
     bool serial_protocol_checks(bool display_failure);
 
+#if AP_ARMING_CRASHDUMP_ACK_ENABLED
+    bool crashdump_checks(bool report);
+#endif
+
     virtual bool system_checks(bool report);
 
     bool can_checks(bool report);
@@ -270,6 +278,14 @@ private:
 
     uint32_t last_prearm_display_ms;  // last time we send statustexts for prearm failures
     bool running_arming_checks;  // true if the arming checks currently being performed are being done because the vehicle is trying to arm the vehicle
+
+#if AP_ARMING_CRASHDUMP_ACK_ENABLED
+    struct CrashDump {
+        void check_reset();
+        AP_Int8  acked;
+    } crashdump_ack;
+#endif  // AP_ARMING_CRASHDUMP_ACK_ENABLED
+
 };
 
 namespace AP {
