@@ -1225,6 +1225,15 @@ public:
     bool set_velocity_match(const Vector2f &velocity) override;
 #endif // AP_SCRIPTING_ENABLED
 
+    struct {
+        bool enabled;
+        bool thread_created;
+        bool running;
+        uint32_t pulse_started_us;
+        uint32_t pulse_width_us;
+    } gpio_pwm;
+    void check_gpio_pwm();
+    void gpio_pwm_thread(void);
 };
 
 extern Plane plane;

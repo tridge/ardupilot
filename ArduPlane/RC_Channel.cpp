@@ -405,6 +405,10 @@ bool RC_Channel_Plane::do_aux_function(const aux_func_t ch_option, const AuxSwit
         plane.autotune_enable(ch_flag == AuxSwitchPos::HIGH);
         break;
 
+    case AUX_FUNC::SCRIPTING_8:
+        plane.gpio_pwm.enabled = (ch_flag == AuxSwitchPos::HIGH);
+        break;
+
     default:
         return RC_Channel::do_aux_function(ch_option, ch_flag);
     }

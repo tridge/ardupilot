@@ -347,6 +347,8 @@ void Plane::one_second_loop()
         !is_equal(G_Dt, scheduler.get_loop_period_s())) {
         INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
     }
+
+    check_gpio_pwm();
 }
 
 void Plane::three_hz_loop()
@@ -826,3 +828,62 @@ void Plane::update_current_loc(void)
 }
 
 AP_HAL_MAIN_CALLBACKS(&plane);
+
+
+void Plane::check_gpio_pwm(void)
+{
+    if (!gpio_pwm.enabled) {
+        return;
+    }
+    if (!gpio_pwm.thread_created) {
+        gpio_pwm.thread_created = true;
+        hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Plane::gpio_pwm_thread, void), "GPIO_PWM", 4096,
+                                     AP_HAL::Scheduler::PRIORITY_BOOST, 1);
+        gcs().send_text(MAV_SEVERITY_NOTICE, "Created GPIO PWM thread");
+    }
+}
+
+/*
+  high priority thread to generate PWM pulses with ability to cut a pulse
+ */
+void Plane::gpio_pwm_thread(void)
+{
+    while (true) {
+        uint32_t now_us = AP_HAL::micros();
+        const float t = now_us*1.0e-6;
+        const float freq_hz = 0.3;
+        const float amplitude = sinf(t*M_PI*2*freq_hz);
+        const uint32_t pulse_width_us = 1400 + 100 * amplitude;
+        const uint32_t pulse_period_us = 2500;
+        const uint32_t pulse_width_cut = 1150;
+
+        if (!gpio_pwm.running) {
+            gpio_pwm.pulse_started_us = 0;
+            if (gpio_pwm.enabled) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "GPIO PWM started");
+                gpio_pwm.running = true;
+            } else {
+                relay.set(0, 0);
+                hal.scheduler->delay_microseconds(pulse_period_us);
+                continue;
+            }
+        }
+
+        if (gpio_pwm.pulse_started_us != 0) {
+            relay.set(0, 0);
+            gpio_pwm.pulse_started_us = 0;
+            hal.scheduler->delay_microseconds(pulse_period_us - gpio_pwm.pulse_width_us);
+        } else {
+            if (!gpio_pwm.enabled) {
+                gpio_pwm.pulse_width_us = pulse_width_cut;
+                gpio_pwm.running = false;
+                gcs().send_text(MAV_SEVERITY_NOTICE, "GPIO PWM stopping");
+            } else {
+                gpio_pwm.pulse_width_us = pulse_width_us;
+            }
+            relay.set(0, 1);
+            gpio_pwm.pulse_started_us = now_us;
+            hal.scheduler->delay_microseconds(gpio_pwm.pulse_width_us);
+        }
+    }
+}
