@@ -4,6 +4,7 @@ on:
     push:
       branches:
         - CxPilot
+        - CxPilot-*
         - master
       paths-ignore:
         # remove non chibios HAL
@@ -124,6 +125,8 @@ on:
         - '.vscode/**'
         - '.github/ISSUE_TEMPLATE/**'
 
+    workflow_dispatch:
+      
 concurrency:
     group: ci-${{github.workflow}}-${{ github.ref }}
     cancel-in-progress: true

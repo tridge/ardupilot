@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - CxPilot
+      - CxPilot-*
       - master
     paths-ignore:
       # remove non LINUX HAL
