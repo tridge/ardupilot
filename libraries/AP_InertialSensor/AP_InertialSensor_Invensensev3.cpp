@@ -369,6 +369,8 @@ void AP_InertialSensor_Invensensev3::start()
 
     // start the timer process to read samples, using the fastest rate avilable
     periodic_handle = dev->register_periodic_callback(backend_period_us, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensensev3::read_fifo, void));
+    // turn off minimum cycle separation to get even reads
+    dev->set_periodic_minimum(0);
 }
 
 // get a startup banner to output to the GCS
