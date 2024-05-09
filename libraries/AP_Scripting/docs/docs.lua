@@ -1048,6 +1048,13 @@ function MotorsMatrix:add_motor_raw(motor_num, roll_factor, pitch_factor, yaw_fa
 ---@return boolean
 function MotorsMatrix:init(expected_num_motors) end
 
+-- number of motor that has failed. Need to be checked if get_thrust_boost returns True
+---@return integer
+function MotorsMatrix:get_lost_motor() end
+
+-- Return True if it has lost any motor
+---@return boolean
+function MotorsMatrix:get_thrust_boost() end
 
 -- desc
 ---@class quadplane
@@ -1236,6 +1243,11 @@ function esc_telem:update_rpm(esc_index, rpm, error_rate) end
 ---@param param1 motor index (0 is first motor)
 ---@param param2 scale factor
 function esc_telem:set_rpm_scale(esc_index, scale_factor) end
+
+-- get the timestamp of last telemetry data for an ESC
+---@param esc_index integer
+---@return uint32_t_ud
+function esc_telem:get_last_telem_data_ms(esc_index) end
 
 -- desc
 ---@class optical_flow
