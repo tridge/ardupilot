@@ -24,7 +24,7 @@
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #ifdef CARBOPILOT
-#define AP_CUSTOM_FIRMWARE_STRING "CxPilot 5.1.1"
+#define AP_CUSTOM_FIRMWARE_STRING "CxPilot-5.1.1"
 #endif
 
 /*
