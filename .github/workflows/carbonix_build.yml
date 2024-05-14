@@ -1,4 +1,4 @@
-name: Build and Archive
+name: Carbonix Build
 
 on:
     push:
@@ -196,16 +196,26 @@ jobs:
         with:
           files: "build/CubeOrange/*, build/CarbonixCubeOrange/*, build/sitl/*, build/CarbonixF405/*, build/Volanti-M1/*, build/Volanti-M2/*, build/Volanti-M3/*, build/Volanti-M4/*, build/Volanti-M5/*, build/Volanti-LWing/*, build/Volanti-RWing/*, build/Volanti-LTail/*, build/Volanti-RTail/*, build/Ottano-M1/*, build/Ottano-M2/*, build/Ottano-M3/*, build/Ottano-M4/*, build/Ottano-M5/*, build/Ottano-LWing/*, build/Ottano-RWing/*, build/Ottano-LTail/*, build/Ottano-RTail/*"
           fail: true
-      - name: Install zip utility
-        run: sudo apt-get install zip
-      - name: Archive build output
+      - name: Extract firmware version and commit id
+        id: extract_info
         run: |
-          echo build/*/bin/ | xargs -n 1 cp -v ArduPlane/ReleaseNotes.txt
-          cp -v ArduPlane/ReleaseNotes.txt build/
-          zip -r build-output.zip build/*/bin/*
+          FIRMWARE_VERSION=$(grep -oP '#define AP_CUSTOM_FIRMWARE_STRING "\K(.*)(?=")' libraries/AP_Common/AP_FWVersionDefine.h)
+          COMMIT_ID=$(git rev-parse --short HEAD)
+          echo "firmware_version=$FIRMWARE_VERSION" >> $GITHUB_ENV
+          echo "commit_id=$COMMIT_ID" >> $GITHUB_ENV
+        shell: sh -e {0}
+      - name: Gather build output
+        run: |
+          mkdir -p temp
+          for dir in CubeOrange CarbonixCubeOrange sitl CarbonixF405 Volanti-M1 Volanti-M2 Volanti-M3 Volanti-M4 Volanti-M5 Volanti-LWing Volanti-RWing Volanti-LTail Volanti-RTail Ottano-M1 Ottano-M2 Ottano-M3 Ottano-M4 Ottano-M5 Ottano-LWing Ottano-RWing Ottano-LTail Ottano-RTail; do
+            mkdir -p temp/$dir/bin
+            cp -v build/$dir/bin/* temp/$dir/bin/
+          done
+          cp -v ArduPlane/ReleaseNotes.txt temp/
+        shell: sh -e {0}
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: compiled-output
-          path: build-output.zip
+          name: ${{ env.firmware_version }}_${{ env.commit_id }}
+          path: temp
           retention-days: 90
