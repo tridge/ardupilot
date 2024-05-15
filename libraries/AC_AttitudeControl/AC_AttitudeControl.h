@@ -490,6 +490,9 @@ protected:
     AP_Float            _land_pitch_mult;
     AP_Float            _land_yaw_mult;
 
+    // latest gyro value use by the rate_controller
+    Vector3f            _rate_gyro;
+
     // Intersampling period in seconds
     float               _dt;
 
