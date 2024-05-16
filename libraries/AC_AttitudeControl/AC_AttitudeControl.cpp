@@ -604,6 +604,16 @@ void AC_AttitudeControl::input_angle_step_bf_roll_pitch_yaw(float roll_angle_ste
     attitude_controller_run_quat();
 }
 
+// Command an rate step (i.e change) in body frame rate
+// Used to command a step in rate without exciting the orthogonal axis during autotune
+void AC_AttitudeControl::input_rate_step_bf_roll_pitch_yaw(float roll_rate_step_bf_cd, float pitch_rate_step_bf_cd, float yaw_rate_step_bf_cd)
+{
+    input_rate_bf_roll_pitch_yaw_2(0.0f, 0.0f, 0.0f);
+    rate_bf_roll_target(roll_rate_step_bf_cd);
+    rate_bf_pitch_target(pitch_rate_step_bf_cd);
+    rate_bf_yaw_target(yaw_rate_step_bf_cd);
+}
+
 // Command a thrust vector and heading rate
 void AC_AttitudeControl::input_thrust_vector_rate_heading(const Vector3f& thrust_vector, float heading_rate_cds, bool slew_yaw)
 {
