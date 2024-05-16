@@ -52,7 +52,7 @@
 
 // number of grid_blocks in the LRU memory cache
 #ifndef TERRAIN_GRID_BLOCK_CACHE_SIZE
-#define TERRAIN_GRID_BLOCK_CACHE_SIZE 12
+#define TERRAIN_GRID_BLOCK_CACHE_SIZE 48
 #endif
 
 // format of grid on disk
