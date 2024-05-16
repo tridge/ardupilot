@@ -709,7 +709,9 @@ void Copter::one_hz_loop()
 #endif
 
     // see if we should have a separate rate thread
-    if (!started_rate_thread && flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD)) {
+    if (!started_rate_thread && (flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD)
+                        || flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD))) {
+
         if (hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Copter::rate_controller_thread, void),
                                          "attitude",
                                          2048, AP_HAL::Scheduler::PRIORITY_BOOST, 1)) {

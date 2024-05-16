@@ -25,7 +25,8 @@ void Copter::rate_controller_thread()
 
     while (true) {
         // allow changing option at runtime
-        if (!flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD) ||
+        if ((!flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD) &&
+             !flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD)) ||
             ap.motor_test) {
             using_rate_thread = false;
             if (was_using_rate_thread) {
@@ -118,11 +119,11 @@ void Copter::rate_controller_thread()
         }
         
         // check that the CPU is not pegged, if it is drop the attitude rate
-        if (now_ms - last_report_ms >= 200) {
+        if (now_ms - last_report_ms >= 200 && !flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD)) {
             last_report_ms = now_ms;
             if (running_slow > 5 || AP::scheduler().get_extra_loop_us() > 0) {
                 const uint32_t new_attitude_rate = ins.get_raw_gyro_rate_hz()/(rate_decimation+1);
-                if (new_attitude_rate > AP::scheduler().get_filtered_loop_rate_hz()) {
+                if (new_attitude_rate > AP::scheduler().get_filtered_loop_rate_hz() * 2) {
                     rate_decimation = rate_decimation + 1;
                     ins.set_rate_decimation(rate_decimation);
                     attitude_control->set_notch_sample_rate(new_attitude_rate);
