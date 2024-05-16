@@ -501,6 +501,12 @@ void AC_AttitudeControl::input_rate_bf_roll_pitch_yaw(float roll_rate_bf_cds, fl
 // Command an angular velocity with angular velocity smoothing using rate loops only with no attitude loop stabilization
 void AC_AttitudeControl::input_rate_bf_roll_pitch_yaw_2(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds)
 {
+    _ang_vel_body = input_rate_bf_roll_pitch_yaw_4(roll_rate_bf_cds, pitch_rate_bf_cds, yaw_rate_bf_cds);
+}
+
+// Command an angular velocity with angular velocity smoothing using rate loops only with no attitude loop stabilization
+Vector3f AC_AttitudeControl::input_rate_bf_roll_pitch_yaw_4(float roll_rate_bf_cds, float pitch_rate_bf_cds, float yaw_rate_bf_cds)
+{
     // Convert from centidegrees on public interface to radians
     float roll_rate_rads = radians(roll_rate_bf_cds * 0.01f);
     float pitch_rate_rads = radians(pitch_rate_bf_cds * 0.01f);
@@ -518,8 +524,8 @@ void AC_AttitudeControl::input_rate_bf_roll_pitch_yaw_2(float roll_rate_bf_cds, 
     _attitude_target.to_euler(_euler_angle_target);
     // Convert body-frame angular velocity into euler angle derivative of desired attitude
     ang_vel_to_euler_rate(_attitude_target, _ang_vel_target, _euler_rate_target);
-    // finally update the attitude target
-    _ang_vel_body = _ang_vel_target;
+
+    return _ang_vel_target;
 }
 
 // Command an angular velocity with angular velocity smoothing using rate loops only with integrated rate error stabilization
@@ -606,12 +612,16 @@ void AC_AttitudeControl::input_angle_step_bf_roll_pitch_yaw(float roll_angle_ste
 
 // Command an rate step (i.e change) in body frame rate
 // Used to command a step in rate without exciting the orthogonal axis during autotune
+// Done as a single thread-safe function to avoid intermediate zero values being seen by the attitude controller
 void AC_AttitudeControl::input_rate_step_bf_roll_pitch_yaw(float roll_rate_step_bf_cd, float pitch_rate_step_bf_cd, float yaw_rate_step_bf_cd)
 {
-    input_rate_bf_roll_pitch_yaw_2(0.0f, 0.0f, 0.0f);
-    rate_bf_roll_target(roll_rate_step_bf_cd);
-    rate_bf_pitch_target(pitch_rate_step_bf_cd);
-    rate_bf_yaw_target(yaw_rate_step_bf_cd);
+    Vector3f ang_vel_body = input_rate_bf_roll_pitch_yaw_4(0.0f, 0.0f, 0.0f);
+    // Set x-axis angular velocity in centidegrees/s
+    ang_vel_body.x = radians(roll_rate_step_bf_cd * 0.01f);
+    ang_vel_body.y = radians(pitch_rate_step_bf_cd * 0.01f);
+    ang_vel_body.z = radians(yaw_rate_step_bf_cd * 0.01f);
+    // finally update the attitude target
+    _ang_vel_body = ang_vel_body;
 }
 
 // Command a thrust vector and heading rate
