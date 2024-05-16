@@ -1,0 +1,128 @@
+name: Compare Build Outputs
+
+on:
+  pull_request:
+    types: [labeled]
+
+concurrency:
+    group: ci-${{github.workflow}}-${{ github.ref }}
+    cancel-in-progress: true
+      
+jobs:
+  build-and-compare:
+    if: github.event.label.name == 'CX_NO_CODE_CHANGE'
+    runs-on: ubuntu-20.04
+
+    container: ardupilot/ardupilot-dev-${{ matrix.toolchain }}:v0.0.29
+    strategy:
+      fail-fast: false  # don't cancel if a job from the matrix fails
+      matrix:
+        toolchain: [
+            chibios,
+        ]
+        gcc: [10]
+        exclude:
+          - gcc: 10
+            toolchain: chibios-clang
+        board: ["CarbonixCubeOrange", "Volanti-M1", "Volanti-M2", "Volanti-M3", "Volanti-M4", "Volanti-M5", "Volanti-LWing", "Volanti-RWing", "Volanti-LTail", "Volanti-RTail", "Ottano-M1", "Ottano-M2", "Ottano-M3", "Ottano-M4", "Ottano-M5", "Ottano-LWing", "Ottano-RWing", "Ottano-LTail", "Ottano-RTail"]        
+    steps:
+      # git checkout the PR
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      # Put ccache into github cache for faster build
+      - name: Prepare ccache timestamp
+        id: ccache_cache_timestamp
+        run: |
+          NOW=$(date -u +"%F-%T")
+          echo "timestamp=${NOW}" >> $GITHUB_OUTPUT
+
+      - name: ccache cache files
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{github.workflow}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
+          restore-keys: ${{github.workflow}}-ccache-  # restore ccache from either previous build on this branch or on master
+      
+      - name: setup ccache
+        run: |
+          . .github/workflows/ccache.env
+      
+      - name: Check if Hwdef directory has been modified
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          CHANGED=$(git diff --quiet HEAD origin/${{ github.event.pull_request.base.ref }} -- libraries/AP_HAL_ChibiOS/hwdef || echo "changed")
+          if [ "$CHANGED" = "changed" ]; then
+            echo "Directory has been modified"
+            exit 1
+          fi
+
+      - name: Build Head and ${{ github.event.pull_request.base.ref }} ${{matrix.board}} 
+        shell: bash
+        run: |
+            git config --global --add safe.directory ${GITHUB_WORKSPACE}
+            PATH="/github/home/.local/bin:$PATH"
+
+            # export some environment variables designed to get
+            # repeatable builds from the same source:
+            export CHIBIOS_GIT_VERSION="12345678"
+            export GIT_VERSION="abcdef"
+            export GIT_VERSION_INT="15"
+            ./waf configure --board ${{matrix.board}} 
+
+            ./Tools/Carbonix_scripts/build_no_clean.sh ${{ matrix.board }}
+  
+            NO_VERSIONS_DIR="$GITHUB_WORKSPACE/${{matrix.board}}/pr_bin_no_versions"
+            mkdir -p "$NO_VERSIONS_DIR"  
+            cp -r build/${{matrix.board}}/bin/* "$NO_VERSIONS_DIR"
+
+            echo [`date`] Built Base with no versions
+
+            git checkout ${{ github.event.pull_request.base.ref }} 
+
+            # export some environment variables designed to get
+            # repeatable builds from the same source:
+            
+            export CHIBIOS_GIT_VERSION="12345678"
+            export GIT_VERSION="abcdef"
+            export GIT_VERSION_INT="15"
+            ./Tools/Carbonix_scripts/build_no_clean.sh ${{ matrix.board }}
+
+            NO_VERSIONS_DIR="$GITHUB_WORKSPACE/${{matrix.board}}/base_branch_bin_no_versions"
+            mkdir -p "$NO_VERSIONS_DIR"
+            cp -r build/${{matrix.board}}/bin/* "$NO_VERSIONS_DIR"
+
+            echo [`date`] Built ${{ github.event.pull_request.base.ref }} with no versions
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.board }}
+          path: ${{ github.workspace }}/${{ matrix.board }}
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Compare build outputs
+        shell: bash
+        run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
+          PATH="/github/home/.local/bin:$PATH"
+          differences_found=0
+
+          for base_file in $GITHUB_WORKSPACE/${{ matrix.board }}/base_branch_bin_no_versions/*.bin
+          do
+            base_filename=$(basename "$base_file")
+            diff_output=$(diff $base_file $GITHUB_WORKSPACE/${{ matrix.board }}/pr_bin_no_versions/$base_filename) || true
+            if [ "$diff_output" != "" ]; then
+              echo Failed -- Comparing $base_file and $GITHUB_WORKSPACE/${{ matrix.board }}/pr_bin_no_versions/$base_filename resulted in $diff_output 
+              differences_found=1
+            else
+              echo Passed -- Comparing $base_file and $GITHUB_WORKSPACE/${{ matrix.board }}/pr_bin_no_versions/$base_filename
+            fi
+          done
+          if [ $differences_found -eq 1 ]; then
+            exit 1
+          fi
+          
