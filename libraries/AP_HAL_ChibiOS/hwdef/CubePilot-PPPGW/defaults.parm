@@ -1,8 +1,8 @@
 NET_ENABLE 1
 NET_OPTIONS 1
 
-# enable hw flow control
-UART1_RTSCTS 1
+# disable hw flow control
+UART1_RTSCTS 0
 
 # swap TX and RX
 UART1_OPTIONS 8
