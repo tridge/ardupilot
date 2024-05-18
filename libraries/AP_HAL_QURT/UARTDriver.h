@@ -23,46 +23,18 @@ class QURT::UARTDriver : public AP_HAL::UARTDriver {
 public:
     UARTDriver(const char *name);
 
-    /* QURT implementations of UARTDriver virtual methods */
+    bool is_initialized() override;
+    bool tx_pending() override;
 
-    void set_device_path(const char *path) {
-        devname = path;
-    }
-    
-    void begin(uint32_t b);
-    void begin(uint32_t b, uint16_t rxS, uint16_t txS);
-    void end();
-    void flush();
-    bool is_initialized();
-    void set_blocking_writes(bool blocking);
-    bool tx_pending();
+    /* Empty implementations of Stream virtual methods */
+    uint32_t txspace() override;
 
-    /* QURT implementations of Stream virtual methods */
-    int16_t available();
-    int16_t txspace();
-    int16_t read();
-
-    /* QURT implementations of Print virtual methods */
-    size_t write(uint8_t c);
-    size_t write(const uint8_t *buffer, size_t size);
-
-    void _read_callback(char *buf, size_t size);
-
-    void _timer_tick(void) override;
-    
-private:
-    const char *devname;
-    int fd = -1;
-    Semaphore lock;
-
-    ByteBuffer *readbuf;
-    ByteBuffer *writebuf;
-
-    bool nonblocking_writes = false;
-    volatile bool in_timer = false;
-    volatile bool initialised = false;
-
-    uint64_t last_write_time_us;
-
-    int write_fd(const uint8_t *buf, uint16_t n);
+protected:
+    void _begin(uint32_t b, uint16_t rxS, uint16_t txS) override;
+    size_t _write(const uint8_t *buffer, size_t size) override;
+    ssize_t _read(uint8_t *buffer, uint16_t size) override WARN_IF_UNUSED;
+    void _end() override;
+    void _flush() override;
+    uint32_t _available() override;
+    bool _discard_input() override;
 };

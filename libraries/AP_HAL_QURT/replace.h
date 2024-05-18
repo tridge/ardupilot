@@ -1,7 +1,5 @@
 #pragma once
-#include <AP_HAL/AP_HAL.h>
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_QURT
 #include <stdlib.h>
 #include <stdint.h>
 #include <types.h>
@@ -40,5 +38,3 @@ extern volatile uint32_t _last_counter;
 
 // missing defines from math.h
 #define M_SQRT1_2 0.70710678118654752440
-
-#endif // CONFIG_HAL_BOARD

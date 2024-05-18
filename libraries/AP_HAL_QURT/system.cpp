@@ -6,8 +6,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/system.h>
 
-#include <sys/timespec.h>
-#include <dspal_time.h>
 #include "replace.h"
 #include <fenv.h>
 
@@ -34,8 +32,6 @@ void panic(const char *errormsg, ...)
     vsnprintf(buf, sizeof(buf), errormsg, ap);
     va_end(ap);
     HAP_PRINTF(buf);
-    usleep(2000000);
-    hal.rcin->deinit();
     exit(1);
 }
 
