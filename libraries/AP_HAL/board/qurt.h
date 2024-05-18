@@ -14,7 +14,7 @@
 #endif
 
 #ifndef HAL_HAVE_HARDWARE_DOUBLE
-#define HAL_HAVE_HARDWARE_DOUBLE 1
+#define HAL_HAVE_HARDWARE_DOUBLE 0
 #endif
 
 #ifndef HAL_WITH_EKF_DOUBLE
@@ -32,9 +32,23 @@
 #define HAL_HAVE_BOARD_VOLTAGE 0
 #define HAL_HAVE_SERVO_VOLTAGE 0
 #define HAL_HAVE_SAFETY_SWITCH 0
+#define HAL_WITH_MCU_MONITORING 0
+#define HAL_USE_QUADSPI 0
+#define HAL_LOGGING_ENABLED 0
+#define HAL_WITH_DSP 0
+#define HAL_CANFD_SUPPORTED 0
+#define HAL_NUM_CAN_IFACES 0
+#define AP_CRASHDUMP_ENABLED 0
+#define HAL_ENABLE_DFU_BOOT 0
+#define HAL_PARAM_DEFAULTS_PATH nullptr
+#define AP_FILESYSTEM_HAVE_DIRENT_DTYPE 0
+#define AP_FILESYSTEM_PARAM_ENABLED 0
+#define AP_FILESYSTEM_FILE_READING_ENABLED 0
+
+#define USE_LIBC_REALLOC 1
+
 
 /*
-  macros to ease the port
+  bring in missing standard library functions
  */
-#define strnlen(s,n) strnlen_s(s,n)
-
+#include <AP_HAL_QURT/replace.h>

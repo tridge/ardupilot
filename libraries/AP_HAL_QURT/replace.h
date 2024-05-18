@@ -21,6 +21,8 @@ extern "C" {
     off_t lseek(int, off_t, int);
     DIR *opendir (const char *);
     int unlink(const char *pathname);
+    void *memmem(const void *haystack, size_t haystacklen,
+                 const void *needle, size_t needlelen);
 
     //typedef int32_t pid_t;
     pid_t getpid (void);
@@ -35,5 +37,8 @@ extern volatile const char *_last_dsp_file;
 extern volatile uint32_t _last_counter;
 
 #define HAP_LINE() do { _last_dsp_line = __LINE__; _last_dsp_file = __FILE__; _last_counter++; } while (0)
+
+// missing defines from math.h
+#define M_SQRT1_2 0.70710678118654752440
 
 #endif // CONFIG_HAL_BOARD
