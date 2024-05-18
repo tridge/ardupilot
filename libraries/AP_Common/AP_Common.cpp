@@ -19,6 +19,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include "AP_Common.h"
+#include <string.h>
 
 extern const AP_HAL::HAL& hal;
 
