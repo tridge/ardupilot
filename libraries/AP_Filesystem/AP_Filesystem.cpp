@@ -16,6 +16,9 @@
 #include "AP_Filesystem.h"
 
 #include "AP_Filesystem_config.h"
+
+#if AP_FILESYSTEM_FILE_READING_ENABLED
+
 #include <AP_HAL/HAL.h>
 #include <AP_HAL/Util.h>
 #include <AP_Math/AP_Math.h>
@@ -418,3 +421,4 @@ AP_Filesystem &FS()
 }
 }
 
+#endif // AP_FILESYSTEM_FILE_READING_ENABLED
