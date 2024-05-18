@@ -588,6 +588,7 @@ void GCS_MAVLINK::ftp_worker(void) {
 
 // calculates how much string length is needed to fit this in a list response
 int GCS_MAVLINK::gen_dir_entry(char *dest, size_t space, const char *path, const struct dirent * entry) {
+#if AP_FILESYSTEM_FILE_READING_ENABLED
     const bool is_file = entry->d_type == DT_REG || entry->d_type == DT_LNK;
 
     if (space < 3) {
@@ -616,6 +617,9 @@ int GCS_MAVLINK::gen_dir_entry(char *dest, size_t space, const char *path, const
     } else {
         return hal.util->snprintf(dest, space, "D%s%c", entry->d_name, (char)0);
     }
+#else
+    return -1;
+#endif // AP_FILESYSTEM_FILE_READING_ENABLED
 }
 
 // list the contents of a directory, skip the offset number of entries before providing data
