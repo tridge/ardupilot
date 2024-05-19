@@ -24,8 +24,7 @@
 #include <AP_SerialManager/AP_SerialManager_config.h>
 #include "AP_InertialSensor_Params.h"
 #include "AP_InertialSensor_tempcal.h"
-#include <hal.h>
-#include <AP_HAL_ChibiOS/AP_HAL_ChibiOS.h>
+#include <AP_HAL/CondMutex.h>
 
 #ifndef AP_SIM_INS_ENABLED
 #define AP_SIM_INS_ENABLED AP_SIM_ENABLED
@@ -165,12 +164,12 @@ public:
     const Vector3f& get_gyro_for_fft(void) const { return _gyro_for_fft[_first_usable_gyro]; }
     FloatBuffer&  get_raw_gyro_window(uint8_t instance, uint8_t axis) { return _gyro_window[instance][axis]; }
     FloatBuffer&  get_raw_gyro_window(uint8_t axis) { return get_raw_gyro_window(_first_usable_gyro, axis); }
-    uint16_t get_raw_gyro_rate_hz() const { return get_raw_gyro_rate_hz(_first_usable_gyro); }
-    uint16_t get_raw_gyro_rate_hz(uint8_t instance) const { return _gyro_raw_sample_rates[_first_usable_gyro]; }
 #if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     bool has_fft_notch() const;
 #endif
 #endif
+    uint16_t get_raw_gyro_rate_hz(uint8_t instance) const { return _gyro_raw_sample_rates[_first_usable_gyro]; }
+    uint16_t get_raw_gyro_rate_hz() const { return get_raw_gyro_rate_hz(_first_usable_gyro); }
     bool set_gyro_window_size(uint16_t size);
     // get accel offsets in m/s/s
     const Vector3f &get_accel_offsets(uint8_t i) const { return _accel_offset(i); }
@@ -802,22 +801,24 @@ private:
     bool raw_logging_option_set(RAW_LOGGING_OPTION option) const {
         return (raw_logging_options.get() & int32_t(option)) != 0;
     }
-
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
     /*
       binary semaphore for rate loop to use to start a rate loop when
       we hav finished filtering the primary IMU
      */
-    thread_t *rate_loop_thread;
     ObjectBuffer<Vector3f> _rate_loop_gyro_window{AP_INERTIAL_SENSOR_RATE_LOOP_BUFFER_SIZE};
     uint8_t rate_decimation = 1;
     uint8_t rate_decimation_count;
+    AP_HAL::CondMutex* _cmutex;
 
 public:
-    static const eventmask_t EVT_GYRO_SAMPLE = EVENT_MASK(5);
-    void set_rate_loop_thread(thread_t *t) { rate_loop_thread = t; }
-    bool get_next_gyro_sample(Vector3f& gyro) { return _rate_loop_gyro_window.pop(gyro); }
+    void set_rate_loop_mutex(AP_HAL::CondMutex* cmutex) { _cmutex = cmutex; }
+    bool get_next_gyro_sample(Vector3f& gyro);
     uint32_t get_num_gyro_samples() { return _rate_loop_gyro_window.available(); }
     void set_rate_decimation(uint8_t rdec) { rate_decimation = rdec; }
+
+    bool gyro_samples_available() { return  _rate_loop_gyro_window.available() > 0; }
+#endif
 };
 
 namespace AP {
