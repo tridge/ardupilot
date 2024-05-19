@@ -1652,6 +1652,7 @@ class QURT(Board):
         env.HEAXGON_APP = "libardupilot.so"
         env.HEXAGON_LINKFLAGS = f"-march=hexagon -mcpu=hexagonv66 -shared -call_shared -G0 {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/initS.o -L{cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic -Bsymbolic {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/libgcc.a --wrap=malloc --wrap=calloc --wrap=free --wrap=realloc --wrap=memalign --wrap=__stack_chk_fail -lc -soname={env.HEXAGON_APP} --start-group --whole-archive OBJECT_LIST --end-group  --start-group -lgcc --end-group {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/finiS.o"
         env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/qurt"]
+        env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/posix"]
         env.CXXFLAGS += ["-fPIC", "-MD"]
 
         env.DEFINES.update(
