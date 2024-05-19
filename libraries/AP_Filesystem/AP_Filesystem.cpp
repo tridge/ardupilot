@@ -205,7 +205,9 @@ AP_Filesystem::DirHandle *AP_Filesystem::opendir(const char *pathname)
         (strlen(pathname) == 1 && pathname[0] == '/')) {
         virtual_dirent.backend_ofs = 0;
         virtual_dirent.d_off = 0;
+#if AP_FILESYSTEM_HAVE_DIRENT_DTYPE
         virtual_dirent.de.d_type = DT_DIR;
+#endif
     } else {
         virtual_dirent.backend_ofs = 255;
     }

@@ -29,6 +29,10 @@
 #include <errno.h>
 #include "AP_Filesystem_backend.h"
 
+#ifndef AP_FILESYSTEM_POSIX_HAVE_UTIME
+#define AP_FILESYSTEM_POSIX_HAVE_UTIME 1
+#endif
+
 class AP_Filesystem_Posix : public AP_Filesystem_Backend
 {
 public:

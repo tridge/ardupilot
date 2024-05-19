@@ -26,10 +26,13 @@
 
 #if defined(__APPLE__)
 #include <sys/mount.h>
-#else
+#elif CONFIG_HAL_BOARD != HAL_BOARD_QURT
 #include <sys/vfs.h>
 #endif
+
+#if AP_FILESYSTEM_POSIX_HAVE_UTIME
 #include <utime.h>
+#endif
 
 extern const AP_HAL::HAL& hal;
 
@@ -182,6 +185,7 @@ int64_t AP_Filesystem_Posix::disk_space(const char *path)
  */
 bool AP_Filesystem_Posix::set_mtime(const char *filename, const uint32_t mtime_sec)
 {
+#if AP_FILESYSTEM_POSIX_HAVE_UTIME
     FS_CHECK_ALLOWED(false);
     filename = map_filename(filename);
     struct utimbuf times {};
@@ -189,6 +193,9 @@ bool AP_Filesystem_Posix::set_mtime(const char *filename, const uint32_t mtime_s
     times.modtime = mtime_sec;
 
     return utime(filename, &times) == 0;
+#else
+    return false;
+#endif
 }
 
 #endif  // AP_FILESYSTEM_POSIX_ENABLED
