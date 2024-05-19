@@ -41,6 +41,9 @@
 #include <AP_Math/AP_Math.h>
 #include <stdio.h>
 
+// only needed for simulation environments for now
+#if AP_SIM_ENABLED
+
 /*
   load JSON file, returning a value object or nullptr on failure
  */
@@ -716,3 +719,5 @@ std::string AP_JSON::parse(value &out, const std::string &s)
     ::parse(out, s.begin(), s.end(), &err);
     return err;
 }
+
+#endif // AP_SIM_ENABLED
