@@ -708,6 +708,7 @@ void Copter::one_hz_loop()
     custom_control.set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
 #endif
 
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
     // see if we should have a separate rate thread
     if (!started_rate_thread && (flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD)
                         || flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD))) {
@@ -718,6 +719,7 @@ void Copter::one_hz_loop()
             started_rate_thread = true;
         }
     }
+#endif
 }
 
 void Copter::init_simple_bearing()

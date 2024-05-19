@@ -1,16 +1,19 @@
 #include "Copter.h"
+#include <AP_HAL/CondMutex.h>
 
 /*************************************************************
  *  Attitude Rate controllers and timing
  ****************************************************************/
 
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
 /*
   thread for rate control
 */
 void Copter::rate_controller_thread()
 {
     uint8_t rate_decimation = 1;
-    ins.set_rate_loop_thread(chThdGetSelfX());
+    HAL_CondMutex cmutex;
+    ins.set_rate_loop_mutex(&cmutex);
     ins.set_rate_decimation(rate_decimation);
 
     uint32_t last_run_us = AP_HAL::micros();
@@ -18,7 +21,9 @@ void Copter::rate_controller_thread()
     float min_dt = 1.0;
     uint32_t now_ms = AP_HAL::millis();
     uint32_t last_report_ms = now_ms;
+#if HAL_LOGGING_ENABLED
     uint32_t last_rtdt_log_ms = now_ms;
+#endif
     uint32_t last_notch_sample_ms = now_ms;
     bool was_using_rate_thread = false;
     uint32_t running_slow = 0;
@@ -46,11 +51,11 @@ void Copter::rate_controller_thread()
 
         // wait for an IMU sample
         Vector3f gyro;
+        ins.get_next_gyro_sample(gyro);
+
         // we must use multiples of the actual sensor rate
         const float sensor_dt = 1.0f * rate_decimation / ins.get_raw_gyro_rate_hz();
 
-        // wait for at least one gyro sample to be available
-        chEvtWaitOne(AP_InertialSensor::EVT_GYRO_SAMPLE);
 
         if (ap.motor_test) {
             continue;
@@ -94,10 +99,7 @@ void Copter::rate_controller_thread()
         // run the rate controller on all available samples
         // it is important not to drop samples otherwise the filtering will be fubar
         // there is no need to output to the motors more than once for every batch of samples
-        while (ins.get_next_gyro_sample(gyro)) {
-            attitude_control->rate_controller_run_dt(sensor_dt, gyro + ahrs.get_gyro_drift());
-        }
-        chEvtGetAndClearEvents(AP_InertialSensor::EVT_GYRO_SAMPLE);
+        attitude_control->rate_controller_run_dt(sensor_dt, gyro + ahrs.get_gyro_drift());
 
         /*
           immediately output the new motor values
@@ -127,22 +129,23 @@ void Copter::rate_controller_thread()
                     rate_decimation = rate_decimation + 1;
                     ins.set_rate_decimation(rate_decimation);
                     attitude_control->set_notch_sample_rate(new_attitude_rate);
-                    gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU high, dropping rate to %luHz",
-                        new_attitude_rate);
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU high, dropping rate to %uHz",
+                        (unsigned)new_attitude_rate);
                 }
             } else if (rate_decimation > 1) {
                 const uint32_t new_attitude_rate = ins.get_raw_gyro_rate_hz()/(rate_decimation-1);
                 rate_decimation = rate_decimation - 1;
                 ins.set_rate_decimation(rate_decimation);
                 attitude_control->set_notch_sample_rate(new_attitude_rate);
-                gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU normal, increasing rate to %luHz",
-                    new_attitude_rate);
+                gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU normal, increasing rate to %uHz",
+                   (unsigned) new_attitude_rate);
             }
         }
 
         was_using_rate_thread = true;
     }
 }
+#endif
 
 /*
   update rate controller when run from main thread (normal operation)
