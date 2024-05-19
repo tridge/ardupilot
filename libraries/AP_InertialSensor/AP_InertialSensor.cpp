@@ -2798,6 +2798,17 @@ void AP_InertialSensor::force_save_calibration(void)
     }
 }
 
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+bool AP_InertialSensor::get_next_gyro_sample(Vector3f& gyro)
+{
+    _cmutex->lock_and_wait(FUNCTOR_BIND_MEMBER(&AP_InertialSensor::gyro_samples_available, bool));
+    bool ret = _rate_loop_gyro_window.pop(gyro);
+    _cmutex->unlock();
+
+    return ret;
+}
+#endif
+
 namespace AP {
 
 AP_InertialSensor &ins()
