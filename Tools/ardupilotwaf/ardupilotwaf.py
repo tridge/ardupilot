@@ -16,6 +16,13 @@ SOURCE_EXTS = [
     '*.cpp',
 ]
 
+COMMON_VEHICLE_DEPENDENT_CAN_LIBRARIES = [
+    'AP_CANManager',
+    'AP_KDECAN',
+    'AP_PiccoloCAN',
+    'AP_PiccoloCAN/piccolo_protocol',
+]
+
 COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_Airspeed',
     'AP_AccelCal',
@@ -26,7 +33,6 @@ COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_BattMonitor',
     'AP_BoardConfig',
     'AP_Camera',
-    'AP_CANManager',
     'AP_Common',
     'AP_Compass',
     'AP_Declination',
@@ -34,7 +40,6 @@ COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_HAL',
     'AP_HAL_Empty',
     'AP_InertialSensor',
-    'AP_KDECAN',
     'AP_Math',
     'AP_Mission',
     'AP_DAL',
@@ -73,8 +78,6 @@ COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_SBusOut',
     'AP_IOMCU',
     'AP_Parachute',
-    'AP_PiccoloCAN',
-    'AP_PiccoloCAN/piccolo_protocol',
     'AP_RAMTRON',
     'AP_RCProtocol',
     'AP_Radio',
@@ -248,11 +251,8 @@ def ap_get_all_libraries(bld):
 def ap_common_vehicle_libraries(bld):
     libraries = COMMON_VEHICLE_DEPENDENT_LIBRARIES
 
-    if bld.env.DEST_BINFMT == 'pe':
-        libraries += [
-            'AC_Fence',
-            'AC_AttitudeControl',
-        ]
+    if bld.env.with_can:
+        libraries.extend(COMMON_VEHICLE_DEPENDENT_CAN_LIBRARIES)
 
     return libraries
 
