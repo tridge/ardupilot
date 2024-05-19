@@ -1638,17 +1638,30 @@ class QURT(Board):
         cfg.env.TOOLCHAIN_DIR = cfg.env.HEXAGON_SDK_DIR + "/tools/HEXAGON_Tools/8.4.05/Tools"
         cfg.env.COMPILER_CC = cfg.env.TOOLCHAIN_DIR + "/bin/hexagon-clang"
         cfg.env.COMPILER_CXX = cfg.env.TOOLCHAIN_DIR + "/bin/hexagon-clang++"
+        cfg.env.LINK_CXX = cfg.env.HEXAGON_SDK_DIR + "/tools/HEXAGON_Tools/8.4.05/Tools/bin/hexagon-link"
         cfg.env.CXX = ["ccache", cfg.env.COMPILER_CXX]
         cfg.env.CXX_TGT_F = ['-c', '-o']
+        cfg.env.CCLNK_SRC_F = []
+        cfg.env.CXXLNK_SRC_F = []
+        cfg.env.CXXLNK_TGT_F = ['-o']
+        cfg.env.CCLNK_TGT_F = ['-o']
         cfg.env.CPPPATH_ST = '-I%s'
         cfg.env.DEFINES_ST = '-D%s'
-
+        cfg.env.AR = cfg.env.HEXAGON_SDK_DIR + "/tools/HEXAGON_Tools/8.4.05/Tools/bin/hexagon-ar"
+        cfg.env.ARFLAGS = 'rcs'
+        cfg.env.cxxstlib_PATTERN = 'lib%s.a'
+        cfg.env.cstlib_PATTERN = 'lib%s.a'
+        cfg.env.LIBPATH_ST = '-L%s'
+        cfg.env.LIB_ST = '-l%s'
+        cfg.env.SHLIB_MARKER = ''
+        cfg.env.STLIBPATH_ST = '-L%s'
+        cfg.env.STLIB_MARKER = ''
+        cfg.env.STLIB_ST = '-l%s'
 
     def configure_env(self, cfg, env):
         super(QURT, self).configure_env(cfg, env)
 
         env.BOARD_CLASS = "QURT"
-        env.HEXAGON_LINK = cfg.env.HEXAGON_SDK_DIR + "/tools/HEXAGON_Tools/8.4.05/Tools/bin/hexagon-link"
         env.HEAXGON_APP = "libardupilot.so"
         env.HEXAGON_LINKFLAGS = f"-march=hexagon -mcpu=hexagonv66 -shared -call_shared -G0 {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/initS.o -L{cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic -Bsymbolic {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/libgcc.a --wrap=malloc --wrap=calloc --wrap=free --wrap=realloc --wrap=memalign --wrap=__stack_chk_fail -lc -soname={env.HEXAGON_APP} --start-group --whole-archive OBJECT_LIST --end-group  --start-group -lgcc --end-group {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/finiS.o"
         env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/qurt"]
@@ -1660,6 +1673,33 @@ class QURT(Board):
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_NONE',
             AP_SIM_ENABLED = 0,
         )
+
+        env.LINKFLAGS = [
+            "-march=hexagon",
+            "-mcpu=hexagonv66",
+            "-shared",
+            "-call_shared",
+            "-G0",
+            cfg.env.TOOLCHAIN_DIR + "/target/hexagon/lib/v66/G0/pic/initS.o",
+            f"-L{cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic",
+            "-Bsymbolic",
+            cfg.env.TOOLCHAIN_DIR + "/target/hexagon/lib/v66/G0/pic/libgcc.a",
+            "--wrap=malloc",
+            "--wrap=calloc",
+            "--wrap=free",
+            "--wrap=realloc",
+            "--wrap=memalign",
+            "--wrap=__stack_chk_fail",
+            "-lc",
+            f"-soname={cfg.env.HEXAGON_APP}",
+            "--start-group",
+            "--whole-archive",
+            "--end-group",
+            "--start-group",
+            "-lgcc",
+            "--end-group",
+            cfg.env.TOOLCHAIN_DIR + "/target/hexagon/lib/v66/G0/pic/finiS.o"
+        ]
 
         if not cfg.env.DEBUG:
             env.CXXFLAGS += [
