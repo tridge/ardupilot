@@ -6,7 +6,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <pthread.h>
 #include "replace.h"
+#include "interface.h"
 
 extern "C" {
 
@@ -73,4 +75,74 @@ int asprintf(char **ptr, const char *format, ...)
 	return ret;
 }
 
+void *memmem(const void *haystack, size_t haystacklen,
+                    const void *needle, size_t needlelen)
+{
+       // TODO: IMPLEMENT THIS!!!
+       return NULL;
+}
+
+char *strndup(const char *str, size_t size) 
+{
+       // TODO: IMPLEMENT THIS!!!
+       return NULL;
+}
+
+// INVESTIGATE: Why are these next two pthread functions not in the SLPI base image?
+int pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)
+{
+       return 0;
+}
+int pthread_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
+{
+       return 0;
+}
+
+// INVESTIGATE: What is this needed on QURT?
+int apfs_rename(const char *oldpath, const char *newpath)
+{
+       return 0;
+}
+
+// INVESTIGATE: How to enable
+void lua_abort() {}
+const char* lua_get_modules_path() {return NULL;}
+int lua_get_current_ref() {return 0;}
+
+// INVESTIGATE: Seems important :-)
+int ArduPilot_main(int argc, const char *argv[])
+{
+       return 0;
+}
+
+}
+
+int px4muorb_orb_initialize(fc_func_ptrs *func_ptrs, int32_t clock_offset_us)
+{
+       return 0;
+}
+
+int px4muorb_topic_advertised(const char *name)
+{
+       return 0;
+}
+
+int px4muorb_add_subscriber(const char *name)
+{
+       return 0;
+}
+
+int px4muorb_remove_subscriber(const char *name)
+{
+       return 0;
+}
+
+int px4muorb_send_topic_data(const char *name, const uint8_t *data, int data_len_in_bytes)
+{
+       return 0;
+}
+
+float px4muorb_get_cpu_load(void)
+{
+       return 0.0f;
 }

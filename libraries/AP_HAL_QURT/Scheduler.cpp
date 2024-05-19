@@ -63,7 +63,7 @@ void Scheduler::init()
 
 void Scheduler::delay_microseconds(uint16_t usec) 
 {
-    qurt_sleep(usec);
+    qurt_timer_sleep(usec);
 }
 
 void Scheduler::delay(uint16_t ms)
@@ -137,7 +137,7 @@ void Scheduler::resume_timer_procs()
 void Scheduler::reboot(bool hold_in_bootloader) 
 {
     HAP_PRINTF("**** REBOOT REQUESTED ****");
-    qurt_sleep(2000000);
+    qurt_timer_sleep(2000000);
     exit(1);
 }
 
