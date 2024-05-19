@@ -61,6 +61,8 @@
 #include <AP_HAL_ChibiOS/Semaphores.h>
 #define HAL_Semaphore ChibiOS::Semaphore
 #define HAL_BinarySemaphore ChibiOS::BinarySemaphore
+#include <AP_HAL_ChibiOS/CondMutex.h>
+#define HAL_CondMutex ChibiOS::CondMutex
 #endif
 
 /* string names for well known SPI devices */
@@ -89,6 +91,10 @@
 #define HAL_INS_ICM20608_NAME "icm20608"
 #define HAL_INS_ICM20608_AM_NAME "icm20608-am"
 #define HAL_INS_ICM20608_EXT_NAME "icm20608_ext"
+
+#ifndef HAL_INS_RATE_LOOP
+#define HAL_INS_RATE_LOOP 1
+#endif
 
 #define HAL_COMPASS_HMC5843_NAME "hmc5843"
 #define HAL_COMPASS_LIS3MDL_NAME "lis3mdl"
