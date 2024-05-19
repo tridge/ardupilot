@@ -204,6 +204,8 @@ class Board:
         # make easy to override them. Convert back to list before consumption.
         env.DEFINES = {}
 
+        env.with_can = self.with_can
+
         # potentially set extra defines from an environment variable:
         if cfg.options.define is not None:
             for (n, v) in [d.split("=") for d in cfg.options.define]:
@@ -1640,7 +1642,9 @@ class QURT(Board):
         cfg.env.COMPILER_CXX = cfg.env.TOOLCHAIN_DIR + "/bin/hexagon-clang++"
         cfg.env.LINK_CXX = cfg.env.HEXAGON_SDK_DIR + "/tools/HEXAGON_Tools/8.4.05/Tools/bin/hexagon-link"
         cfg.env.CXX = ["ccache", cfg.env.COMPILER_CXX]
+        cfg.env.CC = ["ccache", cfg.env.COMPILER_CC]
         cfg.env.CXX_TGT_F = ['-c', '-o']
+        cfg.env.CC_TGT_F = ['-c', '-o']
         cfg.env.CCLNK_SRC_F = []
         cfg.env.CXXLNK_SRC_F = []
         cfg.env.CXXLNK_TGT_F = ['-o']
@@ -1663,10 +1667,11 @@ class QURT(Board):
 
         env.BOARD_CLASS = "QURT"
         env.HEAXGON_APP = "libardupilot.so"
-        env.HEXAGON_LINKFLAGS = f"-march=hexagon -mcpu=hexagonv66 -shared -call_shared -G0 {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/initS.o -L{cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic -Bsymbolic {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/libgcc.a --wrap=malloc --wrap=calloc --wrap=free --wrap=realloc --wrap=memalign --wrap=__stack_chk_fail -lc -soname={env.HEXAGON_APP} --start-group --whole-archive OBJECT_LIST --end-group  --start-group -lgcc --end-group {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/finiS.o"
+        env.HEXAGON_LINKFLAGS = f"-march=hexagon -mcpu=hexagonv66 -fpic -shared -call_shared -mG0lib -G0 {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/initS.o -L{cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic -Bsymbolic {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/libgcc.a --wrap=malloc --wrap=calloc --wrap=free --wrap=realloc --wrap=memalign --wrap=__stack_chk_fail -lc -soname={env.HEXAGON_APP} --start-group --whole-archive OBJECT_LIST --end-group  --start-group -lgcc --end-group {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/finiS.o"
         env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/qurt"]
         env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/posix"]
         env.CXXFLAGS += ["-fPIC", "-MD"]
+        env.CFLAGS += ["-fPIC", "-MD"]
 
         env.DEFINES.update(
             CONFIG_HAL_BOARD = 'HAL_BOARD_QURT',
