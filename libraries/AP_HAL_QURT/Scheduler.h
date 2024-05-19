@@ -20,20 +20,23 @@ public:
     Scheduler();
     /* AP_HAL::Scheduler methods */
 
-    void     init();
-    void     delay(uint16_t ms);
-    void     delay_microseconds(uint16_t us);
-    void     register_timer_process(AP_HAL::MemberProc);
-    void     register_io_process(AP_HAL::MemberProc);
-    void     register_timer_failsafe(AP_HAL::Proc, uint32_t period_us);
+    void     init() override;
+    void     delay(uint16_t ms) override;
+    void     delay_microseconds(uint16_t us) override;
+    void     register_timer_process(AP_HAL::MemberProc) override;
+    void     register_io_process(AP_HAL::MemberProc) override;
+    void     register_timer_failsafe(AP_HAL::Proc, uint32_t period_us) override;
     void     suspend_timer_procs();
     void     resume_timer_procs();
-    void     reboot(bool hold_in_bootloader);
+    void     reboot(bool hold_in_bootloader) override;
 
     bool     in_main_thread() const override;
     void     system_initialized();
     void     hal_initialized();
-    
+
+    void     set_system_initialized() override;
+    bool     is_system_initialized() override;
+
 private:
     bool _initialized;
     volatile bool _hal_initialized;

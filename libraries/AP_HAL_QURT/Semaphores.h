@@ -1,7 +1,9 @@
 #pragma once
 
 #include <AP_HAL/AP_HAL_Boards.h>
+#include <stdint.h>
 #include <AP_HAL/Semaphores.h>
+#include <pthread.h>
 
 namespace QURT {
 
@@ -12,9 +14,8 @@ public:
     bool give() override;
     bool take(uint32_t timeout_ms) override;
     bool take_nonblocking() override;
-
 protected:
-    int dummy_lock;
+    pthread_mutex_t _lock;
 };
 
 
@@ -28,6 +29,7 @@ public:
 
 protected:
     Semaphore mtx;
+    pthread_cond_t cond;
     bool pending;
 };
     

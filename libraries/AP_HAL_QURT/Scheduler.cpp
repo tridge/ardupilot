@@ -11,8 +11,7 @@
 #include <sched.h>
 #include <errno.h>
 #include <stdio.h>
-#include <dspal/include/pthread.h>
-#include <dspal_types.h>
+#include <pthread.h>
 
 #include "UARTDriver.h"
 #include "Storage.h"
@@ -64,8 +63,7 @@ void Scheduler::init()
 
 void Scheduler::delay_microseconds(uint16_t usec) 
 {
-    //pthread_yield();
-    usleep(usec);
+    qurt_sleep(usec);
 }
 
 void Scheduler::delay(uint16_t ms)
@@ -139,7 +137,7 @@ void Scheduler::resume_timer_procs()
 void Scheduler::reboot(bool hold_in_bootloader) 
 {
     HAP_PRINTF("**** REBOOT REQUESTED ****");
-    usleep(2000000);
+    qurt_sleep(2000000);
     exit(1);
 }
 
@@ -174,7 +172,6 @@ extern bool qurt_ran_overtime;
 void *Scheduler::_timer_thread(void *arg)
 {
     Scheduler *sched = (Scheduler *)arg;
-    uint32_t last_ran_overtime = 0;
 
     while (!sched->_hal_initialized) {
         sched->delay_microseconds(1000);
@@ -184,15 +181,6 @@ void *Scheduler::_timer_thread(void *arg)
 
         // run registered timers
         sched->_run_timers(true);
-
-        // process any pending RC output requests
-        ((RCOutput *)hal.rcout)->timer_update();
-
-        if (qurt_ran_overtime && AP_HAL::millis() - last_ran_overtime > 2000) {
-            last_ran_overtime = AP_HAL::millis();
-            printf("Overtime in task %d\n", (int)AP_Scheduler::current_task);
-            hal.console->printf("Overtime in task %d\n", (int)AP_Scheduler::current_task);
-        }
     }
     return nullptr;
 }
@@ -228,11 +216,12 @@ void *Scheduler::_uart_thread(void *arg)
 
         // process any pending serial bytes
         //((UARTDriver *)hal.uartA)->timer_tick();
-        hal.uartB->timer_tick();
-        hal.uartC->timer_tick();
-        hal.uartD->timer_tick();
-        hal.uartE->timer_tick();
-        hal.uartF->timer_tick();
+        for (uint8_t i = 0; i < hal.num_serial; i++) {
+            auto *p = hal.serial(i);
+            if (p != nullptr) {
+                p->_timer_tick();
+            }
+        }
     }
     return nullptr;
 }

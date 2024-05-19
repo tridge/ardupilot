@@ -1,18 +1,3 @@
-/*
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
@@ -20,12 +5,30 @@
 
 class QURT::Util : public AP_HAL::Util {
 public:
-    Util(void) {}
-    bool run_debug_shell(AP_HAL::BetterStream *stream) override { return false; }
+    /*
+      set HW RTC in UTC microseconds
+     */
+    void set_hw_rtc(uint64_t time_utc_usec) override {}
 
-    uint32_t available_memory(void) override;
+    /*
+      get system clock in UTC microseconds
+     */
+    uint64_t get_hw_rtc() const override { return 0; }
 
-    // create a new semaphore
-    Semaphore *new_semaphore(void) override;
+#if ENABLE_HEAP
+    // heap functions, note that a heap once alloc'd cannot be dealloc'd
+    virtual void *allocate_heap_memory(size_t size) override;
+    virtual void *heap_realloc(void *h, void *ptr, size_t old_size, size_t new_size) override;
+#endif // ENABLE_HEAP
+
+#if ENABLE_HEAP
+    struct heap_allocation_header {
+        size_t allocation_size; // size of allocated block, not including this header
+    };
+
+    struct heap {
+      size_t max_heap_size;
+      size_t current_heap_usage;
+    };
+#endif // ENABLE_HEAP
 };
-

@@ -5,7 +5,6 @@
 #include "Scheduler.h"
 #include "Storage.h"
 #include "replace.h"
-#include <qurt_dsp.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -97,10 +96,10 @@ uint32_t ardupilot_get_storage(uint8_t *buf, int len)
 
 uint32_t ardupilot_socket_check(uint8_t *buf, int len, uint32_t *nbytes)
 {
-    return QURT::UDPDriver::from(hal.uartA)->socket_check(buf, len, nbytes);
+    return 0;
 }
 
 uint32_t ardupilot_socket_input(const uint8_t *buf, int len, uint32_t *nbytes)
 {
-    return QURT::UDPDriver::from(hal.uartA)->socket_input(buf, len, nbytes);
+    return 0;
 }
