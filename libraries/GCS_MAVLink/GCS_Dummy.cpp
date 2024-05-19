@@ -5,6 +5,9 @@
 #include "GCS_Dummy.h"
 
 #include <stdio.h>
+#include <AP_Vehicle/AP_Vehicle_Type.h>
+
+#if APM_BUILD_TYPE(APM_BUILD_UNKNOWN)
 
 #define FORCE_VERSION_H_INCLUDE
 #include <AP_Common/AP_FWVersionDefine.h>
@@ -12,6 +15,7 @@
 #undef FORCE_VERSION_H_INCLUDE
 
 const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] {};
+#endif
 
 /*
   send_text implementation for dummy GCS
