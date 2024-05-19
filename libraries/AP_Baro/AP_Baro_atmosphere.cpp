@@ -314,6 +314,7 @@ float AP_Baro::_get_EAS2TAS(void) const
 #endif
 }
 
+#if AP_SIM_ENABLED
 // lookup expected temperature in degrees C for a given altitude. Used for SITL backend
 float AP_Baro::get_temperatureC_for_alt_amsl(const float alt_amsl)
 {
@@ -329,6 +330,7 @@ float AP_Baro::get_pressure_for_alt_amsl(const float alt_amsl)
     get_pressure_temperature_for_alt_amsl(alt_amsl, pressure, temp_K);
     return pressure;
 }
+#endif // AP_SIM_ENABLED
 
 /*
   return sea level pressure given a current altitude and pressure reading
