@@ -247,7 +247,7 @@ bool Scheduler::in_main_thread() const
     return getpid() == _main_task_pid;
 }
 
-void Scheduler::system_initialized() {
+void Scheduler::set_system_initialized() {
     if (_initialized) {
         AP_HAL::panic("PANIC: scheduler::system_initialized called"
                    "more than once");

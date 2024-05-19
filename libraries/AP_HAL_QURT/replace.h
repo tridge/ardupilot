@@ -9,12 +9,16 @@
 
 #include <types.h>
 #include <dirent.h>
+
+#ifdef __cplusplus
 extern "C" {
+#endif
 
     /*
       work around broken headers
      */
     size_t strnlen(const char *s, size_t maxlen);
+    char *strndup(const char *s, size_t n);
     int asprintf(char **, const char *, ...);
     off_t lseek(int, off_t, int);
     DIR *opendir (const char *);
@@ -26,7 +30,10 @@ extern "C" {
     pid_t getpid (void);
     
     void HAP_printf(const char *file, int line, const char *fmt, ...);
+
+#ifdef __cplusplus
 }
+#endif
 
 #define HAP_PRINTF(...) HAP_printf(__FILE__, __LINE__, __VA_ARGS__)
 

@@ -31,11 +31,10 @@ public:
     void     reboot(bool hold_in_bootloader) override;
 
     bool     in_main_thread() const override;
-    void     system_initialized();
     void     hal_initialized();
 
     void     set_system_initialized() override;
-    bool     is_system_initialized() override;
+    bool     is_system_initialized() override { return _initialized; }
 
 private:
     bool _initialized;
