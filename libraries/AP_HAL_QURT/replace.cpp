@@ -78,21 +78,37 @@ int asprintf(char **ptr, const char *format, ...)
 void *memmem(const void *haystack, size_t haystacklen,
                     const void *needle, size_t needlelen)
 {
-       // TODO: IMPLEMENT THIS!!!
-       return NULL;
+	if (needlelen == 0) {
+        return const_cast<void*>(haystack);
+	}
+	while (haystacklen >= needlelen) {
+		char *p = (char *)memchr(haystack, *(const char *)needle,
+                                 haystacklen-(needlelen-1));
+		if (!p) return NULL;
+		if (memcmp(p, needle, needlelen) == 0) {
+			return p;
+		}
+		haystack = p+1;
+		haystacklen -= (p - (const char *)haystack) + 1;
+	}
+	return NULL;
 }
 
-char *strndup(const char *str, size_t size) 
+char *strndup(const char *s, size_t n)
 {
-       // TODO: IMPLEMENT THIS!!!
-       return NULL;
+	char *ret;
+	
+    n = strnlen(s, n);
+    ret = (char*)malloc(n+1);
+    if (!ret) {
+        return NULL;
+    }
+	memcpy(ret, s, n);
+	ret[n] = 0;
+
+	return ret;
 }
 
-// INVESTIGATE: Why are these next two pthread functions not in the SLPI base image?
-int pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)
-{
-       return 0;
-}
 int pthread_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
 {
        return 0;
