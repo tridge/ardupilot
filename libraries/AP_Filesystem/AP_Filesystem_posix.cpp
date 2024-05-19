@@ -91,8 +91,12 @@ int32_t AP_Filesystem_Posix::write(int fd, const void *buf, uint32_t count)
 
 int AP_Filesystem_Posix::fsync(int fd)
 {
+#if AP_FILESYSTEM_POSIX_HAVE_FSYNC
     FS_CHECK_ALLOWED(-1);
     return ::fsync(fd);
+#else
+    return 0;
+#endif
 }
 
 int32_t AP_Filesystem_Posix::lseek(int fd, int32_t offset, int seek_from)
@@ -114,7 +118,7 @@ int AP_Filesystem_Posix::unlink(const char *pathname)
     pathname = map_filename(pathname);
     // we match the FATFS interface and use unlink
     // for both files and directories
-    int ret = ::rmdir(pathname);
+    int ret = ::rmdir(const_cast<char*>(pathname));
     if (ret == -1) {
         ret = ::unlink(pathname);
     }
@@ -125,7 +129,7 @@ int AP_Filesystem_Posix::mkdir(const char *pathname)
 {
     FS_CHECK_ALLOWED(-1);
     pathname = map_filename(pathname);
-    return ::mkdir(pathname, 0775);
+    return ::mkdir(const_cast<char*>(pathname), 0775);
 }
 
 void *AP_Filesystem_Posix::opendir(const char *pathname)
@@ -158,6 +162,7 @@ int AP_Filesystem_Posix::rename(const char *oldpath, const char *newpath)
 // return free disk space in bytes
 int64_t AP_Filesystem_Posix::disk_free(const char *path)
 {
+#if AP_FILESYSTEM_POSIX_HAVE_STATFS
     FS_CHECK_ALLOWED(-1);
     path = map_filename(path);
     struct statfs stats;
@@ -165,11 +170,15 @@ int64_t AP_Filesystem_Posix::disk_free(const char *path)
         return -1;
     }
     return (((int64_t)stats.f_bavail) * stats.f_bsize);
+#else
+    return -1;
+#endif
 }
 
 // return total disk space in bytes
 int64_t AP_Filesystem_Posix::disk_space(const char *path)
 {
+#if AP_FILESYSTEM_POSIX_HAVE_STATFS
     FS_CHECK_ALLOWED(-1);
     path = map_filename(path);
     struct statfs stats;
@@ -177,6 +186,9 @@ int64_t AP_Filesystem_Posix::disk_space(const char *path)
         return -1;
     }
     return (((int64_t)stats.f_blocks) * stats.f_bsize);
+#else
+    return -1;
+#endif
 }
 
 

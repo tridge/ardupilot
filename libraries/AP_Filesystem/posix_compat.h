@@ -77,6 +77,11 @@ char *tmpnam(char s[L_tmpnam]);
 #define SEEK_END 2
 #endif
 
+#ifndef __cplusplus
+/*
+  only redefine posix functions for C code (eg. lua).
+  for C++ use the AP_Filsystem APIs
+*/
 #define FILE APFS_FILE
 #define fopen(p,m) apfs_fopen(p,m)
 #define fprintf(stream, format, args...) apfs_fprintf(stream, format, ##args)
@@ -100,6 +105,7 @@ char *tmpnam(char s[L_tmpnam]);
 #if !defined(__APPLE__)
 #define remove(pathname) apfs_remove(pathname)
 int sprintf(char *str, const char *format, ...);
+#endif
 #endif
 
 #ifdef __cplusplus

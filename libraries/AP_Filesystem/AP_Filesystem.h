@@ -54,16 +54,12 @@ struct dirent {
 #define AP_FILESYSTEM_FORMAT_ENABLED 1
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_QURT
 #include "AP_Filesystem_posix.h"
 #endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_ESP32
 #include "AP_Filesystem_ESP32.h"
-#endif
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_QURT
-#include "AP_Filesystem_QURT.h"
 #endif
 
 #include "AP_Filesystem_backend.h"
