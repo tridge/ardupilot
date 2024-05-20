@@ -3,10 +3,7 @@
 #include <AP_HAL/AP_HAL_Boards.h>
 #include <stdint.h>
 #include <AP_HAL/Semaphores.h>
-extern "C" {
-#include <qurt_rmutex.h>
-#include <qurt_cond.h>
-}
+#include <pthread.h>
 
 namespace QURT {
 
@@ -18,7 +15,8 @@ public:
     bool take(uint32_t timeout_ms) override;
     bool take_nonblocking() override;
 protected:
-    qurt_mutex_t _lock;
+    // qurt_mutex_t _lock;
+    pthread_mutex_t _lock;
 };
 
 
@@ -32,7 +30,7 @@ public:
 
 protected:
     Semaphore mtx;
-    qurt_cond_t cond;
+    pthread_cond_t cond;
     bool pending;
 };
     

@@ -9,27 +9,38 @@ using namespace QURT;
 // construct a semaphore
 Semaphore::Semaphore()
 {
-    qurt_rmutex_init(&_lock);
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&_lock, &attr);
 }
 
 bool Semaphore::give()
 {
-    qurt_rmutex_unlock(&_lock);
-    return true;
+    return pthread_mutex_unlock(&_lock) == 0;
 }
 
 bool Semaphore::take(uint32_t timeout_ms)
 {
     if (timeout_ms == HAL_SEMAPHORE_BLOCK_FOREVER) {
-        qurt_rmutex_lock(&_lock);
+        return pthread_mutex_lock(&_lock) == 0;
+    }
+    if (take_nonblocking()) {
         return true;
     }
-    return qurt_rmutex_lock_timed(&_lock, timeout_ms*1000UL);
+    uint64_t start = AP_HAL::micros64();
+    do {
+        hal.scheduler->delay_microseconds(200);
+        if (take_nonblocking()) {
+            return true;
+        }
+    } while ((AP_HAL::micros64() - start) < timeout_ms*1000);
+    return false;
 }
 
 bool Semaphore::take_nonblocking()
 {
-    return qurt_rmutex_try_lock(&_lock) == 0;
+    return pthread_mutex_trylock(&_lock) == 0;
 }
 
 /*
@@ -39,16 +50,29 @@ bool Semaphore::take_nonblocking()
 BinarySemaphore::BinarySemaphore(bool initial_state) :
     AP_HAL::BinarySemaphore(initial_state)
 {
-    qurt_cond_init(&cond);
+    pthread_cond_init(&cond, NULL);
     pending = initial_state;
 }
 
 bool BinarySemaphore::wait(uint32_t timeout_us)
 {
-    /*
-      not available!
-     */
-    AP_HAL::panic("no timed BinarySemaphore");
+    WITH_SEMAPHORE(mtx);
+    if (!pending) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+            return false;
+        }
+        ts.tv_sec += timeout_us/1000000UL;
+        ts.tv_nsec += (timeout_us % 1000000U) * 1000UL;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec++;
+            ts.tv_nsec -= 1000000000L;
+        }
+        if (pthread_cond_timedwait(&cond, &mtx._lock, &ts) != 0) {
+            return false;
+        }
+    }
+    pending = false;
     return true;
 }
 
@@ -56,7 +80,9 @@ bool BinarySemaphore::wait_blocking(void)
 {
     WITH_SEMAPHORE(mtx);
     if (!pending) {
-        qurt_cond_wait(&cond, &mtx._lock);
+        if (pthread_cond_wait(&cond, &mtx._lock) != 0) {
+            return false;
+        }
     }
     pending = false;
     return true;
@@ -67,6 +93,6 @@ void BinarySemaphore::signal(void)
     WITH_SEMAPHORE(mtx);
     if (!pending) {
         pending = true;
-        qurt_cond_signal(&cond);
+        pthread_cond_signal(&cond);
     }
 }
