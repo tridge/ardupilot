@@ -1666,8 +1666,7 @@ class QURT(Board):
         super(QURT, self).configure_env(cfg, env)
 
         env.BOARD_CLASS = "QURT"
-        env.HEAXGON_APP = "libardupilot.so"
-        env.HEXAGON_LINKFLAGS = f"-march=hexagon -mcpu=hexagonv66 -fpic -shared -call_shared -mG0lib -G0 {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/initS.o -L{cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic -Bsymbolic {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/libgcc.a --wrap=malloc --wrap=calloc --wrap=free --wrap=realloc --wrap=memalign --wrap=__stack_chk_fail -lc -soname={env.HEXAGON_APP} --start-group --whole-archive OBJECT_LIST --end-group  --start-group -lgcc --end-group {cfg.env.TOOLCHAIN_DIR}/target/hexagon/lib/v66/G0/pic/finiS.o"
+        env.HEXAGON_APP = "libardupilot.so"
         env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/qurt"]
         env.INCLUDES += [cfg.env.HEXAGON_SDK_DIR + "/rtos/qurt/computev66/include/posix"]
         env.CXXFLAGS += ["-fPIC", "-MD"]
@@ -1678,6 +1677,18 @@ class QURT(Board):
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_NONE',
             AP_SIM_ENABLED = 0,
         )
+
+# The linking has to be done very precisely for QURT. Below is an example of a
+# linker run_str that works correctly. This needs to be modified in the waflib/Tools/cxx.py
+# file in the waf submodule
+
+# class cxxprogram(link_task):
+# 	"Links object files into c++ programs"
+# 	# run_str = '${LINK_CXX} ${LINKFLAGS} ${CXXLNK_SRC_F}${SRC} ${CXXLNK_TGT_F}${TGT[0].relpath()} ${RPATH_ST:RPATH} ${FRAMEWORKPATH_ST:FRAMEWORKPATH} ${FRAMEWORK_ST:FRAMEWORK} ${ARCH_ST:ARCH} ${STLIB_MARKER} ${STLIBPATH_ST:STLIBPATH} ${STLIB_ST:STLIB} ${SHLIB_MARKER} ${LIBPATH_ST:LIBPATH} ${LIB_ST:LIB} ${LDFLAGS}'
+# 	run_str = '${LINK_CXX} ${CXXLNK_TGT_F} ${TGT[0].relpath()} ${LINKFLAGS} ${STLIBPATH_ST:STLIBPATH} --start-group --whole-archive ${CXXLNK_SRC_F}${SRC} ${STLIB_ST:STLIB} --end-group --start-group -lgcc --end-group /opt/hexagon-sdk/4.1.0.4-lite/tools/HEXAGON_Tools/8.4.05/Tools/target/hexagon/lib/v66/G0/pic/finiS.o'
+# 	vars    = ['LINKDEPS']
+# 	ext_out = ['.bin']
+# 	inst_to = '${BINDIR}'
 
         env.LINKFLAGS = [
             "-march=hexagon",
@@ -1696,14 +1707,7 @@ class QURT(Board):
             "--wrap=memalign",
             "--wrap=__stack_chk_fail",
             "-lc",
-            f"-soname={cfg.env.HEXAGON_APP}",
-            "--start-group",
-            "--whole-archive",
-            "--end-group",
-            "--start-group",
-            "-lgcc",
-            "--end-group",
-            cfg.env.TOOLCHAIN_DIR + "/target/hexagon/lib/v66/G0/pic/finiS.o"
+            "-lc++"
         ]
 
         if not cfg.env.DEBUG:

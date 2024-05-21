@@ -133,9 +133,15 @@ int ArduPilot_main(int argc, const char *argv[])
 
 }
 
+extern "C" int qurt_arducopter_main(int argc, char* const argv[]);
+
 int px4muorb_orb_initialize(fc_func_ptrs *func_ptrs, int32_t clock_offset_us)
 {
-       return 0;
+	HAP_PRINTF("About to call qurt_arducopter_main %p", &qurt_arducopter_main);
+	
+	qurt_arducopter_main(0, NULL);
+
+    return 0;
 }
 
 int px4muorb_topic_advertised(const char *name)
@@ -161,4 +167,35 @@ int px4muorb_send_topic_data(const char *name, const uint8_t *data, int data_len
 float px4muorb_get_cpu_load(void)
 {
        return 0.0f;
+}
+
+extern "C" void free(void *ptr) {
+       return;
+}
+
+// malloc
+extern "C" void *malloc(size_t size) {
+       return NULL;
+}
+
+// posix_memalign
+extern "C" int posix_memalign(void **memptr, size_t alignment, size_t size) {
+       return 0;
+}
+
+// calloc
+extern "C" void *calloc(size_t nmemb, size_t size) {
+       return NULL;
+}
+
+
+// realloc
+extern "C" void *realloc(void *ptr, size_t size) {
+       return NULL;
+}
+
+// nanosleep
+#include <time.h>
+extern "C" int nanosleep(const struct timespec *req, struct timespec *_Nullable rem) {
+       return 0;
 }
