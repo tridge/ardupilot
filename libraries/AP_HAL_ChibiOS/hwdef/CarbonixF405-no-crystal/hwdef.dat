@@ -1,0 +1,7 @@
+include ../CarbonixF405/hwdef.dat
+
+undef OSCILLATOR_HZ
+OSCILLATOR_HZ 0
+
+undef CAN_APP_NODE_NAME
+define CAN_APP_NODE_NAME "org.ardupilot.CarbonixF405-no-crystal"

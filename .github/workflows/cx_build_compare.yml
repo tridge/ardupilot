@@ -24,7 +24,7 @@ jobs:
         exclude:
           - gcc: 10
             toolchain: chibios-clang
-        board: ["CarbonixCubeOrange", "CarbonixF405", "CarbonixL496"]
+        board: ["CarbonixCubeOrange", "CarbonixF405", "CarbonixF405-no-crystal", "CarbonixL496"]
     steps:
       # git checkout the PR
       - uses: actions/checkout@v3

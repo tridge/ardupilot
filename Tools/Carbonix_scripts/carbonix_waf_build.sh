@@ -30,7 +30,7 @@ for board in "${main_boards[@]}"; do
   ./waf plane
 done
 
-periph_boards=("CarbonixF405" "CarbonixL496")
+periph_boards=("CarbonixF405" "CarbonixF405-no-crystal" "CarbonixL496")
 
 for board in "${periph_boards[@]}"; do
   echo "Compiling AP_Periph for $board..."
