@@ -8,7 +8,7 @@ set -e
 # The board to build for is passed as an argument to the script
 BOARD=$1
 
-if [ "$BOARD" == "CubeOrange" ] || [ "$BOARD" == "CarbonixCubeOrange" ] || [ "$BOARD" == "sitl" ]
+if [ "$BOARD" == "CubeOrange" ] || [ "$BOARD" == "CubeOrange-Volanti" ] || [ "$BOARD" == "sitl" ]
 then
     echo "Compiling Plane for $BOARD..."
     ./waf plane

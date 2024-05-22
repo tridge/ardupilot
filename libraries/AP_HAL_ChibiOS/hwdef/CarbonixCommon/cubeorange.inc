@@ -1,7 +1,7 @@
 # hw definition file for processing by chibios_hwdef.py
 
 include ../CubeOrange/hwdef.dat
-include ../CarbonixCommon/features.inc
+include ./features.inc
 
 # The Carbonix carrier board (CX13042008) uses uninverted logic for these pins,
 # as opposed to how the CubePilot carrier hardware is designed. We have to
