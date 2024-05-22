@@ -1,5 +1,0 @@
-include ../CarbonixF405/hwdef.dat
-
-undef CAN_APP_NODE_NAME
-
-define CAN_APP_NODE_NAME "VOl-CPN-16-Right-Wing"

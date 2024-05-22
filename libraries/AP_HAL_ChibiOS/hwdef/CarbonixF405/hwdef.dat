@@ -4,3 +4,5 @@
 MCU STM32F4xx STM32F405xx
 
 include ../CarbonixCommon/cpn.inc
+
+define CAN_APP_NODE_NAME "org.ardupilot.CarbonixF405"

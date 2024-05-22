@@ -185,7 +185,7 @@ jobs:
       - name: build Carbonix Periph boards
         shell: bash
         run: |
-          boards=("CarbonixF405" "Volanti-M1" "Volanti-M2" "Volanti-M3" "Volanti-M4" "Volanti-M5" "Volanti-LWing" "Volanti-RWing" "Volanti-LTail" "Volanti-RTail" "Ottano-M1" "Ottano-M2" "Ottano-M3" "Ottano-M4" "Ottano-M5" "Ottano-LWing" "Ottano-RWing" "Ottano-LTail" "Ottano-RTail")
+          boards=("CarbonixF405" "CarbonixL496")
           for board in "${boards[@]}"; do
             echo "Compiling AP_Periph for $board..."
             ./Tools/scripts/build_bootloaders.py "$board"
@@ -197,7 +197,7 @@ jobs:
         id: check_files
         uses: andstor/file-existence-action@v2
         with:
-          files: "build/CubeOrange/*, build/CarbonixCubeOrange/*, build/sitl/*, build/CarbonixF405/*, build/Volanti-M1/*, build/Volanti-M2/*, build/Volanti-M3/*, build/Volanti-M4/*, build/Volanti-M5/*, build/Volanti-LWing/*, build/Volanti-RWing/*, build/Volanti-LTail/*, build/Volanti-RTail/*, build/Ottano-M1/*, build/Ottano-M2/*, build/Ottano-M3/*, build/Ottano-M4/*, build/Ottano-M5/*, build/Ottano-LWing/*, build/Ottano-RWing/*, build/Ottano-LTail/*, build/Ottano-RTail/*"
+          files: "build/CubeOrange/*, build/CarbonixCubeOrange/*, build/sitl/*, build/CarbonixF405/*, build/CarbonixL496/*"
           fail: true
       - name: Extract firmware version and commit id
         id: extract_info
@@ -210,7 +210,7 @@ jobs:
       - name: Gather build output
         run: |
           mkdir -p temp
-          for dir in CubeOrange CarbonixCubeOrange sitl CarbonixF405 Volanti-M1 Volanti-M2 Volanti-M3 Volanti-M4 Volanti-M5 Volanti-LWing Volanti-RWing Volanti-LTail Volanti-RTail Ottano-M1 Ottano-M2 Ottano-M3 Ottano-M4 Ottano-M5 Ottano-LWing Ottano-RWing Ottano-LTail Ottano-RTail; do
+          for dir in CubeOrange CarbonixCubeOrange sitl CarbonixF405 CarbonixL496; do
             mkdir -p temp/$dir/bin
             cp -v build/$dir/bin/* temp/$dir/bin/
           done

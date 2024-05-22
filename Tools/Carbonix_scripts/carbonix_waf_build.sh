@@ -30,7 +30,7 @@ for board in "${main_boards[@]}"; do
   ./waf plane
 done
 
-periph_boards=("CarbonixF405" "Volanti-M1" "Volanti-M2" "Volanti-M3" "Volanti-M4" "Volanti-M5" "Volanti-LWing" "Volanti-RWing" "Volanti-LTail" "Volanti-RTail" "Ottano-M1" "Ottano-M2" "Ottano-M3" "Ottano-M4" "Ottano-M5" "Ottano-LWing" "Ottano-RWing" "Ottano-LTail" "Ottano-RTail")
+periph_boards=("CarbonixF405" "CarbonixL496")
 
 for board in "${periph_boards[@]}"; do
   echo "Compiling AP_Periph for $board..."

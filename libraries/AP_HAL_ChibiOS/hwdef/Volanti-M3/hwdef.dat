@@ -1,9 +1,0 @@
-include ../CarbonixF405/hwdef.dat
-
-undef CAN_APP_NODE_NAME
-undef HAL_WITH_ESC_TELEM
-
-define CAN_APP_NODE_NAME "VOl-CPN-23-Motor-3"
-
-# enable ESC control
-define HAL_WITH_ESC_TELEM 1
