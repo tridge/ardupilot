@@ -169,33 +169,3 @@ float px4muorb_get_cpu_load(void)
        return 0.0f;
 }
 
-extern "C" void free(void *ptr) {
-       return;
-}
-
-// malloc
-extern "C" void *malloc(size_t size) {
-       return NULL;
-}
-
-// posix_memalign
-extern "C" int posix_memalign(void **memptr, size_t alignment, size_t size) {
-       return 0;
-}
-
-// calloc
-extern "C" void *calloc(size_t nmemb, size_t size) {
-       return NULL;
-}
-
-
-// realloc
-extern "C" void *realloc(void *ptr, size_t size) {
-       return NULL;
-}
-
-// nanosleep
-#include <time.h>
-extern "C" int nanosleep(const struct timespec *req, struct timespec *_Nullable rem) {
-       return 0;
-}
