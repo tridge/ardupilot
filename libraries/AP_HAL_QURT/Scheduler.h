@@ -36,6 +36,9 @@ public:
     void     set_system_initialized() override;
     bool     is_system_initialized() override { return _initialized; }
 
+    bool thread_create(AP_HAL::MemberProc proc, const char *name,
+                               uint32_t stack_size, priority_base base, int8_t priority) override;
+
 private:
     bool _initialized;
     volatile bool _hal_initialized;
@@ -60,6 +63,8 @@ private:
     pthread_t _io_thread_ctx;
     pthread_t _storage_thread_ctx;
     pthread_t _uart_thread_ctx;
+
+    uint8_t calculate_thread_priority(priority_base base, int8_t priority) const;
 
     static void *_timer_thread(void *arg);
     static void *_io_thread(void *arg);

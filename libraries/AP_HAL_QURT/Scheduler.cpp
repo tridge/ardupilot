@@ -61,6 +61,64 @@ void Scheduler::init()
 	pthread_create(&_io_thread_ctx, &thread_attr, &Scheduler::_io_thread, this);
 }
 
+#define APM_LINUX_MAX_PRIORITY          20
+#define APM_LINUX_TIMER_PRIORITY        15
+#define APM_LINUX_UART_PRIORITY         14
+#define APM_LINUX_NET_PRIORITY          14
+#define APM_LINUX_RCIN_PRIORITY         13
+#define APM_LINUX_MAIN_PRIORITY         12
+#define APM_LINUX_IO_PRIORITY           10
+#define APM_LINUX_SCRIPTING_PRIORITY     1
+#define AP_LINUX_SENSORS_SCHED_PRIO     12
+
+uint8_t Scheduler::calculate_thread_priority(priority_base base, int8_t priority) const
+{
+    uint8_t thread_priority = APM_LINUX_IO_PRIORITY;
+    static const struct {
+        priority_base base;
+        uint8_t p;
+    } priority_map[] = {
+        { PRIORITY_BOOST, APM_LINUX_MAIN_PRIORITY},
+        { PRIORITY_MAIN, APM_LINUX_MAIN_PRIORITY},
+        { PRIORITY_SPI, AP_LINUX_SENSORS_SCHED_PRIO},
+        { PRIORITY_I2C, AP_LINUX_SENSORS_SCHED_PRIO},
+        { PRIORITY_CAN, APM_LINUX_TIMER_PRIORITY},
+        { PRIORITY_TIMER, APM_LINUX_TIMER_PRIORITY},
+        { PRIORITY_RCIN, APM_LINUX_RCIN_PRIORITY},
+        { PRIORITY_IO, APM_LINUX_IO_PRIORITY},
+        { PRIORITY_UART, APM_LINUX_UART_PRIORITY},
+        { PRIORITY_STORAGE, APM_LINUX_IO_PRIORITY},
+        { PRIORITY_SCRIPTING, APM_LINUX_SCRIPTING_PRIORITY},
+        { PRIORITY_NET, APM_LINUX_NET_PRIORITY},
+    };
+    for (uint8_t i=0; i<ARRAY_SIZE(priority_map); i++) {
+        if (priority_map[i].base == base) {
+            thread_priority = constrain_int16(priority_map[i].p + priority, 1, APM_LINUX_MAX_PRIORITY);
+            break;
+        }
+    }
+
+    return thread_priority;
+}
+
+bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name,
+                               uint32_t stack_size, priority_base base, int8_t priority)
+{
+	pthread_attr_t thread_attr;
+	struct sched_param param;
+
+	pthread_attr_init(&thread_attr);
+	pthread_attr_setstacksize(&thread_attr, (1024 * 256) + stack_size);
+
+	param.sched_priority = calculate_thread_priority(base, priority);
+
+	(void)pthread_attr_setschedparam(&thread_attr, &param);
+
+	pthread_create(&_timer_thread_ctx, &thread_attr, &Scheduler::_timer_thread, this);
+
+	return true;
+}
+
 void Scheduler::delay_microseconds(uint16_t usec) 
 {
     qurt_timer_sleep(usec);
