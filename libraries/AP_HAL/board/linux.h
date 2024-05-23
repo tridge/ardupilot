@@ -401,6 +401,8 @@
 #include <AP_HAL_Linux/Semaphores.h>
 #define HAL_Semaphore Linux::Semaphore
 #define HAL_BinarySemaphore Linux::BinarySemaphore
+#include <AP_HAL_Linux/CondMutex.h>
+#define HAL_CondMutex Linux::CondMutex
 #endif
 
 #ifndef HAL_HAVE_HARDWARE_DOUBLE
@@ -416,7 +418,7 @@
 #endif
 
 #ifndef HAL_INS_RATE_LOOP
-#define HAL_INS_RATE_LOOP 0
+#define HAL_INS_RATE_LOOP 1
 #endif
 
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NONE
