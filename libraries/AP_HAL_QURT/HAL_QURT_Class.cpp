@@ -30,7 +30,7 @@
 
 using namespace QURT;
 
-static Empty::UARTDriver serial0Driver;
+static UARTDriver serial0Driver("/dev/console");
 static UARTDriver serial1Driver("/dev/tty-4");
 static UARTDriver serial2Driver("/dev/tty-2");
 
@@ -87,9 +87,9 @@ void HAL_QURT::run(int argc, char* const argv[], Callbacks* callbacks) const
     serial0Driver.begin(115200);
     rcinDriver.init();
 	// Runs okay up to here. Next line causes a crash!
-    // callbacks->setup();
-    // scheduler->set_system_initialized();
-	// 
+    callbacks->setup();
+    scheduler->set_system_initialized();
+ 
     // for (;;) {
     //     callbacks->loop();
     // }

@@ -398,6 +398,9 @@ void AP_Vehicle::setup()
     can_mgr.init();
 #endif
 
+// Crashes if we go farther!
+return;
+
 #if HAL_LOGGING_ENABLED
     logger.init(get_log_bitmask(), get_log_structures(), get_num_log_structures());
 #endif

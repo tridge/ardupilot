@@ -19,6 +19,8 @@
 #include "Semaphores.h"
 #include <AP_HAL/utility/RingBuffer.h>
 
+#define CONSOLE_BUFFER_SIZE 64
+
 class QURT::UARTDriver : public AP_HAL::UARTDriver {
 public:
     UARTDriver(const char *name);
@@ -29,6 +31,8 @@ public:
     /* Empty implementations of Stream virtual methods */
     uint32_t txspace() override;
 
+	void printf(const char *fmt, ...) override;
+
 protected:
     void _begin(uint32_t b, uint16_t rxS, uint16_t txS) override;
     size_t _write(const uint8_t *buffer, size_t size) override;
@@ -37,4 +41,6 @@ protected:
     void _flush() override;
     uint32_t _available() override;
     bool _discard_input() override;
+	bool _is_console{ false };
+	char _console_buffer[CONSOLE_BUFFER_SIZE];
 };

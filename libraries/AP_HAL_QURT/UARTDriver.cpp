@@ -2,7 +2,27 @@
 #include "UARTDriver.h"
 #include <AP_Common/ExpandingString.h>
 
-QURT::UARTDriver::UARTDriver(const char *name) {}
+extern const AP_HAL::HAL& hal;
+
+QURT::UARTDriver::UARTDriver(const char *name)
+{ 
+	if (strcmp(name, "/dev/console") == 0) {
+		_is_console = true;
+		HAP_PRINTF("UART console created");
+	}
+}
+
+void QURT::UARTDriver::printf(const char *fmt, ...)
+{
+	if (_is_console) {
+		va_list ap;
+		char buf[300];
+		va_start(ap, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, ap);
+		va_end(ap);
+		HAP_PRINTF(buf);
+	}
+}
 
 /* QURT implementations of virtual methods */
 void QURT::UARTDriver::_begin(uint32_t b, uint16_t rxS, uint16_t txS) {}
