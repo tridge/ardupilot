@@ -35,7 +35,7 @@ void Copter::init_ardupilot()
     rssi.init();
 
 	// Any use of barometer crashes the DSP
-    // barometer.init();
+    barometer.init();
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
