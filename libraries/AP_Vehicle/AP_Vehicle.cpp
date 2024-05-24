@@ -294,6 +294,10 @@ AP_Vehicle& vehicle = *AP_Vehicle::get_singleton();
 extern AP_Vehicle& vehicle;
 #endif
 
+#include <qurt.h>
+// #define GOT_HERE() do { DEV_PRINTF("got to %s:%d\n", __FILE__, __LINE__); qurt_timer_sleep(5000); } while(false);
+#define GOT_HERE()
+
 /*
   setup is called when the sketch starts
  */
@@ -398,9 +402,6 @@ void AP_Vehicle::setup()
     can_mgr.init();
 #endif
 
-// Crashes if we go farther!
-return;
-
 #if HAL_LOGGING_ENABLED
     logger.init(get_log_bitmask(), get_log_structures(), get_num_log_structures());
 #endif
@@ -413,27 +414,36 @@ return;
     // init_ardupilot is where the vehicle does most of its initialisation.
     init_ardupilot();
 
+GOT_HERE();
+
 #if AP_SCRIPTING_ENABLED
     scripting.init();
 #endif // AP_SCRIPTING_ENABLED
 
+GOT_HERE();
+
 #if AP_AIRSPEED_ENABLED
     airspeed.init();
+GOT_HERE();
     if (airspeed.enabled()) {
         airspeed.calibrate(true);
     } 
+GOT_HERE();
 #if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
     else {
+GOT_HERE();
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "No airspeed sensor");
     }
 #endif
 #endif  // AP_AIRSPEED_ENABLED
 
+GOT_HERE();
 
 #if AP_SRV_CHANNELS_ENABLED
     SRV_Channels::init();
 #endif
 
+GOT_HERE();
     // gyro FFT needs to be initialized really late
 #if HAL_GYROFFT_ENABLED
 #if AP_SCHEDULER_ENABLED
@@ -442,84 +452,105 @@ return;
     gyro_fft.init(1000);
 #endif
 #endif
+GOT_HERE();
 #if HAL_RUNCAM_ENABLED
     runcam.init();
 #endif
+GOT_HERE();
 #if HAL_HOTT_TELEM_ENABLED
     hott_telem.init();
 #endif
+GOT_HERE();
 #if HAL_VISUALODOM_ENABLED
     // init library used for visual position estimation
     visual_odom.init();
 #endif
 
+GOT_HERE();
 #if AP_VIDEOTX_ENABLED
     vtx.init();
 #endif
 
+GOT_HERE();
 #if AP_SMARTAUDIO_ENABLED
     smartaudio.init();
 #endif
 
+GOT_HERE();
 #if AP_TRAMP_ENABLED
     tramp.init();
 #endif
 
+GOT_HERE();
 #if AP_PARAM_KEY_DUMP
     AP_Param::show_all(hal.console, true);
 #endif
 
+GOT_HERE();
     send_watchdog_reset_statustext();
 
+GOT_HERE();
 #if AP_OPENDRONEID_ENABLED
     opendroneid.init();
 #endif
 
 // init EFI monitoring
+GOT_HERE();
 #if HAL_EFI_ENABLED
     efi.init();
 #endif
 
+GOT_HERE();
 #if AP_TEMPERATURE_SENSOR_ENABLED
     temperature_sensor.init();
 #endif
 
+GOT_HERE();
 #if AP_KDECAN_ENABLED
     kdecan.init();
 #endif
 
+GOT_HERE();
 #if AP_AIS_ENABLED
     ais.init();
 #endif
 
+GOT_HERE();
 #if HAL_NMEA_OUTPUT_ENABLED
     nmea.init();
 #endif
 
+GOT_HERE();
 #if AP_FENCE_ENABLED
     fence.init();
 #endif
 
+GOT_HERE();
 #if AP_CUSTOMROTATIONS_ENABLED
     custom_rotations.init();
 #endif
 
+GOT_HERE();
 #if AP_FILTER_ENABLED
     filters.init();
 #endif
 
+GOT_HERE();
 #if HAL_WITH_ESC_TELEM && HAL_GYROFFT_ENABLED
     for (uint8_t i = 0; i<ESC_TELEM_MAX_ESCS; i++) {
         esc_noise[i].set_cutoff_frequency(2);
     }
 #endif
 
+GOT_HERE();
     // invalidate count in case an enable parameter changed during
     // initialisation
     AP_Param::invalidate_count();
 
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "ArduPilot Ready");
+    DEV_PRINTF("ArduPilot Ready");
 
+GOT_HERE();
 #if AP_DDS_ENABLED
     if (!init_dds_client()) {
         GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "%s Failed to Initialize", AP_DDS_Client::msg_prefix);
