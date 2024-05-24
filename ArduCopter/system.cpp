@@ -13,6 +13,10 @@ static void failsafe_check_static()
     copter.failsafe_check();
 }
 
+#include <qurt.h>
+// #define GOT_HERE() do { DEV_PRINTF("got to %s:%d\n", __FILE__, __LINE__); qurt_timer_sleep(5000); } while(false);
+#define GOT_HERE()
+
 void Copter::init_ardupilot()
 {
     // init winch
@@ -29,45 +33,71 @@ void Copter::init_ardupilot()
 
     // Init RSSI
     rssi.init();
-    
-    barometer.init();
+
+	// Any use of barometer crashes the DSP
+    // barometer.init();
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
+
+GOT_HERE();
 
 #if OSD_ENABLED == ENABLED
     osd.init();
 #endif
 
+GOT_HERE();
+
     // update motor interlock state
     update_using_interlock();
+
+GOT_HERE();
 
 #if FRAME_CONFIG == HELI_FRAME
     // trad heli specific initialisation
     heli_init();
 #endif
+
+GOT_HERE();
+
 #if FRAME_CONFIG == HELI_FRAME
     input_manager.set_loop_rate(scheduler.get_loop_rate_hz());
 #endif
 
+GOT_HERE();
+
     init_rc_in();               // sets up rc channels from radio
+
+GOT_HERE();
 
     // initialise surface to be tracked in SurfaceTracking
     // must be before rc init to not override initial switch position
     surface_tracking.init((SurfaceTracking::Surface)copter.g2.surftrak_mode.get());
 
+GOT_HERE();
+
     // allocate the motors class
     allocate_motors();
 
+GOT_HERE();
+
     // initialise rc channels including setting mode
     rc().convert_options(RC_Channel::AUX_FUNC::ARMDISARM_UNUSED, RC_Channel::AUX_FUNC::ARMDISARM_AIRMODE);
+GOT_HERE();
+
     rc().init();
+
+GOT_HERE();
 
     // sets up motors and output to escs
     init_rc_out();
 
+GOT_HERE();
+
     // check if we should enter esc calibration mode
     esc_calibration_startup_check();
+
+GOT_HERE();
 
     // motors initialised so parameters can be sent
     ap.initialised_params = true;
@@ -76,51 +106,77 @@ void Copter::init_ardupilot()
     relay.init();
 #endif
 
+GOT_HERE();
+
     /*
      *  setup the 'main loop is dead' check. Note that this relies on
      *  the RC library being initialised.
      */
     hal.scheduler->register_timer_failsafe(failsafe_check_static, 1000);
 
+GOT_HERE();
+
     // Do GPS init
     gps.set_log_gps_bit(MASK_LOG_GPS);
+GOT_HERE();
+
     gps.init();
 
+GOT_HERE();
+
     AP::compass().set_log_bit(MASK_LOG_COMPASS);
+GOT_HERE();
+
     AP::compass().init();
 
 #if AP_AIRSPEED_ENABLED
+GOT_HERE();
+
     airspeed.set_log_bit(MASK_LOG_IMU);
 #endif
 
 #if AP_OAPATHPLANNER_ENABLED
+GOT_HERE();
+
     g2.oa.init();
 #endif
+
+GOT_HERE();
 
     attitude_control->parameter_sanity_check();
 
 #if AP_OPTICALFLOW_ENABLED
     // initialise optical flow sensor
+GOT_HERE();
+
     optflow.init(MASK_LOG_OPTFLOW);
 #endif      // AP_OPTICALFLOW_ENABLED
 
 #if HAL_MOUNT_ENABLED
     // initialise camera mount
+GOT_HERE();
+
     camera_mount.init();
 #endif
 
 #if AP_CAMERA_ENABLED
     // initialise camera
+GOT_HERE();
+
     camera.init();
 #endif
 
 #if AC_PRECLAND_ENABLED
     // initialise precision landing
+GOT_HERE();
+
     init_precland();
 #endif
 
 #if AP_LANDINGGEAR_ENABLED
     // initialise landing gear position
+GOT_HERE();
+
     landinggear.init();
 #endif
 
@@ -130,67 +186,96 @@ void Copter::init_ardupilot()
 
     // read Baro pressure at ground
     //-----------------------------
-    barometer.set_log_baro_bit(MASK_LOG_IMU);
-    barometer.calibrate();
+GOT_HERE();
+
+	// Any use of barometer crashes the DSP
+    // barometer.set_log_baro_bit(MASK_LOG_IMU);
+    // barometer.calibrate();
 
 #if RANGEFINDER_ENABLED == ENABLED
     // initialise rangefinder
+GOT_HERE();
+
     init_rangefinder();
 #endif
 
 #if HAL_PROXIMITY_ENABLED
     // init proximity sensor
+GOT_HERE();
+
     g2.proximity.init();
 #endif
 
 #if AP_BEACON_ENABLED
     // init beacons used for non-gps position estimation
+GOT_HERE();
+
     g2.beacon.init();
 #endif
 
 #if AP_RPM_ENABLED
+GOT_HERE();
+
     // initialise AP_RPM library
     rpm_sensor.init();
 #endif
 
 #if MODE_AUTO_ENABLED == ENABLED
+GOT_HERE();
+
     // initialise mission library
     mode_auto.mission.init();
 #endif
 
 #if MODE_SMARTRTL_ENABLED == ENABLED
+GOT_HERE();
+
     // initialize SmartRTL
     g2.smart_rtl.init();
 #endif
 
 #if HAL_LOGGING_ENABLED
+GOT_HERE();
+
     // initialise AP_Logger library
     logger.setVehicle_Startup_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 #endif
 
-    startup_INS_ground();
+GOT_HERE();
+
+	// Get an error message here and then crashes
+    // startup_INS_ground();
 
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
+GOT_HERE();
+
     custom_control.init();
 #endif
 
     // set landed flags
     set_land_complete(true);
+GOT_HERE();
+
     set_land_complete_maybe(true);
+GOT_HERE();
 
     // enable CPU failsafe
     failsafe_enable();
+GOT_HERE();
 
     ins.set_log_raw_bit(MASK_LOG_IMU_RAW);
+GOT_HERE();
 
     motors->output_min();  // output lowest possible value to motors
 
     // attempt to set the initial_mode, else set to STABILIZE
+GOT_HERE();
     if (!set_mode((enum Mode::Number)g.initial_mode.get(), ModeReason::INITIALISED)) {
         // set mode to STABILIZE will trigger mode change notification to pilot
         set_mode(Mode::Number::STABILIZE, ModeReason::UNAVAILABLE);
     }
 
+GOT_HERE();
     pos_variance_filt.set_cutoff_frequency(g2.fs_ekf_filt_hz);
     vel_variance_filt.set_cutoff_frequency(g2.fs_ekf_filt_hz);
     hgt_variance_filt.set_cutoff_frequency(g2.fs_ekf_filt_hz);
