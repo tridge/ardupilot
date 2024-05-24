@@ -22,4 +22,6 @@ class HAL_QURT : public AP_HAL::HAL {
 public:
     HAL_QURT();
     void run(int argc, char* const* argv, Callbacks* callbacks) const override;
+    void start_main_thread(Callbacks* callbacks);
+    void main_thread(void);
 };

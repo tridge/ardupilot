@@ -141,6 +141,8 @@ int px4muorb_orb_initialize(fc_func_ptrs *func_ptrs, int32_t clock_offset_us)
 	
 	qurt_arducopter_main(0, NULL);
 
+    HAP_PRINTF("qurt_arducopter_main RETURNED");
+
     return 0;
 }
 

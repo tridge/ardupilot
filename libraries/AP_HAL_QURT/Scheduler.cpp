@@ -17,6 +17,7 @@
 #include "Storage.h"
 #include "RCOutput.h"
 #include <AP_Scheduler/AP_Scheduler.h>
+#include "Thread.h"
 
 using namespace QURT;
 
@@ -101,22 +102,33 @@ uint8_t Scheduler::calculate_thread_priority(priority_base base, int8_t priority
     return thread_priority;
 }
 
-bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name,
-                               uint32_t stack_size, priority_base base, int8_t priority)
+/*
+  create a new thread
+*/
+bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size, priority_base base, int8_t priority)
 {
-	pthread_attr_t thread_attr;
-	struct sched_param param;
+    Thread *thread = new Thread{(Thread::task_t)proc};
+    if (!thread) {
+        return false;
+    }
 
-	pthread_attr_init(&thread_attr);
-	pthread_attr_setstacksize(&thread_attr, (1024 * 256) + stack_size);
+    const uint8_t thread_priority = calculate_thread_priority(base, priority);
 
-	param.sched_priority = calculate_thread_priority(base, priority);
+    // Add 10k to HAL-independent requested stack size
+    thread->set_stack_size(10 * 1024 + stack_size);
 
-	(void)pthread_attr_setschedparam(&thread_attr, &param);
+    /*
+     * We should probably store the thread handlers and join() when exiting,
+     * but let's the thread manage itself for now.
+     */
+    thread->set_auto_free(true);
 
-	pthread_create(&_timer_thread_ctx, &thread_attr, &Scheduler::_timer_thread, this);
+    if (!thread->start(name, SCHED_FIFO, thread_priority)) {
+        delete thread;
+        return false;
+    }
 
-	return true;
+    return true;
 }
 
 void Scheduler::delay_microseconds(uint16_t usec) 

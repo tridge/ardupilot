@@ -75,6 +75,32 @@ HAL_QURT::HAL_QURT() :
 {
 }
 
+
+static HAL_QURT::Callbacks *_callbacks;
+
+void HAL_QURT::main_thread(void)
+{
+    HAP_PRINTF("In main_thread!");
+    rcinDriver.init();
+    _callbacks->setup();
+    scheduler->set_system_initialized();
+
+    HAP_PRINTF("starting loop");
+
+    for (;;) {
+        _callbacks->loop();
+    }
+}
+
+void HAL_QURT::start_main_thread(Callbacks* callbacks)
+{
+    _callbacks = callbacks;
+    scheduler->thread_create(FUNCTOR_BIND_MEMBER(&HAL_QURT::main_thread, void), "main_thread",
+                             32768,
+                             AP_HAL::Scheduler::PRIORITY_MAIN,
+                             0);
+}
+
 void HAL_QURT::run(int argc, char* const argv[], Callbacks* callbacks) const
 {
     assert(callbacks);
@@ -85,14 +111,10 @@ void HAL_QURT::run(int argc, char* const argv[], Callbacks* callbacks) const
     scheduler->init();
     schedulerInstance.hal_initialized();
     serial0Driver.begin(115200);
-    rcinDriver.init();
-    callbacks->setup();
-    scheduler->set_system_initialized();
- 
-	// Crashes on the loop
-    // for (;;) {
-    //     callbacks->loop();
-    // }
+
+    HAP_PRINTF("Creating thread!");
+
+    const_cast<HAL_QURT *>(this)->start_main_thread(callbacks);
 }
 
 const AP_HAL::HAL& AP_HAL::get_HAL() {
