@@ -86,10 +86,10 @@ void HAL_QURT::run(int argc, char* const argv[], Callbacks* callbacks) const
     schedulerInstance.hal_initialized();
     serial0Driver.begin(115200);
     rcinDriver.init();
-	// Runs okay up to here. Next line causes a crash!
     callbacks->setup();
     scheduler->set_system_initialized();
  
+	// Crashes on the loop
     // for (;;) {
     //     callbacks->loop();
     // }
