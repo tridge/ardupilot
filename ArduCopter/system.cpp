@@ -15,27 +15,43 @@ static void failsafe_check_static()
 
 #include <qurt.h>
 // #define GOT_HERE() do { DEV_PRINTF("got to %s:%d\n", __FILE__, __LINE__); qurt_timer_sleep(5000); } while(false);
-#define GOT_HERE()
+#define GOT_HERE() do {} while(0)
+
 
 void Copter::init_ardupilot()
 {
+    GOT_HERE();
+
     // init winch
 #if AP_WINCH_ENABLED
     g2.winch.init();
 #endif
 
+    GOT_HERE();
+
     // initialise notify system
     notify.init();
+
+    GOT_HERE();
+
     notify_flight_mode();
+
+    GOT_HERE();
 
     // initialise battery monitor
     battery.init();
 
+    GOT_HERE();
+
     // Init RSSI
     rssi.init();
 
+    GOT_HERE();
+
 	// Any use of barometer crashes the DSP
     barometer.init();
+
+    GOT_HERE();
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
@@ -189,8 +205,8 @@ GOT_HERE();
 GOT_HERE();
 
 	// Any use of barometer crashes the DSP
-    // barometer.set_log_baro_bit(MASK_LOG_IMU);
-    // barometer.calibrate();
+    barometer.set_log_baro_bit(MASK_LOG_IMU);
+    barometer.calibrate();
 
 #if RANGEFINDER_ENABLED == ENABLED
     // initialise rangefinder
@@ -241,13 +257,12 @@ GOT_HERE();
     logger.setVehicle_Startup_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 #endif
 
-GOT_HERE();
+    GOT_HERE();
 
-	// Get an error message here and then crashes
-    // startup_INS_ground();
+    startup_INS_ground();
 
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
-GOT_HERE();
+    GOT_HERE();
 
     custom_control.init();
 #endif
@@ -294,11 +309,16 @@ void Copter::startup_INS_ground()
     ahrs.init();
     ahrs.set_vehicle_class(AP_AHRS::VehicleClass::COPTER);
 
+    GOT_HERE();
+
     // Warm up and calibrate gyro offsets
     ins.init(scheduler.get_loop_rate_hz());
 
+    GOT_HERE();
+
     // reset ahrs including gyro bias
     ahrs.reset();
+    GOT_HERE();
 }
 
 // position_ok - returns true if the horizontal absolute position is ok and home position is set
