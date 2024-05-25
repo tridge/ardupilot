@@ -439,6 +439,23 @@ bool AP_BoardConfig::_in_error_loop;
 
 void AP_BoardConfig::throw_error(const char *err_type, const char *fmt, va_list arg)
 {
+    HAP_PRINTF("throw_error: %s", err_type);
+    qurt_timer_sleep(5000);
+    uint32_t last_ms = AP_HAL::millis();
+    uint32_t last_us = AP_HAL::micros();
+    while (true) {
+        qurt_timer_sleep(1000000);
+        uint32_t now_ms = AP_HAL::millis();
+        uint32_t now_us = AP_HAL::micros();
+        uint32_t dt_ms = now_ms - last_ms;
+        uint32_t dt_us = now_us - last_us;
+        HAP_PRINTF("tick! %u %u dt_ms=%u dt_us=%u\n",
+                   unsigned(now_ms), unsigned(now_us),
+                   unsigned(dt_ms), unsigned(dt_us));
+        last_ms = now_ms;
+        last_us = now_us;
+    }
+
     _in_error_loop = true;
     /*
       to give the user the opportunity to connect to USB we keep
