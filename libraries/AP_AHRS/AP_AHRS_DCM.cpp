@@ -34,6 +34,9 @@
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
+#include <qurt.h>
+#define GOT_HERE() do { DEV_PRINTF("got to %s:%d\n", __FILE__, __LINE__); qurt_timer_sleep(5000); } while(false);
+
 extern const AP_HAL::HAL& hal;
 
 // this is the speed in m/s above which we first get a yaw lock with
@@ -177,12 +180,15 @@ void AP_AHRS_DCM::matrix_update(void)
 void
 AP_AHRS_DCM::reset(bool recover_eulers)
 {
+    GOT_HERE();
+
     // reset the integration terms
     _omega_I.zero();
     _omega_P.zero();
     _omega_yaw_P.zero();
     _omega.zero();
 
+    GOT_HERE();
     // if the caller wants us to try to recover to the current
     // attitude then calculate the dcm matrix from the current
     // roll/pitch/yaw values
@@ -205,14 +211,6 @@ AP_AHRS_DCM::reset(bool recover_eulers)
 
         // Get body frame accel vector
         Vector3f initAccVec = _ins.get_accel();
-        uint8_t counter = 0;
-
-        // the first vector may be invalid as the filter starts up
-        while ((initAccVec.length() < 9.0f || initAccVec.length() > 11) && counter++ < 20) {
-            _ins.wait_for_sample();
-            _ins.update();
-            initAccVec = _ins.get_accel();
-        }
 
         // normalise the acceleration vector
         if (initAccVec.length() > 5.0f) {
@@ -228,12 +226,14 @@ AP_AHRS_DCM::reset(bool recover_eulers)
         _dcm_matrix.from_euler(roll, pitch, 0);
 
     }
+    GOT_HERE();
 
     // pre-calculate some trig for CPU purposes:
     _cos_yaw = cosf(yaw);
     _sin_yaw = sinf(yaw);
 
     _last_startup_ms = AP_HAL::millis();
+    GOT_HERE();
 }
 
 /*
