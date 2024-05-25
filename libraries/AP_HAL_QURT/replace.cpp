@@ -176,3 +176,16 @@ float px4muorb_get_cpu_load(void)
        return 0.0f;
 }
 
+int __wrap_printf(const char *fmt, ...)
+{
+   va_list ap;
+
+   char buf[300];
+   va_start(ap, fmt);
+   vsnprintf(buf, sizeof(buf), fmt, ap);
+   va_end(ap);
+   HAP_PRINTF(buf);
+   qurt_timer_sleep(5000);
+
+   return 0;
+}

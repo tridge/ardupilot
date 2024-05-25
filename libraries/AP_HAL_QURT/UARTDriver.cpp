@@ -20,7 +20,8 @@ void QURT::UARTDriver::printf(const char *fmt, ...)
 		va_start(ap, fmt);
 		vsnprintf(buf, sizeof(buf), fmt, ap);
 		va_end(ap);
-		HAP_PRINTF(buf);
+        HAP_PRINTF(buf);
+        qurt_timer_sleep(5000);
 	}
 }
 

@@ -31,6 +31,8 @@ extern "C" {
     
     void HAP_printf(const char *file, int line, const char *fmt, ...);
 
+    int __wrap_printf(const char *fmt, ...);
+
 #ifdef __cplusplus
 }
 #endif

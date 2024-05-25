@@ -82,6 +82,7 @@ bool Thread::start(const char *name, int policy, int prio)
     }
 
     if (_stack_size) {
+        HAP_PRINTF("Using stack_size=%u", unsigned(_stack_size));
         if (pthread_attr_setstacksize(&attr, _stack_size) != 0) {
             return false;
         }

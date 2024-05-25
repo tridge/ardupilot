@@ -32,6 +32,7 @@ void panic(const char *errormsg, ...)
     vsnprintf(buf, sizeof(buf), errormsg, ap);
     va_end(ap);
     HAP_PRINTF(buf);
+    qurt_timer_sleep(100000);
     exit(1);
 }
 

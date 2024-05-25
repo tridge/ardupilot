@@ -14,9 +14,11 @@ public:
     bool give() override;
     bool take(uint32_t timeout_ms) override;
     bool take_nonblocking() override;
+    bool check_owner(void);
 protected:
     // qurt_mutex_t _lock;
     pthread_mutex_t _lock;
+    pthread_t owner;
 };
 
 

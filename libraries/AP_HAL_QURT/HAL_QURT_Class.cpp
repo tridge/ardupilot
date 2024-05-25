@@ -23,6 +23,7 @@
 #include "Semaphores.h"
 #include "RCInput.h"
 #include "RCOutput.h"
+#include "I2CDevice.h"
 #include <AP_HAL_Empty/AP_HAL_Empty.h>
 #include <AP_HAL_Empty/AP_HAL_Empty_Private.h>
 #include <AP_HAL/utility/getopt_cpp.h>
@@ -36,13 +37,13 @@ static UARTDriver serial2Driver("/dev/tty-2");
 
 static Empty::SPIDeviceManager spiDeviceManager;
 static Empty::AnalogIn analogIn;
-static Storage storageDriver;
+static Empty::Storage storageDriver;
 static Empty::GPIO gpioDriver;
 static Empty::RCInput rcinDriver;
 static RCOutput rcoutDriver;
 static Util utilInstance;
 static Scheduler schedulerInstance;
-static Empty::I2CDeviceManager i2c_mgr_instance;
+static I2CDeviceManager i2c_mgr_instance;
 
 bool qurt_ran_overtime;
 
@@ -76,6 +77,9 @@ HAL_QURT::HAL_QURT() :
 }
 
 
+// QURT interface pointers
+qurt_func_ptrs_t qurt_func_ptrs {};
+
 static HAL_QURT::Callbacks *_callbacks;
 
 void HAL_QURT::main_thread(void)
@@ -96,7 +100,7 @@ void HAL_QURT::start_main_thread(Callbacks* callbacks)
 {
     _callbacks = callbacks;
     scheduler->thread_create(FUNCTOR_BIND_MEMBER(&HAL_QURT::main_thread, void), "main_thread",
-                             32768,
+                             500000,
                              AP_HAL::Scheduler::PRIORITY_MAIN,
                              0);
 }

@@ -20,10 +20,19 @@ bool Semaphore::give()
     return pthread_mutex_unlock(&_lock) == 0;
 }
 
+bool Semaphore::check_owner()
+{
+    return owner == pthread_self();
+}
+
 bool Semaphore::take(uint32_t timeout_ms)
 {
     if (timeout_ms == HAL_SEMAPHORE_BLOCK_FOREVER) {
-        return pthread_mutex_lock(&_lock) == 0;
+        auto ok = pthread_mutex_lock(&_lock) == 0;
+        if (ok) {
+            owner = pthread_self();
+        }
+        return ok;
     }
     if (take_nonblocking()) {
         return true;
@@ -40,7 +49,11 @@ bool Semaphore::take(uint32_t timeout_ms)
 
 bool Semaphore::take_nonblocking()
 {
-    return pthread_mutex_trylock(&_lock) == 0;
+    const auto ok = pthread_mutex_trylock(&_lock) == 0;
+    if (ok) {
+        owner = pthread_self();
+    }
+    return ok;
 }
 
 /*

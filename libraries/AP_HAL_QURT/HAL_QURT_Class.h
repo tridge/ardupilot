@@ -17,6 +17,7 @@
 #include <AP_HAL/AP_HAL.h>
 
 #include "AP_HAL_QURT_Namespace.h"
+#include "interface.h"
 
 class HAL_QURT : public AP_HAL::HAL {
 public:
