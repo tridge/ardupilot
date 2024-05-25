@@ -36,7 +36,7 @@ void Scheduler::init()
 	struct sched_param param;
 
 	pthread_attr_init(&thread_attr);
-	pthread_attr_setstacksize(&thread_attr, 40960);
+    pthread_attr_setstacksize(&thread_attr, 16000);
 
 	param.sched_priority = APM_TIMER_PRIORITY;
 	(void)pthread_attr_setschedparam(&thread_attr, &param);
@@ -45,7 +45,7 @@ void Scheduler::init()
 
     // the UART thread runs at a medium priority
 	pthread_attr_init(&thread_attr);
-	pthread_attr_setstacksize(&thread_attr, 40960);
+    pthread_attr_setstacksize(&thread_attr, 16000);
 
 	param.sched_priority = APM_UART_PRIORITY;
 	(void)pthread_attr_setschedparam(&thread_attr, &param);
@@ -54,7 +54,7 @@ void Scheduler::init()
 
     // the IO thread runs at lower priority
 	pthread_attr_init(&thread_attr);
-	pthread_attr_setstacksize(&thread_attr, 40960);
+    pthread_attr_setstacksize(&thread_attr, 16000);
 
 	param.sched_priority = APM_IO_PRIORITY;
 	(void)pthread_attr_setschedparam(&thread_attr, &param);
@@ -62,39 +62,39 @@ void Scheduler::init()
 	pthread_create(&_io_thread_ctx, &thread_attr, &Scheduler::_io_thread, this);
 }
 
-#define APM_LINUX_MAX_PRIORITY          20
-#define APM_LINUX_TIMER_PRIORITY        15
-#define APM_LINUX_UART_PRIORITY         14
-#define APM_LINUX_NET_PRIORITY          14
-#define APM_LINUX_RCIN_PRIORITY         13
-#define APM_LINUX_MAIN_PRIORITY         12
-#define APM_LINUX_IO_PRIORITY           10
-#define APM_LINUX_SCRIPTING_PRIORITY     1
-#define AP_LINUX_SENSORS_SCHED_PRIO     12
+#define APM_QURT_MAX_PRIORITY          20
+#define APM_QURT_TIMER_PRIORITY        15
+#define APM_QURT_UART_PRIORITY         14
+#define APM_QURT_NET_PRIORITY          14
+#define APM_QURT_RCIN_PRIORITY         13
+#define APM_QURT_MAIN_PRIORITY         12
+#define APM_QURT_IO_PRIORITY           10
+#define APM_QURT_SCRIPTING_PRIORITY     1
+#define AP_QURT_SENSORS_SCHED_PRIO     12
 
 uint8_t Scheduler::calculate_thread_priority(priority_base base, int8_t priority) const
 {
-    uint8_t thread_priority = APM_LINUX_IO_PRIORITY;
+    uint8_t thread_priority = APM_QURT_IO_PRIORITY;
     static const struct {
         priority_base base;
         uint8_t p;
     } priority_map[] = {
-        { PRIORITY_BOOST, APM_LINUX_MAIN_PRIORITY},
-        { PRIORITY_MAIN, APM_LINUX_MAIN_PRIORITY},
-        { PRIORITY_SPI, AP_LINUX_SENSORS_SCHED_PRIO},
-        { PRIORITY_I2C, AP_LINUX_SENSORS_SCHED_PRIO},
-        { PRIORITY_CAN, APM_LINUX_TIMER_PRIORITY},
-        { PRIORITY_TIMER, APM_LINUX_TIMER_PRIORITY},
-        { PRIORITY_RCIN, APM_LINUX_RCIN_PRIORITY},
-        { PRIORITY_IO, APM_LINUX_IO_PRIORITY},
-        { PRIORITY_UART, APM_LINUX_UART_PRIORITY},
-        { PRIORITY_STORAGE, APM_LINUX_IO_PRIORITY},
-        { PRIORITY_SCRIPTING, APM_LINUX_SCRIPTING_PRIORITY},
-        { PRIORITY_NET, APM_LINUX_NET_PRIORITY},
+        { PRIORITY_BOOST, APM_QURT_MAIN_PRIORITY},
+        { PRIORITY_MAIN, APM_QURT_MAIN_PRIORITY},
+        { PRIORITY_SPI, AP_QURT_SENSORS_SCHED_PRIO+1},
+        { PRIORITY_I2C, AP_QURT_SENSORS_SCHED_PRIO},
+        { PRIORITY_CAN, APM_QURT_TIMER_PRIORITY},
+        { PRIORITY_TIMER, APM_QURT_TIMER_PRIORITY},
+        { PRIORITY_RCIN, APM_QURT_RCIN_PRIORITY},
+        { PRIORITY_IO, APM_QURT_IO_PRIORITY},
+        { PRIORITY_UART, APM_QURT_UART_PRIORITY},
+        { PRIORITY_STORAGE, APM_QURT_IO_PRIORITY},
+        { PRIORITY_SCRIPTING, APM_QURT_SCRIPTING_PRIORITY},
+        { PRIORITY_NET, APM_QURT_NET_PRIORITY},
     };
     for (uint8_t i=0; i<ARRAY_SIZE(priority_map); i++) {
         if (priority_map[i].base == base) {
-            thread_priority = constrain_int16(priority_map[i].p + priority, 1, APM_LINUX_MAX_PRIORITY);
+            thread_priority = constrain_int16(priority_map[i].p + priority, 1, APM_QURT_MAX_PRIORITY);
             break;
         }
     }

@@ -24,6 +24,7 @@
 #include "RCInput.h"
 #include "RCOutput.h"
 #include "I2CDevice.h"
+#include "SPIDevice.h"
 #include <AP_HAL_Empty/AP_HAL_Empty.h>
 #include <AP_HAL_Empty/AP_HAL_Empty_Private.h>
 #include <AP_HAL/utility/getopt_cpp.h>
@@ -35,7 +36,7 @@ static UARTDriver serial0Driver("/dev/console");
 static UARTDriver serial1Driver("/dev/tty-4");
 static UARTDriver serial2Driver("/dev/tty-2");
 
-static Empty::SPIDeviceManager spiDeviceManager;
+static SPIDeviceManager spiDeviceManager;
 static Empty::AnalogIn analogIn;
 static Empty::Storage storageDriver;
 static Empty::GPIO gpioDriver;

@@ -10,10 +10,16 @@ typedef struct {
     int (*subscribe_func_ptr)(const char *topic_name);
     int (*unsubscribe_func_ptr)(const char *topic_name);
     int (*topic_data_func_ptr)(const char *name, const uint8_t *data, int data_len_in_bytes);
-    // device::SPI::_config_spi_bus_func_t config_spi_bus;
-    // device::SPI::_spi_transfer_func_t spi_transfer;
+
+    /*
+      get a fd for the SPI bus
+     */
     int (*_config_spi_bus_func_t)();
-    int (*_spi_transfer_func_t)(int, const uint8_t *, uint8_t *, const unsigned);
+
+    /*
+      perform a SPI bus transfer
+     */
+    int (*_spi_transfer_func_t)(int fd, const uint8_t *send, uint8_t *recv, const unsigned length);
 
     /*
       configure an I2C device, returns a file descriptor
@@ -30,9 +36,6 @@ typedef struct {
      */
     int (*_i2c_transfer_func_t)(int fd, const uint8_t *send_data, const unsigned send_len, uint8_t *recv_data, const unsigned recv_len);
 
-    // open_uart_func_t open_uart_func;
-    // write_uart_func_t write_uart_func;
-    // read_uart_func_t read_uart_func;
     int (*open_uart_func_t)(uint8_t, speed_t);
     int (*write_uart_func_t)(int, const void *, size_t);
     int (*read_uart_func_t)(int,  void *, size_t);

@@ -21,7 +21,7 @@
 #include "AP_HAL_QURT.h"
 #include "Scheduler.h"
 
-#define HAL_QURT_DEVICE_STACK_SIZE 32768
+#define HAL_QURT_DEVICE_STACK_SIZE 8192
 
 namespace QURT
 {
