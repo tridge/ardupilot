@@ -392,7 +392,7 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Description: Conrols when automatic gyro calibration is performed
     // @Values: 0:Never, 1:Start-up only
     // @User: Advanced
-    AP_GROUPINFO("_GYR_CAL", 24, AP_InertialSensor, _gyro_cal_timing, 1),
+    AP_GROUPINFO("_GYR_CAL", 24, AP_InertialSensor, _gyro_cal_timing, 0),
 
     // @Param: _TRIM_OPTION
     // @DisplayName: Accel cal trim option
