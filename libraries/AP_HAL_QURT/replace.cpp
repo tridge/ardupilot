@@ -10,6 +10,8 @@
 #include "replace.h"
 #include "interface.h"
 
+extern qurt_func_ptrs_t qurt_func_ptrs;
+
 extern "C" {
 
 // this is not declared in qurt headers
@@ -135,10 +137,13 @@ int ArduPilot_main(int argc, const char *argv[])
 
 extern "C" int qurt_arducopter_main(int argc, char* const argv[]);
 
-int px4muorb_orb_initialize(fc_func_ptrs *func_ptrs, int32_t clock_offset_us)
+int px4muorb_orb_initialize(qurt_func_ptrs_t *func_ptrs, int32_t clock_offset_us)
 {
 	HAP_PRINTF("About to call qurt_arducopter_main %p", &qurt_arducopter_main);
-	
+
+    qurt_func_ptrs = *func_ptrs;
+    HAP_PRINTF("qurt_func_ptrs->_config_i2c_bus_func_t=%p", qurt_func_ptrs._config_i2c_bus_func_t);
+
 	qurt_arducopter_main(0, NULL);
 
     HAP_PRINTF("qurt_arducopter_main RETURNED");
