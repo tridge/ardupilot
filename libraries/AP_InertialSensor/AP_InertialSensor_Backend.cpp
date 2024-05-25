@@ -212,10 +212,6 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
     save_gyro_window(instance, gyro, filter_phase++);
 
     Vector3f gyro_filtered = gyro;
-#if AP_AHRS_ENABLED && (AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED || AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED)
-    const uint8_t primary_gyro = AP::ahrs().get_primary_gyro_index();
-#endif
-
 #if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     // apply the harmonic notch filters
     for (auto &notch : _imu.harmonic_notches) {
@@ -223,15 +219,13 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
             continue;
         }
         bool inactive = notch.is_inactive();
-#if AP_AHRS_ENABLED
         // by default we only run the expensive notch filters on the
         // currently active IMU we reset the inactive notch filters so
         // that if we switch IMUs we're not left with old data
         if (!notch.params.hasOption(HarmonicNotchFilterParams::Options::EnableOnAllIMUs) &&
-            instance != primary_gyro) {
+            instance != _imu._primary_gyro) {
             inactive = true;
         }
-#endif
         if (inactive) {
             // while inactive we reset the filter so when it activates the first output
             // will be the first input sample
@@ -261,8 +255,8 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
         _imu._gyro_filtered[instance] = gyro_filtered;
     }
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED && AP_AHRS_ENABLED
-    if (_imu._cmutex != nullptr && instance == primary_gyro) {
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+    if (_imu._cmutex != nullptr && instance == _imu._primary_gyro) {
         /*
           tell the rate thread we have a new sample
         */
@@ -816,6 +810,8 @@ void AP_InertialSensor_Backend::update_gyro(uint8_t instance) /* front end */
         }
     }
 #endif
+
+    set_primary_gyro(_imu._primary_gyro);
 }
 
 /*
@@ -838,6 +834,8 @@ void AP_InertialSensor_Backend::update_accel(uint8_t instance) /* front end */
         _imu._accel_filter[instance].set_cutoff_frequency(_accel_raw_sample_rate(instance), _accel_filter_cutoff());
         _last_accel_filter_hz = _accel_filter_cutoff();
     }
+
+    set_primary_accel(_imu._primary_accel);
 }
 
 #if HAL_LOGGING_ENABLED

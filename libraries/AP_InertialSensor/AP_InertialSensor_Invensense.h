@@ -112,6 +112,7 @@ private:
     bool _accumulate_sensor_rate_sampling(uint8_t *samples, uint8_t n_samples) __RAMFUNC__;
 
     bool _check_raw_temp(int16_t t2) __RAMFUNC__;
+    void set_primary_gyro(uint8_t instance) override;
 
     int16_t _raw_temp;
     

@@ -441,8 +441,6 @@ void AP_InertialSensor_Invensense::start()
 
     // start the timer process to read samples, using the fastest rate avilable
     periodic_handle = _dev->register_periodic_callback(1000000UL / _gyro_backend_rate_hz, FUNCTOR_BIND_MEMBER(&AP_InertialSensor_Invensense::_poll_data, void));
-    // turn off minimum cycle separation to get even reads
-    _dev->set_periodic_minimum(0);
 }
 
 // get a startup banner to output to the GCS
@@ -487,6 +485,11 @@ bool AP_InertialSensor_Invensense::update() /* front end */
     }
 
     return true;
+}
+
+void AP_InertialSensor_Invensense::set_primary_gyro(uint8_t instance)
+{
+    _dev->set_periodic_minimum(instance == _gyro_instance ? 0 : 100);
 }
 
 /*
