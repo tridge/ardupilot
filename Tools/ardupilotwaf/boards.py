@@ -1661,6 +1661,10 @@ class QURT(Board):
         cfg.env.STLIBPATH_ST = '-L%s'
         cfg.env.STLIB_MARKER = ''
         cfg.env.STLIB_ST = '-l%s'
+        cfg.env.LDFLAGS = [
+            '-lgcc',
+            cfg.env.TOOLCHAIN_DIR + '/target/hexagon/lib/v66/G0/pic/finiS.o'
+        ]
 
     def configure_env(self, cfg, env):
         super(QURT, self).configure_env(cfg, env)
@@ -1677,18 +1681,6 @@ class QURT(Board):
             CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_NONE',
             AP_SIM_ENABLED = 0,
         )
-
-# The linking has to be done very precisely for QURT. Below is an example of a
-# linker run_str that works correctly. This needs to be modified in the waflib/Tools/cxx.py
-# file in the waf submodule
-
-# class cxxprogram(link_task):
-# 	"Links object files into c++ programs"
-# 	# run_str = '${LINK_CXX} ${LINKFLAGS} ${CXXLNK_SRC_F}${SRC} ${CXXLNK_TGT_F}${TGT[0].relpath()} ${RPATH_ST:RPATH} ${FRAMEWORKPATH_ST:FRAMEWORKPATH} ${FRAMEWORK_ST:FRAMEWORK} ${ARCH_ST:ARCH} ${STLIB_MARKER} ${STLIBPATH_ST:STLIBPATH} ${STLIB_ST:STLIB} ${SHLIB_MARKER} ${LIBPATH_ST:LIBPATH} ${LIB_ST:LIB} ${LDFLAGS}'
-# 	run_str = '${LINK_CXX} ${CXXLNK_TGT_F} ${TGT[0].relpath()} ${LINKFLAGS} ${STLIBPATH_ST:STLIBPATH} --start-group --whole-archive ${CXXLNK_SRC_F}${SRC} ${STLIB_ST:STLIB} --end-group --start-group -lgcc --end-group /opt/hexagon-sdk/4.1.0.4-lite/tools/HEXAGON_Tools/8.4.05/Tools/target/hexagon/lib/v66/G0/pic/finiS.o'
-# 	vars    = ['LINKDEPS']
-# 	ext_out = ['.bin']
-# 	inst_to = '${BINDIR}'
 
         env.LINKFLAGS = [
             "-march=hexagon",
