@@ -118,6 +118,11 @@
 #define PROBE_BARO_I2C(driver, bus, addr, args ...) ADD_BACKEND(AP_Baro_ ## driver::probe(*this,std::move(GET_I2C_DEVICE(bus, addr)),##args))
 #define HAL_BARO_PROBE_LIST PROBE_BARO_I2C(ICP101XX, 3, 0x63)
 
+/*
+  IMU list
+ */
+#define PROBE_IMU_SPI(driver, devname, args ...) ADD_BACKEND(AP_InertialSensor_ ## driver::probe(*this,hal.spi->get_device(devname),##args))
+#define HAL_INS_PROBE_LIST PROBE_IMU_SPI(Invensensev3, "INV3", ROTATION_NONE)
 
 /*
   bring in missing standard library functions
