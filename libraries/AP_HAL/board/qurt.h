@@ -112,6 +112,12 @@
 
 #define USE_LIBC_REALLOC 1
 
+/*
+  barometer list
+ */
+#define PROBE_BARO_I2C(driver, bus, addr, args ...) ADD_BACKEND(AP_Baro_ ## driver::probe(*this,std::move(GET_I2C_DEVICE(bus, addr)),##args))
+#define HAL_BARO_PROBE_LIST PROBE_BARO_I2C(ICP101XX, 3, 0x63)
+
 
 /*
   bring in missing standard library functions
