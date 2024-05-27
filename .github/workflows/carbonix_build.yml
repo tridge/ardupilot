@@ -125,6 +125,9 @@ on:
         - '.vscode/**'
         - '.github/ISSUE_TEMPLATE/**'
 
+    release:
+      types: [published]
+    
     workflow_dispatch:
       
 concurrency:
@@ -219,3 +222,38 @@ jobs:
           name: ${{ env.firmware_version }}_${{ env.commit_id }}
           path: temp
           retention-days: 90
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl unzip
+          curl "https://d1vvhvl2y92vvt.cloudfront.net/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+  
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 
+
+      - name: Set BRANCH_NAME
+        run: echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_ENV
+                
+      - name: Upload artifacts to S3
+        run: |
+          DATE_HR=$(date +%Y%m%d_%H%M)
+          if ${{ github.event_name == 'release' }}; then
+            PATH_TO_S3=s3://carbonix-firmware-release-files/Carbopilot_V2/${DATE_HR}_${{ env.firmware_version }}_${{ env.commit_id }}/
+            echo "Uploading to: $PATH_TO_S3"
+            aws s3 cp temp/ $PATH_TO_S3 --recursive
+          elif ${{ github.event_name == 'push' && startsWith(env.BRANCH_NAME, 'CxPilot') }}; then
+            PATH_TO_S3=s3://carbonix-firmware-dev-files/Carbopilot_V2/${{ env.BRANCH_NAME }}/${DATE_HR}_${{ env.firmware_version }}_${{ env.commit_id }}/
+            echo "Uploading to: $PATH_TO_S3"
+            aws s3 cp temp/ $PATH_TO_S3 --recursive
+          elif ${{ github.event_name == 'pull_request' }}; then
+            PATH_TO_S3=s3://carbonix-firmware-dev-files/Carbopilot_V2/PR/${DATE_HR}_${{ env.firmware_version }}_${{ env.commit_id }}_${{ github.event.pull_request.number }}/
+            echo "Uploading to: $PATH_TO_S3"
+            aws s3 cp temp/ $PATH_TO_S3 --recursive
+          fi
