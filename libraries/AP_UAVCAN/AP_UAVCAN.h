@@ -51,6 +51,7 @@ class ActuatorStatusCb;
 class PowerCktStatusCb;
 class DeviceTemperatureCb;
 class ESCStatusCb;
+class ESCXStatusCb;
 class DebugCb;
 class ParamGetSetCb;
 class ParamExecuteOpcodeCb;
@@ -346,6 +347,7 @@ private:
     static void handle_power_cktstatus(AP_UAVCAN* ap_uavcan, uint8_t node_id, const PowerCktStatusCb &cb);
     static void handle_device_temperature(AP_UAVCAN* ap_uavcan, uint8_t node_id, const DeviceTemperatureCb &cb);
     static void handle_ESC_status(AP_UAVCAN* ap_uavcan, uint8_t node_id, const ESCStatusCb &cb);
+    static void handle_esc_ext_status(AP_UAVCAN* ap_uavcan, uint8_t node_id, const ESCXStatusCb &cb);
     static bool is_esc_data_index_valid(const uint8_t index);
     static void handle_debug(AP_UAVCAN* ap_uavcan, uint8_t node_id, const DebugCb &cb);
     static void handle_param_get_set_response(AP_UAVCAN* ap_uavcan, uint8_t node_id, const ParamGetSetCb &cb);

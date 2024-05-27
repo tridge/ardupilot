@@ -35,6 +35,7 @@
 
 #include <uavcan/equipment/esc/RawCommand.hpp>
 #include <uavcan/equipment/esc/Status.hpp>
+#include <uavcan/equipment/esc/StatusExtended.hpp>
 #include <uavcan/equipment/indication/LightsCommand.hpp>
 #include <uavcan/equipment/indication/SingleLightCommand.hpp>
 #include <uavcan/equipment/indication/BeepCommand.hpp>
@@ -203,6 +204,10 @@ static uavcan::Subscriber<uavcan::equipment::device::Temperature, DeviceTemperat
 // handler ESC status
 UC_REGISTRY_BINDER(ESCStatusCb, uavcan::equipment::esc::Status);
 static uavcan::Subscriber<uavcan::equipment::esc::Status, ESCStatusCb> *esc_status_listener[HAL_MAX_CAN_PROTOCOL_DRIVERS];
+
+// handler Extended ESC status
+UC_REGISTRY_BINDER(ESCXStatusCb, uavcan::equipment::esc::StatusExtended);
+static uavcan::Subscriber<uavcan::equipment::esc::StatusExtended, ESCXStatusCb> *extesc_status_listener[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 
 // handler DEBUG
 UC_REGISTRY_BINDER(DebugCb, uavcan::protocol::debug::LogMessage);
@@ -430,6 +435,11 @@ void AP_UAVCAN::init(uint8_t driver_index, bool enable_filters)
     esc_status_listener[driver_index] = new uavcan::Subscriber<uavcan::equipment::esc::Status, ESCStatusCb>(*_node);
     if (esc_status_listener[driver_index]) {
         esc_status_listener[driver_index]->start(ESCStatusCb(this, &handle_ESC_status));
+    }
+
+    extesc_status_listener[driver_index] = new uavcan::Subscriber<uavcan::equipment::esc::StatusExtended, ESCXStatusCb>(*_node);
+    if (extesc_status_listener[driver_index]) {
+        extesc_status_listener[driver_index]->start(ESCXStatusCb(this, &handle_esc_ext_status));
     }
 
     debug_listener[driver_index] = new uavcan::Subscriber<uavcan::protocol::debug::LogMessage, DebugCb>(*_node);
@@ -1070,6 +1080,34 @@ void AP_UAVCAN::handle_ESC_status(AP_UAVCAN* ap_uavcan, uint8_t node_id, const E
         AP_ESC_Telem_Backend::TelemetryType::CURRENT
             | AP_ESC_Telem_Backend::TelemetryType::VOLTAGE
             | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE);
+#endif
+}
+
+/*
+  handle ESC status extended message
+ */
+void AP_UAVCAN::handle_esc_ext_status(AP_UAVCAN* ap_uavcan, uint8_t node_id, const ESCXStatusCb &cb)
+{
+#if HAL_WITH_ESC_TELEM
+    const uint8_t esc_offset = constrain_int16(ap_uavcan->_esc_offset.get(), 0, UAVCAN_SRV_NUMBER);
+    const uint8_t esc_index = cb.msg->esc_index + esc_offset;
+
+    if (!is_esc_data_index_valid(esc_index)) {
+        return;
+    }
+
+    TelemetryData telemetryData {
+        .motor_temp_cdeg = (int16_t)(cb.msg->motor_temperature_degC * 100),
+        .input_duty = cb.msg->input_pct,
+        .output_duty = cb.msg->output_pct,
+        .flags = (uint32_t)cb.msg->status_flags,
+    };
+
+    ap_uavcan->update_telem_data(esc_index, telemetryData,
+        AP_ESC_Telem_Backend::TelemetryType::MOTOR_TEMPERATURE
+        | AP_ESC_Telem_Backend::TelemetryType::INPUT_DUTY
+        | AP_ESC_Telem_Backend::TelemetryType::OUTPUT_DUTY
+        | AP_ESC_Telem_Backend::TelemetryType::FLAGS);
 #endif
 }
 
