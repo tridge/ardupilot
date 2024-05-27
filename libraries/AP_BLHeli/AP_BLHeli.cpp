@@ -151,12 +151,23 @@ const AP_Param::GroupInfo AP_BLHeli::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("RVMASK",  12, AP_BLHeli, channel_reversed_mask, 0),
 
+#if HAL_WITH_ESC_TELEM
+    // @Param: EXTLM
+    // @DisplayName: Enable extended BLHeli telemetry
+    // @Description: When set to 1, this listens for 13-byte extended telemetry packets from BLHeli ESCs
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("EXTLM",  13, AP_BLHeli, extended_telemetry, 0),
+#endif
+
     AP_GROUPEND
 };
 
 #define RPM_SLEW_RATE 50
 
 AP_BLHeli *AP_BLHeli::_singleton;
+uint8_t AP_BLHeli::telem_packet_size;
 
 // constructor
 AP_BLHeli::AP_BLHeli(void)
@@ -1415,6 +1426,8 @@ void AP_BLHeli::init(void)
             telem_uart = serial_manager->find_serial(AP_SerialManager::SerialProtocol_ESCTelemetry,0);
         }
     }
+
+    telem_packet_size = extended_telemetry ? 13 : 10;
 }
 
 /*
@@ -1423,9 +1436,9 @@ void AP_BLHeli::init(void)
 void AP_BLHeli::read_telemetry_packet(void)
 {
 #if HAL_WITH_ESC_TELEM
-    uint8_t buf[telem_packet_size];
+    uint8_t buf[13];
     if (telem_uart->read(buf, telem_packet_size) < telem_packet_size) {
-        // short read, we should have 10 bytes ready when this function is called
+        // short read, we should have all bytes ready when this function is called
         return;
     }
 
@@ -1447,18 +1460,28 @@ void AP_BLHeli::read_telemetry_packet(void)
     hal.rcout->set_active_escs_mask(1<<motor_idx);
     update_rpm(motor_idx - chan_offset, new_rpm);
 
-    TelemetryData t {
+    TelemetryData telemetryData {
         .temperature_cdeg = int16_t(buf[0] * 100),
         .voltage = float(uint16_t((buf[1]<<8) | buf[2])) * 0.01,
         .current = float(uint16_t((buf[3]<<8) | buf[4])) * 0.01,
         .consumption_mah = float(uint16_t((buf[5]<<8) | buf[6])),
     };
 
-    update_telem_data(motor_idx - chan_offset, t,
-        AP_ESC_Telem_Backend::TelemetryType::CURRENT
+    uint16_t types = AP_ESC_Telem_Backend::TelemetryType::CURRENT
             | AP_ESC_Telem_Backend::TelemetryType::VOLTAGE
             | AP_ESC_Telem_Backend::TelemetryType::CONSUMPTION
-            | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE);
+            | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE;
+
+    if (extended_telemetry) {
+        telemetryData.input_duty = buf[9];
+        telemetryData.output_duty = buf[10];
+        telemetryData.flags = buf[11];
+        types |= AP_ESC_Telem_Backend::TelemetryType::INPUT_DUTY
+                | AP_ESC_Telem_Backend::TelemetryType::OUTPUT_DUTY
+                | AP_ESC_Telem_Backend::TelemetryType::FLAGS;
+    }
+
+    update_telem_data(motor_idx - chan_offset, telemetryData, types);
 
     if (debug_level >= 2) {
         uint16_t trpm = new_rpm;
@@ -1470,10 +1493,10 @@ void AP_BLHeli::read_telemetry_packet(void)
         }
         DEV_PRINTF("ESC[%u] T=%u V=%f C=%f con=%f RPM=%u e=%.1f t=%u\n",
                             last_telem_esc,
-                            t.temperature_cdeg,
-                            t.voltage,
-                            t.current,
-                            t.consumption_mah,
+                            telemetryData.temperature_cdeg,
+                            telemetryData.voltage,
+                            telemetryData.current,
+                            telemetryData.consumption_mah,
                             trpm, hal.rcout->get_erpm_error_rate(motor_idx), (unsigned)AP_HAL::millis());
     }
 #endif // HAL_WITH_ESC_TELEM

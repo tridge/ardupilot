@@ -76,6 +76,7 @@ private:
     AP_Int8 motor_poles;
     // mask of channels with bi-directional dshot enabled
     AP_Int32 channel_bidir_dshot_mask;
+    AP_Int8 extended_telemetry;
     
     enum mspState {
         MSP_IDLE=0,
@@ -250,7 +251,7 @@ private:
     // when did we last request telemetry?
     uint32_t last_telem_request_us;
     uint8_t last_telem_esc;
-    static const uint8_t telem_packet_size = 10;
+    static uint8_t telem_packet_size;
     bool telem_uart_started;
     uint32_t last_telem_byte_read_us;
     int8_t last_control_port;
