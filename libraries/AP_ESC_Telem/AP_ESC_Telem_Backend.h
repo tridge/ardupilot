@@ -25,6 +25,9 @@ public:
         uint32_t last_update_ms;    // last update time in milliseconds, determines whether active
         uint16_t types;             // telemetry types present
         uint16_t count;             // number of times updated
+        uint8_t input_duty;         // input duty cycle
+        uint8_t output_duty;        // output duty cycle
+        uint32_t flags;              // Status flags
     };
 
     struct RpmData {
@@ -41,7 +44,13 @@ public:
         VOLTAGE     = 1 << 2,
         CURRENT     = 1 << 3,
         CONSUMPTION = 1 << 4,
-        USAGE       = 1 << 5
+        USAGE       = 1 << 5,
+        // 6 reserved for temperature external
+        // 7 reserved for motor temperature external
+        // 8 and 9 are reserved for recent dshot extensions
+        INPUT_DUTY  = 1 << 10,
+        OUTPUT_DUTY = 1 << 11,
+        FLAGS       = 1 << 12
     };
 
 
