@@ -398,6 +398,9 @@ public:
     // degraded by vibration
     bool isVibrationAffected() const;
 
+    // Write a range measurement and 1-sigma uncertainty in metres to a location.
+    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms);
+
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const;
 
