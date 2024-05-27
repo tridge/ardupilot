@@ -327,6 +327,13 @@ public:
     // Write velocity data from an external navigation system
     void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
 
+    // Write range measurements from a known location for processing by the navigation EKF. Cannot be used together with AP_Beacon functionality.
+    // range - 3D distance from location to flight vehicle in metres
+    // uncertainty - 1-Sigma range uncertainty in metres
+    // loc - LLH location from which range to vehicle is being measured
+    // timestamp_ms - system time from boot in milli-seconds that the measurement was taken
+    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms);
+
     // get speed limit
     void getControlLimits(float &ekfGndSpdLimit, float &controlScaleXY) const;
     float getControlScaleZ(void) const;
