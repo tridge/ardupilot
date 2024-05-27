@@ -1660,6 +1660,22 @@ void AP_Periph_FW::esc_telem_update()
                          CANARD_TRANSFER_PRIORITY_LOW,
                          &buffer[0],
                          total_size);
+
+        uavcan_equipment_esc_StatusExtended pkt2{};
+        pkt2.esc_index = pkt.esc_index;
+        bool has_ext_data = esc_telem.get_input_duty(i, pkt2.input_pct)
+                | esc_telem.get_output_duty(i, pkt2.output_pct)
+                | esc_telem.get_flags(i, pkt2.status_flags);
+
+        if (has_ext_data) {
+            uint8_t buffer_ext[UAVCAN_EQUIPMENT_ESC_STATUSEXTENDED_MAX_SIZE] {};
+            uint16_t total_size_ext = uavcan_equipment_esc_StatusExtended_encode(&pkt2, buffer_ext, !periph.canfdout());
+            canard_broadcast(UAVCAN_EQUIPMENT_ESC_STATUSEXTENDED_SIGNATURE,
+                            UAVCAN_EQUIPMENT_ESC_STATUSEXTENDED_ID,
+                            CANARD_TRANSFER_PRIORITY_LOW,
+                            &buffer_ext[0],
+                            total_size_ext);
+        }
     }
 }
 #endif // HAL_WITH_ESC_TELEM
