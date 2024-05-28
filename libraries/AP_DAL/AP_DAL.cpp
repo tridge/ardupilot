@@ -256,6 +256,7 @@ void AP_DAL::log_writeRangeToLocation(const float range, const float uncertainty
         alt          : loc.alt,
         timeStamp_ms : timeStamp_ms,
     };
+    _RRLT = pkt;
     WRITE_REPLAY_BLOCK(RRLT, pkt);
 #endif
 }
@@ -534,6 +535,16 @@ void AP_DAL::handle_message(const log_RSLL &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
     // note that EKF2 does not support body frame odometry
     const Location loc {msg.lat, msg.lng, 0, Location::AltFrame::ABSOLUTE };
     ekf3.setLatLng(loc, msg.posAccSD, msg.timestamp_ms);
+}
+
+/*
+  handle range information
+ */
+void AP_DAL::handle_message(const log_RRLT &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
+{
+    _RRLT = msg;
+    Location loc{msg.lat, msg.lng, msg.alt, Location::AltFrame::ABSOLUTE};
+    ekf3.writeRangeToLocation(msg.range, msg.uncertainty, loc, msg.timeStamp_ms);
 }
 #endif // APM_BUILD_Replay
 

@@ -323,6 +323,7 @@ public:
     void handle_message(const log_RWOH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RBOH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
     void handle_message(const log_RSLL &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
+    void handle_message(const log_RRLT &msg, NavEKF2 &ekf2, NavEKF3 &ekf3);
 
     // map core number for replay
     uint8_t logging_core(uint8_t c) const;
@@ -349,6 +350,7 @@ private:
     struct log_RWOH _RWOH;
     struct log_RBOH _RBOH;
     struct log_RSLL _RSLL;
+    struct log_RRLT _RRLT;
 
     // cached variables for speed:
     uint32_t _micros;
