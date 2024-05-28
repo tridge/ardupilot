@@ -1043,6 +1043,10 @@ void NavEKF3_core::writeRangeToLocation(const float range, const float uncertain
     rngBcnDataNew.beacon_loc = loc;
     rngBcnDataNew.beacon_ID = 0;
 
+    // No distinction between multiple fixed vs a single moving ground station
+    // TODO a method determining how many ground stations there are
+    rngBcn.N = 1;
+
     // write data to buffer with time stamp to be fused when the fusion time horizon catches up with it
     rngBcn.storedRange.push(rngBcnDataNew);
 
