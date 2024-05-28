@@ -245,6 +245,21 @@ void AP_DAL::log_writeDefaultAirSpeed3(const float aspeed, const float uncertain
 #endif
 }
 
+void AP_DAL::log_writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms)
+{
+#if !APM_BUILD_TYPE(APM_BUILD_AP_DAL_Standalone) && !APM_BUILD_TYPE(APM_BUILD_Replay)
+    struct log_RRLT pkt{
+        range        : range,
+        uncertainty  : uncertainty,
+        lat          : loc.lat,
+        lng          : loc.lng,
+        alt          : loc.alt,
+        timeStamp_ms : timeStamp_ms,
+    };
+    WRITE_REPLAY_BLOCK(RRLT, pkt);
+#endif
+}
+
 void AP_DAL::log_writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type)
 {
 #if !APM_BUILD_TYPE(APM_BUILD_AP_DAL_Standalone) && !APM_BUILD_TYPE(APM_BUILD_Replay)
