@@ -14,7 +14,7 @@ void NavEKF3_core::SelectRngBcnFusion()
     if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms)) {
         FuseRngBcn();
 
-        if (((imuSampleTime_ms - lastPosPassTime_ms) > frontend->deadReckonDeclare_ms) && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->deadReckonDeclare_ms)) {
+        if (((imuSampleTime_ms - lastGpsPosPassTime_ms) > frontend->deadReckonDeclare_ms) && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->deadReckonDeclare_ms)) {
             // reset position to match range measurement
             const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
             Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
