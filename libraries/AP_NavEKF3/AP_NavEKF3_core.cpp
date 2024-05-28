@@ -137,7 +137,7 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
     }
     // Note: range beacon data is read one beacon at a time and can arrive at a high rate
 #if EK3_FEATURE_BEACON_FUSION
-    if(dal.beacon() && !rngBcn.storedRange.init(imu_buffer_length+1)) {
+    if(!rngBcn.storedRange.init(imu_buffer_length+1)) {
         return false;
     }
 #endif
