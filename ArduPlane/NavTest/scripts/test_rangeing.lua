@@ -91,7 +91,11 @@ local function provide_range()
       return
    end
    dist = math.floor(dist / RRNG_ROUND:get()) * RRNG_ROUND:get()
-   ahrs:writeRangeToLocation(dist, RRNG_ACC:get(), home, now_ms)
+   accuracy = RRNG_ACC:get()
+   if accuracy < RRNG_ROUND:get() then
+      accuracy = RRNG_ROUND:get()
+   end
+   ahrs:writeRangeToLocation(dist, accuracy, home, now_ms)
 end
 
 local function update()
