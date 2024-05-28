@@ -36,8 +36,17 @@ local RRNG_FREQ = bind_add_param('FREQ', 1, 1)
 --]]
 local RRNG_ACC = bind_add_param('ACC', 2, 20)
 
+--[[
+  // @Param: RRNG_ROUND
+  // @DisplayName: radio range rounding
+  // @Description: radio range rounding
+  // @Units: m
+  // @User: Standard
+--]]
+local RRNG_ROUND = bind_add_param('ROUND', 3, 30)
+
 local MIN_DIST = 100.0
-local DIST_PRECISION = 30
+local MAX_DIST = 100000.0
 
 local last_send = 0
 
@@ -52,17 +61,17 @@ local function provide_range()
    end
    last_send = now_ms
 
-   local loc = ahrs:get_location()
+   local loc = gps:location(0)
    if not loc then
       gcs:send_text(MAV_SEVERITY.ERROR, "No loc")
       return
    end
    local home = ahrs:get_home()
    local dist = home:get_distance(loc)
-   if dist < 100 then
+   if dist < MIN_DIST or dist > MAX_DIST then
       return
    end
-   dist = math.floor(dist / DIST_PRECISION) * DIST_PRECISION
+   dist = math.floor(dist / RRNG_ROUND:get()) * RRNG_ROUND:get()
    ahrs:writeRangeToLocation(dist, RRNG_ACC:get(), home, now_ms)
 end
 
