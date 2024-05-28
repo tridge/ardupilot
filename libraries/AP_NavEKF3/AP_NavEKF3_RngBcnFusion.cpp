@@ -10,6 +10,43 @@
 // select fusion of range beacon measurements
 void NavEKF3_core::SelectRngBcnFusion()
 {
+    // range to location data is being pushed externally to the EKF so we need to check the buffer
+    if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms)) {
+        FuseRngBcn();
+
+        if (((imuSampleTime_ms - lastPosPassTime_ms) > frontend->deadReckonDeclare_ms) && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->deadReckonDeclare_ms)) {
+            // reset position to match range measurement
+            const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
+            Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
+            const ftype rangeDelta = rngBcn.dataDelayed.rng - deltaPosNED.length();
+            Vector2F posNE =  stateStruct.position.xy() + Vector2F(rangeDelta * cosF(bearing), rangeDelta * sinF(bearing));
+            ResetPositionNE(posNE.x, posNE.y);
+            // Rotate the position covariances into RCD (Range, Cross, Down), adjust the down range variance and rotate back
+            Matrix3f R_NED2RCD = Matrix3f(Vector3f(cosf(bearing),sinf(bearing),0),
+                                          Vector3f(-sinf(bearing),cosf(bearing),0),
+                                          Vector3f(0,0,1));
+            Matrix3f covMatNED;
+            for (uint8_t row=0; row<3; row++) {
+                for (uint8_t col=0; col<3; col++) {
+                   covMatNED[row][col] = P[row+7][col+7];
+                }
+            }
+            // rotate covariances into RCD frame
+            Matrix3f covMatRCD = covMatNED * R_NED2RCD.transposed();
+            covMatRCD = R_NED2RCD * covMatRCD;
+            covMatRCD.a.x = sq(MAX(rngBcn.dataDelayed.rngErr , 0.1f));
+            // rotate covariances back into NED frame
+            covMatNED = covMatRCD * R_NED2RCD;
+            covMatNED = R_NED2RCD.transposed() * covMatNED;
+            for (uint8_t row=0; row<3; row++) {
+                for (uint8_t col=0; col<3; col++) {
+                    P[row+7][col+7] = covMatNED[row][col];
+
+                }
+            }
+        }
+    }
+
     // read range data from the sensor and check for new data in the buffer
     readRngBcnData();
 
@@ -67,6 +104,11 @@ void NavEKF3_core::FuseRngBcn()
     pn = stateStruct.position.x;
     pe = stateStruct.position.y;
     pd = stateStruct.position.z;
+
+    if (rngBcn.usingRangeToLoc) {
+        rngBcn.dataDelayed.beacon_posNED = EKF_origin.get_distance_NED_ftype(rngBcn.dataDelayed.beacon_loc);
+        rngBcn.posOffsetNED.z = 0.0f;
+    }
     bcn_pn = rngBcn.dataDelayed.beacon_posNED.x;
     bcn_pe = rngBcn.dataDelayed.beacon_posNED.y;
     bcn_pd = rngBcn.dataDelayed.beacon_posNED.z + rngBcn.posOffsetNED.z;
@@ -267,7 +309,7 @@ void NavEKF3_core::FuseRngBcn()
         }
 
         // Update the fusion report
-        if (rngBcn.fusionReport && rngBcn.dataDelayed.beacon_ID < dal.beacon()->count()) {
+        if (rngBcn.fusionReport && (rngBcn.usingRangeToLoc || rngBcn.dataDelayed.beacon_ID < dal.beacon()->count())) {
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].beaconPosNED = rngBcn.dataDelayed.beacon_posNED;
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innov = rngBcn.innov;
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innovVar = rngBcn.varInnov;

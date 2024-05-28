@@ -449,6 +449,9 @@ public:
     // Writes the default equivalent airspeed and 1-sigma uncertainty in m/s to be used in forward flight if a measured airspeed is required and not available.
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
 
+    // Write a range measurement and 1-sigma uncertainty in metres to a location.
+    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms);
+
     // request a reset the yaw to the EKF-GSF value
     void EKFGSF_requestYawReset();
 
@@ -615,6 +618,7 @@ private:
     struct rng_bcn_elements : EKF_obs_element_t {
         ftype       rng;            // range measurement to each beacon (m)
         Vector3F    beacon_posNED;  // NED position of the beacon (m)
+        Location    beacon_loc;     // WGS-84 location of the beacon
         ftype       rngErr;         // range measurement error 1-std (m)
         uint8_t     beacon_ID;      // beacon identification number
     };
@@ -1403,6 +1407,8 @@ private:
             ftype testRatio;    // innovation consistency test ratio
             Vector3F beaconPosNED; // beacon NED position
         } *fusionReport;
+
+        bool usingRangeToLoc; // true when using single range to location measurements
     } rngBcn;
 #endif  // if EK3_FEATURE_BEACON_FUSION
 

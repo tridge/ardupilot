@@ -980,6 +980,8 @@ void NavEKF3_core::readRngBcnData()
 
             // Save data into the buffer to be fused when the fusion time horizon catches up with it
             rngBcn.storedRange.push(rngBcnDataNew);
+
+            rngBcn.usingRangeToLoc = false;
         }
     }
 
@@ -1031,6 +1033,22 @@ void NavEKF3_core::readRngBcnData()
     }
 
 }
+
+void NavEKF3_core::writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms)
+{
+    rng_bcn_elements rngBcnDataNew = {};
+    rngBcnDataNew.time_ms = timeStamp_ms - frontend->_rngBcnDelay_ms - localFilterTimeStep_ms/2;
+    rngBcnDataNew.rng = range;
+    rngBcnDataNew.rngErr = uncertainty;
+    rngBcnDataNew.beacon_loc = loc;
+    rngBcnDataNew.beacon_ID = 0;
+
+    // write data to buffer with time stamp to be fused when the fusion time horizon catches up with it
+    rngBcn.storedRange.push(rngBcnDataNew);
+
+    rngBcn.usingRangeToLoc = true;
+}
+
 #endif  // EK3_FEATURE_BEACON_FUSION
 
 /********************************************************

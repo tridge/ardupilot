@@ -2169,6 +2169,11 @@ void NavEKF3::writeRangeToLocation(const float range, const float uncertainty, c
 {
     AP::dal().log_writeRangeToLocation(range, uncertainty, loc, timeStamp_ms);
 
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeRangeToLocation(range, uncertainty, loc, timeStamp_ms);
+        }
+    }
 }
 
 // returns true when the yaw angle has been aligned
