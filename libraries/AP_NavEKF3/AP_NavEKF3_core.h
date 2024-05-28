@@ -1367,7 +1367,7 @@ private:
         bool health;                  // boolean true if range beacon measurements have passed innovation consistency check
         ftype varInnov;               // range beacon observation innovation variance (m^2)
         ftype innov;                  // range beacon observation innovation (m)
-        uint32_t lastTime_ms[4];      // last time we received a range beacon measurement (msec)
+        uint32_t lastTime_ms[AP_BEACON_MAX_BEACONS]; // last time we received a range beacon measurement (msec)
         bool dataToFuse;              // true when there is new range beacon data to fuse
         Vector3F vehiclePosNED;       // NED position estimate from the beacon system (NED)
         ftype vehiclePosErr;          // estimated position error from the beacon system (m)
@@ -1409,6 +1409,7 @@ private:
         } *fusionReport;
 
         bool usingRangeToLoc; // true when using single range to location measurements
+        bool newDataToLog[AP_BEACON_MAX_BEACONS]; // true when there has been a range measurement and new data to log
     } rngBcn;
 #endif  // if EK3_FEATURE_BEACON_FUSION
 

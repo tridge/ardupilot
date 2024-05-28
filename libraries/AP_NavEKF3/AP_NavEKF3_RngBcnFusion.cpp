@@ -315,6 +315,7 @@ void NavEKF3_core::FuseRngBcn()
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innovVar = rngBcn.varInnov;
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].rng = rngBcn.dataDelayed.rng;
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].testRatio = rngBcn.testRatio;
+            rngBcn.newDataToLog[rngBcn.dataDelayed.beacon_ID] = true;
         }
     }
 }
@@ -553,6 +554,7 @@ void NavEKF3_core::FuseRngBcnStatic()
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innovVar = rngBcn.varInnov;
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].rng = rngBcn.dataDelayed.rng;
             rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].testRatio = rngBcn.testRatio;
+            rngBcn.newDataToLog[rngBcn.dataDelayed.beacon_ID] = true;
         }
     }
 }
