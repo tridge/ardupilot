@@ -30,11 +30,11 @@ local RRNG_FREQ = bind_add_param('FREQ', 1, 1)
 --[[
   // @Param: RRNG_ACC
   // @DisplayName: radio range accuracy
-  // @Description: radio range accuracy
+  // @Description: Radio range 1-Sigma accuracy. Must be >= RRNG_ROUND
   // @Units: m
   // @User: Standard
 --]]
-local RRNG_ACC = bind_add_param('ACC', 2, 20)
+local RRNG_ACC = bind_add_param('ACC', 2, 30)
 
 --[[
   // @Param: RRNG_ROUND
@@ -44,6 +44,24 @@ local RRNG_ACC = bind_add_param('ACC', 2, 20)
   // @User: Standard
 --]]
 local RRNG_ROUND = bind_add_param('ROUND', 3, 30)
+
+--[[
+  // @Param: RRNG_OFS_N
+  // @DisplayName: base station offset North
+  // @Description: The North position of the radio base station wrt home.
+  // @Units: m
+  // @User: Standard
+--]]
+local RRNG_OFS_N = bind_add_param('OFS_N', 4, 0)
+
+--[[
+  // @Param: RRNG_OFS_E
+  // @DisplayName: base station offset East
+  // @Description: The East position of the radio base station wrt home.
+  // @Units: m
+  // @User: Standard
+--]]
+local RRNG_OFS_E = bind_add_param('OFS_E', 5, 0)
 
 local MIN_DIST = 100.0
 local MAX_DIST = 100000.0
@@ -67,6 +85,7 @@ local function provide_range()
       return
    end
    local home = ahrs:get_home()
+   home:offset(RRNG_OFS_N:get(),RRNG_OFS_E:get())
    local dist = home:get_distance(loc)
    if dist < MIN_DIST or dist > MAX_DIST then
       return
