@@ -274,12 +274,14 @@ void AP_NavTerrain::gather_data(Gather &g)
         if (!g.last_using_gps) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TNAV[%u] using GPS", unsigned(g.ekf_lane));
             g.last_using_gps = true;
+            AP::ahrs().set_terrain_nav_status(false);
         }
         g.samples.clear();
     } else if (g.last_using_gps) {
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "TNAV[%u] non-GPS mode", unsigned(g.ekf_lane));
         g.last_using_gps = false;
         g.restart_terrain_estimation = true;
+        AP::ahrs().set_terrain_nav_status(true);
     }
 
     const uint32_t sample_ms = rng->sample_ms();
