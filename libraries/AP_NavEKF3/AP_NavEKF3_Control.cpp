@@ -325,8 +325,8 @@ void NavEKF3_core::setAidingMode()
             bool dragUsed = (imuSampleTime_ms - lastDragPassTime_ms <= minTestTime_ms);
 
 #if EK3_FEATURE_BEACON_FUSION
-            // Check if range beacon data is being used
-            const bool rngBcnUsed = (imuSampleTime_ms - rngBcn.lastPassTime_ms <= minTestTime_ms);
+            // Check if range beacon data is being used and there are enough beacons to constrain drift
+            const bool rngBcnUsed = (rngBcn.N > 1) && (imuSampleTime_ms - rngBcn.lastPassTime_ms <= minTestTime_ms);
 #else
             const bool rngBcnUsed = false;
 #endif
@@ -350,9 +350,6 @@ void NavEKF3_core::setAidingMode()
                 lastAspdEstIsValid = true;
             }
 
-            // check if position drift has been constrained by a measurement source
-            bool posAiding = posUsed || rngBcnUsed;
-
             // Check if the loss of attitude aiding has become critical
             bool attAidLossCritical = false;
             if (!attAiding) {
@@ -368,7 +365,7 @@ void NavEKF3_core::setAidingMode()
 
             // Check if the loss of position accuracy has become critical
             bool posAidLossCritical = false;
-            if (!posAiding) {
+            if (!posUsed || !rngBcnUsed) {
                 uint16_t maxLossTime_ms;
                 if (!velAiding) {
                     maxLossTime_ms = frontend->posRetryTimeNoVel_ms;
@@ -379,7 +376,6 @@ void NavEKF3_core::setAidingMode()
 #if EK3_FEATURE_BEACON_FUSION
                     (imuSampleTime_ms - rngBcn.lastPassTime_ms > maxLossTime_ms) &&
 #endif
-                    (imuSampleTime_ms - lastGpsPosPassTime_ms > maxLossTime_ms) &&
                     (imuSampleTime_ms - lastExtNavPosPassTime_ms > maxLossTime_ms) &&
                     (imuSampleTime_ms - lastGpsPosPassTime_ms > maxLossTime_ms);
             }

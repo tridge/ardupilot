@@ -14,7 +14,8 @@ void NavEKF3_core::SelectRngBcnFusion()
     if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms)) {
         FuseRngBcn();
 
-        if (((imuSampleTime_ms - lastGpsPosPassTime_ms) > frontend->deadReckonDeclare_ms) && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->deadReckonDeclare_ms)) {
+        // a reset using a single observation from this sensor is a last resort so wait for the slow timeout on the primary position sensors
+        if (posTimeout && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->altPosSwitchTimeout_ms)) {
             // reset position to match range measurement
             const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
             Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
@@ -245,8 +246,11 @@ void NavEKF3_core::FuseRngBcn()
         // fail if the ratio is > 1, but don't fail if bad IMU data
         rngBcn.health = ((rngBcn.testRatio < 1.0f) || badIMUdata);
 
-        // test the ratio before fusing data
-        if (rngBcn.health) {
+        // don't fuse unless preferred navigation source has timed out to prevent these measurements fighting the preferred source
+        const uint32_t use_delay_ms = velAiding ? frontend->altPosSwitchTimeout_ms : frontend->deadReckonDeclare_ms;
+        const bool primary_aiding_lost = (imuSampleTime_ms - lastExtNavPosPassTime_ms > use_delay_ms) &&
+                                         (imuSampleTime_ms - lastGpsPosPassTime_ms > use_delay_ms);
+        if (rngBcn.health && primary_aiding_lost) {
 
             // restart the counter
             rngBcn.lastPassTime_ms = imuSampleTime_ms;
