@@ -17,6 +17,13 @@
 #define AP_HEATER_IMU_INSTANCE 0
 #endif
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
+// hal.console can be accessed from bus threads on ChibiOS
+#define debug(fmt, args ...)  do {hal.console->printf("IMU: " fmt "\n", ## args); } while(0)
+#else
+#define debug(fmt, args ...)  do {printf("IMU: " fmt "\n", ## args); } while(0)
+#endif
+
 const extern AP_HAL::HAL& hal;
 
 AP_InertialSensor_Backend::AP_InertialSensor_Backend(AP_InertialSensor &imu) :
@@ -261,14 +268,16 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
         _imu._gyro_filtered[instance] = gyro_filtered;
     }
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED && AP_AHRS_ENABLED
-    if (_imu._cmutex != nullptr && instance == primary_gyro) {
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+    if (_imu.rate_decimation && _imu._cmutex != nullptr && instance == _primary_gyro) {
         /*
           tell the rate thread we have a new sample
         */
         if (++_imu.rate_decimation_count >= _imu.rate_decimation) {
             _imu._cmutex->lock_and_signal();
-            _imu._rate_loop_gyro_window.push(gyro_filtered);
+            if (!_imu._rate_loop_gyro_window.push(gyro_filtered)) {
+                debug("dropped rate loop sample");
+            }
             _imu.rate_decimation_count = 0;
             _imu._cmutex->unlock();
         }

@@ -266,6 +266,7 @@ public:
     AuxiliaryBus *get_auxiliary_bus(int16_t backend_id, uint8_t instance);
 
     void detect_backends(void);
+    void update_backends();
 
     // accel peak hold detector
     void set_accel_peak_hold(uint8_t instance, const Vector3f &accel);
@@ -807,7 +808,7 @@ private:
       we hav finished filtering the primary IMU
      */
     ObjectBuffer<Vector3f> _rate_loop_gyro_window{AP_INERTIAL_SENSOR_RATE_LOOP_BUFFER_SIZE};
-    uint8_t rate_decimation = 1;
+    uint8_t rate_decimation; // 0 means off
     uint8_t rate_decimation_count;
     AP_HAL::CondMutex* _cmutex;
 
