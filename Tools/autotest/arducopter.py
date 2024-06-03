@@ -6258,7 +6258,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "INS_LOG_BAT_MASK": 3,
             "INS_LOG_BAT_OPT": 0,
             "INS_GYRO_FILTER": 300, # set gyro filter high so we can observe behaviour
-            "LOG_BITMASK": 958,
+            "LOG_BITMASK": 959,
             "LOG_DISARMED": 0,
             "SIM_VIB_MOT_MAX": 350,
             "SIM_GYR1_RND": 20,
