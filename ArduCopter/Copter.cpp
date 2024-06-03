@@ -548,6 +548,15 @@ void Copter::update_batt_compass(void)
 // should be run at loop rate
 void Copter::loop_rate_logging()
 {
+    if (using_rate_thread) {
+        return;
+    }
+
+    fast_logging();
+}
+
+void Copter::fast_logging()
+{
     if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
         Log_Write_PIDS(); // only logs if PIDS bitmask is set
