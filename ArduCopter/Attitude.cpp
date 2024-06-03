@@ -6,18 +6,20 @@
  ****************************************************************/
 
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+
+//#define RATE_LOOP_TIMING_DEBUG
 /*
   thread for rate control
 */
 void Copter::rate_controller_thread()
 {
     uint8_t rate_decimation = 1;
+    uint32_t slow_loop_count = 0;
     uint32_t rate_loop_count = 0;
     uint32_t prev_loop_count = 0;
 
     HAL_CondMutex cmutex;
     ins.set_rate_loop_mutex(&cmutex);
-    ins.set_rate_decimation(rate_decimation);
 
     uint32_t last_run_us = AP_HAL::micros();
     float max_dt = 0.0;
@@ -31,8 +33,20 @@ void Copter::rate_controller_thread()
     uint32_t last_notch_sample_ms = now_ms;
     bool was_using_rate_thread = false;
     uint32_t running_slow = 0;
+#ifdef RATE_LOOP_TIMING_DEBUG
+    uint32_t gyro_sample_time_us = 0;
+    uint32_t rate_controller_time_us = 0;
+    uint32_t motor_output_us = 0;
+    uint32_t timing_count = 0;
+    uint32_t last_timing_msg_us = 0;
+#endif
 
     while (true) {
+
+#ifdef RATE_LOOP_TIMING_DEBUG
+        uint32_t rate_now_us = AP_HAL::micros();
+#endif
+
         // allow changing option at runtime
         if ((!flight_option_is_set(FlightOptions::USE_RATE_LOOP_THREAD) &&
              !flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD)) ||
@@ -44,6 +58,7 @@ void Copter::rate_controller_thread()
                 const float loop_rate_hz = AP::scheduler().get_filtered_loop_rate_hz();
                 attitude_control->set_notch_sample_rate(loop_rate_hz);
                 motors->set_dt(1.0/loop_rate_hz);
+                ins.set_rate_decimation(0);
                 was_using_rate_thread = false;
             }
             hal.scheduler->delay_microseconds(500);
@@ -53,9 +68,16 @@ void Copter::rate_controller_thread()
 
         using_rate_thread = true;
 
+        ins.set_rate_decimation(rate_decimation);
+
         // wait for an IMU sample
         Vector3f gyro;
         ins.get_next_gyro_sample(gyro);
+
+#ifdef RATE_LOOP_TIMING_DEBUG
+        gyro_sample_time_us += AP_HAL::micros() - rate_now_us;
+        rate_now_us = AP_HAL::micros();
+#endif
 
         // we must use multiples of the actual sensor rate
         const float sensor_dt = 1.0f * rate_decimation / ins.get_raw_gyro_rate_hz();
@@ -102,15 +124,28 @@ void Copter::rate_controller_thread()
         // there is no need to output to the motors more than once for every batch of samples
         attitude_control->rate_controller_run_dt(sensor_dt, gyro + ahrs.get_gyro_drift());
 
+#ifdef RATE_LOOP_TIMING_DEBUG
+        rate_controller_time_us += AP_HAL::micros() - rate_now_us;
+        rate_now_us = AP_HAL::micros();
+#endif
+
         /*
           immediately output the new motor values
          */
         motors_output();
 
         /*
-          update the center frequencies of notch filters
+          process slow loop update
          */
-        update_dynamic_notch_at_specified_rate();
+        if (slow_loop_count++ >= (uint8_t)copter.g2.rate_update_decimation.get()) {
+            slow_loop_count = 0;
+            rate_controller_slow_loop();
+        }
+
+#ifdef RATE_LOOP_TIMING_DEBUG
+        motor_output_us += AP_HAL::micros() - rate_now_us;
+        rate_now_us = AP_HAL::micros();
+#endif
 
         now_ms = AP_HAL::millis();
 
@@ -124,7 +159,6 @@ void Copter::rate_controller_thread()
         // Once armed, switch to the fast rate if configured to do so
         if (rate_decimation > 1 && motors->armed() && flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD)) {
             rate_decimation = 1;
-            ins.set_rate_decimation(rate_decimation);
             attitude_control->set_notch_sample_rate(ins.get_raw_gyro_rate_hz());
             gcs().send_text(MAV_SEVERITY_INFO, "Attitude rate active at %uHz", (unsigned)ins.get_raw_gyro_rate_hz());
         }
@@ -143,12 +177,12 @@ void Copter::rate_controller_thread()
                 const uint32_t new_attitude_rate = ins.get_raw_gyro_rate_hz()/(rate_decimation+1);
                 if (new_attitude_rate > AP::scheduler().get_filtered_loop_rate_hz() * 2) {
                     rate_decimation = rate_decimation + 1;
-                    ins.set_rate_decimation(rate_decimation);
                     attitude_control->set_notch_sample_rate(new_attitude_rate);
                     gcs().send_text(MAV_SEVERITY_WARNING, "Attitude CPU high, dropping rate to %uHz",
-                        (unsigned)new_attitude_rate);
+                                    (unsigned)new_attitude_rate);
                     prev_loop_count = rate_loop_count;
                     rate_loop_count = 0;
+                    running_slow = 0;
                 }
             } else if (rate_decimation > 1 && rate_loop_count > att_rate // ensure a second's worth of good readings
                 && (prev_loop_count > att_rate/10   // ensure there was 100ms worth of good readings at the higher rate
@@ -156,18 +190,46 @@ void Copter::rate_controller_thread()
                     || now_ms - last_rate_increase_ms >= 10000)) { // every 10s retry
                 const uint32_t new_attitude_rate = ins.get_raw_gyro_rate_hz()/(rate_decimation-1);
                 rate_decimation = rate_decimation - 1;
-                ins.set_rate_decimation(rate_decimation);
                 attitude_control->set_notch_sample_rate(new_attitude_rate);
                 gcs().send_text(MAV_SEVERITY_INFO, "Attitude CPU normal, increasing rate to %uHz",
-                   (unsigned) new_attitude_rate);
+                                (unsigned) new_attitude_rate);
                 prev_loop_count = 0;
                 rate_loop_count = 0;
                 last_rate_increase_ms = now_ms;
             }
         }
 
+#ifdef RATE_LOOP_TIMING_DEBUG
+        timing_count++;
+
+        if (rate_now_us - last_timing_msg_us > 1e6) {
+            hal.console->printf("Rate loop timing: gyro=%uus, rate=%uus, motors=%uus\n",
+                                unsigned(gyro_sample_time_us/timing_count), unsigned(rate_controller_time_us/timing_count),
+                                unsigned(motor_output_us/timing_count));
+            last_timing_msg_us = rate_now_us;
+            timing_count = 0;
+            gyro_sample_time_us = rate_controller_time_us = motor_output_us = 0;
+        }
+#endif
+
         was_using_rate_thread = true;
     }
+}
+
+/*
+  update rate controller slow loop. on an H7 this is about 30us
+*/
+void Copter::rate_controller_slow_loop()
+{
+    // update the frontend center frequencies of notch filters
+    update_dynamic_notch_at_specified_rate();
+
+    // this copies backend data to the frontend and updates the notches
+    ins.update_backends();
+
+#if HAL_LOGGING_ENABLED
+    fast_logging();
+#endif
 }
 #endif
 

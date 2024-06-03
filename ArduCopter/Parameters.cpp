@@ -1232,6 +1232,16 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("FS_EKF_FILT", 8, ParametersG2, fs_ekf_filt_hz, FS_EKF_FILT_DEFAULT),
 
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+    // @Param: RATE_UPDATE
+    // @DisplayName: Rate thread update rate
+    // @Description: The decimation rate of rate loop thread updates. Updates include rate logging and notch frequency updates. A value of 1 means that these updates happen at the same rate as the gyro reads. A value of N means that updates occur at the gyro read rate / N.
+    // @Range: 1 8
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("RATE_UPDATE", 9, ParametersG2, rate_update_decimation, 4),
+#endif
+
     // ID 62 is reserved for the AP_SUBGROUPEXTENSION
 
     AP_GROUPEND
