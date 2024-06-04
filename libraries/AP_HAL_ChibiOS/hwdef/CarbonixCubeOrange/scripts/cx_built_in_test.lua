@@ -128,66 +128,65 @@ local servo_out_nil_counter = {0, 0, 0, 0, 0}
 local function esc_check_loop()
     for i = 1, number_of_esc  do
         local esc_last_telem_data_ms = esc_telem:get_last_telem_data_ms(i-1):toint()
+        local esc_rpm = esc_telem:get_rpm(i-1)
+        local servo_out = SRV_Channels:get_output_pwm(srv_number[i][2])
         -- Telem data timestamp check
         if not esc_last_telem_data_ms or esc_last_telem_data_ms == 0 or esc_last_telem_data_ms == srv_prv_telem_ms[i] then
             if srv_telem_in_err_status[i] == false then
                 gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " Telemetry Lost")
                 srv_telem_in_err_status[i] = true
             end
+        -- Nil check for RPM reading
+        elseif not esc_rpm then
+            esc_rpm_nil_counter[i] = esc_rpm_nil_counter[i] + 1
+            if esc_rpm_nil_counter[i] < NIL_WARN_THRESHOLD then
+                gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " RPM nil")
+            elseif srv_rpm_in_err_status[i] == false then
+                gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " RPM nil")
+                srv_telem_in_err_status[i] = true
+            end
+        -- Nil check for servo output
+        elseif not servo_out then
+            servo_out_nil_counter[i] = servo_out_nil_counter[i] + 1
+            if servo_out_nil_counter[i] < NIL_WARN_THRESHOLD then
+                gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " Servo Out nil")
+            elseif srv_rpm_in_err_status[i] == false then
+                gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " Servo Out nil")
+                srv_telem_in_err_status[i] = true
+            end
+        -- Telemetry data is fresh and valid
         else
             if srv_telem_in_err_status[i] == true then
                 gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " Telemetry Recovered")
                 srv_telem_in_err_status[i] = false
+                servo_out_nil_counter[i] = 0
+                esc_rpm_nil_counter[i] = 0
             end
+            -- If armed, check that the motor is actually turning when it is commanded to
             if arming:is_armed() then
-                local esc_rpm = esc_telem:get_rpm(i-1)
-                local servo_out = SRV_Channels:get_output_pwm(srv_number[i][2])
-                if not esc_rpm then
-                    esc_rpm_nil_counter[i] = esc_rpm_nil_counter[i] + 1
-                    if esc_rpm_nil_counter[i] < NIL_WARN_THRESHOLD then
-                        gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " RPM nil")
-                    elseif srv_rpm_in_err_status[i] == false then
-                        gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " RPM nil")
-                        srv_telem_in_err_status[i] = true
-                    end
-                else
-                    esc_rpm_nil_counter[i] = 0
-                end
-                if not servo_out then
-                    servo_out_nil_counter[i] = servo_out_nil_counter[i] + 1
-                    if servo_out_nil_counter[i] < NIL_WARN_THRESHOLD then
-                        gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " Servo Out nil")
-                    elseif srv_rpm_in_err_status[i] == false then
-                        gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " Servo Out nil")
-                        srv_telem_in_err_status[i] = true
-                    end
-                else
-                    servo_out_nil_counter[i] = 0
-                end
-                if esc_rpm and servo_out then
-                    -- If the PWM is below the threshold, consider it a stopped motor situation
-                    if servo_out < SERVO_OUT_THRESHOLD then
-                        esc_is_stopped(i)
-                    -- If the PWM is above the threshold consider it start the motor
-                    elseif servo_out > SERVO_OUT_THRESHOLD and not esc_warmup_end_time[i]  then
-                        esc_is_started(i)
-                    -- If the motor is running and the PWM is above the threshold, check the RPM
-                    elseif esc_warmup_end_time[i] and millis() > esc_warmup_end_time[i] then
-                        if servo_out > SERVO_OUT_THRESHOLD and esc_rpm < ESC_RPM_THRESHOLD then
-                            if srv_rpm_in_err_status[i] == false then
-                                gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " RPM Drop")
-                                srv_rpm_in_err_status[i] = true
-                            end
-                        else
-                            if srv_rpm_in_err_status[i] == true then
-                                gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " RPM Recovered")
-                                srv_rpm_in_err_status[i] = false
-                            end
+                -- If the PWM is below the threshold, it is okay for the motor to be stopped
+                if servo_out < SERVO_OUT_THRESHOLD then
+                    esc_is_stopped(i)
+                -- If the PWM has just gone above the threshold, start the warm-up timer
+                elseif servo_out > SERVO_OUT_THRESHOLD and not esc_warmup_end_time[i]  then
+                    esc_is_started(i)
+                -- If the motor is running, and the warmup timer has expired, check that the motor is spinning
+                elseif esc_warmup_end_time[i] and millis() > esc_warmup_end_time[i] then
+                    if servo_out > SERVO_OUT_THRESHOLD and esc_rpm < ESC_RPM_THRESHOLD then
+                        if srv_rpm_in_err_status[i] == false then
+                            gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " RPM Drop")
+                            srv_rpm_in_err_status[i] = true
+                        end
+                    else
+                        if srv_rpm_in_err_status[i] == true then
+                            gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " RPM Recovered")
+                            srv_rpm_in_err_status[i] = false
                         end
                     end
                 end
             end
         end
+        -- Update srv_prv_telem_ms[i] if it had valid data this loop
         if esc_last_telem_data_ms and esc_last_telem_data_ms ~= 0 then
             srv_prv_telem_ms[i] = esc_last_telem_data_ms
         end
