@@ -21,6 +21,7 @@
 #include <AP_Scripting/AP_Scripting.h>
 #include <AP_HAL/CANIface.h>
 #include <AP_Stats/AP_Stats.h>
+#include <AP_Common/CxVersion.h>
 
 #if HAL_GCS_ENABLED
 #include "GCS_MAVLink.h"

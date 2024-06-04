@@ -202,7 +202,7 @@ jobs:
       - name: Extract firmware version and commit id
         id: extract_info
         run: |
-          FIRMWARE_VERSION=$(grep -oP '#define AP_CUSTOM_FIRMWARE_STRING "\K(.*)(?=")' libraries/AP_Common/AP_FWVersionDefine.h)
+          FIRMWARE_VERSION=$(grep -oP '#define AP_CUSTOM_FIRMWARE_STRING "\K(.*)(?=")' libraries/AP_Common/CxVersion.h)
           COMMIT_ID=$(git rev-parse --short HEAD)
           echo "firmware_version=$FIRMWARE_VERSION" >> $GITHUB_ENV
           echo "commit_id=$COMMIT_ID" >> $GITHUB_ENV
