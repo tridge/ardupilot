@@ -118,6 +118,13 @@ local function esc_is_stopped(i)
     esc_warmup_end_time[i] = nil
 end
 
+-- Counters to debounce nil checks on esc rpm and servo output, this is a
+-- workaround to avoid giving the pilot a critical warning for an unexplained
+-- one-loop dropout we saw recently
+local NIL_WARN_THRESHOLD = 3
+local esc_rpm_nil_counter = {0, 0, 0, 0, 0}
+local servo_out_nil_counter = {0, 0, 0, 0, 0}
+
 local function esc_check_loop()
     for i = 1, number_of_esc  do
         local esc_last_telem_data_ms = esc_telem:get_last_telem_data_ms(i-1):toint()
@@ -135,6 +142,28 @@ local function esc_check_loop()
             if arming:is_armed() then
                 local esc_rpm = esc_telem:get_rpm(i-1)
                 local servo_out = SRV_Channels:get_output_pwm(srv_number[i][2])
+                if not esc_rpm then
+                    esc_rpm_nil_counter[i] = esc_rpm_nil_counter[i] + 1
+                    if esc_rpm_nil_counter[i] < NIL_WARN_THRESHOLD then
+                        gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " RPM nil")
+                    elseif srv_rpm_in_err_status[i] == false then
+                        gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " RPM nil")
+                        srv_telem_in_err_status[i] = true
+                    end
+                else
+                    esc_rpm_nil_counter[i] = 0
+                end
+                if not servo_out then
+                    servo_out_nil_counter[i] = servo_out_nil_counter[i] + 1
+                    if servo_out_nil_counter[i] < NIL_WARN_THRESHOLD then
+                        gcs_msg(MAV_SEVERITY_INFO, "ESC " .. i .. " Servo Out nil")
+                    elseif srv_rpm_in_err_status[i] == false then
+                        gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " Servo Out nil")
+                        srv_telem_in_err_status[i] = true
+                    end
+                else
+                    servo_out_nil_counter[i] = 0
+                end
                 if esc_rpm and servo_out then
                     -- If the PWM is below the threshold, consider it a stopped motor situation
                     if servo_out < SERVO_OUT_THRESHOLD then
@@ -156,9 +185,6 @@ local function esc_check_loop()
                             end
                         end
                     end
-                else
-                    gcs_msg(MAV_SEVERITY_CRITICAL, "ESC " .. i .. " Null Rcout or RPM")
-                    srv_telem_in_err_status[i] = true
                 end
             end
         end
