@@ -24,20 +24,20 @@ extern "C" {
 
 void *operator new (size_t size, std::nothrow_t const &nothrow) noexcept
 {
-	if (size < 1) {
-		size = 1;
-	}
+    if (size < 1) {
+        size = 1;
+    }
 
-	return (fc_heap_alloc(size));
+    return (fc_heap_alloc(size));
 }
 
 void *operator new[](size_t size, std::nothrow_t const &nothrow) noexcept
 {
-	if (size < 1) {
-		size = 1;
-	}
+    if (size < 1) {
+        size = 1;
+    }
 
-	return (fc_heap_alloc(size));
+    return (fc_heap_alloc(size));
 }
 
 /*
@@ -46,21 +46,21 @@ void *operator new[](size_t size, std::nothrow_t const &nothrow) noexcept
  */
 void *operator new (size_t size)
 {
-	if (size < 1) {
-		size = 1;
-	}
+    if (size < 1) {
+        size = 1;
+    }
 
-	return (fc_heap_alloc(size));
+    return (fc_heap_alloc(size));
 }
 
 
 void *operator new[](size_t size)
 {
-	if (size < 1) {
-		size = 1;
-	}
+    if (size < 1) {
+        size = 1;
+    }
 
-	return (fc_heap_alloc(size));
+    return (fc_heap_alloc(size));
 }
 
 /*
@@ -71,14 +71,18 @@ void *operator new[](size_t size)
 
 void operator delete (void *p) noexcept
 {
-	if (p) { fc_heap_free(p); }
+    if (p) {
+        fc_heap_free(p);
+    }
 
     // DEV_PRINTF("Heap size: %u, heap usage: %u", fc_heap_size(), fc_heap_usage());
 }
 
 void operator delete[](void *ptr) noexcept
 {
-	if (ptr) { fc_heap_free(ptr); }
+    if (ptr) {
+        fc_heap_free(ptr);
+    }
 }
 
 #else
@@ -87,17 +91,19 @@ void operator delete[](void *ptr) noexcept
   globally override new and delete to ensure that we always start with
   zero memory. This ensures consistent behaviour.
  */
-void * operator new(size_t size)
+void * operator new (size_t size)
 {
     if (size < 1) {
         size = 1;
     }
-    return(calloc(size, 1));
+    return (calloc(size, 1));
 }
 
-void operator delete(void *p)
+void operator delete (void *p)
 {
-    if (p) free(p);
+    if (p) {
+        free(p);
+    }
 }
 
 void * operator new[](size_t size)
@@ -105,12 +111,14 @@ void * operator new[](size_t size)
     if (size < 1) {
         size = 1;
     }
-    return(calloc(size, 1));
+    return (calloc(size, 1));
 }
 
 void operator delete[](void * ptr)
 {
-    if (ptr) free(ptr);
+    if (ptr) {
+        free(ptr);
+    }
 }
 
 #endif
