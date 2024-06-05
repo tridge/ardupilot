@@ -24,7 +24,7 @@ public:
                                             enum Rotation rotation);
 
     /* update accel and gyro state */
-    bool update() override;
+    bool update() override __RAMFUNC__;
     void accumulate() override;
 
     void start() override;
