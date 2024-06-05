@@ -687,7 +687,8 @@ public:
     AP_Float pldp_descent_speed_ms;
 
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-    AP_Int8 rate_update_decimation;
+    AP_Int16 att_filter_rate_hz;
+    AP_Int16 att_log_rate_hz;
 #endif
 };
 

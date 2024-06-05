@@ -1233,13 +1233,23 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     AP_GROUPINFO("FS_EKF_FILT", 8, ParametersG2, fs_ekf_filt_hz, FS_EKF_FILT_DEFAULT),
 
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-    // @Param: RATE_UPDATE
-    // @DisplayName: Rate thread update rate
-    // @Description: The decimation rate of rate loop thread updates. Updates include rate logging and notch frequency updates. A value of 1 means that these updates happen at the same rate as the gyro reads. A value of N means that updates occur at the gyro read rate / N.
-    // @Range: 1 8
+    // @Param: ATT_FILTER_RATE
+    // @DisplayName: Rate thread notch update rate
+    // @Description: The rate of rate thread filter updates in Hz. The actual rate is constrained to be a whole divisor of the gyro rate and thus cannot be larger than the gyro rate. A value of 0 will utilize a rate of half the attitude update rate (usually the gyro rate).
+    // @Range: 400 8000
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("RATE_UPDATE", 9, ParametersG2, rate_update_decimation, 4),
+    // @RebootRequired: True
+    AP_GROUPINFO("ATT_FILTER_RATE", 9, ParametersG2, att_filter_rate_hz, 0),
+
+    // @Param: ATT_LOG_RATE
+    // @DisplayName: Rate thread fast logging rate
+    // @Description: The rate of rate thread fast logging in Hz. The actual rate is constrained to be a whole divisor of the gyro rate and thus cannot be larger than the gyro rate. A value of 0 will utilize a rate equivalent to the main loop rate.
+    // @Range: 400 8000
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("ATT_LOG_RATE", 10, ParametersG2, att_log_rate_hz, 1000),
 #endif
 
     // ID 62 is reserved for the AP_SUBGROUPEXTENSION
