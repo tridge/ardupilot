@@ -866,6 +866,16 @@ void AP_InertialSensor_Backend::update_accel_filters(uint8_t instance) /* front 
     }
 }
 
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+void AP_InertialSensor_Backend::update_filters()
+{
+    WITH_SEMAPHORE(_sem);
+
+    update_accel_filters(accel_instance);
+    update_gyro_filters(gyro_instance);
+}
+#endif
+
 #if HAL_LOGGING_ENABLED
 bool AP_InertialSensor_Backend::should_log_imu_raw() const
 {

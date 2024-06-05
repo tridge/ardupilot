@@ -817,6 +817,7 @@ public:
     bool get_next_gyro_sample(Vector3f& gyro);
     uint32_t get_num_gyro_samples() { return _rate_loop_gyro_window.available(); }
     void set_rate_decimation(uint8_t rdec) { rate_decimation = rdec; }
+    void update_backend_filters();
 
     bool gyro_samples_available() { return  _rate_loop_gyro_window.available() > 0; }
 #endif
