@@ -14,7 +14,6 @@
 void Copter::rate_controller_thread()
 {
     uint8_t rate_decimation = 1;
-    uint32_t slow_loop_count = 0;
     uint32_t rate_loop_count = 0;
     uint32_t prev_loop_count = 0;
 
@@ -40,6 +39,17 @@ void Copter::rate_controller_thread()
     uint32_t timing_count = 0;
     uint32_t last_timing_msg_us = 0;
 #endif
+
+    uint8_t filter_rate_decimate = 2;
+    if (copter.g2.att_filter_rate_hz != 0) {
+        filter_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + copter.g2.att_filter_rate_hz - 1) / copter.g2.att_filter_rate_hz);
+    }
+    uint8_t log_rate_decimate = 0;
+    if (copter.g2.att_log_rate_hz != 0) {
+        log_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + copter.g2.att_log_rate_hz - 1) / copter.g2.att_log_rate_hz);
+    }
+    uint8_t filter_loop_count = 0;
+    uint8_t log_loop_count = 0;
 
     while (true) {
 
@@ -129,17 +139,21 @@ void Copter::rate_controller_thread()
         rate_now_us = AP_HAL::micros();
 #endif
 
-        /*
-          immediately output the new motor values
-         */
+        // immediately output the new motor values
         motors_output();
 
-        /*
-          process slow loop update
-         */
-        if (slow_loop_count++ >= (uint8_t)copter.g2.rate_update_decimation.get()) {
-            slow_loop_count = 0;
-            rate_controller_slow_loop();
+        // process filter updates
+        if (filter_loop_count++ >= filter_rate_decimate) {
+            filter_loop_count = 0;
+            rate_controller_filter_update();
+        }
+
+        // fast logging output
+        if (log_rate_decimate > 0 && log_loop_count++ >= log_rate_decimate) {
+            log_loop_count = 0;
+#if HAL_LOGGING_ENABLED
+            rate_controller_log_update();
+#endif
         }
 
 #ifdef RATE_LOOP_TIMING_DEBUG
@@ -150,7 +164,7 @@ void Copter::rate_controller_thread()
         now_ms = AP_HAL::millis();
 
         if (now_ms - last_notch_sample_ms >= 1000 || !was_using_rate_thread) {
-            // update the PID notch sample rate at 1Hz if if we are
+            // update the PID notch sample rate at 1Hz if we are
             // enabled at runtime
             last_notch_sample_ms = now_ms;
             attitude_control->set_notch_sample_rate(1.0 / sensor_dt);
@@ -165,8 +179,7 @@ void Copter::rate_controller_thread()
         
         // check that the CPU is not pegged, if it is drop the attitude rate
         if (now_ms - last_rate_check_ms >= 200
-            && (!flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD)
-                || !motors->armed() || ap.land_complete)) {
+            && (!flight_option_is_set(FlightOptions::USE_FIXED_RATE_LOOP_THREAD) || !motors->armed())) {
             last_rate_check_ms = now_ms;
             const uint32_t att_rate = ins.get_raw_gyro_rate_hz()/rate_decimation;
             if (running_slow > 5 || AP::scheduler().get_extra_loop_us() > 0
@@ -217,20 +230,37 @@ void Copter::rate_controller_thread()
 }
 
 /*
-  update rate controller slow loop. on an H7 this is about 30us
+  update rate controller filters. on an H7 this is about 30us
 */
-void Copter::rate_controller_slow_loop()
+void Copter::rate_controller_filter_update()
 {
     // update the frontend center frequencies of notch filters
-    update_dynamic_notch_at_specified_rate();
+    for (auto &notch : ins.harmonic_notches) {
+        update_dynamic_notch(notch);
+    }
 
     // this copies backend data to the frontend and updates the notches
     ins.update_backend_filters();
+}
 
+/*
+  log only those items that are updated at the rate loop rate
+ */
+void Copter::rate_controller_log_update()
+{
 #if HAL_LOGGING_ENABLED
-    fast_logging();
+    if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
+        Log_Write_Rate();
+        Log_Write_PIDS(); // only logs if PIDS bitmask is set
+    }
+#if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
+    if (should_log(MASK_LOG_FTN_FAST)) {
+        AP::ins().write_notch_log_messages();
+    }
+#endif
 #endif
 }
+
 #endif
 
 /*
