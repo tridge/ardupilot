@@ -225,7 +225,7 @@ void Copter::rate_controller_slow_loop()
     update_dynamic_notch_at_specified_rate();
 
     // this copies backend data to the frontend and updates the notches
-    ins.update_backends();
+    ins.update_backend_filters();
 
 #if HAL_LOGGING_ENABLED
     fast_logging();
