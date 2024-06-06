@@ -171,26 +171,10 @@ jobs:
         run: |
           . .github/workflows/ccache.env
 
-      - name: build Carbonix Flight Controller
+      - name: build
         shell: bash
-        run: |
-          boards=("CubeOrange" "CubeOrange-Volanti" "CubeOrange-Ottano" "sitl")
-          for board in "${boards[@]}"; do
-            echo "Compiling ArduPlane for $board..."
-            ./waf configure --board "$board" --define=CARBOPILOT=1
-            ./waf plane
-          done
-          echo "Script completed successfully."
-      - name: build Carbonix Periph boards
-        shell: bash
-        run: |
-          boards=("CarbonixF405" "CarbonixF405-no-crystal")
-          for board in "${boards[@]}"; do
-            echo "Compiling AP_Periph for $board..."
-            ./waf configure --board "$board" --define=CARBOPILOT=1
-            ./waf AP_Periph
-          done
-          echo "Script completed successfully."
+        run: Tools/Carbonix_scripts/carbonix_waf_build.sh
+
       - name: Check build files
         id: check_files
         uses: andstor/file-existence-action@v2
@@ -210,7 +194,7 @@ jobs:
           mkdir -p temp
           for dir in CubeOrange CubeOrange-Volanti CubeOrange-Ottano sitl CarbonixF405 CarbonixF405-no-crystal; do
             mkdir -p temp/$dir/bin
-            cp -v build/$dir/bin/* temp/$dir/bin/
+            cp -vr build/$dir/bin/* temp/$dir/bin/
           done
           cp -v ArduPlane/ReleaseNotes.txt temp/
         shell: sh -e {0}
