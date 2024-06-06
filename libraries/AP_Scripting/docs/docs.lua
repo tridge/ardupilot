@@ -1245,9 +1245,27 @@ function esc_telem:update_rpm(esc_index, rpm, error_rate) end
 function esc_telem:set_rpm_scale(esc_index, scale_factor) end
 
 -- get the timestamp of last telemetry data for an ESC
----@param esc_index integer
+---@param instance integer (0 is first motor)
 ---@return uint32_t_ud
-function esc_telem:get_last_telem_data_ms(esc_index) end
+function esc_telem:get_last_telem_data_ms(instance) end
+
+-- get the input_duty of last telemetry data for an ESC
+---@param instance integer (0 is first motor)
+---@param input_duty integer
+---@return boolean
+function esc_telem:get_input_duty(instance, input_duty) end
+
+-- get the output_duty of last telemetry data for an ESC
+---@param instance integer (0 is first motor)
+---@param output_duty integer
+---@return boolean
+function esc_telem:get_output_duty(instance, output_duty) end
+
+-- get the status flags of the last telemetry data for an ESC
+---@param instance integer (0 is first motor)
+---@param flags integer
+---@return boolean
+function esc_telem:get_flags(instance, flags) end
 
 -- desc
 ---@class optical_flow
