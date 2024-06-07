@@ -726,7 +726,7 @@ void Copter::one_hz_loop()
 
         if (hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Copter::rate_controller_thread, void),
                                          "attitude",
-                                         2048, AP_HAL::Scheduler::PRIORITY_BOOST, 1)) {
+                                         1024, AP_HAL::Scheduler::PRIORITY_RCOUT, 1)) {
             started_rate_thread = true;
         }
     }

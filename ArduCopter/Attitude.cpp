@@ -69,6 +69,7 @@ void Copter::rate_controller_thread()
                 attitude_control->set_notch_sample_rate(loop_rate_hz);
                 motors->set_dt(1.0/loop_rate_hz);
                 ins.set_rate_decimation(0);
+                hal.rcout->force_trigger_groups(false);
                 was_using_rate_thread = false;
             }
             hal.scheduler->delay_microseconds(500);
@@ -76,8 +77,9 @@ void Copter::rate_controller_thread()
             continue;
         }
 
+        // set up rate thread requirements
         using_rate_thread = true;
-
+        hal.rcout->force_trigger_groups(true);
         ins.set_rate_decimation(rate_decimation);
 
         // wait for an IMU sample
