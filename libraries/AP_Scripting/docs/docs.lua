@@ -3046,6 +3046,13 @@ function arming:disarm() end
 ---@class ahrs
 ahrs = {}
 
+-- supply an external position estimate to the AHRS (supported by EKF3)
+---@param location Location_ud -- estimated location, altitude is ignored
+---@param accuracy number -- 1-sigma accuracy in meters
+---@param timestamp_ms uint32_t_ud -- timestamp of reading in ms since boot
+---@return boolean -- true if call was handled successfully
+function ahrs:handle_external_position_estimate(location, accuracy, timestamp_ms) end
+
 -- desc
 ---@return Quaternion_ud|nil
 function ahrs:get_quaternion() end
