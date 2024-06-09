@@ -46,21 +46,13 @@ local SLV_IP = { bind_add_param('IP0', 2, 192),
 local SLV_RATE = bind_add_param('RATE', 6, 2)
 
 --[[
-  // @Param: SLV_NODEID
-  // @DisplayName: Silvus node ID
-  // @Description: Silvus node ID for ranging. Zero means auto-allocated
-  // @User: Standard
---]]
-local SLV_NODEID = bind_add_param('NODEID', 7, 0)
-
---[[
   // @Param: SLV_DIST_OFS
   // @DisplayName: Silvus distance offset
   // @Description: Silvus distance offset. A value of 0 for tof_request is assumed to be less than or equal to this distance
   // @Units: m
   // @User: Standard
 --]]
-local SLV_DIST_OFS = bind_add_param('DIST_OFS', 8, 400)
+local SLV_DIST_OFS = bind_add_param('DIST_OFS', 8, 0)
 
 --[[
   // @Param: SLV_DIST_ACC
@@ -81,33 +73,6 @@ local SLV_DIST_ACC = bind_add_param('DIST_ACC', 9, 30)
 local SLV_DIST_MUL = bind_add_param('DIST_MUL', 10, 30)
 
 --[[
-  // @Param: SLV_GND_LAT
-  // @DisplayName: Silvus ground radio latitude
-  // @Description: Silvus ground radio latitude. Use home lat if all zero
-  // @Units: deg
-  // @User: Standard
---]]
-local SLV_GND_LAT = bind_add_param('GND_LAT', 11, 0)
-
---[[
-  // @Param: SLV_GND_LON
-  // @DisplayName: Silvus ground radio longitude
-  // @Description: Silvus ground radio longitude. Use home lat if all zero
-  // @Units: deg
-  // @User: Standard
---]]
-local SLV_GND_LON = bind_add_param('GND_LON', 12, 0)
-
---[[
-  // @Param: SLV_GND_ALT
-  // @DisplayName: Silvus ground radio altitude AMSL
-  // @Description: Silvus ground radio altitude AMSL
-  // @Units: m
-  // @User: Standard
---]]
-local SLV_GND_ALT = bind_add_param('GND_ALT', 13, 0)
-
---[[
   // @Param: SLV_HTTP_PORT
   // @DisplayName: Silvus HTTP port
   // @Description: Silvus HTTP port
@@ -116,7 +81,99 @@ local SLV_GND_ALT = bind_add_param('GND_ALT', 13, 0)
 --]]
 local SLV_HTTP_PORT = bind_add_param('HTTP_PORT', 14, 80)
 
-local radio_nodeid = SLV_NODEID:get()
+--[[
+  // @Param: SLV_MAX_AGE_MS
+  // @DisplayName: Silvus max age
+  // @Description: Silvus max age
+  // @Units: ms
+  // @User: Standard
+--]]
+local SLV_MAX_AGE_MS = bind_add_param('MAX_AGE_MS', 15, 5000)
+
+--[[
+  // @Param: SLV_GND1_NODEID
+  // @DisplayName: Silvus node ID for first ground radio
+  // @Description: Silvus node ID for first ground radio. Zero means auto-allocated
+  // @User: Standard
+--]]
+local SLV_GND1_NODEID = bind_add_param('GND1_NODEID', 16, 0)
+
+--[[
+  // @Param: SLV_GND1_H_DIST
+  // @DisplayName: Silvus ground radio 1 distance
+  // @Description: Silvus ground radio 1 distance from home
+  // @Units: m
+  // @User: Standard
+--]]
+local SLV_GND1_H_DIST = bind_add_param('GND1_H_DIST', 17, 0)
+
+--[[
+  // @Param: SLV_GND1_H_BRG
+  // @DisplayName: Silvus ground radio 1 home bearing
+  // @Description: Silvus ground radio 1 bearing from home
+  // @Units: deg
+  // @User: Standard
+--]]
+local SLV_GND1_H_BRG = bind_add_param('GND1_H_BRG', 18, 0)
+
+--[[
+  // @Param: SLV_GND1_H_ALT
+  // @DisplayName: Silvus ground radio 1 height above home
+  // @Description: Silvus ground radio 1 height above home
+  // @Units: m
+  // @User: Standard
+--]]
+local SLV_GND1_H_ALT = bind_add_param('GND1_H_ALT', 19, 0)
+
+--[[
+  // @Param: SLV_GND2_NODEID
+  // @DisplayName: Silvus node ID for 2nd ground radio
+  // @Description: Silvus node ID for 2nd ground radio. Zero means auto-allocated
+  // @User: Standard
+--]]
+local SLV_GND2_NODEID = bind_add_param('GND2_NODEID', 20, 0)
+
+--[[
+  // @Param: SLV_GND2_H_DIST
+  // @DisplayName: Silvus ground radio 2 distance
+  // @Description: Silvus ground radio 2 distance from home
+  // @Units: m
+  // @User: Standard
+--]]
+local SLV_GND2_H_DIST = bind_add_param('GND2_H_DIST', 21, 0)
+
+--[[
+  // @Param: SLV_GND2_H_BRG
+  // @DisplayName: Silvus ground radio 2 home bearing
+  // @Description: Silvus ground radio 2 bearing from home
+  // @Units: deg
+  // @User: Standard
+--]]
+local SLV_GND2_H_BRG = bind_add_param('GND2_H_BRG', 22, 0)
+
+--[[
+  // @Param: SLV_GND2_H_ALT
+  // @DisplayName: Silvus ground radio 2 height above home
+  // @Description: Silvus ground radio 2 height above home
+  // @Units: m
+  // @User: Standard
+--]]
+local SLV_GND2_H_ALT = bind_add_param('GND2_H_ALT', 23, 0)
+
+--[[
+  // @Param: SLV_OPTIONS
+  // @DisplayName: Silvus options
+  // @Description: Silvus options
+  // @Bitmask: 0:EnableDualRangePosition
+  // @User: Standard
+--]]
+local SLV_OPTIONS = bind_add_param('OPTIONS', 24, 0)
+
+local OPTION_ENABLE_DUAL_RANGE = (1<<0)
+
+local radio_nodeids = {0,0}
+local radio_ranges = {nil, nil}
+local radio_tstamp_ms = {nil, nil}
 
 gcs:send_text(MAV_SEVERITY.INFO, "Silvus: starting")
 
@@ -148,7 +205,7 @@ local function http_request(api)
    sock = Socket(0)
    local node_ip = silvus_ip()
    if not sock:connect(node_ip, SLV_HTTP_PORT:get()) then
-      gcs:send_text(MAV_SEVERITY.ERROR, string.format("Silvus: failed to connect", name))
+      --gcs:send_text(MAV_SEVERITY.ERROR, string.format("Silvus: failed to connect", name))
       return nil
    end
    local json = string.format([[{"jsonrpc":"2.0","method":"%s","id":"sbkb5u0c"}]], api)
@@ -172,31 +229,54 @@ end
 --[[
    get ground radio location
 --]]
-local function get_radio_location()
-   local loc = ahrs:get_home()
+local function get_radio_location(radio_idx)
+   local loc = ahrs:get_home():copy()
    if not loc then
-      gcs:send_text(0,"no home")
+      --gcs:send_text(0,"no home")
       return nil
    end
-   local lat = SLV_GND_LAT:get()
-   local lon = SLV_GND_LON:get()
-   local alt = SLV_GND_ALT:get()
-   if lat ~= 0 or lon ~= 0 then
-      loc:lat(math.floor(lat*1.0e7))
-      loc:lng(math.floor(lon*1.0e7))
-      loc:alt(math.floor(alt*1.0e2))
+   if loc:lat() == 0 and loc:lng() == 0 then
+      return nil
    end
+   local ofs_dist=0
+   local ofs_brg=0
+   local ofs_H=0
+   if radio_idx == 1 then
+      ofs_dist = SLV_GND1_H_DIST:get()
+      ofs_brg = SLV_GND1_H_BRG:get()
+      ofs_H = SLV_GND1_H_ALT:get()
+   else
+      ofs_dist = SLV_GND2_H_DIST:get()
+      ofs_brg = SLV_GND2_H_BRG:get()
+      ofs_H = SLV_GND2_H_ALT:get()
+   end
+   loc:offset_bearing(ofs_brg, ofs_dist)
+   loc:alt(loc:alt()+ofs_H*100)
    return loc
+end
+
+--[[
+   work out the radio index given node ID
+--]]
+local function get_radio_index(node_id)
+   for i = 1, #radio_nodeids do
+      if radio_nodeids[i] == node_id then
+         return i
+      end
+      if radio_nodeids[i] == 0 then
+         radio_nodeids[i] = node_id
+         return i
+      end
+   end
+   return nil
 end
 
 --[[
    handle a distance measurement
 --]]
 local function handle_TOF(node_id, distance_ticks, age_ms)
-   if radio_nodeid == 0 then
-      radio_nodeid = node_id
-   end
-   if radio_nodeid ~= node_id then
+   radio_idx = get_radio_index(node_id)
+   if not radio_idx then
       -- not for us
       return
    end
@@ -204,19 +284,110 @@ local function handle_TOF(node_id, distance_ticks, age_ms)
    if distance_ticks > 0 then
       distance_m = SLV_DIST_OFS:get() + distance_ticks * SLV_DIST_MUL:get()
    end
+   local now_ms = millis()
+
+   radio_ranges[radio_idx] = distance_m
+   radio_tstamp_ms[radio_idx] = now_ms - age_ms
+
    gcs:send_named_float("SlvRange", distance_m)
-   if distance_m > 0 then
+   if distance_m > 0 or SLV_DIST_OFS:get() == 0 then
       local accuracy = SLV_DIST_ACC:get()
       if accuracy < SLV_DIST_MUL:get() then
          accuracy = SLV_DIST_MUL:get()
       end
-      local now_ms = millis()
-      local radio_loc = get_radio_location()
+      local radio_loc = get_radio_location(radio_idx)
       if not radio_loc then
          return
       end
       ahrs:writeRangeToLocation(distance_m, accuracy, radio_loc, now_ms - age_ms)
    end
+end
+
+--[[
+   return true if a number is NaN
+--]]
+local function isNaN(v)
+   return v ~= v
+end
+
+--[[
+   handle positioning using dual range position
+--]]
+local function handle_dual_range_position()
+   local now_ms = millis()
+   if not radio_ranges[1] or not radio_ranges[2] then
+      return
+   end
+   if not radio_tstamp_ms[1] or not radio_tstamp_ms[2] then
+      return
+   end
+   local age1_ms = now_ms - radio_tstamp_ms[1]
+   local age2_ms = now_ms - radio_tstamp_ms[2]
+   if age1_ms > 500 or age2_ms > 500 then
+      -- too old
+      return
+   end
+   local loc1 = get_radio_location(1)
+   local loc2 = get_radio_location(2)
+   if not loc1 or not loc2 then
+      return
+   end
+   local baseline_2D = loc1:get_distance_NE(loc2)
+   local baseline_3D = loc1:get_distance_NED(loc2)
+   local baseline_length = baseline_3D:length()
+   local baseline_angle_rad = baseline_2D:angle()
+   if baseline_length < 50 then
+      -- baseline too small
+      return
+   end
+   local R1 = radio_ranges[1]
+   local R2 = radio_ranges[2]
+   local D = baseline_length
+
+   -- gcs:send_text(0,string.format("baseline: %.1f %.2f R1:%.1f R2:%.1f D:%.1f", baseline_length, math.deg(baseline_angle_rad), R1, R2, D))
+
+   local vehicle_loc = nil
+   if R1 < 1 then
+      vehicle_loc = loc1:copy()
+   elseif R2 < 1 then
+      vehicle_loc = loc2:copy()
+   else
+      local loc1_angle = math.acos((R1^2 + D^2 - R2^2) / (2 * R1 * D))
+      if isNaN(loc1_angle) then
+         return
+      end
+      local vehicle_bearing1 = math.deg(baseline_angle_rad+loc1_angle)
+      local vehicle_bearing2 = math.deg(baseline_angle_rad-loc1_angle)
+      vehicle_loc1 = loc1:copy()
+      vehicle_loc1:offset_bearing(vehicle_bearing1, R1)
+      vehicle_loc2 = loc1:copy()
+      vehicle_loc2:offset_bearing(vehicle_bearing2, R1)
+      logger:write("SPO1","Lat,Lng,Alt", "LLf", 'DU-', 'GG-',
+                vehicle_loc1:lat(),
+                vehicle_loc1:lng(),
+                vehicle_loc1:alt()*0.01)
+      logger:write("SPO2","Lat,Lng,Alt", "LLf", 'DU-', 'GG-',
+                vehicle_loc2:lat(),
+                vehicle_loc2:lng(),
+                vehicle_loc2:alt()*0.01)
+      local ahrs_pos = ahrs:get_location()
+      if not ahrs_pos then
+         vehicle_loc = vehicle_loc1
+      else
+         if ahrs_pos:get_distance(vehicle_loc1) <= ahrs_pos:get_distance(vehicle_loc2) then
+            vehicle_loc = vehicle_loc1
+         else
+            vehicle_loc = vehicle_loc2
+         end
+      end
+   end
+   logger:write("SPOS","Lat,Lng,Alt", "LLf", 'DU-', 'GG-',
+                vehicle_loc:lat(),
+                vehicle_loc:lng(),
+                vehicle_loc:alt()*0.01)
+   gcs:send_named_float("SDST", ahrs:get_home():get_distance(vehicle_loc))
+   gcs:send_named_float("SBRG", math.deg(ahrs:get_home():get_bearing(vehicle_loc)))
+   ahrs:handle_external_position_estimate(vehicle_loc, SLV_DIST_ACC:get(), millis())
 end
 
 --[[
@@ -245,10 +416,14 @@ local function parse_reply()
       local distance_ticks = tonumber(result[2+(i-1)*3])
       local age_ms = tonumber(result[3+(i-1)*3])
       --gcs:send_text(MAV_SEVERITY.INFO, string.format("node:%u dist:%u age_ms:%u", node_id, distance_ticks, age_ms))
-      logger:write("STOF","Node,Dist,Age", "III", node_id, distance_ticks, age_ms)
-      if age_ms < 500 then
+      logger:write("STOF","Node,Dist,Age", "III", '#--', '---', node_id, distance_ticks, age_ms)
+      if age_ms < SLV_MAX_AGE_MS:get() then
          handle_TOF(node_id, distance_ticks, age_ms)
+         gcs:send_named_float(string.format("R%u", node_id), distance_ticks)
       end
+   end
+   if num_nodes >= 2 and (SLV_OPTIONS:get() & OPTION_ENABLE_DUAL_RANGE) ~= 0 then
+      handle_dual_range_position()
    end
 end
 
@@ -271,6 +446,9 @@ end
 
 
 local function update()
+   if SLV_ENABLE:get() <= 0 then
+      return
+   end
    if sock then
       check_reply()
       return

@@ -45,40 +45,40 @@ local SSIM_NODEID1 = bind_add_param('NODEID1', 2, 40001)
 local SSIM_NODEID2 = bind_add_param('NODEID2', 3, 40002)
 
 --[[
-  // @Param: SSIM_NODE1_OFS_N
-  // @DisplayName: silvus node1 offset N
-  // @Description: silvus node1 offset N from home
+  // @Param: SSIM_NODE1_H_DST
+  // @DisplayName: silvus node1 home distance
+  // @Description: silvus node1 home distance
   // @Units: m
   // @User: Standard
 --]]
-local SSIM_NODE1_OFS_N = bind_add_param('NODE1_OFS_N', 4, 0)
+local SSIM_NODE1_H_DST = bind_add_param('NODE1_H_DST', 4, 0)
 
 --[[
-  // @Param: SSIM_NODE1_OFS_E
-  // @DisplayName: silvus node1 offset E
-  // @Description: silvus node1 offset E from home
+  // @Param: SSIM_NODE1_H_BRG
+  // @DisplayName: silvus node1 bearing from home
+  // @Description: silvus node1 bearing from home
   // @Units: m
   // @User: Standard
 --]]
-local SSIM_NODE1_OFS_E = bind_add_param('NODE1_OFS_E', 5, 0)
+local SSIM_NODE1_H_BRG = bind_add_param('NODE1_H_BRG', 5, 0)
 
 --[[
-  // @Param: SSIM_NODE2_OFS_N
-  // @DisplayName: silvus node2 offset N
-  // @Description: silvus node2 offset N from home
+  // @Param: SSIM_NODE2_H_DST
+  // @DisplayName: silvus node2 home distance
+  // @Description: silvus node2 home distance
   // @Units: m
   // @User: Standard
 --]]
-local SSIM_NODE2_OFS_N = bind_add_param('NODE2_OFS_N', 6, 500)
+local SSIM_NODE2_H_DST = bind_add_param('NODE2_H_DST', 6, 0)
 
 --[[
-  // @Param: SSIM_NODE2_OFS_E
-  // @DisplayName: silvus node2 offset E
-  // @Description: silvus node2 offset E from home
+  // @Param: SSIM_NODE2_H_BRG
+  // @DisplayName: silvus node2 bearing from home
+  // @Description: silvus node2 bearing from home
   // @Units: m
   // @User: Standard
 --]]
-local SSIM_NODE2_OFS_E = bind_add_param('NODE2_OFS_E', 7, 200)
+local SSIM_NODE2_H_BRG = bind_add_param('NODE2_H_BRG', 7, 0)
 
 --[[
   // @Param: SSIM_DIST_OFS
@@ -87,7 +87,7 @@ local SSIM_NODE2_OFS_E = bind_add_param('NODE2_OFS_E', 7, 200)
   // @Units: m
   // @User: Standard
 --]]
-local SSIM_DIST_OFS = bind_add_param('DIST_OFS', 8, 400)
+local SSIM_DIST_OFS = bind_add_param('DIST_OFS', 8, 0)
 
 --[[
   // @Param: SSIM_DIST_MUL
@@ -106,14 +106,22 @@ local SSIM_DIST_MUL = bind_add_param('DIST_MUL', 9, 30)
 --]]
 local SSIM_LISTEN_PORT = bind_add_param('LISTEN_PORT', 10, 8003)
 
+--[[
+  // @Param: SSIM_AGE_MAX_MS
+  // @DisplayName: Silvus age max MS
+  // @Description: Silvus age max MS
+  // @User: Standard
+--]]
+local SSIM_AGE_MAX_MS = bind_add_param('AGE_MAX_MS', 11, 5000)
+
 local listen_sock = nil
 
 gcs:send_text(MAV_SEVERITY.INFO, "SilvusSim: starting")
 
 --[[
-   get range in TOF microseconds, given offset of beacon from home
+   get range in TOF units (100ns), given offset of beacon from home
 --]]
-local function get_range(ofs_N, ofs_E)
+local function get_range(ofs_dist, ofs_brg)
    local gps_loc = gps:location(0)
    if not gps_loc then
       return nil
@@ -122,7 +130,7 @@ local function get_range(ofs_N, ofs_E)
    if not loc then
       return nil
    end
-   loc:offset(ofs_N, ofs_E)
+   loc:offset_bearing(ofs_brg, ofs_dist)
    local range_2D_m = gps_loc:get_distance(loc)
    local alt_diff = math.abs(loc:alt()*0.01 - gps_loc:alt()*0.01)
    local range_3D_m = math.sqrt(range_2D_m^2 + alt_diff^2)
@@ -154,8 +162,8 @@ local function update()
       return
    end
    local range_str = [[""]]
-   local range1 = get_range(SSIM_NODE1_OFS_N:get(), SSIM_NODE1_OFS_E:get())
-   local range2 = get_range(SSIM_NODE2_OFS_N:get(), SSIM_NODE2_OFS_E:get())
+   local range1 = get_range(SSIM_NODE1_H_DST:get(), SSIM_NODE1_H_BRG:get())
+   local range2 = get_range(SSIM_NODE2_H_DST:get(), SSIM_NODE2_H_BRG:get())
    if range1 and range2 then
       range_str = string.format([["%u","%u","10","%u","%u","10"]], SSIM_NODEID1:get(), range1, SSIM_NODEID2:get(), range2)
    end
