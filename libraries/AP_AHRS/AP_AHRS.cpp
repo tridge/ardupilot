@@ -3588,7 +3588,7 @@ bool AP_AHRS::get_location_from_home_offset(Location &loc, const Vector3p &offse
  */
 bool AP_AHRS::get_location_EKF3_corrected(uint8_t core, struct Location &loc) const
 {
-    if (EKF3.using_gps(core)) {
+    if (EKF3.using_gps(core) || terrain_nav_duration_msec() == 0) {
         return EKF3.getLLH(core, loc);
     }
     Vector2f delta;
