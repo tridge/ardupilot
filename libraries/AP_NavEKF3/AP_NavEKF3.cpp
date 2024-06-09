@@ -738,7 +738,7 @@ const AP_Param::GroupInfo NavEKF3::var_info2[] = {
     // @Param: OPTIONS
     // @DisplayName: Optional EKF behaviour
     // @Description: This controls optional EKF behaviour. Setting JammingExpected will change the EKF nehaviour such that if dead reckoning navigation is possible it will require the preflight alignment GPS quality checks controlled by EK3_GPS_CHECK and EK3_CHECK_SCALE to pass before resuming GPS use if GPS lock is lost for more than 2 seconds to prevent bad
-    // @Bitmask: 0:JammingExpected
+    // @Bitmask: 0:JammingExpected,1:DisableRangeFusion,2:DisableSetLatLng
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  11, NavEKF3, _options, 0),
 
@@ -1490,6 +1490,10 @@ bool NavEKF3::setLatLng(const Location &loc, float posAccuracy, uint32_t timesta
 #if EK3_FEATURE_POSITION_RESET
     AP::dal().log_SetLatLng(loc, posAccuracy, timestamp_ms);
 
+    if (_options & (int32_t)NavEKF3::Options::DisableSetLatLng) {
+        return false;
+    }
+    
     if (!core) {
         return false;
     }
@@ -2169,6 +2173,9 @@ void NavEKF3::writeRangeToLocation(const float range, const float uncertainty, c
 {
     AP::dal().log_writeRangeToLocation(range, uncertainty, loc, timeStamp_ms);
 
+    if (_options & (int32_t)NavEKF3::Options::DisableRangeFusion) {
+        return;
+    }
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
             core[i].writeRangeToLocation(range, uncertainty, loc, timeStamp_ms);

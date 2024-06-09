@@ -507,6 +507,8 @@ private:
     // enum for processing options
     enum class Options {
         JammingExpected     = (1<<0),
+        DisableRangeFusion  = (1<<1),
+        DisableSetLatLng    = (1<<2),
     };
 
 // Possible values for _flowUse
