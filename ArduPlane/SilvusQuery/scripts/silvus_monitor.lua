@@ -311,6 +311,37 @@ local function isNaN(v)
 end
 
 --[[
+   get 2 possible vehicle positions given beacon1 location, two
+   ranges, the baseline and the elev angles
+
+   loc1: location of beacon1
+   R1: range from beacon1 to vehicle (3D)
+   R2: range from beacon2 to vehicle (3D)
+   D: range from beacon1 to beacon2 (3D)
+   elev_angle1: elevation angle in radians of vehicle from beacon1
+   elev_angle2: elevation angle in radians of beacon2 from beacon1
+   baseline_angle_rad: angle of line between beacon1 and beacon2
+--]]
+local function get_vehicle_position(loc1, R1, R2, D, elev_angle1, elev_angle2, baseline_angle_rad)
+   local loc1_angle = math.acos((R1^2 + D^2 - R2^2) / (2 * R1 * D))
+   if isNaN(loc1_angle) then
+      return nil, nil
+   end
+   local vehicle_bearing1 = math.deg(baseline_angle_rad+loc1_angle)
+   local vehicle_bearing2 = math.deg(baseline_angle_rad-loc1_angle)
+
+   --[[
+      need to correct bearing and distance for the elevation angles
+   --]]
+   local R1_corrected = R1 * math.cos(math.abs(elev_angle1))
+   local vehicle_loc1 = loc1:copy()
+   vehicle_loc1:offset_bearing(vehicle_bearing1, R1_corrected)
+   local vehicle_loc2 = loc1:copy()
+   vehicle_loc2:offset_bearing(vehicle_bearing2, R1_corrected)
+   return vehicle_loc1, vehicle_loc2
+end
+
+--[[
    handle positioning using dual range position
 --]]
 local function handle_dual_range_position()
@@ -343,6 +374,7 @@ local function handle_dual_range_position()
    local R1 = radio_ranges[1]
    local R2 = radio_ranges[2]
    local D = baseline_length
+   local accuracy = SLV_DIST_ACC:get()
 
    -- gcs:send_text(0,string.format("baseline: %.1f %.2f R1:%.1f R2:%.1f D:%.1f", baseline_length, math.deg(baseline_angle_rad), R1, R2, D))
 
@@ -352,16 +384,18 @@ local function handle_dual_range_position()
    elseif R2 < 1 then
       vehicle_loc = loc2:copy()
    else
-      local loc1_angle = math.acos((R1^2 + D^2 - R2^2) / (2 * R1 * D))
-      if isNaN(loc1_angle) then
+      local ahrs_pos = ahrs:get_location()
+      if not ahrs_pos then
          return
       end
-      local vehicle_bearing1 = math.deg(baseline_angle_rad+loc1_angle)
-      local vehicle_bearing2 = math.deg(baseline_angle_rad-loc1_angle)
-      vehicle_loc1 = loc1:copy()
-      vehicle_loc1:offset_bearing(vehicle_bearing1, R1)
-      vehicle_loc2 = loc1:copy()
-      vehicle_loc2:offset_bearing(vehicle_bearing2, R1)
+      local alt_diff1 = (ahrs_pos:alt() - loc1:alt())*0.01
+      local alt_diff2 = (loc2:alt() - loc1:alt())*0.01
+      local elev_angle1 = math.asin(alt_diff1/R1)
+      local elev_angle2 = math.asin(alt_diff2/D)
+      local vehicle_loc1, vehicle_loc2 = get_vehicle_position(loc1, R1, R2, D, elev_angle1, elev_angle2, baseline_angle_rad)
+      if not vehicle_loc1 or not vehicle_loc2 then
+         return
+      end
       logger:write("SPO1","Lat,Lng,Alt", "LLf", 'DU-', 'GG-',
                 vehicle_loc1:lat(),
                 vehicle_loc1:lng(),
@@ -370,24 +404,46 @@ local function handle_dual_range_position()
                 vehicle_loc2:lat(),
                 vehicle_loc2:lng(),
                 vehicle_loc2:alt()*0.01)
+
       local ahrs_pos = ahrs:get_location()
       if not ahrs_pos then
          vehicle_loc = vehicle_loc1
       else
+         --[[
+            disambiguate using current ahrs location
+
+            NOTE! this can get the wrong answer as we cross over the beacon line
+         --]]
          if ahrs_pos:get_distance(vehicle_loc1) <= ahrs_pos:get_distance(vehicle_loc2) then
             vehicle_loc = vehicle_loc1
          else
             vehicle_loc = vehicle_loc2
          end
       end
+
+      --[[
+         use perturbation to get accuracy estimate
+      --]]
+      local vehicle_loc1_2, vehicle_loc2_2 = get_vehicle_position(loc1, R1+accuracy, R2, D, elev_angle1, elev_angle2, baseline_angle_rad)
+      local vehicle_loc1_3, vehicle_loc2_3 = get_vehicle_position(loc1, R1, R2+accuracy, D, elev_angle1, elev_angle2, baseline_angle_rad)
+      if not vehicle_loc1_2 or not vehicle_loc2_2 or not vehicle_loc1_3 or not vehicle_loc2_3 then
+         return
+      end
+
+      accuracy = math.max(accuracy, vehicle_loc1:get_distance(vehicle_loc1_2))
+      accuracy = math.max(accuracy, vehicle_loc2:get_distance(vehicle_loc2_2))
+      accuracy = math.max(accuracy, vehicle_loc1:get_distance(vehicle_loc1_3))
+      accuracy = math.max(accuracy, vehicle_loc2:get_distance(vehicle_loc2_3))
    end
-   logger:write("SPOS","Lat,Lng,Alt", "LLf", 'DU-', 'GG-',
+   logger:write("SPOS","Lat,Lng,Alt,Acc", "LLff", 'DU--', 'GG--',
                 vehicle_loc:lat(),
                 vehicle_loc:lng(),
-                vehicle_loc:alt()*0.01)
+                vehicle_loc:alt()*0.01,
+                accuracy)
    gcs:send_named_float("SDST", ahrs:get_home():get_distance(vehicle_loc))
    gcs:send_named_float("SBRG", math.deg(ahrs:get_home():get_bearing(vehicle_loc)))
-   ahrs:handle_external_position_estimate(vehicle_loc, SLV_DIST_ACC:get(), millis())
+   gcs:send_named_float("SACC", accuracy)
+   ahrs:handle_external_position_estimate(vehicle_loc, accuracy, millis())
 end
 
 --[[
