@@ -12,10 +12,13 @@ void NavEKF3_core::SelectRngBcnFusion()
 {
     // range to location data is being pushed externally to the EKF so we need to check the buffer
     if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms)) {
-        FuseRngBcn();
 
         // a reset using a single observation from this sensor is a last resort so wait for the slow timeout on the primary position sensors
-        if (posTimeout && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->altPosSwitchTimeout_ms)) {
+        bool noPositionFix = (imuSampleTime_ms - lastGpsPosPassTime_ms > frontend->altPosSwitchTimeout_ms) &&
+                           (imuSampleTime_ms - lastExtNavPosPassTime_ms > frontend->altPosSwitchTimeout_ms);
+        if (noPositionFix && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->altPosSwitchTimeout_ms)) {
+            rngBcn.lastPassTime_ms = imuSampleTime_ms;
+            rngBcn.dataDelayed.beacon_posNED = EKF_origin.get_distance_NED_ftype(rngBcn.dataDelayed.beacon_loc);
             // reset position to match range measurement
             const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
             Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
@@ -42,9 +45,10 @@ void NavEKF3_core::SelectRngBcnFusion()
             for (uint8_t row=0; row<3; row++) {
                 for (uint8_t col=0; col<3; col++) {
                     P[row+7][col+7] = covMatNED[row][col];
-
                 }
             }
+        } else {
+            FuseRngBcn();
         }
     }
 
