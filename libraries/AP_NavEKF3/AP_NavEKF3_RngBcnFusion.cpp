@@ -119,7 +119,8 @@ void NavEKF3_core::FuseRngBcn()
     bcn_pd = rngBcn.dataDelayed.beacon_posNED.z + rngBcn.posOffsetNED.z;
 
     // predicted range
-    Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
+    Vector3F predictedPosNED = stateStruct.position - stateStruct.velocity * MIN((0.001f * (ftype)rngBcn.dataDelayed.delay_ms), 2.0f);
+    Vector3F deltaPosNED = predictedPosNED - rngBcn.dataDelayed.beacon_posNED;
     rngPred = deltaPosNED.length();
 
     // calculate measurement innovation
