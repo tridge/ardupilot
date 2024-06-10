@@ -544,6 +544,18 @@ void AP_DAL::handle_message(const log_RRLT &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
     _RRLT = msg;
     Location loc{msg.lat, msg.lng, msg.alt, Location::AltFrame::ABSOLUTE};
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    // nasty HACK!
+    static const Location loc1{-352798410,1490053342,60399,Location::AltFrame::ABSOLUTE};
+    static const Location loc2{-352823366,1490067353,59699,Location::AltFrame::ABSOLUTE};
+    if (loc1.get_distance(loc) < 10) {
+        loc = loc2;
+    } else if (loc2.get_distance(loc) < 10) {
+        loc = loc1;
+    }
+#endif
+
     ekf3.writeRangeToLocation(msg.range, msg.uncertainty, loc, msg.timeStamp_ms);
 }
 #endif // APM_BUILD_Replay
