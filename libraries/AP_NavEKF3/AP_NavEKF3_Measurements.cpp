@@ -958,6 +958,7 @@ void NavEKF3_core::readRngBcnData()
             // set the timestamp, correcting for measurement delay and average intersampling delay due to the filter update rate
             rngBcn.lastTime_ms[index] = beacon->beacon_last_update_ms(index);
             rngBcnDataNew.time_ms = rngBcn.lastTime_ms[index] - frontend->_rngBcnDelay_ms - localFilterTimeStep_ms/2;
+            rngBcnDataNew.delay_ms = 0;
 
             // set the range noise
             // TODO the range library should provide the noise/accuracy estimate for each beacon
@@ -1038,6 +1039,10 @@ void NavEKF3_core::writeRangeToLocation(const float range, const float uncertain
 {
     rng_bcn_elements rngBcnDataNew = {};
     rngBcnDataNew.time_ms = timeStamp_ms - frontend->_rngBcnDelay_ms - localFilterTimeStep_ms/2;
+    // Prevent time delay exceeding age of oldest IMU data in the buffer
+    const uint32_t clipped_time_ms = MAX(rngBcnDataNew.time_ms, imuDataDelayed.time_ms);
+    rngBcnDataNew.delay_ms = clipped_time_ms - rngBcnDataNew.time_ms;
+    rngBcnDataNew.time_ms = clipped_time_ms;
     rngBcnDataNew.rng = range;
     rngBcnDataNew.rngErr = uncertainty;
     rngBcnDataNew.beacon_loc = loc;

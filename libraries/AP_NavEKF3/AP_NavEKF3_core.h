@@ -621,6 +621,7 @@ private:
         Location    beacon_loc;     // WGS-84 location of the beacon
         ftype       rngErr;         // range measurement error 1-std (m)
         uint8_t     beacon_ID;      // beacon identification number
+        uint32_t    delay_ms;       // additional time delay (msec)
     };
 
     struct tas_elements : EKF_obs_element_t {
