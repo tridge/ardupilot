@@ -476,6 +476,7 @@ local function parse_reply()
       if age_ms < SLV_MAX_AGE_MS:get() then
          handle_TOF(node_id, distance_ticks, age_ms)
          gcs:send_named_float(string.format("R%u", node_id), distance_ticks)
+         gcs:send_named_float(string.format("A%u", node_id), age_ms)
       end
    end
    if num_nodes >= 2 and (SLV_OPTIONS:get() & OPTION_ENABLE_DUAL_RANGE) ~= 0 then
