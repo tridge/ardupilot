@@ -259,14 +259,11 @@ end
    work out the radio index given node ID
 --]]
 local function get_radio_index(node_id)
-   for i = 1, #radio_nodeids do
-      if radio_nodeids[i] == node_id then
-         return i
-      end
-      if radio_nodeids[i] == 0 then
-         radio_nodeids[i] = node_id
-         return i
-      end
+   if node_id == SLV_GND1_NODEID:get() then
+      return 1
+   end
+   if node_id == SLV_GND2_NODEID:get() then
+      return 2
    end
    return nil
 end
