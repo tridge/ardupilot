@@ -633,4 +633,6 @@ private:
 
     // true when we should not use GPS due to AUX switch disable
     bool _gps_disabled;
+
+    HAL_Semaphore _write_mutex;
 };

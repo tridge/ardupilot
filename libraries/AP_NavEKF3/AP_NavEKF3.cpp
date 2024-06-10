@@ -1488,6 +1488,8 @@ bool NavEKF3::setOriginLLH(const Location &loc)
 bool NavEKF3::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
 #if EK3_FEATURE_POSITION_RESET
+    WITH_SEMAPHORE(_write_mutex);
+
     AP::dal().log_SetLatLng(loc, posAccuracy, timestamp_ms);
 
     if (_options & (int32_t)NavEKF3::Options::DisableSetLatLng) {
@@ -2171,6 +2173,8 @@ void NavEKF3::writeDefaultAirSpeed(float airspeed, float uncertainty)
 // Write a range measurement and 1-sigma uncertainty in metres to a location.
 void NavEKF3::writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms)
 {
+    WITH_SEMAPHORE(_write_mutex);
+
     AP::dal().log_writeRangeToLocation(range, uncertainty, loc, timeStamp_ms);
 
     if (_options & (int32_t)NavEKF3::Options::DisableRangeFusion) {
