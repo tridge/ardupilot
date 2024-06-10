@@ -3209,6 +3209,9 @@ bool AP_Param::add_param(uint8_t _key, uint8_t param_num, const char *pname, flo
     p.set_default(default_value);
     p.load();
 
+    // and tell the GCS:
+    p.notify();
+
     return true;
 }
 #endif
