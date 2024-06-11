@@ -22,7 +22,10 @@ void NavEKF3_core::SelectRngBcnFusion()
             // reset position to match range measurement
             const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
             Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
-            const ftype rangeDelta = rngBcn.dataDelayed.rng - deltaPosNED.length();
+            // predict range measurement to curren time using delay and range rate
+            const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
+            const ftype rangeCorrection = MIN(0.001f * (ftype)rngBcn.dataDelayed.delay_ms, 2.0f) * rangeRate;
+            const ftype rangeDelta = rngBcn.dataDelayed.rng + rangeCorrection - deltaPosNED.length();
             Vector2F posNE =  stateStruct.position.xy() + Vector2F(rangeDelta * cosF(bearing), rangeDelta * sinF(bearing));
             ResetPositionNE(posNE.x, posNE.y);
             // Rotate the position covariances into RCD (Range, Cross, Down), adjust the down range variance and rotate back
