@@ -332,7 +332,9 @@ public:
     // uncertainty - 1-Sigma range uncertainty in metres
     // loc - LLH location from which range to vehicle is being measured
     // timestamp_ms - system time from boot in milli-seconds that the measurement was taken
-    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms);
+    // index - unique identifier for each beacon measurement in the range from 0 to Nbeacons-1
+    // Nbeacons - number of range beacons in use
+    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms, const uint8_t index, const uint8_t Nbeacons);
 
     // get speed limit
     void getControlLimits(float &ekfGndSpdLimit, float &controlScaleXY) const;
