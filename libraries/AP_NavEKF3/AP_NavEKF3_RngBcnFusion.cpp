@@ -53,35 +53,35 @@ void NavEKF3_core::SelectRngBcnFusion()
         } else {
             FuseRngBcn();
         }
-    }
+    } else if (!rngBcn.usingRangeToLoc) {
+        // read range data from the sensor and check for new data in the buffer
+        readRngBcnData();
 
-    // read range data from the sensor and check for new data in the buffer
-    readRngBcnData();
-
-    // Determine if we need to fuse range beacon data on this time step
-    if (!rngBcn.usingRangeToLoc && rngBcn.dataToFuse) {
-        if (PV_AidingMode == AID_ABSOLUTE) {
-            if ((frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::BEACON) && rngBcn.alignmentCompleted) {
-                if (!rngBcn.originEstInit) {
-                    rngBcn.originEstInit = true;
-                    rngBcn.posOffsetNED.x = rngBcn.receiverPos.x - stateStruct.position.x;
-                    rngBcn.posOffsetNED.y = rngBcn.receiverPos.y - stateStruct.position.y;
+        // Determine if we need to fuse range beacon data on this time step
+        if (!rngBcn.usingRangeToLoc && rngBcn.dataToFuse) {
+            if (PV_AidingMode == AID_ABSOLUTE) {
+                if ((frontend->sources.getPosXYSource() == AP_NavEKF_Source::SourceXY::BEACON) && rngBcn.alignmentCompleted) {
+                    if (!rngBcn.originEstInit) {
+                        rngBcn.originEstInit = true;
+                        rngBcn.posOffsetNED.x = rngBcn.receiverPos.x - stateStruct.position.x;
+                        rngBcn.posOffsetNED.y = rngBcn.receiverPos.y - stateStruct.position.y;
+                    }
+                    // beacons are used as the primary means of position reference
+                    FuseRngBcn();
+                } else {
+                    // If another source (i.e. GPS, ExtNav) is the primary reference, we continue to use the beacon data
+                    // to calculate an independent position that is used to update the beacon position offset if we need to
+                    // start using beacon data as the primary reference.
+                    FuseRngBcnStatic();
+                    // record that the beacon origin needs to be initialised
+                    rngBcn.originEstInit = false;
                 }
-                // beacons are used as the primary means of position reference
-                FuseRngBcn();
             } else {
-                // If another source (i.e. GPS, ExtNav) is the primary reference, we continue to use the beacon data
-                // to calculate an independent position that is used to update the beacon position offset if we need to
-                // start using beacon data as the primary reference.
+                // If we aren't able to use the data in the main filter, use a simple 3-state filter to estimate position only
                 FuseRngBcnStatic();
                 // record that the beacon origin needs to be initialised
                 rngBcn.originEstInit = false;
             }
-        } else {
-            // If we aren't able to use the data in the main filter, use a simple 3-state filter to estimate position only
-            FuseRngBcnStatic();
-            // record that the beacon origin needs to be initialised
-            rngBcn.originEstInit = false;
         }
     }
 }
