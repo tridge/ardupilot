@@ -555,8 +555,8 @@ local function update()
       return
    end
    local now = millis()
-   -- heartbeat at 5Hz
-   if not last_heartbeat_ms or now - last_heartbeat_ms >= 200 then
+   -- heartbeat at 10Hz
+   if not last_heartbeat_ms or now - last_heartbeat_ms >= 100 then
       last_heartbeat_ms = now
       send_heartbeats()
    end
