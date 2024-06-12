@@ -191,11 +191,14 @@ jobs:
         shell: sh -e {0}
       - name: Gather build output
         run: |
-          mkdir -p temp
+          mkdir -p temp/others
           for dir in CubeOrange CubeOrange-Volanti CubeOrange-Ottano sitl CarbonixF405 CarbonixF405-no-crystal; do
-            mkdir -p temp/$dir/bin
-            cp -vr build/$dir/bin/* temp/$dir/bin/
+            mkdir -p temp/others/$dir/bin
+            cp -vr build/$dir/bin/* temp/others/$dir/bin/
           done
+          cp -vr output/* temp/
+          mv temp/others/CubeOrange-Volanti temp/Volanti
+          mv temp/others/CubeOrange-Ottano temp/Ottano
           if [ -d "ArduPlane/ReleaseNotes.txt" ]; then
             cp -v ArduPlane/ReleaseNotes.txt temp/
           else
