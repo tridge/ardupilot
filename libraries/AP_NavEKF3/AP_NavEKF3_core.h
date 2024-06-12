@@ -450,7 +450,7 @@ public:
     void writeDefaultAirSpeed(float airspeed, float uncertainty);
 
     // Write a range measurement and 1-sigma uncertainty in metres to a location.
-    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms);
+    void writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms, const uint8_t index, const uint8_t Nbeacons);
 
     // request a reset the yaw to the EKF-GSF value
     void EKFGSF_requestYawReset();
