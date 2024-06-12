@@ -11,44 +11,15 @@
 void NavEKF3_core::SelectRngBcnFusion()
 {
     // range to location data is being pushed externally to the EKF so we need to check the buffer
-    if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms)) {
+    if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms) && (rngBcn.dataDelayed.beacon_ID < AP_BEACON_MAX_BEACONS)) {
+        rngBcn.dataLast[rngBcn.dataDelayed.beacon_ID] = rngBcn.dataDelayed;
         rngBcn.receiverPos.zero();
         // a reset using a single observation from this sensor is a last resort so wait for the slow timeout on the primary position sensors
         bool noPositionFix = (imuSampleTime_ms - lastGpsPosPassTime_ms > frontend->altPosSwitchTimeout_ms) &&
                            (imuSampleTime_ms - lastExtNavPosPassTime_ms > frontend->altPosSwitchTimeout_ms);
         if (noPositionFix && ((imuSampleTime_ms - rngBcn.lastPassTime_ms) > frontend->altPosSwitchTimeout_ms)) {
-            rngBcn.lastPassTime_ms = imuSampleTime_ms;
-            rngBcn.dataDelayed.beacon_posNED = EKF_origin.get_distance_NED_ftype(rngBcn.dataDelayed.beacon_loc);
-            // reset position to match range measurement
-            const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
-            Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
-            // predict range measurement to curren time using delay and range rate
-            const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
-            const ftype rangeCorrection = MIN(0.001f * (ftype)rngBcn.dataDelayed.delay_ms, 2.0f) * rangeRate;
-            const ftype rangeDelta = rngBcn.dataDelayed.rng + rangeCorrection - deltaPosNED.length();
-            Vector2F posNE =  stateStruct.position.xy() + Vector2F(rangeDelta * cosF(bearing), rangeDelta * sinF(bearing));
-            ResetPositionNE(posNE.x, posNE.y);
-            // Rotate the position covariances into RCD (Range, Cross, Down), adjust the down range variance and rotate back
-            Matrix3f R_NED2RCD = Matrix3f(Vector3f(cosf(bearing),sinf(bearing),0),
-                                          Vector3f(-sinf(bearing),cosf(bearing),0),
-                                          Vector3f(0,0,1));
-            Matrix3f covMatNED;
-            for (uint8_t row=0; row<3; row++) {
-                for (uint8_t col=0; col<3; col++) {
-                   covMatNED[row][col] = P[row+7][col+7];
-                }
-            }
-            // rotate covariances into RCD frame
-            Matrix3f covMatRCD = covMatNED * R_NED2RCD.transposed();
-            covMatRCD = R_NED2RCD * covMatRCD;
-            covMatRCD.a.x = sq(MAX(rngBcn.dataDelayed.rngErr , 0.1f));
-            // rotate covariances back into NED frame
-            covMatNED = covMatRCD * R_NED2RCD;
-            covMatNED = R_NED2RCD.transposed() * covMatNED;
-            for (uint8_t row=0; row<3; row++) {
-                for (uint8_t col=0; col<3; col++) {
-                    P[row+7][col+7] = covMatNED[row][col];
-                }
+            if (ResetPosToRngBcn()) {
+                rngBcn.lastPassTime_ms = imuSampleTime_ms;
             }
         } else {
             FuseRngBcn();
@@ -84,6 +55,135 @@ void NavEKF3_core::SelectRngBcnFusion()
             }
         }
     }
+}
+
+bool NavEKF3_core::ResetPosToRngBcn()
+{
+    bool ret = false;
+    switch (rngBcn.N) {
+    case 1:
+        {
+            rngBcn.dataDelayed.beacon_posNED = EKF_origin.get_distance_NED_ftype(rngBcn.dataDelayed.beacon_loc);
+            // reset position to match range measurement
+            const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataDelayed.beacon_posNED.y, stateStruct.position.x - rngBcn.dataDelayed.beacon_posNED.x);
+            Vector3F deltaPosNED = stateStruct.position - rngBcn.dataDelayed.beacon_posNED;
+            // predict range measurement to current time using delay and range rate
+            const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
+            const ftype rangeCorrection = MIN(0.001f * (ftype)rngBcn.dataDelayed.delay_ms, 2.0f) * rangeRate;
+            const ftype rangeDelta = rngBcn.dataDelayed.rng + rangeCorrection - deltaPosNED.length();
+            Vector2F posNE =  stateStruct.position.xy() + Vector2F(rangeDelta * cosF(bearing), rangeDelta * sinF(bearing));
+            ResetPositionNE(posNE.x, posNE.y);
+            // Rotate the position covariances into RCD (Range, Cross, Down), adjust the down range variance and rotate back
+            Matrix3f R_NED2RCD = Matrix3f(Vector3f(cosf(bearing),sinf(bearing),0),
+                                          Vector3f(-sinf(bearing),cosf(bearing),0),
+                                          Vector3f(0,0,1));
+            Matrix3f covMatNED;
+            for (uint8_t row=0; row<3; row++) {
+                for (uint8_t col=0; col<3; col++) {
+                   covMatNED[row][col] = P[row+7][col+7];
+                }
+            }
+            // rotate covariances into RCD frame
+            Matrix3f covMatRCD = covMatNED * R_NED2RCD.transposed();
+            covMatRCD = R_NED2RCD * covMatRCD;
+            covMatRCD.a.x = sq(MAX(rngBcn.dataDelayed.rngErr , 0.1f));
+            // rotate covariances back into NED frame
+            covMatNED = covMatRCD * R_NED2RCD;
+            covMatNED = R_NED2RCD.transposed() * covMatNED;
+            for (uint8_t row=0; row<3; row++) {
+                for (uint8_t col=0; col<3; col++) {
+                    P[row+7][col+7] = covMatNED[row][col];
+                }
+            }
+        }
+        break;
+    case 2:
+        {
+            uint8_t Nfound = 0;
+            ftype correctedSlantRng[2];
+            for (uint8_t index=0; index<2; index++) {
+                Vector3F deltaPosNED = stateStruct.position - rngBcn.dataLast[index].beacon_posNED;
+                // predict range measurement to current time using delay and range rate
+                const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
+                const ftype delaySec = 0.001f * (ftype)rngBcn.dataLast[index].delay_ms;
+                if (delaySec < 2.0f) {
+                    Nfound++;
+                    correctedSlantRng[index] = rngBcn.dataLast[index].rng + rangeRate * delaySec;
+                }
+            }
+
+            if (Nfound <2) {
+                break;
+            }
+
+            // find the intersection including the sigma points for evaluation of the covariance
+            Vector2F PosNE[4];
+            const ftype DR0 = rngBcn.dataLast[0].rngErr;
+            const ftype DR1 = rngBcn.dataLast[1].rngErr;
+            if (DualRangeIntersectNE(PosNE[0], correctedSlantRng[0], correctedSlantRng[1], rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED) &&
+                DualRangeIntersectNE(PosNE[1], correctedSlantRng[0]+DR0, correctedSlantRng[1]+DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED) &&
+                DualRangeIntersectNE(PosNE[2], correctedSlantRng[0]-DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED) &&
+                DualRangeIntersectNE(PosNE[3], correctedSlantRng[0]+DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED))
+            {
+                ResetPositionNE(PosNE[0].x,PosNE[0].y);
+                ftype maxSigma = 0.0f;
+                for (uint8_t index=1; index<4; index++) {
+                    ftype sigma = (PosNE[index] - PosNE[0]).length();
+                    maxSigma = MAX(maxSigma,sigma);
+                }
+                zeroRows(P,7,8);
+                zeroCols(P,7,8);
+                P[7][7] = P[8][8] = sq(maxSigma);
+                ret = true;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+    return ret;
+}
+
+// PosNE is the NE local position defined by the intersection of slant ranges from two NE locations
+// return true if solution found
+bool NavEKF3_core::DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const ftype R1, const Vector3F &P0, const Vector3F &P1)
+{
+    ftype RH0sq = sq(R0)-sq(P0.z - stateStruct.position.z);
+    ftype RH0 = is_positive(RH0sq) ? sqrtF(RH0sq) : 0.0f; // horizontal range from beacon 0
+    ftype RH1sq = sq(R1)-sq(P1.z - stateStruct.position.z);
+    ftype RH1 = is_positive(RH1sq) ? sqrtF(RH1sq) : 0.0f; // horizontal range from beacon 1
+
+    // Calculate the distance between the beacons
+    ftype dx = P1.x - P0.x;
+    ftype dy = P1.y - P0.y;
+    ftype dist = sqrtF(dx * dx + dy * dy);
+
+    // Check if there are no solutions
+    if (dist > (RH0 + RH1) || dist < fabsF(RH0 - RH1)) {
+        // No intersection
+        return false;
+    }
+
+    // Calculate the point of intersection of the line through the circle intersection points
+    ftype a = (sq(RH0) - sq(RH1) + sq(dist)) / (2.0f * dist);
+    ftype h = sqrtF(RH0 * RH0 - a * a);
+    ftype x2 = P0.x + a * (dx / dist);
+    ftype y2 = P0.y + a * (dy / dist);
+
+    // Calculate the intersection points
+    double rx = -dy * (h / dist);
+    double ry =  dx * (h / dist);
+    Vector2F intersection1 = Vector2F(x2 + rx, y2 + ry);
+    Vector2F intersection2 = Vector2F(x2 - rx, y2 - ry);
+
+    // return the solution closest to the vehicle position
+    if ((intersection1-stateStruct.position.xy()).length_squared() < (intersection2-stateStruct.position.xy()).length_squared()) {
+        PosNE = intersection1;
+    } else {
+        PosNE = intersection2;
+    }
+
+    return true;
 }
 
 /*
