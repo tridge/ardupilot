@@ -12,15 +12,16 @@ for board in "${main_boards[@]}"; do
   ./waf configure --board "$board" --define=CARBOPILOT=1
   ./waf plane
 done
-echo "Script completed successfully."
 
 periph_boards=("CarbonixF405" "CarbonixF405-no-crystal")
 for board in "${periph_boards[@]}"; do
-  for file in libraries/AP_HAL_ChibiOS/hwdef/CarbonixCommon/cpn_params/*.parm; do
-    # Extract the filename without the extension
+  for file in $(find libraries/AP_HAL_ChibiOS/hwdef/CarbonixCommon/cpn_params/ -name "*.parm"); do
+    # Extract the filename without the extension 
     filename=$(basename -- "$file")
     filename="${filename%.*}"
-
+    # Extract the Parent folder name 
+    foldername=$(basename -- "$(dirname -- "$file")")
+    echo "Compiling AP_Periph for $board with $filename with foldername $foldername..."
     # Create extra hwdef file
     printf "undef CAN_APP_NODE_NAME\ndefine CAN_APP_NODE_NAME \"$board-$filename\"" > temp.hwdef
     
@@ -30,9 +31,11 @@ for board in "${periph_boards[@]}"; do
     ./waf AP_Periph
     
     # Rename build outputs
-    mkdir build/$board/bin/$filename
+    mkdir -p output/$foldername/${filename}_$board    
     # Move all the files (not folders) in build/$board/bin to build/$board/bin/$filename
-    find build/$board/bin -maxdepth 1 -type f -exec mv {} build/$board/bin/$filename \;
+    find build/$board/bin -maxdepth 1 -type f -exec mv {} output/$foldername/${filename}_$board \;
+    # Move default $file in the output folder
+    cp $file output/$foldername/${filename}_$board
 
     # Cleanup
     rm temp.hwdef
