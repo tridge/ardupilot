@@ -196,7 +196,16 @@ jobs:
             mkdir -p temp/$dir/bin
             cp -vr build/$dir/bin/* temp/$dir/bin/
           done
-          cp -v ArduPlane/ReleaseNotes.txt temp/
+          if [ -d "ArduPlane/ReleaseNotes.txt" ]; then
+            cp -v ArduPlane/ReleaseNotes.txt temp/
+          else
+            echo "ReleaseNotes.txt File does not exist"
+          fi
+          if [ -d "libraries/AP_HAL_ChibiOS/hwdef/CarbonixCommon/payloads" ]; then
+            cp -vr libraries/AP_HAL_ChibiOS/hwdef/CarbonixCommon/payloads temp/
+          else
+            echo "payloads Folder does not exist"
+          fi
         shell: sh -e {0}
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
