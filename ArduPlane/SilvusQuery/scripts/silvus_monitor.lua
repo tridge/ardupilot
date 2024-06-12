@@ -299,7 +299,7 @@ local function handle_TOF(node_id, distance_ticks, age_ms)
       if not radio_loc then
          return
       end
-      ahrs:writeRangeToLocation(distance_m, accuracy, radio_loc, now_ms - age_ms)
+      ahrs:writeRangeToLocation(distance_m, accuracy, radio_loc, now_ms - age_ms,0,1)
    end
 end
 
