@@ -36,7 +36,6 @@
 #include <AP_Filesystem/AP_Filesystem.h>
 #include <stdio.h>
 #include <AP_ROMFS/AP_ROMFS.h>
-#include <AP_Logger/AP_Logger.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     #include <SITL/SITL.h>
@@ -3205,19 +3204,6 @@ bool AP_Param::add_param(uint8_t _key, uint8_t param_num, const char *pname, flo
     AP_Float &p = pvalues[param_num];
     p.set_default(default_value);
     p.load();
-
-#if HAL_LOGGING_ENABLED
-    // try to log the value
-    AP_Logger *logger = AP_Logger::get_singleton();
-    if (logger != nullptr) {
-        logger->Write_Parameter(pname, p.get());
-    }
-#endif
-
-#if HAL_GCS_ENABLED
-    // and tell the GCS:
-    p.notify();
-#endif
 
     return true;
 }
