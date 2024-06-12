@@ -20,3 +20,10 @@ console add SRng "SRng: %.0f" NAMED_VALUE_FLOAT["SlvRange"].value
 gahrs2err
 gahrs3err
 wp list
+
+map icon -34.59471 150.06417 barrell
+map icon -34.5043868 150.0305249 barrell # peter
+
+console menu add Graphs:Volanti:BeaconRanges graph NAMED_VALUE_FLOAT[R268460].value NAMED_VALUE_FLOAT[R304901].value NAMED_VALUE_FLOAT[R306268].value
+console menu add Graphs:Volanti:BeaconDist graph NAMED_VALUE_FLOAT[R268460].value*30 NAMED_VALUE_FLOAT[R304901].value*30 NAMED_VALUE_FLOAT[R306268].value*30
+console menu add Graphs:Volanti:BeaconAges graph NAMED_VALUE_FLOAT[A268460].value NAMED_VALUE_FLOAT[A304901].value NAMED_VALUE_FLOAT[A306268].value
