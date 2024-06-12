@@ -245,7 +245,7 @@ void AP_DAL::log_writeDefaultAirSpeed3(const float aspeed, const float uncertain
 #endif
 }
 
-void AP_DAL::log_writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms)
+void AP_DAL::log_writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms, const uint8_t index, const uint8_t Nbeacons)
 {
 #if !APM_BUILD_TYPE(APM_BUILD_AP_DAL_Standalone) && !APM_BUILD_TYPE(APM_BUILD_Replay)
     struct log_RRLT pkt{
@@ -255,6 +255,8 @@ void AP_DAL::log_writeRangeToLocation(const float range, const float uncertainty
         lng          : loc.lng,
         alt          : loc.alt,
         timeStamp_ms : timeStamp_ms,
+        index        : index,
+        Nbeacons     : Nbeacons,
     };
     _RRLT = pkt;
     WRITE_REPLAY_BLOCK(RRLT, pkt);
@@ -556,7 +558,7 @@ void AP_DAL::handle_message(const log_RRLT &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
     }
 #endif
 
-    ekf3.writeRangeToLocation(msg.range, msg.uncertainty, loc, msg.timeStamp_ms);
+    ekf3.writeRangeToLocation(msg.range, msg.uncertainty, loc, msg.timeStamp_ms, msg.index, msg.Nbeacons);
 }
 #endif // APM_BUILD_Replay
 
