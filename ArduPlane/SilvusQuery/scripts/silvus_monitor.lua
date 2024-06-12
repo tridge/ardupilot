@@ -1,14 +1,14 @@
 --[[
-   monitor silvus radio link
-
-   192.168.0.1: gnd silvus radio
-   192.168.0.2: air silvus radio
+   monitor silvus radio TOF data and give to AHRS for range fusion
 --]]
 
 local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTICE=5, INFO=6, DEBUG=7}
 
 PARAM_TABLE_KEY = 46
 PARAM_TABLE_PREFIX = "SLV_"
+
+local PORT_HEATBEAT = 8888
+local MAX_GROUND_RADIOS = 8
 
 -- add a parameter and bind it to a variable
 function bind_add_param(name, idx, default_value)
@@ -17,7 +17,7 @@ function bind_add_param(name, idx, default_value)
 end
 
 -- Setup Parameters
-assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 30), 'could not add param table')
+assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 63), 'could not add param table')
 
 --[[
   // @Param: SLV_ENABLE
@@ -26,7 +26,7 @@ assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 30), 'could not add 
   // @Values: 0:Disabled,1:Enabled
   // @User: Standard
 --]]
-local SLV_ENABLE = bind_add_param('ENABLE',  1, 0)
+local SLV_ENABLE = bind_add_param('ENABLE',  1, 1)
 if SLV_ENABLE:get() == 0 then
    return
 end
@@ -43,7 +43,7 @@ local SLV_IP = { bind_add_param('IP0', 2, 192),
   // @Units: Hz
   // @User: Standard
 --]]
-local SLV_RATE = bind_add_param('RATE', 6, 2)
+local SLV_RATE = bind_add_param('RATE', 6, 1)
 
 --[[
   // @Param: SLV_DIST_OFS
@@ -52,7 +52,7 @@ local SLV_RATE = bind_add_param('RATE', 6, 2)
   // @Units: m
   // @User: Standard
 --]]
-local SLV_DIST_OFS = bind_add_param('DIST_OFS', 8, 0)
+local SLV_DIST_OFS = bind_add_param('DIST_OFS', 7, 0)
 
 --[[
   // @Param: SLV_DIST_ACC
@@ -61,7 +61,7 @@ local SLV_DIST_OFS = bind_add_param('DIST_OFS', 8, 0)
   // @Units: m
   // @User: Standard
 --]]
-local SLV_DIST_ACC = bind_add_param('DIST_ACC', 9, 30)
+local SLV_DIST_ACC = bind_add_param('DIST_ACC', 8, 30)
 
 --[[
   // @Param: SLV_DIST_MUL
@@ -70,7 +70,7 @@ local SLV_DIST_ACC = bind_add_param('DIST_ACC', 9, 30)
   // @Units: m
   // @User: Standard
 --]]
-local SLV_DIST_MUL = bind_add_param('DIST_MUL', 10, 30)
+local SLV_DIST_MUL = bind_add_param('DIST_MUL', 9, 30)
 
 --[[
   // @Param: SLV_HTTP_PORT
@@ -79,86 +79,16 @@ local SLV_DIST_MUL = bind_add_param('DIST_MUL', 10, 30)
   // @Units: m
   // @User: Standard
 --]]
-local SLV_HTTP_PORT = bind_add_param('HTTP_PORT', 14, 80)
+local SLV_HTTP_PORT = bind_add_param('HTTP_PORT', 10, 80)
 
 --[[
   // @Param: SLV_MAX_AGE_MS
   // @DisplayName: Silvus max age
-  // @Description: Silvus max age
+  // @Description: Silvus max age. If a TOF range is older than this then it is discarded
   // @Units: ms
   // @User: Standard
 --]]
-local SLV_MAX_AGE_MS = bind_add_param('MAX_AGE_MS', 15, 5000)
-
---[[
-  // @Param: SLV_GND1_NODEID
-  // @DisplayName: Silvus node ID for first ground radio
-  // @Description: Silvus node ID for first ground radio. Zero means auto-allocated
-  // @User: Standard
---]]
-local SLV_GND1_NODEID = bind_add_param('GND1_NODEID', 16, 0)
-
---[[
-  // @Param: SLV_GND1_H_DIST
-  // @DisplayName: Silvus ground radio 1 distance
-  // @Description: Silvus ground radio 1 distance from home
-  // @Units: m
-  // @User: Standard
---]]
-local SLV_GND1_H_DIST = bind_add_param('GND1_H_DIST', 17, 0)
-
---[[
-  // @Param: SLV_GND1_H_BRG
-  // @DisplayName: Silvus ground radio 1 home bearing
-  // @Description: Silvus ground radio 1 bearing from home
-  // @Units: deg
-  // @User: Standard
---]]
-local SLV_GND1_H_BRG = bind_add_param('GND1_H_BRG', 18, 0)
-
---[[
-  // @Param: SLV_GND1_H_ALT
-  // @DisplayName: Silvus ground radio 1 height above home
-  // @Description: Silvus ground radio 1 height above home
-  // @Units: m
-  // @User: Standard
---]]
-local SLV_GND1_H_ALT = bind_add_param('GND1_H_ALT', 19, 0)
-
---[[
-  // @Param: SLV_GND2_NODEID
-  // @DisplayName: Silvus node ID for 2nd ground radio
-  // @Description: Silvus node ID for 2nd ground radio. Zero means auto-allocated
-  // @User: Standard
---]]
-local SLV_GND2_NODEID = bind_add_param('GND2_NODEID', 20, 0)
-
---[[
-  // @Param: SLV_GND2_H_DIST
-  // @DisplayName: Silvus ground radio 2 distance
-  // @Description: Silvus ground radio 2 distance from home
-  // @Units: m
-  // @User: Standard
---]]
-local SLV_GND2_H_DIST = bind_add_param('GND2_H_DIST', 21, 0)
-
---[[
-  // @Param: SLV_GND2_H_BRG
-  // @DisplayName: Silvus ground radio 2 home bearing
-  // @Description: Silvus ground radio 2 bearing from home
-  // @Units: deg
-  // @User: Standard
---]]
-local SLV_GND2_H_BRG = bind_add_param('GND2_H_BRG', 22, 0)
-
---[[
-  // @Param: SLV_GND2_H_ALT
-  // @DisplayName: Silvus ground radio 2 height above home
-  // @Description: Silvus ground radio 2 height above home
-  // @Units: m
-  // @User: Standard
---]]
-local SLV_GND2_H_ALT = bind_add_param('GND2_H_ALT', 23, 0)
+local SLV_MAX_AGE_MS = bind_add_param('MAX_AGE_MS', 11, 5000)
 
 --[[
   // @Param: SLV_OPTIONS
@@ -167,18 +97,97 @@ local SLV_GND2_H_ALT = bind_add_param('GND2_H_ALT', 23, 0)
   // @Bitmask: 0:EnableDualRangePosition
   // @User: Standard
 --]]
-local SLV_OPTIONS = bind_add_param('OPTIONS', 24, 0)
+local SLV_OPTIONS = bind_add_param('OPTIONS', 12, 0)
 
 local OPTION_ENABLE_DUAL_RANGE = (1<<0)
 
-local radio_nodeids = {0,0}
+--[[
+  // @Param: SLV_NUM_RADIOS
+  // @DisplayName: Silvus number of ground radios
+  // @Description: Silvus number of ground radios
+  // @Range: 1 8
+  // @User: Standard
+--]]
+local SLV_NUM_RADIOS = bind_add_param('NUM_RADIOS', 13, 0)
+
+--[[
+  // @Param: SLV_GND1_NODEID
+  // @DisplayName: Silvus node ID for first ground radio
+  // @Description: Silvus node ID for first ground radio
+  // @User: Standard
+--]]
+
+--[[
+  // @Param: SLV_GND1_LAT
+  // @DisplayName: Silvus ground radio 1 latitude
+  // @Description: Silvus ground radio 1 latitude
+  // @Units: deg
+  // @User: Standard
+--]]
+
+--[[
+  // @Param: SLV_GND1_LON
+  // @DisplayName: Silvus ground radio 1 longitude
+  // @Description: Silvus ground radio 1 longitude
+  // @Units: deg
+  // @User: Standard
+--]]
+
+--[[
+  // @Param: SLV_GND1_ALT
+  // @DisplayName: Silvus ground radio 1 height AMSL
+  // @Description: Silvus ground radio 1 height AMSL
+  // @Units: m
+  // @User: Standard
+--]]
+
+--[[
+  // @Param: SLV_GND1_IP3
+  // @DisplayName: Silvus ground radio 1 IP3
+  // @Description: Silvus ground radio 1 last octet of IP address
+  // @User: Standard
+--]]
+
+local SLV_GND_NODEID = {}
+local SLV_GND_LAT = {}
+local SLV_GND_LON = {}
+local SLV_GND_ALT = {}
+local SLV_GND_IP3 = {}
+
+-- clamp number of radios
+if SLV_NUM_RADIOS:get() > MAX_GROUND_RADIOS then
+   SLV_NUM_RADIOS:set(MAX_GROUND_RADIOS)
+end
+
+--[[
+   create the parameters per ground radio (beacon)
+--]]
+for r = 1, SLV_NUM_RADIOS:get() do
+   SLV_GND_NODEID[r] = bind_add_param(string.format('GND%u_NODEID',r), 20+(r-1)*5, 0)
+   SLV_GND_LAT[r] = bind_add_param(string.format('GND%u_LAT',r),       21+(r-1)*5, 0)
+   SLV_GND_LON[r] = bind_add_param(string.format('GND%u_LON',r),       22+(r-1)*5, 0)
+   SLV_GND_ALT[r] = bind_add_param(string.format('GND%u_ALT',r),       23+(r-1)*5, 0)
+   SLV_GND_IP3[r] = bind_add_param(string.format('GND%u_IP3',r),       24+(r-1)*5, 0)
+end
+
+
 local radio_ranges = {nil, nil}
 local radio_tstamp_ms = {nil, nil}
 
-gcs:send_text(MAV_SEVERITY.INFO, "Silvus: starting")
+gcs:send_text(MAV_SEVERITY.INFO, string.format("Silvus: starting with %u ground radios", SLV_NUM_RADIOS:get()))
 
+--[[
+   get IP address of air radio
+--]]
 local function silvus_ip()
    return string.format("%u.%u.%u.%u", SLV_IP[1]:get(), SLV_IP[2]:get(), SLV_IP[3]:get(), SLV_IP[4]:get())
+end
+
+--[[
+   get IP address of a ground radio
+--]]
+local function ground_radio_ip(radio_index)
+   return string.format("%u.%u.%u.%u", SLV_IP[1]:get(), SLV_IP[2]:get(), SLV_IP[3]:get(), SLV_GND_IP3[radio_index]:get())
 end
 
 local function save_to_file(fname, data)
@@ -192,6 +201,7 @@ local http_reply = nil
 local reply_start = nil
 local REQUEST_TIMEOUT = 250
 local last_request_ms = nil
+local last_heartbeat_ms = nil
 local json = require("json")
 
 --[[
@@ -230,28 +240,22 @@ end
    get ground radio location
 --]]
 local function get_radio_location(radio_idx)
-   local loc = ahrs:get_home():copy()
+   local loc = Location()
    if not loc then
-      --gcs:send_text(0,"no home")
       return nil
    end
-   if loc:lat() == 0 and loc:lng() == 0 then
+   if radio_idx < 1 or radio_idx > #SLV_GND_LAT then
       return nil
    end
-   local ofs_dist=0
-   local ofs_brg=0
-   local ofs_H=0
-   if radio_idx == 1 then
-      ofs_dist = SLV_GND1_H_DIST:get()
-      ofs_brg = SLV_GND1_H_BRG:get()
-      ofs_H = SLV_GND1_H_ALT:get()
-   else
-      ofs_dist = SLV_GND2_H_DIST:get()
-      ofs_brg = SLV_GND2_H_BRG:get()
-      ofs_H = SLV_GND2_H_ALT:get()
+   local lat = SLV_GND_LAT[radio_idx]:get()
+   local lon = SLV_GND_LON[radio_idx]:get()
+   local alt = SLV_GND_ALT[radio_idx]:get()
+   if lat == 0 or lon == 0 then
+      return nil
    end
-   loc:offset_bearing(ofs_brg, ofs_dist)
-   loc:alt(loc:alt()+ofs_H*100)
+   loc:lat(math.floor(lat*1.0e7))
+   loc:lng(math.floor(lon*1.0e7))
+   loc:alt(math.floor(alt*100))
    return loc
 end
 
@@ -259,11 +263,10 @@ end
    work out the radio index given node ID
 --]]
 local function get_radio_index(node_id)
-   if node_id == SLV_GND1_NODEID:get() then
-      return 1
-   end
-   if node_id == SLV_GND2_NODEID:get() then
-      return 2
+   for i = 1, #SLV_GND_NODEID do
+      if SLV_GND_NODEID[i]:get() == node_id then
+         return i
+      end
    end
    return nil
 end
@@ -458,6 +461,7 @@ local function parse_reply()
    if not success then
       return
    end
+   -- gcs:send_text(0, lines[#lines])
    local result = req['result']
    if not result then
       -- badly formatted
@@ -481,6 +485,9 @@ local function parse_reply()
    end
 end
 
+--[[
+   see if we have a API reply
+--]]
 local function check_reply()
    if not sock then
       return
@@ -499,6 +506,35 @@ local function check_reply()
 end
 
 
+local heartbeat_counter = 0
+
+--[[
+   send UDP heartbeat messages to all ground radios to ensure we get up to date TOF data.
+   The silvus TOF system is opprtunistic, if no data is flowing it won't update
+--]]
+local function send_heartbeats()
+   heartbeat_counter = heartbeat_counter + 1
+   for i = 1, #SLV_GND_IP3 do
+      local ip3 = SLV_GND_IP3[i]:get()
+      if ip3 > 0 and ip3 < 255 then
+         local sock = Socket(1)
+         if not sock then
+            return
+         end
+         local ip = ground_radio_ip(i)
+         if sock:connect(ip, PORT_HEATBEAT) then
+            local msg = ip .. string.format(":HEARTBEAT:%u", heartbeat_counter)
+            sock:send(msg, #msg)
+            -- gcs:send_text(0, msg)
+         end
+         sock:close()
+      end
+   end
+end
+
+--[[
+   update called at 20Hz
+--]]
 local function update()
    if SLV_ENABLE:get() <= 0 then
       return
@@ -508,6 +544,11 @@ local function update()
       return
    end
    local now = millis()
+   -- heartbeat at 5Hz
+   if not last_heartbeat_ms or now - last_heartbeat_ms >= 200 then
+      last_heartbeat_ms = now
+      send_heartbeats()
+   end
    local period_ms = 1000.0 / SLV_RATE:get()
    if not last_request_ms or now - last_request_ms >= period_ms then
       last_request_ms = now
