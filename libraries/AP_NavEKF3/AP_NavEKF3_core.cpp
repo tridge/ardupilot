@@ -383,10 +383,6 @@ void NavEKF3_core::InitialiseVariables()
     rngBcn.posOffsetMinVar = 0.0f;
     rngBcn.minOffsetStateChangeFilt = 0.0f;
     rngBcn.fuseDataReportIndex = 0;
-    if (rngBcn.fusionReport == nullptr) {
-        uint8_t n_beacons = dal.beacon() ? dal.beacon()->count() : 1;
-        rngBcn.fusionReport = new BeaconFusion::FusionReport[n_beacons];
-    }
     rngBcn.posOffsetNED.zero();
     rngBcn.originEstInit = false;
 #endif  // EK3_FEATURE_BEACON_FUSION

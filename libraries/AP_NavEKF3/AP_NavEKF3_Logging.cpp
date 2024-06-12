@@ -258,6 +258,9 @@ void NavEKF3_core::Log_Write_Beacon(uint64_t time_us)
         return;
     }
 
+    if (rngBcn.fuseDataReportIndex >= rngBcn.fusionReport_length) {
+        return;
+    }
     const auto &report = rngBcn.fusionReport[rngBcn.fuseDataReportIndex];
 
     const struct log_XKF0 pkt10{

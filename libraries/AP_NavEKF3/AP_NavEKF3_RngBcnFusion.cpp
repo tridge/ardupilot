@@ -86,6 +86,32 @@ void NavEKF3_core::SelectRngBcnFusion()
     }
 }
 
+/*
+  add the range beacon data delayed to the fusion report array, allocating if needed
+ */
+void NavEKF3_core::PushRngBcn()
+{
+    const auto &data = rngBcn.dataDelayed;
+    if (data.beacon_ID >= rngBcn.fusionReport_length) {
+        auto *old_reports = rngBcn.fusionReport;
+        auto *new_reports = new BeaconFusion::FusionReport[data.beacon_ID+1];
+        if (new_reports == nullptr) {
+            return;
+        }
+        memcpy(new_reports, old_reports, rngBcn.fusionReport_length * sizeof(BeaconFusion::FusionReport));
+        rngBcn.fusionReport = new_reports;
+        rngBcn.fusionReport_length = data.beacon_ID+1;
+        delete[] old_reports;
+    }
+    auto &report = rngBcn.fusionReport[data.beacon_ID];
+    report.beaconPosNED = rngBcn.dataDelayed.beacon_posNED;
+    report.innov = rngBcn.innov;
+    report.innovVar = rngBcn.varInnov;
+    report.rng = rngBcn.dataDelayed.rng;
+    report.testRatio = rngBcn.testRatio;
+    rngBcn.newDataToLog[data.beacon_ID] = true;
+}
+
 void NavEKF3_core::FuseRngBcn()
 {
     // declarations
@@ -321,13 +347,8 @@ void NavEKF3_core::FuseRngBcn()
         }
 
         // Update the fusion report
-        if (rngBcn.fusionReport && (rngBcn.usingRangeToLoc || rngBcn.dataDelayed.beacon_ID < dal.beacon()->count())) {
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].beaconPosNED = rngBcn.dataDelayed.beacon_posNED;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innov = rngBcn.innov;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innovVar = rngBcn.varInnov;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].rng = rngBcn.dataDelayed.rng;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].testRatio = rngBcn.testRatio;
-            rngBcn.newDataToLog[rngBcn.dataDelayed.beacon_ID] = true;
+        if (rngBcn.usingRangeToLoc) {
+            PushRngBcn();
         }
     }
 }
@@ -559,15 +580,9 @@ void NavEKF3_core::FuseRngBcnStatic()
             // TODO monitor stability of the position estimate
             rngBcn.alignmentCompleted = true;
         }
+
         // Update the fusion report
-        if (rngBcn.fusionReport && rngBcn.dataDelayed.beacon_ID < dal.beacon()->count()) {
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].beaconPosNED = rngBcn.dataDelayed.beacon_posNED;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innov = rngBcn.innov;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].innovVar = rngBcn.varInnov;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].rng = rngBcn.dataDelayed.rng;
-            rngBcn.fusionReport[rngBcn.dataDelayed.beacon_ID].testRatio = rngBcn.testRatio;
-            rngBcn.newDataToLog[rngBcn.dataDelayed.beacon_ID] = true;
-        }
+        PushRngBcn();
     }
 }
 
