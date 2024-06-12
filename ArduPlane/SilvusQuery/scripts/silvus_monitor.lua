@@ -274,7 +274,7 @@ end
 --[[
    handle a distance measurement
 --]]
-local function handle_TOF(node_id, distance_ticks, age_ms)
+local function handle_TOF(node_id, distance_ticks, age_ms, num_beacons)
    radio_idx = get_radio_index(node_id)
    if not radio_idx then
       -- not for us
@@ -299,7 +299,7 @@ local function handle_TOF(node_id, distance_ticks, age_ms)
       if not radio_loc then
          return
       end
-      ahrs:writeRangeToLocation(distance_m, accuracy, radio_loc, now_ms - age_ms,0,1)
+      ahrs:writeRangeToLocation(distance_m, accuracy, radio_loc, now_ms - age_ms, radio_idx-1, num_beacons)
    end
 end
 
@@ -471,6 +471,14 @@ local function parse_reply()
       return
    end
    local num_nodes = math.floor(#result / 3)
+   local num_beacons = 0
+   for i = 1, num_nodes do
+      local node_id = tonumber(result[1+(i-1)*3])
+      local idx = get_radio_index(node_id)
+      if idx then
+         num_beacons = num_beacons + 1
+      end
+   end
    for i = 1, num_nodes do
       local node_id = tonumber(result[1+(i-1)*3])
       local distance_ticks = tonumber(result[2+(i-1)*3])
@@ -478,7 +486,7 @@ local function parse_reply()
       --gcs:send_text(MAV_SEVERITY.INFO, string.format("node:%u dist:%u age_ms:%u", node_id, distance_ticks, age_ms))
       logger:write("STOF","Node,Dist,Age", "III", '#--', '---', node_id, distance_ticks, age_ms)
       if age_ms < SLV_MAX_AGE_MS:get() then
-         handle_TOF(node_id, distance_ticks, age_ms)
+         handle_TOF(node_id, distance_ticks, age_ms, num_beacons)
          gcs:send_named_float(string.format("R%u", node_id), distance_ticks)
          gcs:send_named_float(string.format("A%u", node_id), age_ms)
       end
