@@ -453,6 +453,9 @@ local function parse_reply()
    sock:close()
    sock = nil
    lines = {}
+   if not http_reply then
+      return
+   end
    --save_to_file("json_rep.txt", http_reply)
    for s in http_reply:gmatch("[^\r\n]+") do
       table.insert(lines, s)
