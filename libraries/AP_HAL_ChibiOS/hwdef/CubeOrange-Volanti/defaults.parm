@@ -182,7 +182,6 @@ TECS_PTCH_FF_V0,19
 TECS_RLL2THR,14
 TECS_SINK_MAX,4
 TECS_TIME_CONST,3
-THR_SLEWRATE,75
 TRIM_ARSPD_CM,2100
 TRIM_PITCH_CD,200
 TRIM_THROTTLE,60                # 60% Throttle is the target percentage in auto flight to maintain TRIM_ARSPD_CM.
