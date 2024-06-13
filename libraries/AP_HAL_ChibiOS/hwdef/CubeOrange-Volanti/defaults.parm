@@ -1,10 +1,10 @@
 @include ../CarbonixCommon/defaults.parm
 # Volanti-specific parameters
+ARSPD_FBW_MIN,20            # 20m/s is the minimum airspeed demanded in automatic throttle modes. Should be 20% above stall speed which is 16.5m/s at 16kg MTOW.
 COMPASS_PRIO1_ID,70403      # Compass from Drone CAN GPS 19 on CAN BUS 1 mounted left.
 COMPASS_PRIO2_ID,72963      # Compass from Drone CAN GPS 29 on CAN BUS 1 mounted right.
 # FFT_ENABLE,0              # Disable FFT as on lower Frequency it could create a major slew rate which could cause a crash. (Recommended by Tridge).  
 ARSPD_FBW_MAX,28
-ARSPD_FBW_MIN,19
 ARSPD_RATIO,1.6
 ARSPD_WIND_MAX,25
 ARSPD2_RATIO,1.6
