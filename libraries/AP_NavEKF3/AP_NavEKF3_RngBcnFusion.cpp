@@ -13,6 +13,7 @@ void NavEKF3_core::SelectRngBcnFusion()
     // range to location data is being pushed externally to the EKF so we need to check the buffer
     if (rngBcn.usingRangeToLoc && rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms) && (rngBcn.dataDelayed.beacon_ID < AP_BEACON_MAX_BEACONS)) {
         rngBcn.dataLast[rngBcn.dataDelayed.beacon_ID] = rngBcn.dataDelayed;
+        rngBcn.dataLast[rngBcn.dataDelayed.beacon_ID].beacon_posNED = EKF_origin.get_distance_NED_ftype(rngBcn.dataDelayed.beacon_loc);
         rngBcn.receiverPos.zero();
         // a reset using a single observation from this sensor is a last resort so wait for the slow timeout on the primary position sensors
         bool noPositionFix = (imuSampleTime_ms - lastGpsPosPassTime_ms > frontend->altPosSwitchTimeout_ms) &&
