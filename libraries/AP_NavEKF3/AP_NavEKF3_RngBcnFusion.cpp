@@ -117,9 +117,12 @@ bool NavEKF3_core::ResetPosToRngBcn()
             }
 
             // find the intersection including the sigma points for evaluation of the covariance
-            Vector2F PosNE[4];
             const ftype DR0 = rngBcn.dataLast[0].rngErr;
             const ftype DR1 = rngBcn.dataLast[1].rngErr;
+            if (!is_positive(correctedSlantRng[0]-DR0) || !is_positive(correctedSlantRng[1]-DR1)) {
+                break;
+            }
+            Vector2F PosNE[4];
             if (DualRangeIntersectNE(PosNE[0], correctedSlantRng[0], correctedSlantRng[1], rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
                 DualRangeIntersectNE(PosNE[1], correctedSlantRng[0]+DR0, correctedSlantRng[1]+DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
                 DualRangeIntersectNE(PosNE[2], correctedSlantRng[0]-DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
@@ -152,14 +155,24 @@ bool NavEKF3_core::DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const f
 {
     // correct slant ranges for vertical position offset
     ftype RH0sq = sq(R0)-sq(P0.z - PosD);
-    ftype RH0 = is_positive(RH0sq) ? sqrtF(RH0sq) : 0.0f; // horizontal range from beacon 0
+    if (!is_positive(RH0sq)) {
+        return false;
+    }
+    ftype RH0 =sqrtF(RH0sq); // horizontal range from beacon 0
+
     ftype RH1sq = sq(R1)-sq(P1.z - PosD);
-    ftype RH1 = is_positive(RH1sq) ? sqrtF(RH1sq) : 0.0f; // horizontal range from beacon 1
+    if (!is_positive(RH1sq)) {
+        return false;
+    }
+    ftype RH1 = sqrtF(RH1sq); // horizontal range from beacon 1
 
     // Calculate the distance between the beacons
     ftype dx = P1.x - P0.x;
     ftype dy = P1.y - P0.y;
     ftype dist = sqrtF(dx * dx + dy * dy);
+    if (!is_positive(dist)) {
+        return false;
+    }
 
     // Check if there are no solutions
     if (dist > (RH0 + RH1) || dist < fabsF(RH0 - RH1)) {
