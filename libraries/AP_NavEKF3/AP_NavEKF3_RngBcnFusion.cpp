@@ -120,12 +120,14 @@ bool NavEKF3_core::ResetPosToRngBcn()
             Vector2F PosNE[4];
             const ftype DR0 = rngBcn.dataLast[0].rngErr;
             const ftype DR1 = rngBcn.dataLast[1].rngErr;
-            if (DualRangeIntersectNE(PosNE[0], correctedSlantRng[0], correctedSlantRng[1], rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED) &&
-                DualRangeIntersectNE(PosNE[1], correctedSlantRng[0]+DR0, correctedSlantRng[1]+DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED) &&
-                DualRangeIntersectNE(PosNE[2], correctedSlantRng[0]-DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED) &&
-                DualRangeIntersectNE(PosNE[3], correctedSlantRng[0]+DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED))
+            if (DualRangeIntersectNE(PosNE[0], correctedSlantRng[0], correctedSlantRng[1], rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
+                DualRangeIntersectNE(PosNE[1], correctedSlantRng[0]+DR0, correctedSlantRng[1]+DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
+                DualRangeIntersectNE(PosNE[2], correctedSlantRng[0]-DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
+                DualRangeIntersectNE(PosNE[3], correctedSlantRng[0]+DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z))
             {
+                // reset to expected value
                 ResetPositionNE(PosNE[0].x,PosNE[0].y);
+                // use sigma points relative to expected value to define initial uncertainty
                 ftype maxSigma = 0.0f;
                 for (uint8_t index=1; index<4; index++) {
                     ftype sigma = (PosNE[index] - PosNE[0]).length();
@@ -144,13 +146,14 @@ bool NavEKF3_core::ResetPosToRngBcn()
     return ret;
 }
 
-// PosNE is the NE local position defined by the intersection of slant ranges from two NE locations
+// PosNE is the NE local position defined by the intersection of slant ranges from two NED locations to the specified vertical position PosD
 // return true if solution found
-bool NavEKF3_core::DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const ftype R1, const Vector3F &P0, const Vector3F &P1)
+bool NavEKF3_core::DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const ftype R1, const Vector3F &P0, const Vector3F &P1, const ftype PosD)
 {
-    ftype RH0sq = sq(R0)-sq(P0.z - stateStruct.position.z);
+    // correct slant ranges for vertical position offset
+    ftype RH0sq = sq(R0)-sq(P0.z - PosD);
     ftype RH0 = is_positive(RH0sq) ? sqrtF(RH0sq) : 0.0f; // horizontal range from beacon 0
-    ftype RH1sq = sq(R1)-sq(P1.z - stateStruct.position.z);
+    ftype RH1sq = sq(R1)-sq(P1.z - PosD);
     ftype RH1 = is_positive(RH1sq) ? sqrtF(RH1sq) : 0.0f; // horizontal range from beacon 1
 
     // Calculate the distance between the beacons

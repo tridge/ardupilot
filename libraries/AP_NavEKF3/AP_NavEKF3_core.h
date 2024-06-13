@@ -751,9 +751,9 @@ private:
     // return true if successful
     bool ResetPosToRngBcn();
 
-    // PosNE is the NE local position defined by the intersection of slant ranges from two NE locations
+    // PosNE is the NE local position defined by the intersection of slant ranges from two NED locations to the specified vertical position PosD
     // return true if solution found
-    bool DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const ftype R1, const Vector3F &P0, const Vector3F &P1);
+    bool DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const ftype R1, const Vector3F &P0, const Vector3F &P1, const ftype PosD);
 
     // use range beacon measurements to calculate a static position
     void FuseRngBcnStatic();
