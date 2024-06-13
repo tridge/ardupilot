@@ -1,5 +1,7 @@
 @include ../CarbonixCommon/defaults.parm
 # Volanti-specific parameters
+COMPASS_PRIO1_ID,70403      # Compass from Drone CAN GPS 19 on CAN BUS 1 mounted left.
+COMPASS_PRIO2_ID,72963      # Compass from Drone CAN GPS 29 on CAN BUS 1 mounted right.
 # FFT_ENABLE,0              # Disable FFT as on lower Frequency it could create a major slew rate which could cause a crash. (Recommended by Tridge).  
 ARSPD_FBW_MAX,28
 ARSPD_FBW_MIN,19
@@ -37,8 +39,6 @@ CAN_D1_UC_ESC_BM,19
 CAN_D1_UC_SRV_BM,1824
 CAN_D2_UC_ESC_BM,12
 CAN_D2_UC_SRV_BM,1824
-COMPASS_PRIO1_ID,72963
-COMPASS_PRIO2_ID,70403
 COMPASS_USE3,0
 FWD_BAT_VOLT_MAX,50.4
 FWD_BAT_VOLT_MIN,42
