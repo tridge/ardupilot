@@ -21,7 +21,7 @@ fi
 echo "Running distclean..."
 ./waf distclean
 
-main_boards=("CubeOrange-Volanti" "CubeOrange" "sitl")
+main_boards=("CubeOrange-Volanti" "CubeOrange-Ottano" "CubeOrange" "sitl")
 
 for board in "${main_boards[@]}"; do
   echo "Compiling Plane for $board..."
