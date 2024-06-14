@@ -124,6 +124,9 @@ bool NavEKF3_core::ResetPosToRngBcn()
                 break;
             }
             Vector2F PosNE[4];
+printf("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", correctedSlantRng[0], correctedSlantRng[1],
+                                                    rngBcn.dataLast[0].beacon_posNED.x,rngBcn.dataLast[0].beacon_posNED.y,rngBcn.dataLast[0].beacon_posNED.z, 
+                                                    rngBcn.dataLast[1].beacon_posNED.x,rngBcn.dataLast[1].beacon_posNED.y,rngBcn.dataLast[1].beacon_posNED.z);
             if (DualRangeIntersectNE(PosNE[0], correctedSlantRng[0], correctedSlantRng[1], rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
                 DualRangeIntersectNE(PosNE[1], correctedSlantRng[0]+DR0, correctedSlantRng[1]+DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
                 DualRangeIntersectNE(PosNE[2], correctedSlantRng[0]-DR0, correctedSlantRng[1]-DR1, rngBcn.dataLast[0].beacon_posNED, rngBcn.dataLast[1].beacon_posNED, stateStruct.position.z) &&
@@ -276,7 +279,7 @@ void NavEKF3_core::FuseRngBcn()
     if (rngPred > 0.1f)
     {
         // calculate observation jacobians
-        ftype H_BCN[24];
+        Vector24 H_BCN;
         memset(H_BCN, 0, sizeof(H_BCN));
         ftype t2 = bcn_pd-pd;
         ftype t3 = bcn_pe-pe;
@@ -406,41 +409,79 @@ void NavEKF3_core::FuseRngBcn()
             // restart the counter
             rngBcn.lastPassTime_ms = imuSampleTime_ms;
 
-            // correct the covariance P = (I - K*H)*P
-            // take advantage of the empty columns in KH to reduce the
-            // number of operations
-            for (unsigned i = 0; i<=stateIndexLim; i++) {
-                for (unsigned j = 0; j<=6; j++) {
-                    KH[i][j] = 0.0f;
+            // // correct the covariance P = (I - K*H)*P
+            // // take advantage of the empty columns in KH to reduce the
+            // // number of operations
+            // for (unsigned i = 0; i<=stateIndexLim; i++) {
+            //     for (unsigned j = 0; j<=6; j++) {
+            //         KH[i][j] = 0.0f;
+            //     }
+            //     for (unsigned j = 7; j<=9; j++) {
+            //         KH[i][j] = Kfusion[i] * H_BCN[j];
+            //     }
+            //     for (unsigned j = 10; j<=23; j++) {
+            //         KH[i][j] = 0.0f;
+            //     }
+            // }
+            // for (unsigned j = 0; j<=stateIndexLim; j++) {
+            //     for (unsigned i = 0; i<=stateIndexLim; i++) {
+            //         ftype res = 0;
+            //         res += KH[i][7] * P[7][j];
+            //         res += KH[i][8] * P[8][j];
+            //         res += KH[i][9] * P[9][j];
+            //         KHP[i][j] = res;
+            //     }
+            // }
+            // // Check that we are not going to drive any variances negative and skip the update if so
+            // bool healthyFusion = true;
+            // for (uint8_t i= 0; i<=stateIndexLim; i++) {
+            //     if (KHP[i][i] > P[i][i]) {
+            //         healthyFusion = false;
+            //     }
+            // }
+            // if (healthyFusion) {
+                // // update the covariance matrix
+                // for (uint8_t i= 0; i<=stateIndexLim; i++) {
+                //     for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                //         P[i][j] = P[i][j] - KHP[i][j];
+                //     }
+                // }
+
+                // Efficient implementation of the Joseph stabilized covariance update
+                // Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
+                // P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
+                //   =      P_temp     * (I - H.T * K.T) + K * R * K.T
+                //   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
+
+                // Step 1: conventional update
+                // Compute P_temp and store it in P to avoid allocating more memory
+                // P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
+                // PH = P * H_BCN where H is stored as a column vector. H is in fact H.T
+                Vector24 PH{};
+                for (uint8_t row = 0; row < 24; row++) {
+                    for (uint8_t col = 0; col < 24; col++) {
+                        PH[row] += P[row][col] * H_BCN[col];
+                    }
                 }
-                for (unsigned j = 7; j<=9; j++) {
-                    KH[i][j] = Kfusion[i] * H_BCN[j];
+
+                for (uint8_t row = 0; row < 24; row++) {
+                    for (uint8_t col = 0; col < 24; col++) {
+                        P[row][col] -= Kfusion[row] * PH[col]; // P is now not symmetrical if K is not optimal (e.g.: some gains have been zeroed)
+                    }
                 }
-                for (unsigned j = 10; j<=23; j++) {
-                    KH[i][j] = 0.0f;
+
+                // Step 2: stabilized update
+                // PH = P * H_BCN where H is stored as a column vector. H is in fact H.T
+                for (uint8_t row = 0; row < 24; row++) {
+                    for (uint8_t col = 0; col < 24; col++) {
+                        PH[row] += P[row][col] * H_BCN[col];
+                    }
                 }
-            }
-            for (unsigned j = 0; j<=stateIndexLim; j++) {
-                for (unsigned i = 0; i<=stateIndexLim; i++) {
-                    ftype res = 0;
-                    res += KH[i][7] * P[7][j];
-                    res += KH[i][8] * P[8][j];
-                    res += KH[i][9] * P[9][j];
-                    KHP[i][j] = res;
-                }
-            }
-            // Check that we are not going to drive any variances negative and skip the update if so
-            bool healthyFusion = true;
-            for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                if (KHP[i][i] > P[i][i]) {
-                    healthyFusion = false;
-                }
-            }
-            if (healthyFusion) {
-                // update the covariance matrix
-                for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                    for (uint8_t j= 0; j<=stateIndexLim; j++) {
-                        P[i][j] = P[i][j] - KHP[i][j];
+
+                for (uint8_t row = 0; row < 24; row++) {
+                    for (unsigned col = 0; col <= row; col++) {
+                        P[row][col] = P[row][col] - PH[row] * Kfusion[col] + Kfusion[row] * R_BCN * Kfusion[col];
+                        P[col][row] = P[row][col];
                     }
                 }
 
@@ -456,11 +497,11 @@ void NavEKF3_core::FuseRngBcn()
                 // record healthy fusion
                 faultStatus.bad_rngbcn = false;
 
-            } else {
-                // record bad fusion
-                faultStatus.bad_rngbcn = true;
+            // } else {
+            //     // record bad fusion
+            //     faultStatus.bad_rngbcn = true;
 
-            }
+            // }
         }
 
         // Update the fusion report
