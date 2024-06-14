@@ -174,7 +174,7 @@ jobs:
       - name: build Carbonix Flight Controller
         shell: bash
         run: |
-          boards=("CubeOrange" "CubeOrange-Volanti" "sitl")
+          boards=("CubeOrange" "CubeOrange-Volanti" "CubeOrange-Ottano" "sitl")
           for board in "${boards[@]}"; do
             echo "Compiling ArduPlane for $board..."
             ./waf configure --board "$board" --define=CARBOPILOT=1
@@ -195,7 +195,7 @@ jobs:
         id: check_files
         uses: andstor/file-existence-action@v2
         with:
-          files: "build/CubeOrange/*, build/CubeOrange-Volanti/*, build/sitl/*, build/CarbonixF405/*, build/CarbonixF405-no-crystal/*, build/CarbonixL496/*"
+          files: "build/CubeOrange/*, build/CubeOrange-Volanti/*, build/CubeOrange-Ottano/*, build/sitl/*, build/CarbonixF405/*, build/CarbonixF405-no-crystal/*, build/CarbonixL496/*"
           fail: true
       - name: Extract firmware version and commit id
         id: extract_info
@@ -208,7 +208,7 @@ jobs:
       - name: Gather build output
         run: |
           mkdir -p temp
-          for dir in CubeOrange CubeOrange-Volanti sitl CarbonixF405 CarbonixF405-no-crystal CarbonixL496; do
+          for dir in CubeOrange CubeOrange-Volanti CubeOrange-Ottano sitl CarbonixF405 CarbonixF405-no-crystal CarbonixL496; do
             mkdir -p temp/$dir/bin
             cp -v build/$dir/bin/* temp/$dir/bin/
           done
