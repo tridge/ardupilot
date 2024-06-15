@@ -2814,7 +2814,7 @@ void AP_InertialSensor::force_save_calibration(void)
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
 bool AP_InertialSensor::get_next_gyro_sample(Vector3f& gyro)
 {
-    if (!_cmutex) {
+    if (!use_rate_loop_gyro_samples()) {
         return false;
     }
 

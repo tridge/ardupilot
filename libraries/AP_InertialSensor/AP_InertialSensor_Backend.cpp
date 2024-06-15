@@ -263,7 +263,7 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
     }
 
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-    if (_imu.rate_decimation && _imu._cmutex != nullptr && instance == _imu._primary_gyro) {
+    if (_imu.use_rate_loop_gyro_samples() && _imu.rate_decimation && instance == _imu._primary_gyro) {
         /*
           tell the rate thread we have a new sample
         */
