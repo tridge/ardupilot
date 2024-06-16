@@ -1,3 +1,64 @@
+Release 5.2.0-beta1 16th June 2024
+------------------------------
+ - Added a prearm check for a crash dump file. If one is found, arming will be blocked by the prearm. 
+ - Added prearm checks for cx_built_in_test script to warn about ESC failure.
+ - On boot the Safety state will be always ON "SAFE".
+ - Terrain frame no longer ignored for Auto.
+ - FENCE should no longer disable itself, and is set to auto enable on arm.
+ - IMU heater value set to vendor specific value (60 degree) default which might take more time to stabilize.
+ - RangeFinder defaulted to support on SF30D on CPN15 (DroneCAN) and limited 158m.
+ - Add new messages for pilot awareness
+    - "Script Version x.y Initialized"  - On bootup of cx_built_in_test script .
+    - "Parameter Init Failed"           - Fail to Initialized Parameter in script.
+    - "Aircraft Type Check Failed"      - Fail to Check Aircraft Type in script.
+    - "ESC x RPM nil"                   - Script did not receive RPM data.
+    - "ESC x Servo Out nil"             - Script did not receive Servo data.
+    - "ESC x Telemetry Lost/Recovered"  - Fail/Recover on Lost of ESC telemetry.
+    - "ESC x RPM Drop/Recovered"        - Drop/Recover on Lost of RPM during Demand.
+    - "Actuator x Telemetry Error"      - Before Arming ESC Telemetry not present.
+ - Servo Numbering updated
+    - Servo No  | FC |CAN | Function
+    - Servo 6   | 19 | 56 | Elevator 
+    - Servo 10  |  4 | 60 | Aileron
+    - servo 11  | 21 | 61 | Rudder
+ - Flight Modes now default to the correct settings  
+    - FLTMODE1,11 # RTL
+    - FLTMODE3,10 # Auto
+    - FLTMODE4,19 # QLoiter
+    - FLTMODE5,7 # Cruise
+ - Volanti specific changes
+    - FFT has been disabled and Pitch rate D and I gain have been changed to compensate for it. 
+    - Minimum airspeed value (ARSPD_FBW_MIN) pushed to 20m/s from 19m/s to keep it 20% above stall speed.
+    - Control Loop rate changed to 200Hz from 400Hz reducing Log size and freeing up CPU resources.
+    - Flight Controller will clear logs before flight to make 5GB available.
+    - Compass priority is Left GPS 19 and Right GPS 29.
+    - Auto flight will set throttle to 60% TRIM_THROTTLE to maintain flight (TRIM_ARSPD_CM).
+ - Added "ESCX" extended telemetry log message for logging ErrorStatus, InputPct and OutputPct from ESC.
+ - FW version name format change "CxPilot x.y.x" to "CxPilot-x.y.z". 
+ - Flight controller board type changed from CarbonixCubeOrange to CubeOrange-Volanti and CubeOrange-Ottano.
+ - Default configurations build into Cube and CPN for easier drone setup and reduced configuration steps.
+ - All build files will be uploaded to AWS S3 bucket "carbonix-firmware-release-files" and "carbonix-firmware-dev-files" with folder format yyyymmdd_hhmm_CxPilot-x.y.z_commitId
+
+Technical:
+ - cx_built_in_test: debounce audible warning for nil #146 [SW-219](https://carbonix.atlassian.net/browse/SW-219)
+ - AP_Periph: fix missing custom firmware version #147 [SW-159](https://carbonix.atlassian.net/browse/SW-159) 
+ - AP_ESC: APD F120 packet modification #138 [SW-187](https://carbonix.atlassian.net/browse/SW-187)
+ - AP_Scripting: fixed float register save/restore in setjmp/longjmp #134 [SW-193](https://carbonix.atlassian.net/browse/SW-193)
+ - LUA : added bindings for extended ESC telem #114 [SW-97](https://carbonix.atlassian.net/browse/SW-97)
+ - Battery Monitor can will report minimum of ESC voltage rather than average - specific support for Ottano split battery. #114 [SW-97](https://carbonix.atlassian.net/browse/SW-97)
+ - hwdef: CarbonixCubeOrange - added cx_built_in_test.lua #122 [SW-61](https://carbonix.atlassian.net/browse/SW-61)
+ - hwdef: Removed CarbonixL496 board support for periph #136 [SW-159](https://carbonix.atlassian.net/browse/SW-159)
+ - hwdef: added CarbonixF405-Non-crystal board for periph #136 [SW-159](https://carbonix.atlassian.net/browse/SW-159)
+ - Fix servo assignments #128 [SW-181](https://carbonix.atlassian.net/browse/SW-181)
+ - workflow: Carbonix_build to push data to AWS S3 bucket #143 [SW-199](https://carbonix.atlassian.net/browse/SW-199)  
+ - workflow change buildfile name to firmware name #132 [SW-191](https://carbonix.atlassian.net/browse/SW-191)
+ - workflows: added on branches CxPilot-* #130 [SW-130](https://carbonix.atlassian.net/browse/SW-130)
+ - Params: BATT*_MONITOR corrected in defaults.parm #126 [SW-158](https://carbonix.atlassian.net/browse/SW-158)
+ - Params: Enable terrain following if commanded by mission item for Auto and Guided #136 [SW-159](https://carbonix.atlassian.net/browse/SW-159)
+ - AP_Arming: force user to ack crashdump or get prearm failure #125 [SW-148](https://carbonix.atlassian.net/browse/SW-148)
+ - Tools: Added Python Script to decode and encode Devid #136 [SW-159](https://carbonix.atlassian.net/browse/SW-159)
+
+
 Release 5.1.1 20th March 2024
 ------------------------------
 - AP_ICEngine: Added a new parameter CRANK_DIR for controlling the direction of engine cranking, providing flexibility in engine configurations.
