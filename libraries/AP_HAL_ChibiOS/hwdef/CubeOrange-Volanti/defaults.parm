@@ -6,9 +6,6 @@ COMPASS_PRIO1_ID,70403      # Compass from Drone CAN GPS 19 on CAN BUS 1 mounted
 COMPASS_PRIO2_ID,72963      # Compass from Drone CAN GPS 29 on CAN BUS 1 mounted right.
 # FFT_ENABLE,0              # Disable FFT as on lower Frequency it could create a major slew rate which could cause a crash. (Recommended by Tridge).  
 ARSPD_FBW_MAX,28
-ARSPD_RATIO,1.6
-ARSPD_WIND_MAX,25
-ARSPD2_RATIO,1.6
 BATT_CAPACITY,22000
 BATT_CRT_VOLT,44.4
 BATT_FS_LOW_ACT,1
