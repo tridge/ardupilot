@@ -1,3 +1,8 @@
+Release 5.2.0-beta3 19th June 2024
+------------------------------
+Technical:
+ - AP_Param: fixed setting of defaults for dynamic param trees 
+
 Release 5.2.0-beta2 18th June 2024
 ------------------------------
 Technical:
