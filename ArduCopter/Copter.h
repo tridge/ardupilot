@@ -635,11 +635,6 @@ private:
         return (g2.flight_options & uint32_t(option)) != 0;
     }
 
-    // return true if a flight option is set
-    bool flight_option_is_set(FlightOptions option) const {
-        return (g2.flight_options & uint32_t(option)) != 0;
-    }
-
     static constexpr int8_t _failsafe_priorities[] = {
                                                       (int8_t)FailsafeAction::TERMINATE,
                                                       (int8_t)FailsafeAction::LAND,
