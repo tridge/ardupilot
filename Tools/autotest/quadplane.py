@@ -12,6 +12,7 @@ import math
 
 from pymavlink import mavutil
 from pymavlink.rotmat import Vector3
+from pysim import util
 
 import vehicle_test_suite
 from vehicle_test_suite import Test
@@ -1771,6 +1772,244 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         self.fly_home_land_and_disarm()
 
+    def TOFRadios(self):
+        '''test navigation using TOF messages from digital radios'''
+
+        self.progress("Put EK2 in charge")
+        self.set_parameter("AHRS_EKF_TYPE", 2)
+
+        self.context_push()
+
+        self.progress("Install scripts")
+        # replace these with install_applet_script_context:
+        scripts_to_install = "silvus_monitor.lua", "silvus_tof_sim.lua"
+        scripts_base = "ArduPlane/SilvusQuery/scripts"
+        for scriptname in scripts_to_install:
+            p = util.reltopdir(f"{scripts_base}/{scriptname}")
+            self.install_script(p, scriptname)
+        # replace this with install_script_module_context:
+        p = util.reltopdir(f"{scripts_base}/modules/json.lua")
+        self.install_script_module(p, "json.lua")
+
+        self.progress("Enable scripting and base configuration")
+        self.set_parameters({
+            "AHRS_OPTIONS": 3,  # no DCM fallback
+            "SCR_ENABLE": 1,
+            'LOG_REPLAY': 1,
+            'EK2_ENABLE': 1,
+            'EK2_IMU_MASK': 1,
+            'EK3_OPTIONS': 4,
+            'EK3_IMU_MASK': 1,
+            'RTL_AUTOLAND': 2,
+            'SIM_WIND_SPD': 5,  # need to keep this under control or we end up transitioning when switching wind direction
+            'SIM_WIND_DIR': 0,
+            'SIM_IMU_COUNT': 3,
+            #            'SCR_DEBUG_OPTS': 8,  # runtime memory usage and time
+            'SCR_VM_I_COUNT': 1000000,
+            'INS_ACC3OFFS_X': 0.00001,
+            'INS_ACC3OFFS_Y': 0.00001,
+            'INS_ACC3OFFS_Z': 0.00001,
+            'INS_ACCSCAL_X': 1,
+            'INS_ACCSCAL_Y': 1,
+            'INS_ACCSCAL_Z': 1,
+
+        })
+        # need to force the IMU calibrations into storage:
+        self.run_cmd_int(mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, p5=76)
+
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+
+        self.wait_statustext("Silvus: starting with 0 ground radios", check_context=True)
+        self.context_pop()
+
+        # set up beacons
+        beacon_home_relative_positions = [
+            # n   e    u
+            (500, -50, 0),
+            (-500, -50, 30),
+            (-1000, 6000, 10),
+        ]
+
+        radio_beacon_parameters = {}
+        radio_beacon_sim_parameters = {
+            "SSIM_AGE_MAX_MS": 330.3,
+        }
+        i = 0
+        for (n, e, u) in beacon_home_relative_positions:
+            loc = self.home_relative_loc_neu(n, e, u)
+            i += 1
+            node_id = int(str(i) * 3)
+            # configured beacon position:
+            radio_beacon_parameters.update({
+                f"SLV_GND{i}_LAT": loc.lat,
+                f"SLV_GND{i}_LON": loc.lng,
+                f"SLV_GND{i}_ALT": loc.alt,
+                f"SLV_GND{i}_NODEID": node_id,
+            })
+
+            # simulated beacon positions:
+            radio_beacon_sim_parameters.update({
+                f"SSIM_GND{i}_LAT": loc.lat,
+                f"SSIM_GND{i}_LON": loc.lng,
+                f"SSIM_GND{i}_ALT": loc.alt,
+                f"SSIM_GND{i}_NODEID": node_id,
+            })
+            # show on map when running with --map
+            if self.mavproxy is not None:
+                self.mavproxy.send(f"map icon {loc.lat} {loc.lng} barrell\n")
+
+        # need to restart so the script makes allocations:
+        self.set_parameters({
+            "SSIM_ENABLE": 1,
+            "SLV_NUM_RADIOS": i,
+            "SLV_HTTP_PORT": 8003,
+
+            "SLV_IP0": 127,
+            "SLV_IP1": 0,
+            "SLV_IP2": 0,
+            "SLV_IP3": 1,
+        })
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+        self.wait_statustext(f"Silvus: starting with {i} ground radios", check_context=True)
+        self.wait_statustext("SilvusSim: starting with 0 beacons", check_context=True)
+        self.context_pop()
+
+        # need to restart so the sim script makes parameters:
+        self.set_parameters({
+            "SSIM_NUM_RADIOS": i,
+        })
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+        self.wait_statustext(f"Silvus: starting with {i} ground radios", check_context=True)
+        self.wait_statustext(f"SilvusSim: starting with {i} beacons", check_context=True)
+        self.context_pop()
+
+        more_params = {
+            "SLV_GND1_IP3": 1,
+            "SLV_GND2_IP3": 3,
+            "SLV_GND3_IP3": 100,
+        }
+        more_params.update(radio_beacon_parameters)
+        more_params.update(radio_beacon_sim_parameters)
+        self.set_parameters(more_params)
+
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+        self.wait_statustext(f"Silvus: starting with {i} ground radios", check_context=True)
+        self.wait_statustext(f"SilvusSim: starting with {i} beacons", check_context=True)
+        self.context_pop()
+
+        # offsets are enu
+        reps = 200  # we RTL, so this can be high
+        self.upload_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 300, 00, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 50, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 300, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 300, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 50, 100),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_DO_JUMP,
+                p1=3,   # wp
+                p2=reps,
+            ),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_DO_LAND_START,
+            ),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 350, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 350, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 0, 25),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 0, 25),
+            # 0.1 so it gets made relhome rather than being left to
+            # the autopilot to assume "here":
+            (mavutil.mavlink.MAV_CMD_NAV_LAND, 0.1, 0, 0),
+        ])
+
+        self.reboot_sitl()  # so we get a clean log with final state
+
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        # self.set_parameter('SIM_SPEEDUP', 1)
+        if self.mavproxy is not None:
+            self.mavproxy.send("wp list\n")
+        self.arm_vehicle()
+
+        self.progress("Do a couple of laps to let wind estimate sink in")
+        self.context_push()
+        self.install_message_hook_context(
+            vehicle_test_suite.TestSuite.ValidateAHRS3AgainstSimState(
+                self,
+                max_allowed_divergence=5,
+            )
+        )
+        self.wait_statustext(f"Jump 2/{reps}", timeout=300)
+        self.context_pop()  # remove AHRS3 validation
+
+        self.context_push()
+        self.start_subtest("Ensure position does not diverge when GPS removed")
+        self.install_message_hook_context(
+            vehicle_test_suite.TestSuite.ValidateAHRS3AgainstSimState(
+                self,
+                max_allowed_divergence=60,
+            )
+        )
+        self.progress("Remove GPS from EK3")
+        self.run_auxfunc(190, 2)
+        self.wait_statustext(f"Jump 5/{reps}", timeout=600)
+        self.context_pop()
+
+        self.start_subtest("Ensure we are not simply dead-reckoning by destroying wind estimate")
+        self.context_push()
+        self.install_message_hook_context(
+            vehicle_test_suite.TestSuite.ValidateAHRS3AgainstSimState(
+                self,
+                max_allowed_divergence=1000,
+            )
+        )
+        self.set_parameters({
+            "SIM_WIND_DIR": 90,
+        })
+        self.wait_statustext(f"Jump 10/{reps}", timeout=600)
+        self.context_pop()  # will revert SIM_WIND_DIR
+
+        self.start_subtest("Make sure that the beacons are making the difference by disabling them and demanding divergence")
+        # note that EKF3's wind estimate will have been re-learnt, but
+        # the wind is now back to its original direction.
+        self.context_push()
+        self.set_parameters({
+            "SLV_ENABLE": 0,
+        })
+        self.wait_distance_between('SIMSTATE', 'AHRS3', 200, 20000, minimum_duration=15, timeout=300)
+        self.context_pop()  # will revert SLV_ENABLE
+
+        self.progress("Return GPS to EK3")
+        self.run_auxfunc(190, 0)
+
+        self.start_subtest("Ensure EKF3 narrows position when it gets GPS again")
+        self.wait_distance_between('SIMSTATE', 'AHRS3', 0, 5, minimum_duration=15, timeout=30)
+
+        self.send_cmd_do_set_mode('RTL')
+        self.wait_mode('AUTO')
+
+        num_wp = self.get_mission_count()
+        self.wait_waypoint(1, num_wp-1, timeout=300, ignore_RTL_mode_change=True)
+        self.wait_disarmed(timeout=180)
+
+        self.reboot_sitl()  # just so the log has final param values in it
+
+        self.remove_installed_script_module("json.lua")
+        for script_to_uninstall in scripts_to_install:
+            self.remove_installed_script(script_to_uninstall)
+
+        self.context_pop()
+        self.reboot_sitl()
+
     def tests(self):
         '''return list of all tests'''
 
@@ -1817,5 +2056,6 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
             self.DCMClimbRate,
             self.RTL_AUTOLAND_1,  # as in fly-home then go to landing sequence
             self.RTL_AUTOLAND_1_FROM_GUIDED,  # as in fly-home then go to landing sequence
+            self.TOFRadios,
         ])
         return ret
