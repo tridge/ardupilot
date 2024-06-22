@@ -723,9 +723,7 @@ void Copter::one_hz_loop()
 
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
     // see if we should have a separate rate thread
-    if (!started_rate_thread && (copter.option_is_enabled(FlightOption::USE_RATE_LOOP_THREAD)
-                        || copter.option_is_enabled(FlightOption::USE_FIXED_RATE_LOOP_THREAD))) {
-
+    if (!started_rate_thread && get_fast_rate_type() != FastRateType::FAST_RATE_DISABLED) {
         if (hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Copter::rate_controller_thread, void),
                                          "attitude",
                                          1024, AP_HAL::Scheduler::PRIORITY_RCOUT, 1)) {
