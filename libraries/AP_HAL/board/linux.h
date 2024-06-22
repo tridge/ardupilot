@@ -417,10 +417,6 @@
 #define HAL_GYROFFT_ENABLED 0
 #endif
 
-#ifndef HAL_INS_RATE_LOOP
-#define HAL_INS_RATE_LOOP 1
-#endif
-
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NONE
 // we can use virtual CAN on native builds
 #define HAL_LINUX_USE_VIRTUAL_CAN 1

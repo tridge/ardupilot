@@ -42,7 +42,6 @@
 #define HAL_BOARD_TERRAIN_DIRECTORY "terrain"
 #define HAL_PARAM_DEFAULTS_PATH nullptr
 #define HAL_INS_DEFAULT HAL_INS_NONE
-#define HAL_INS_RATE_LOOP 1
 #define HAL_BARO_DEFAULT HAL_BARO_NONE
 
 // simulated LEDs are disabled by default as they lead to a large
