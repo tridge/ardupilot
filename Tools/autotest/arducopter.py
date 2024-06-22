@@ -6249,7 +6249,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
     def DynamicRpmNotchesRateThread(self):
         """Use dynamic harmonic notch to control motor noise via ESC telemetry."""
         self.progress("Flying with ESC telemetry driven dynamic notches")
-
+        self.context_push()
         self.set_rc_default()
         self.set_parameters({
             "AHRS_EKF_TYPE": 10,
@@ -6314,7 +6314,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         if esc_peakdb2 > -25:
             raise NotAchievedException(
                 "Notch-per-motor had a peak of %fdB there should be none" % esc_peakdb2)
-
+        self.context_pop()
         self.reboot_sitl()
 
     def hover_and_check_matched_frequency(self, dblevel=-15, minhz=200, maxhz=300, fftLength=32, peakhz=None):
