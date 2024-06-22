@@ -6261,7 +6261,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "SIM_VIB_MOT_MAX": 350,
             "SIM_GYR1_RND": 20,
             "SIM_ESC_TELEM": 1,
-            "FLIGHT_OPTIONS": 8
+            "FSTRATE_ENABLE": 1
         })
         self.reboot_sitl()
 
@@ -6282,7 +6282,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             "INS_HNTCH_ATT": 50,
             "INS_HNTCH_BW": 40,
             "INS_HNTCH_MODE": 3,
-            "FLIGHT_OPTIONS": 8
+            "FSTRATE_ENABLE": 1
         })
         self.reboot_sitl()
 
