@@ -40,10 +40,8 @@ void Copter::rate_controller_thread()
     uint32_t last_timing_msg_us = 0;
 #endif
 
+    // run the filters at half the gyro rate
     uint8_t filter_rate_decimate = 2;
-    if (copter.g2.att_filter_rate_hz != 0) {
-        filter_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + copter.g2.att_filter_rate_hz - 1) / copter.g2.att_filter_rate_hz);
-    }
     uint8_t log_rate_decimate = 0;
     if (copter.g2.att_log_rate_hz != 0) {
         log_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + copter.g2.att_log_rate_hz - 1) / copter.g2.att_log_rate_hz);
@@ -58,8 +56,8 @@ void Copter::rate_controller_thread()
 #endif
 
         // allow changing option at runtime
-        if ((!copter.option_is_enabled(FlightOption::USE_RATE_LOOP_THREAD) &&
-             !copter.option_is_enabled(FlightOption::USE_FIXED_RATE_LOOP_THREAD)) ||
+        if ((get_fast_rate_type() != FastRateType::FAST_RATE_DYNAMIC &&
+             get_fast_rate_type() != FastRateType::FAST_RATE_FIXED) ||
             ap.motor_test) {
             using_rate_thread = false;
             if (was_using_rate_thread) {
@@ -173,7 +171,7 @@ void Copter::rate_controller_thread()
         }
 
         // Once armed, switch to the fast rate if configured to do so
-        if (rate_decimation > 1 && motors->armed() && copter.option_is_enabled(FlightOption::USE_FIXED_RATE_LOOP_THREAD)) {
+        if (rate_decimation > 1 && motors->armed() && get_fast_rate_type() != FastRateType::FAST_RATE_FIXED) {
             rate_decimation = 1;
             attitude_control->set_notch_sample_rate(ins.get_raw_gyro_rate_hz());
             gcs().send_text(MAV_SEVERITY_INFO, "Attitude rate active at %uHz", (unsigned)ins.get_raw_gyro_rate_hz());
@@ -181,7 +179,7 @@ void Copter::rate_controller_thread()
         
         // check that the CPU is not pegged, if it is drop the attitude rate
         if (now_ms - last_rate_check_ms >= 200
-            && (!copter.option_is_enabled(FlightOption::USE_FIXED_RATE_LOOP_THREAD) || !motors->armed())) {
+            && (get_fast_rate_type() != FastRateType::FAST_RATE_FIXED || !motors->armed())) {
             last_rate_check_ms = now_ms;
             const uint32_t att_rate = ins.get_raw_gyro_rate_hz()/rate_decimation;
             if (running_slow > 5 || AP::scheduler().get_extra_loop_us() > 0

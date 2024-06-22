@@ -630,6 +630,17 @@ private:
         RELEASE_GRIPPER_ON_THRUST_LOSS = (1<<2),  // 4
         REQUIRE_POSITION_FOR_ARMING =   (1<<3),   // 8
     };
+
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+    // type of fast rate attitude controller in operation
+    enum class FastRateType : uint8_t {
+        FAST_RATE_DISABLED            = 0,
+        FAST_RATE_DYNAMIC             = 1,
+        FAST_RATE_FIXED               = 2,
+    };
+
+    FastRateType get_fast_rate_type() const { return FastRateType(g2.att_enable.get()); }
+#endif
     // returns true if option is enabled for this vehicle
     bool option_is_enabled(FlightOption option) const {
         return (g2.flight_options & uint32_t(option)) != 0;
