@@ -92,10 +92,6 @@
 #define HAL_INS_ICM20608_AM_NAME "icm20608-am"
 #define HAL_INS_ICM20608_EXT_NAME "icm20608_ext"
 
-#ifndef HAL_INS_RATE_LOOP
-#define HAL_INS_RATE_LOOP 1
-#endif
-
 #define HAL_COMPASS_HMC5843_NAME "hmc5843"
 #define HAL_COMPASS_LIS3MDL_NAME "lis3mdl"
 
