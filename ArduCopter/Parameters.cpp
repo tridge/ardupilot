@@ -1239,16 +1239,7 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @User: Advanced
     // @RebootRequired: True
     // @Values: 0:Disabled,1:Enabled-Dynamic,2:Enabled-Fixed
-    AP_GROUPINFO("FSTRATE_ENABLE", 10, ParametersG2, att_enable, 0),
-
-    // @Param: FSTRATE_LOG_RATE
-    // @DisplayName: Rate thread fast logging rate
-    // @Description: The rate of rate thread fast logging in Hz. The actual rate is constrained to be a whole divisor of the gyro rate and thus cannot be larger than the gyro rate. A value of 0 will utilize a rate equivalent to the main loop rate.
-    // @Range: 400 8000
-    // @Increment: 1
-    // @User: Advanced
-    // @RebootRequired: True
-    AP_GROUPINFO("FSTRATE_LOG_RATE", 11, ParametersG2, att_log_rate_hz, 1000),
+    AP_GROUPINFO("FSTRATE_ENABLE", 9, ParametersG2, att_enable, 0),
 #endif
 
     // ID 62 is reserved for the AP_SUBGROUPEXTENSION
