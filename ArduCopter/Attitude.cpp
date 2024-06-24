@@ -42,10 +42,8 @@ void Copter::rate_controller_thread()
 
     // run the filters at half the gyro rate
     uint8_t filter_rate_decimate = 2;
-    uint8_t log_rate_decimate = 0;
-    if (copter.g2.att_log_rate_hz != 0) {
-        log_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + copter.g2.att_log_rate_hz - 1) / copter.g2.att_log_rate_hz);
-    }
+    uint8_t log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 1000 - 1) / 1000);   // 1Khz
+    uint8_t log_med_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 10 - 1) / 10);        // 10Hz
     uint8_t filter_loop_count = 0;
     uint8_t log_loop_count = 0;
 
@@ -148,13 +146,20 @@ void Copter::rate_controller_thread()
             rate_controller_filter_update();
         }
 
-        // fast logging output
-        if (log_rate_decimate > 0 && log_loop_count++ >= log_rate_decimate) {
-            log_loop_count = 0;
 #if HAL_LOGGING_ENABLED
-            rate_controller_log_update();
-#endif
+        // fast logging output
+        if (should_log(MASK_LOG_ATTITUDE_FAST)) {
+            if (log_fast_rate_decimate > 0 && log_loop_count++ >= log_fast_rate_decimate) {
+                log_loop_count = 0;
+                rate_controller_log_update();
+            }
+        } else if (should_log(MASK_LOG_ATTITUDE_MED)) {
+            if (log_med_rate_decimate > 0 && log_loop_count++ >= log_med_rate_decimate) {
+                log_loop_count = 0;
+                rate_controller_log_update();
+            }
         }
+#endif
 
 #ifdef RATE_LOOP_TIMING_DEBUG
         motor_output_us += AP_HAL::micros() - rate_now_us;
@@ -196,6 +201,12 @@ void Copter::rate_controller_thread()
                     prev_loop_count = rate_loop_count;
                     rate_loop_count = 0;
                     running_slow = 0;
+                    if (new_attitude_rate > 1000) {
+                        log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 1000 - 1) / 1000);
+                    } else {
+                        log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz()
+                            + AP::scheduler().get_filtered_loop_rate_hz() - 1) / AP::scheduler().get_filtered_loop_rate_hz());
+                    }
                 }
             } else if (rate_decimation > 1 && rate_loop_count > att_rate // ensure a second's worth of good readings
                 && (prev_loop_count > att_rate/10   // ensure there was 100ms worth of good readings at the higher rate
@@ -209,6 +220,12 @@ void Copter::rate_controller_thread()
                 prev_loop_count = 0;
                 rate_loop_count = 0;
                 last_rate_increase_ms = now_ms;
+                if (new_attitude_rate > 1000) {
+                    log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 1000 - 1) / 1000);
+                } else {
+                    log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz()
+                        + AP::scheduler().get_filtered_loop_rate_hz() - 1) / AP::scheduler().get_filtered_loop_rate_hz());
+                }
             }
         }
 
@@ -249,7 +266,7 @@ void Copter::rate_controller_filter_update()
 void Copter::rate_controller_log_update()
 {
 #if HAL_LOGGING_ENABLED
-    if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
+    if (!copter.flightmode->logs_attitude()) {
         Log_Write_Rate();
         Log_Write_PIDS(); // only logs if PIDS bitmask is set
     }

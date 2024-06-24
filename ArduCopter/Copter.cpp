@@ -548,22 +548,15 @@ void Copter::update_batt_compass(void)
 // should be run at loop rate
 void Copter::loop_rate_logging()
 {
-    bool log_rates = true;
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-    if (using_rate_thread && copter.g2.att_log_rate_hz != 0) {
-        log_rates = false;
-    }
-#endif
-
    if (should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
-        if (log_rates) {
+        if (!using_rate_thread) {
             Log_Write_Rate();
             Log_Write_PIDS(); // only logs if PIDS bitmask is set
         }
     }
 #if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
-    if (should_log(MASK_LOG_FTN_FAST) && log_rates) {
+    if (should_log(MASK_LOG_FTN_FAST) && !using_rate_thread) {
         AP::ins().write_notch_log_messages();
     }
 #endif
@@ -579,11 +572,15 @@ void Copter::ten_hz_logging_loop()
     // log attitude data if we're not already logging at the higher rate
     if (should_log(MASK_LOG_ATTITUDE_MED) && !should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
         Log_Write_Attitude();
-        Log_Write_Rate();
+        if (!using_rate_thread) {
+            Log_Write_Rate();
+        }
     }
     if (!should_log(MASK_LOG_ATTITUDE_FAST) && !copter.flightmode->logs_attitude()) {
     // log at 10Hz if PIDS bitmask is selected, even if no ATT bitmask is selected; logs at looprate if ATT_FAST and PIDS bitmask set
-        Log_Write_PIDS();
+        if (!using_rate_thread) {
+            Log_Write_PIDS();
+        }
     }
     // log EKF attitude data always at 10Hz unless ATTITUDE_FAST, then do it in the 25Hz loop
     if (!should_log(MASK_LOG_ATTITUDE_FAST)) {
