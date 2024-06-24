@@ -980,7 +980,7 @@ void NavEKF3_core::readRngBcnData()
             rngBcn.lastChecked = index;
 
             // Save data into the buffer to be fused when the fusion time horizon catches up with it
-            rngBcn.storedRange.push(rngBcnDataNew);
+            rngBcn.storedRange[index].push(rngBcnDataNew);
 
             rngBcn.usingRangeToLoc = false;
         }
@@ -1025,18 +1025,23 @@ void NavEKF3_core::readRngBcnData()
     }
 
     // Check the buffer for measurements that have been overtaken by the fusion time horizon and need to be fused
-    rngBcn.dataToFuse = rngBcn.storedRange.recall(rngBcn.dataDelayed, imuDataDelayed.time_ms);
-
-    // Correct the range beacon earth frame origin for estimated offset relative to the EKF earth frame origin
-    if (rngBcn.dataToFuse) {
-        rngBcn.dataDelayed.beacon_posNED.x += rngBcn.posOffsetNED.x;
-        rngBcn.dataDelayed.beacon_posNED.y += rngBcn.posOffsetNED.y;
+    for (uint8_t i=0; i<rngBcn.N; i++) {
+        if (rngBcn.storedRange[i].recall(rngBcn.dataDelayed[i], imuDataDelayed.time_ms)) {
+            rngBcn.dataToFuse = true;
+            // Correct the range beacon earth frame origin for estimated offset relative to the EKF earth frame origin
+            rngBcn.dataDelayed[i].beacon_posNED.x += rngBcn.posOffsetNED.x;
+            rngBcn.dataDelayed[i].beacon_posNED.y += rngBcn.posOffsetNED.y;
+        }
     }
 
 }
 
 void NavEKF3_core::writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms, const uint8_t index, const uint8_t Nbeacons)
 {
+    if (index >= ARRAY_SIZE(rngBcn.storedRange)) {
+        return;
+    }
+
     rng_bcn_elements rngBcnDataNew = {};
     rngBcnDataNew.time_ms = timeStamp_ms - frontend->_rngBcnDelay_ms - localFilterTimeStep_ms/2;
     // Prevent time delay exceeding age of oldest IMU data in the buffer
@@ -1051,7 +1056,7 @@ void NavEKF3_core::writeRangeToLocation(const float range, const float uncertain
     rngBcn.N = Nbeacons;
 
     // write data to buffer with time stamp to be fused when the fusion time horizon catches up with it
-    rngBcn.storedRange.push(rngBcnDataNew);
+    rngBcn.storedRange[index].push(rngBcnDataNew);
 
     rngBcn.usingRangeToLoc = true;
 }

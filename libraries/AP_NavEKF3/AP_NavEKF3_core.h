@@ -741,11 +741,16 @@ private:
     void FuseBodyVel();
 
 #if EK3_FEATURE_BEACON_FUSION
-    // fuse range beacon measurements
+    // fuse all range beacon measurements
     void FuseRngBcn();
     void FuseRngToBcn2D(const ftype rngObs, const ftype rngObsVar);
+    // FuseLowElevationRngBcns - fuse rangebeacons which are above a
+    // particular elevation and look good in terms of range errors:
+    void FuseLowElevationRngBcns();
+    // fuse range beacon measurements
+    void FuseRngBcn(rng_bcn_elements &data);
     // push to range beacon array
-    void PushRngBcn();
+    void PushRngBcn(const rng_bcn_elements &data);
 #endif
 
     // reset the position to be consistent with range beacon measurements
@@ -757,10 +762,12 @@ private:
     bool DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const ftype R1, const Vector3F &P0, const Vector3F &P1, const ftype PosD);
 
     // use range beacon measurements to calculate a static position
+    void FuseRngBcnStatic(rng_bcn_elements &dataDelayed);
+    // use all range beacon measurements to calculate a static position
     void FuseRngBcnStatic();
 
     // calculate the offset from EKF vertical position datum to the range beacon system datum
-    void CalcRangeBeaconPosDownOffset(ftype obsVar, Vector3F &vehiclePosNED, bool aligning);
+    void CalcRangeBeaconPosDownOffset(rng_bcn_elements &dataDelayed, ftype obsVar, Vector3F &vehiclePosNED, bool aligning);
 
     // fuse magnetometer measurements
     void FuseMagnetometer();
@@ -1372,8 +1379,8 @@ private:
 #if EK3_FEATURE_BEACON_FUSION
     class BeaconFusion {
     public:
-        EKF_obs_buffer_t<rng_bcn_elements> storedRange; // Beacon range buffer
-        rng_bcn_elements dataDelayed; // Range beacon data at the fusion time horizon
+        EKF_obs_buffer_t<rng_bcn_elements> storedRange[AP_BEACON_MAX_BEACONS]; // Beacon range buffer
+        rng_bcn_elements dataDelayed[AP_BEACON_MAX_BEACONS]; // Range beacon data at the fusion time horizon
         rng_bcn_elements dataLast[AP_BEACON_MAX_BEACONS]; // Last retrieved range beacon data at the fusion time horizon for each beacon
         ftype correctedSlantRange[AP_BEACON_MAX_BEACONS]; // slant range corrected for time offset and range rate (m)
         ftype horizontalRange[AP_BEACON_MAX_BEACONS]; //  horizontal component of corrected slant range slant range (m)
