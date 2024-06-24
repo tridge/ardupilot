@@ -2001,6 +2001,8 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_waypoint(1, num_wp-1, timeout=300, ignore_RTL_mode_change=True)
         self.wait_disarmed(timeout=180)
 
+        dflog_filepath = self.current_onboard_log_filepath()
+
         self.reboot_sitl()  # just so the log has final param values in it
 
         self.remove_installed_script_module("json.lua")
@@ -2009,6 +2011,28 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         self.context_pop()
         self.reboot_sitl()
+
+        self.start_subtest("Ensure log is replayable")
+        self.progress("Building Replay")
+        util.build_SITL('tool/Replay', clean=False, configure=False)
+
+        replay_log_filepath = self.run_replay(dflog_filepath)
+
+        dfreader = self.dfreader_for_path(replay_log_filepath)
+
+        seen_xkf1_0 = False
+        while True:
+            if seen_xkf1_0:
+                passed = True
+                break
+            m = dfreader.recv_match()
+            m_type = m.get_type()
+            if m_type == "XKF1":
+                if m.C == 100:
+                    seen_xkf1_0 = True
+
+        if not passed:
+            raise NotAchievedException("Did not get expected messages from Replay")
 
     def tests(self):
         '''return list of all tests'''
