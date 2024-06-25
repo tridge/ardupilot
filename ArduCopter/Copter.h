@@ -734,10 +734,12 @@ private:
     void set_accel_throttle_I_from_pilot_throttle();
     void rotate_body_frame_to_NE(float &x, float &y);
     uint16_t get_pilot_speed_dn() const;
+    void run_rate_controller_main();
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
     void rate_controller_thread();
     void rate_controller_filter_update();
     void rate_controller_log_update();
-    void run_rate_controller_main();
+#endif
 
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
     void run_custom_controller() { custom_control.update(); }
