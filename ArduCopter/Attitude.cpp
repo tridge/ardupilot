@@ -42,10 +42,12 @@ void Copter::rate_controller_thread()
 
     // run the filters at half the gyro rate
     uint8_t filter_rate_decimate = 2;
+#if HAL_LOGGING_ENABLED
     uint8_t log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 1000 - 1) / 1000);   // 1Khz
     uint8_t log_med_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 10 - 1) / 10);        // 10Hz
-    uint8_t filter_loop_count = 0;
     uint8_t log_loop_count = 0;
+#endif
+    uint8_t filter_loop_count = 0;
 
     while (true) {
 
@@ -201,12 +203,14 @@ void Copter::rate_controller_thread()
                     prev_loop_count = rate_loop_count;
                     rate_loop_count = 0;
                     running_slow = 0;
+#if HAL_LOGGING_ENABLED
                     if (new_attitude_rate > 1000) {
                         log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 1000 - 1) / 1000);
                     } else {
                         log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz()
                             + AP::scheduler().get_filtered_loop_rate_hz() - 1) / AP::scheduler().get_filtered_loop_rate_hz());
                     }
+#endif
                 }
             } else if (rate_decimation > 1 && rate_loop_count > att_rate // ensure a second's worth of good readings
                 && (prev_loop_count > att_rate/10   // ensure there was 100ms worth of good readings at the higher rate
@@ -220,12 +224,14 @@ void Copter::rate_controller_thread()
                 prev_loop_count = 0;
                 rate_loop_count = 0;
                 last_rate_increase_ms = now_ms;
+#if HAL_LOGGING_ENABLED
                 if (new_attitude_rate > 1000) {
                     log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz() + 1000 - 1) / 1000);
                 } else {
                     log_fast_rate_decimate = uint8_t((ins.get_raw_gyro_rate_hz()
                         + AP::scheduler().get_filtered_loop_rate_hz() - 1) / AP::scheduler().get_filtered_loop_rate_hz());
                 }
+#endif
             }
         }
 
@@ -278,7 +284,7 @@ void Copter::rate_controller_log_update()
 #endif
 }
 
-#endif
+#endif // AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
 
 /*
   update rate controller when run from main thread (normal operation)
