@@ -1374,6 +1374,8 @@ private:
         EKF_obs_buffer_t<rng_bcn_elements> storedRange; // Beacon range buffer
         rng_bcn_elements dataDelayed; // Range beacon data at the fusion time horizon
         rng_bcn_elements dataLast[AP_BEACON_MAX_BEACONS]; // Last retrieved range beacon data at the fusion time horizon for each beacon
+        ftype correctedSlantRange[AP_BEACON_MAX_BEACONS]; // slant range corrected for time offset and range rate (m)
+        ftype horizontalRange[AP_BEACON_MAX_BEACONS]; //  horizontal component of corrected slant range slant range (m)
         uint32_t lastPassTime_ms;     // time stamp when the range beacon measurement last passed innovation consistency checks (msec)
         ftype testRatio;              // Innovation test ratio for range beacon measurements
         bool health;                  // boolean true if range beacon measurements have passed innovation consistency check
@@ -1386,26 +1388,27 @@ private:
         uint32_t last3DmeasTime_ms;   // last time the beacon system returned a 3D fix (msec)
         bool goodToAlign;             // true when the range beacon systems 3D fix can be used to align the filter
         uint8_t lastChecked;          // index of the last range beacon checked for data
-        Vector3F receiverPos;               // receiver NED position (m) - alignment 3 state filter
-        ftype receiverPosCov[3][3];         // Receiver position covariance (m^2) - alignment 3 state filter (
+        Vector3F receiverPos;         // receiver NED position (m) - alignment 3 state filter
+        ftype receiverPosCov[3][3];   // Receiver position covariance (m^2) - alignment 3 state filter (
         bool alignmentStarted;        // True when the initial position alignment using range measurements has started
         bool alignmentCompleted;      // True when the initial position alignment using range measurements has finished
         uint8_t lastIndex;            // Range beacon index last read -  used during initialisation of the 3-state filter
         Vector3F posSum;              // Sum of range beacon NED position (m) - used during initialisation of the 3-state filter
-        uint8_t numMeas;                 // Number of beacon measurements - used during initialisation of the 3-state filter
-        ftype sum;                       // Sum of range measurements (m) - used during initialisation of the 3-state filter
-        uint8_t N;                  // Number of range beacons in use
-        ftype maxPosD;                   // maximum position of all beacons in the down direction (m)
-        ftype minPosD;                   // minimum position of all beacons in the down direction (m)
-        bool usingMinHypothesis;            // true when the min beacon constellation offset hypothesis is being used
+        uint8_t numMeas;              // Number of beacon measurements - used during initialisation of the 3-state filter
+        ftype sum;                    // Sum of range measurements (m) - used during initialisation of the 3-state filter
+        uint8_t N;                    // Number of range beacons in use
+        uint32_t lastGoodN_ms;        // last time the N value was good enough for a 2D fix (mSec)
+        ftype maxPosD;                // maximum position of all beacons in the down direction (m)
+        ftype minPosD;                // minimum position of all beacons in the down direction (m)
+        bool usingMinHypothesis;      // true when the min beacon constellation offset hypothesis is being used
 
         ftype posDownOffsetMax;          // Vertical position offset of the beacon constellation origin relative to the EKF origin (m)
         ftype posOffsetMaxVar;           // Variance of the PosDownOffsetMax state (m)
-        ftype maxOffsetStateChangeFilt;     // Filtered magnitude of the change in PosOffsetHigh
+        ftype maxOffsetStateChangeFilt;  // Filtered magnitude of the change in PosOffsetHigh
 
         ftype posDownOffsetMin;          // Vertical position offset of the beacon constellation origin relative to the EKF origin (m)
         ftype posOffsetMinVar;           // Variance of the PosDownOffsetMin state (m)
-        ftype minOffsetStateChangeFilt;     // Filtered magnitude of the change in PosOffsetLow
+        ftype minOffsetStateChangeFilt;  // Filtered magnitude of the change in PosOffsetLow
 
         Vector3F posOffsetNED;           // NED position of the beacon origin in earth frame (m)
         bool originEstInit;              // True when the beacon origin has been initialised
