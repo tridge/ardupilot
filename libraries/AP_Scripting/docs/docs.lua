@@ -1651,6 +1651,10 @@ function Motors_dynamic:init(expected_num_motors) end
 -- desc
 analog = {}
 
+-- return MCU temperature in degrees C
+---@return number -- MCU temperature
+function analog:mcu_temperature() end
+
 -- desc
 ---@return AP_HAL__AnalogSource_ud|nil
 function analog:channel() end
