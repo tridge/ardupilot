@@ -203,10 +203,34 @@ bool NavEKF3_core::ResetPosToRngBcn()
             Matrix3F cov;
             ftype covJacTrans[3][Nmeas];
             ftype p[3];
-            Vector3F posNED = stateStruct.position;
+            // start in middle of beacon pattern and 1000m above the highest beacon.
+            ftype xmin =  EK3_POSXY_STATE_LIMIT;
+            ftype xmax = -EK3_POSXY_STATE_LIMIT;
+            ftype ymin =  EK3_POSXY_STATE_LIMIT;
+            ftype ymax = -EK3_POSXY_STATE_LIMIT;
+            ftype zmin =  1.0e4f;
+            for (int i = 0; i < Nmeas; i++) {
+                Vector3F bcnPosNED = rngBcn.dataLast[indexList[i]].beacon_posNED;
+                if (bcnPosNED.x < xmin) {
+                    xmin = bcnPosNED.x;
+                }
+                if (bcnPosNED.x > xmax) {
+                    xmax = bcnPosNED.x;
+                }
+                if (bcnPosNED.y < ymin) {
+                    ymin = bcnPosNED.y;
+                }
+                if (bcnPosNED.y > ymax) {
+                    ymax = bcnPosNED.y;
+                }
+                if (bcnPosNED.z < zmin) {
+                    zmin = bcnPosNED.z;
+                }
+            }
+            Vector3F posNED = Vector3F(0.5F*(xmin+xmax),0.5F*(ymin+ymax),zmin-1000.0F);
             ftype maxResidualRatio = 0.0F;
 
-            for (uint8_t dse_alignIterCount=0; dse_alignIterCount<5; dse_alignIterCount++) {
+            for (uint8_t iteration=0; iteration<10; iteration++) {
 
                 // Evaluate Jacobian and residual vector
                 for (int i = 0; i < Nmeas; i++) {
@@ -265,12 +289,13 @@ bool NavEKF3_core::ResetPosToRngBcn()
                     }
 
                     // p = inv(Jac'*Jac)*Jac'*res_vec;
-                    posNED.x -= p[0];
-                    posNED.y -= p[1];
-                    posNED.z -= p[2];
+                    const ftype gain = 0.7F; // gain factor reduction to improve convergence stability margin
+                    posNED.x -= p[0] * gain;
+                    posNED.y -= p[1] * gain;
+                    posNED.z -= p[2] * gain;
                     posNED.z = MIN(posNED.z, 0);
 
-                    // calculate the variance of the residuals
+                    // calculate the maximum residual normalised wrt the measurement uncertainty
                     maxResidualRatio = 0.0F;
                     for (int i = 0; i < Nmeas; i++) {
                         const ftype residualRatio = fabsF(res_vec[i]) / MAX(rngBcn.dataLast[indexList[i]].rngErr, 0.1F);
@@ -279,9 +304,12 @@ bool NavEKF3_core::ResetPosToRngBcn()
                         }
                     }
                 }
+                // printf("iteration=%i, maxResidualRatio=%.2f, pos=%.1f,%.1f,%.1f\n",iteration,maxResidualRatio,posNED.x,posNED.y,posNED.z);
+                if (is_positive(maxResidualRatio) && maxResidualRatio < 0.5F) {
+                    break;
+                }
             }
-            printf("Range to location residual ratio %e m\n",maxResidualRatio);
-            if (is_positive(maxResidualRatio) && maxResidualRatio < 0.5F) {
+            if (is_positive(maxResidualRatio) && maxResidualRatio < 5.0F) {
                 ResetPositionNE(posNE.x,posNE.y);
                 ret = true;
             }
