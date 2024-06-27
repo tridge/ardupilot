@@ -106,6 +106,8 @@ bool NavEKF3_core::ResetPosToRngBcn()
     }
 
     switch (Nfound) {
+    case 0:
+        break;
     case 1:
         {
             const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataLast[indexList[0]].beacon_posNED.y, stateStruct.position.x - rngBcn.dataLast[indexList[0]].beacon_posNED.x);
@@ -190,24 +192,100 @@ bool NavEKF3_core::ResetPosToRngBcn()
         }
         break;
     default:
+        {
+            const uint8_t Nmeas = MAX(Nfound,3);
+            // use a least squares solver
+            ftype Jac[Nmeas][3];
+            ftype JacTrans[3][Nmeas];
+            ftype res_vec[Nmeas];
+            ftype gradf[3];
+            Matrix3F JacTransJac;
+            Matrix3F cov;
+            ftype covJacTrans[3][Nmeas];
+            ftype p[3];
+            Vector3F posNED = stateStruct.position;
+            ftype maxResidualRatio = 0.0F;
+
+            for (uint8_t dse_alignIterCount=0; dse_alignIterCount<5; dse_alignIterCount++) {
+
+                // Evaluate Jacobian and residual vector
+                for (int i = 0; i < Nmeas; i++) {
+                    res_vec[i] = safe_sqrt(sq(posNED.x-rngBcn.dataLast[indexList[i]].beacon_posNED.x)+sq(posNED.y-rngBcn.dataLast[indexList[i]].beacon_posNED.y)+sq(posNED.z-rngBcn.dataLast[indexList[i]].beacon_posNED.z))-correctedSlantRng[i];
+
+                    const ftype t23 = sq(posNED.x-rngBcn.dataLast[indexList[i]].beacon_posNED.x)+sq(posNED.y-rngBcn.dataLast[indexList[i]].beacon_posNED.y)+sq(posNED.z-rngBcn.dataLast[indexList[i]].beacon_posNED.z);
+                    const ftype t24 = 1.0F / safe_sqrt(t23);
+                    const ftype t25 = (((posNED.x*2.0F)+(-(rngBcn.dataLast[indexList[i]].beacon_posNED.x*2.0F)))*t24)*0.5F;
+                    const ftype t26 = (((posNED.y*2.0F)+(-(rngBcn.dataLast[indexList[i]].beacon_posNED.y*2.0F)))*t24)*0.5F;
+                    const ftype t27 = (((posNED.z*2.0F)+(-(rngBcn.dataLast[indexList[i]].beacon_posNED.z*2.0F)))*t24)*0.5F;
+
+                    Jac[i][0] = t25;
+                    Jac[i][1] = t26;
+                    Jac[i][2] = t27;
+                }
+
+                for (int i = 0; i < 3; i++) {
+                    for (int j = 0; j < 4; j++){
+                        JacTrans[i][j] = Jac[j][i];
+                    }
+                }
+
+                for (int i = 0; i < 3; i++) {
+                    gradf[i] = 0;
+                    for (int j = 0; j < Nmeas; j++) {
+                        gradf[i] += JacTrans[i][j]*res_vec[j];
+                    }
+                }
+
+                for (int i = 0; i<3; i++) {
+                    for (int j = 0; j<3; j++) {
+                        JacTransJac[i][j] = 0;
+                        for (int k = 0; k<Nmeas; k++) {
+                            JacTransJac[i][j] += JacTrans[i][k]*Jac[k][j];
+                        }
+                    }
+                }
+
+                bool test = JacTransJac.inverse(cov);
+
+                if(test) {
+                    for (int i = 0; i<3; i++) {
+                        for (int j = 0; j<Nmeas; j++) {
+                            covJacTrans[i][j] = 0;
+                            for (int k = 0; k<3; k++) {
+                                covJacTrans[i][j] += cov[i][k]*JacTrans[k][j];
+                            }
+                        }
+                    }
+
+                    for (int i = 0; i < 3; i++) {
+                        p[i] = 0;
+                        for (int j = 0; j < Nmeas; j++) {
+                            p[i] += covJacTrans[i][j]*res_vec[j];
+                        }
+                    }
+
+                    // p = inv(Jac'*Jac)*Jac'*res_vec;
+                    posNED.x -= p[0];
+                    posNED.y -= p[1];
+                    posNED.z -= p[2];
+                    posNED.z = MIN(posNED.z, 0);
+
+                    // calculate the variance of the residuals
+                    maxResidualRatio = 0.0F;
+                    for (int i = 0; i < Nmeas; i++) {
+                        const ftype residualRatio = fabsF(res_vec[i]) / MAX(rngBcn.dataLast[indexList[i]].rngErr, 0.1F);
+                        if (maxResidualRatio < residualRatio) {
+                            maxResidualRatio = residualRatio;
+                        }
+                    }
+                }
+            }
+            printf("Range to location residual ratio %e m\n",maxResidualRatio);
+            if (is_positive(maxResidualRatio) && maxResidualRatio < 0.F) {
+                ret = true;
+            }
+        }
         break;
-    }
-    if (ret) {
-        Location loc;
-        loc.lat = EKF_origin.lat;
-        loc.lng = EKF_origin.lng;
-        loc.offset(stateStruct.position.x,stateStruct.position.y);
-        AP::logger().WriteStreaming("DBG2",
-                                    "TimeUS,C,N,Lat,Lng",  // labels
-                                    "s##DU",    // units
-                                    "F----",    // mults
-                                    "QBBLL",    // fmt
-                                    dal.micros64(),
-                                    DAL_CORE(core_index),
-                                    Nfound,
-                                    loc.lat,
-                                    loc.lng
-                                    );
     }
     return ret;
 }
