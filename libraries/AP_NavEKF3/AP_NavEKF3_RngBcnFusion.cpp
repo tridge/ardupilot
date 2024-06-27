@@ -281,7 +281,7 @@ bool NavEKF3_core::ResetPosToRngBcn()
                 }
             }
             printf("Range to location residual ratio %e m\n",maxResidualRatio);
-            if (is_positive(maxResidualRatio) && maxResidualRatio < 0.F) {
+            if (is_positive(maxResidualRatio) && maxResidualRatio < 0.5F) {
                 ResetPositionNE(posNE.x,posNE.y);
                 ret = true;
             }
