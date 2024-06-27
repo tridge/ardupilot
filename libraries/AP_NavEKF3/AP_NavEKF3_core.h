@@ -743,6 +743,7 @@ private:
 #if EK3_FEATURE_BEACON_FUSION
     // fuse range beacon measurements
     void FuseRngBcn();
+    void FuseRngToBcn2D(const ftype rngObs, const ftype rngObsVar);
     // push to range beacon array
     void PushRngBcn();
 #endif
