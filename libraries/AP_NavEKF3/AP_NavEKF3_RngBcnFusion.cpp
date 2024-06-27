@@ -316,6 +316,25 @@ bool NavEKF3_core::ResetPosToRngBcn()
         }
         break;
     }
+    if (ret) {
+        Location loc;
+        loc.lat = EKF_origin.lat;
+        loc.lng = EKF_origin.lng;
+        loc.alt = EKF_origin.alt;
+        loc.offset(stateStruct.position.x,stateStruct.position.y);
+        loc.alt -= (int32_t)(100.0f * stateStruct.position.z);
+        AP::logger().WriteStreaming("DBG2",
+                                    "TimeUS,C,Lat,Lng,N",  // labels
+                                    "s#DU#",    // units
+                                    "F----",    // mults
+                                    "QBLLB",    // fmt
+                                    dal.micros64(),
+                                    DAL_CORE(core_index),
+                                    loc.lat,
+                                    loc.lng,
+                                    Nfound
+                                    );
+    }
     return ret;
 }
 
