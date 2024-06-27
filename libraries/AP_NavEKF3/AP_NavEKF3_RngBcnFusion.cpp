@@ -36,7 +36,7 @@ void NavEKF3_core::SelectRngBcnFusion()
             }
         } else {
             // check for elevation angle < 45 degrees
-            if (rngBcn.horizontalRange[rngBcn.dataDelayed.beacon_ID] > cosF(radians(45.0f)) * rngBcn.correctedSlantRange[rngBcn.dataDelayed.beacon_ID]) {
+            if (rngBcn.correctedSlantRange[rngBcn.dataDelayed.beacon_ID] > 3.0F * MAX(rngBcn.dataDelayed.rngErr , 0.1f) && rngBcn.horizontalRange[rngBcn.dataDelayed.beacon_ID] > cosF(radians(45.0f)) * rngBcn.correctedSlantRange[rngBcn.dataDelayed.beacon_ID]) {
                 FuseRngBcn();
                 // // adjust range observation noise for geometric dilution of precision
                 // const ftype RHV = sq(MAX(rngBcn.dataDelayed.rngErr , 0.1f) * (rngBcn.correctedSlantRange[rngBcn.dataDelayed.beacon_ID]/rngBcn.horizontalRange[rngBcn.dataDelayed.beacon_ID]));
