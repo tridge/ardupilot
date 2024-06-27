@@ -636,7 +636,8 @@ private:
     enum class FastRateType : uint8_t {
         FAST_RATE_DISABLED            = 0,
         FAST_RATE_DYNAMIC             = 1,
-        FAST_RATE_FIXED               = 2,
+        FAST_RATE_FIXED_ARMED         = 2,
+        FAST_RATE_FIXED               = 3,
     };
 
     FastRateType get_fast_rate_type() const { return FastRateType(g2.att_enable.get()); }
@@ -736,9 +737,11 @@ private:
     uint16_t get_pilot_speed_dn() const;
     void run_rate_controller_main();
 #if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+    uint8_t calc_gyro_decimation(uint16_t gyro_decimation, uint16_t rate_hz);
     void rate_controller_thread();
     void rate_controller_filter_update();
     void rate_controller_log_update();
+    uint8_t rate_controller_set_rates(uint8_t rate_decimation, bool warn_cpu_high);
 #endif
 
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
@@ -914,7 +917,7 @@ private:
     // motors.cpp
     void arm_motors_check();
     void auto_disarm_check();
-    void motors_output();
+    void motors_output(bool full_push = true);
     void motors_output_main();
     void lost_vehicle_check();
 
