@@ -13,7 +13,7 @@ void NavEKF3_core::SelectRngBcnFusion()
 {
     // range to location data is being pushed externally to the EKF so we need to check the buffer
     if (rngBcn.usingRangeToLoc) {
-        bool new_data = false;
+        uint32_t new_data_mask = 0;
         for (uint8_t i=0; i<rngBcn.N; i++) {
             auto &dataDelayed = rngBcn.dataDelayed[i];
             // recall data into our dataDelayed array
@@ -41,10 +41,10 @@ void NavEKF3_core::SelectRngBcnFusion()
             // calculate an equivalent horizontal range assuming vehicle and beacon height is accurate
             ftype RHsq = sq(rngBcn.correctedSlantRange[dataDelayed.beacon_ID])-sq(dataDelayed.beacon_posNED.z - stateStruct.position.z);
             rngBcn.horizontalRange[dataDelayed.beacon_ID] = sqrtF(MAX(RHsq, 0.0f));
-            new_data = true;
+            new_data_mask |= (1<<i);
         }
 
-        if (new_data) {
+        if (new_data_mask != 0) {
             // a reset using a single observation set is a last resort so wait for the slow timeout on the primary position sensors
             bool noPositionFix = (imuSampleTime_ms - lastGpsPosPassTime_ms > frontend->altPosSwitchTimeout_ms) &&
                 (imuSampleTime_ms - lastExtNavPosPassTime_ms > frontend->altPosSwitchTimeout_ms);
@@ -54,7 +54,7 @@ void NavEKF3_core::SelectRngBcnFusion()
                 }
             } else {
                 // check for elevation angle < 45 degrees
-                FuseLowElevationRngBcns();
+                FuseLowElevationRngBcns(new_data_mask);
                     // // adjust range observation noise for geometric dilution of precision
                     // const ftype RHV = sq(MAX(dataDelayed.rngErr , 0.1f) * (rngBcn.correctedSlantRange[dataDelayed.beacon_ID]/rngBcn.horizontalRange[dataDelayed.beacon_ID]));
                     // FuseRngToBcn2D(rngBcn.horizontalRange[dataDelayed.beacon_ID], RHV);
@@ -445,9 +445,12 @@ void NavEKF3_core::FuseRngBcn()
 
 // FuseLowElevationRngBcns - fuse rangebeacons which are above a
 // particular elevation and look good in terms of range errors:
-void NavEKF3_core::FuseLowElevationRngBcns()
+void NavEKF3_core::FuseLowElevationRngBcns(uint32_t new_data_mask)
 {
     for (uint8_t i=0; i<rngBcn.N; i++) {
+        if ((new_data_mask & (1U<<i)) == 0) {
+            continue;
+        }
         auto dataDelayed = rngBcn.dataDelayed[i];
         const auto beacon_ID = dataDelayed.beacon_ID;
         if (rngBcn.correctedSlantRange[beacon_ID] <= 3.0F * MAX(dataDelayed.rngErr , 0.1f)) {

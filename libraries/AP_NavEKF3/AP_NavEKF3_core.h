@@ -746,7 +746,7 @@ private:
     void FuseRngToBcn2D(const ftype rngObs, const ftype rngObsVar);
     // FuseLowElevationRngBcns - fuse rangebeacons which are above a
     // particular elevation and look good in terms of range errors:
-    void FuseLowElevationRngBcns();
+    void FuseLowElevationRngBcns(uint32_t new_data_mask);
     // fuse range beacon measurements
     void FuseRngBcn(rng_bcn_elements &data);
     // push to range beacon array
