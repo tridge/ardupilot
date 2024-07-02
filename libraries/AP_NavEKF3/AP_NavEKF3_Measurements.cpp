@@ -1053,7 +1053,7 @@ void NavEKF3_core::writeRangeToLocation(const float range, const float uncertain
     rngBcnDataNew.beacon_loc = loc;
     rngBcnDataNew.beacon_ID = index;
 
-    rngBcn.N = Nbeacons;
+    rngBcn.N = MAX(Nbeacons, index+1);
 
     // write data to buffer with time stamp to be fused when the fusion time horizon catches up with it
     rngBcn.storedRange[index].push(rngBcnDataNew);
