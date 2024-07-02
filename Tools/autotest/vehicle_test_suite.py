@@ -3185,6 +3185,8 @@ class TestSuite(ABC):
 
         def hook_removed(self):
             self.progress(f"Maximum divergence was {self.max_divergence}m (max={self.max_allowed_divergence}m)")
+            if self.max_divergence > 3*self.max_allowed_divergence:
+                raise NotAchievedException("Bad upper bound on divergence")
 
     class ValidateGlobalPositionIntAgainstSimState(ValidateIntPositionAgainstSimState):
         def __init__(self, suite, **kwargs):
