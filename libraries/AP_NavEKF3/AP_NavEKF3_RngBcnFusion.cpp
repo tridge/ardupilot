@@ -96,55 +96,63 @@ void NavEKF3_core::SelectRngBcnFusion()
 
 bool NavEKF3_core::ResetPosToRngBcn()
 {
-    bool ret = false;
-    Vector2F posNE;
-
     // find beacons that can be used to set position
-    uint8_t Nfound = 0;
-    ftype correctedSlantRng[AP_BEACON_MAX_BEACONS];
     ftype correctedHorizRng[AP_BEACON_MAX_BEACONS];
-    uint8_t indexList[AP_BEACON_MAX_BEACONS];
-    for (uint8_t index=0; index<AP_BEACON_MAX_BEACONS; index++) {
-        // predict range measurement to current time using delay and range rate
-        const Vector3F deltaPosNED = stateStruct.position - rngBcn.dataLast[index].beacon_posNED;
-        const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
-        ftype delaySec = 0.001f * (ftype)((double)rngBcn.dataLast[index].delay_ms + (double)imuDataDelayed.time_ms - (double)rngBcn.dataLast[index].time_ms);
-        if (fabsF(delaySec) < 5.0f) {
-            // limit time separation between measurements or else velocity errors due to turns become too large.
-            // TODO include bank angle in range correction calculation
-            indexList[Nfound] = index;
-            correctedSlantRng[Nfound] = rngBcn.dataLast[index].rng + rangeRate * delaySec;
-            // calculate an equivalent horizontal range assuming vehicle and beacon height is accurate
-            ftype RHsq = sq(correctedSlantRng[Nfound])-sq(rngBcn.dataLast[index].beacon_posNED.z - stateStruct.position.z);
-            correctedHorizRng[Nfound] = sqrtF(MAX(RHsq, 0.0f));
-            if (correctedHorizRng[Nfound] > cosF(radians(45.0f)) * correctedSlantRng[Nfound]) {
-                Nfound++;
+    static rng_bcn_elements dataForReset[AP_BEACON_MAX_BEACONS];
+
+    if (rngBcn.resetIterCount == 0) {
+        rngBcn.posResetNumBcns = 0;
+        for (uint8_t index=0; index<AP_BEACON_MAX_BEACONS; index++) {
+            // predict range measurement to current time using delay and range rate
+            const Vector3F deltaPosNED = stateStruct.position - rngBcn.dataLast[index].beacon_posNED;
+            const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
+            ftype delaySec = 0.001f * (ftype)((double)rngBcn.dataLast[index].delay_ms + (double)imuDataDelayed.time_ms - (double)rngBcn.dataLast[index].time_ms);
+            if (fabsF(delaySec) < 5.0f) {
+                // limit time separation between measurements or else velocity errors due to turns become too large.
+                // TODO include bank angle in range correction calculation
+                const ftype correctedSlantRng = rngBcn.dataLast[index].rng + rangeRate * delaySec;
+                // calculate an equivalent horizontal range assuming vehicle and beacon height is accurate
+                ftype RHsq = sq(correctedSlantRng)-sq(rngBcn.dataLast[index].beacon_posNED.z - stateStruct.position.z);
+                if (RHsq > sq(rngBcn.dataLast[index].rngErr)) {
+                    correctedHorizRng[rngBcn.posResetNumBcns] = sqrtF(RHsq);
+                    dataForReset[rngBcn.posResetNumBcns] = rngBcn.dataLast[index];
+                    dataForReset[rngBcn.posResetNumBcns].rng = correctedSlantRng;
+                    rngBcn.posResetNumBcns++;
+                } else if (rngBcn.dataLast[index].rng < rngBcn.dataLast[index].rngErr) {
+                    // we are very close to a beacon so set the vehicle horizontal position to match the beacon
+                    ResetPositionNE(rngBcn.dataLast[index].beacon_posNED.x, rngBcn.dataLast[index].beacon_posNED.y);
+                    rngBcn.posResetNumBcns = 0;
+                    return true;
+                }
             }
         }
     }
 
-    switch (Nfound) {
+    bool ret = false;
+    bool reachedCountLimit = false;
+
+    switch (rngBcn.posResetNumBcns) {
     case 0:
         break;
     case 1:
         {
-            const ftype bearing = atan2F(stateStruct.position.y - rngBcn.dataLast[indexList[0]].beacon_posNED.y, stateStruct.position.x - rngBcn.dataLast[indexList[0]].beacon_posNED.x);
-            posNE = rngBcn.dataLast[indexList[0]].beacon_posNED.xy();
-            posNE += Vector2F(correctedHorizRng[0] * cosF(bearing), correctedHorizRng[0] * sinF(bearing));
-            ResetPositionNE(posNE.x, posNE.y);
+            const ftype bearing = atan2F(stateStruct.position.y - dataForReset[0].beacon_posNED.y, stateStruct.position.x - dataForReset[0].beacon_posNED.x);
+            rngBcn.posResetNED.xy() = dataForReset[0].beacon_posNED.xy();
+            rngBcn.posResetNED.xy() += Vector2F(correctedHorizRng[0] * cosF(bearing), correctedHorizRng[0] * sinF(bearing));
+            ResetPositionNE(rngBcn.posResetNED.x, rngBcn.posResetNED.y);
             ret = true;
         }
         break;
     case 2:
         {
             // find the intersection
-            const ftype DR0 = rngBcn.dataLast[indexList[0]].rngErr;
-            const ftype DR1 = rngBcn.dataLast[indexList[1]].rngErr;
-            if (!is_positive(correctedSlantRng[0]-DR0) || !is_positive(correctedSlantRng[1]-DR1)) {
+            const ftype DR0 = dataForReset[0].rngErr;
+            const ftype DR1 = dataForReset[1].rngErr;
+            if (!is_positive(dataForReset[0].rng - DR0) || !is_positive(dataForReset[1].rng - DR1)) {
                 break;
             }
-            if (DualRangeIntersectNE(posNE, correctedSlantRng[0], correctedSlantRng[1], rngBcn.dataLast[indexList[0]].beacon_posNED, rngBcn.dataLast[indexList[1]].beacon_posNED, stateStruct.position.z)) {
-                ResetPositionNE(posNE.x,posNE.y);
+            if (DualRangeIntersectNE(rngBcn.posResetNED.xy(), dataForReset[0].rng, dataForReset[1].rng, dataForReset[0].beacon_posNED, dataForReset[1].beacon_posNED, stateStruct.position.z)) {
+                ResetPositionNE(rngBcn.posResetNED.x,rngBcn.posResetNED.y);
                 ret = true;
             }
         }
@@ -152,12 +160,12 @@ bool NavEKF3_core::ResetPosToRngBcn()
     case 3:
         {
             // do trilateration
-            const Vector3F p1 = rngBcn.dataLast[indexList[0]].beacon_posNED;
-            const Vector3F p2 = rngBcn.dataLast[indexList[1]].beacon_posNED;
-            const Vector3F p3 = rngBcn.dataLast[indexList[2]].beacon_posNED;
-            const ftype r1 = correctedSlantRng[0];
-            const ftype r2 = correctedSlantRng[1];
-            const ftype r3 = correctedSlantRng[2];
+            const Vector3F p1 = dataForReset[0].beacon_posNED;
+            const Vector3F p2 = dataForReset[1].beacon_posNED;
+            const Vector3F p3 = dataForReset[2].beacon_posNED;
+            const ftype r1 = dataForReset[0].rng;
+            const ftype r2 = dataForReset[1].rng;
+            const ftype r3 = dataForReset[2].rng;
 
             // Calculate vectors
             Vector3F ex = Vector3F(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
@@ -200,140 +208,154 @@ bool NavEKF3_core::ResetPosToRngBcn()
 
             // Use the solution above the beacons (up is negative z)
             if (result1.z < result2.z) {
-                posNE = result1.xy();
+                rngBcn.posResetNED.xy() = result1.xy();
             } else {
-                posNE = result2.xy();
+                rngBcn.posResetNED.xy() = result2.xy();
             }
 
-            ResetPositionNE(posNE.x,posNE.y);
+            ResetPositionNE(rngBcn.posResetNED.x,rngBcn.posResetNED.y);
             ret = true;
         }
         break;
-    default:
+    default: // Iterative Gauss Newton least squares method
         {
-            const uint8_t Nmeas = MAX(Nfound,3);
-            // use a least squares solver
-            ftype Jac[Nmeas][3];
-            ftype JacTrans[3][Nmeas];
-            ftype res_vec[Nmeas];
-            ftype gradf[3];
-            Matrix3F JacTransJac;
-            Matrix3F cov;
-            ftype covJacTrans[3][Nmeas];
-            ftype p[3];
-            // start in middle of beacon pattern and 1000m above the highest beacon.
-            ftype xmin =  EK3_POSXY_STATE_LIMIT;
-            ftype xmax = -EK3_POSXY_STATE_LIMIT;
-            ftype ymin =  EK3_POSXY_STATE_LIMIT;
-            ftype ymax = -EK3_POSXY_STATE_LIMIT;
-            ftype zmin =  1.0e4f;
-            for (int i = 0; i < Nmeas; i++) {
-                Vector3F bcnPosNED = rngBcn.dataLast[indexList[i]].beacon_posNED;
-                if (bcnPosNED.x < xmin) {
-                    xmin = bcnPosNED.x;
-                }
-                if (bcnPosNED.x > xmax) {
-                    xmax = bcnPosNED.x;
-                }
-                if (bcnPosNED.y < ymin) {
-                    ymin = bcnPosNED.y;
-                }
-                if (bcnPosNED.y > ymax) {
-                    ymax = bcnPosNED.y;
-                }
-                if (bcnPosNED.z < zmin) {
-                    zmin = bcnPosNED.z;
-                }
-            }
-            Vector3F posNED = Vector3F(0.5F*(xmin+xmax),0.5F*(ymin+ymax),zmin-1000.0F);
-            ftype maxResidualRatio = 0.0F;
+            const uint8_t Nmeas = rngBcn.posResetNumBcns;
 
-            for (uint8_t iteration=0; iteration<10; iteration++) {
-
-                // Evaluate Jacobian and residual vector
+            if (rngBcn.resetIterCount == 0) {
+                // start in middle of beacon pattern and 1000m above the highest beacon.
+                ftype xmin =  EK3_POSXY_STATE_LIMIT;
+                ftype xmax = -EK3_POSXY_STATE_LIMIT;
+                ftype ymin =  EK3_POSXY_STATE_LIMIT;
+                ftype ymax = -EK3_POSXY_STATE_LIMIT;
+                ftype zmin =  1.0e4f;
                 for (int i = 0; i < Nmeas; i++) {
-                    res_vec[i] = safe_sqrt(sq(posNED.x-rngBcn.dataLast[indexList[i]].beacon_posNED.x)+sq(posNED.y-rngBcn.dataLast[indexList[i]].beacon_posNED.y)+sq(posNED.z-rngBcn.dataLast[indexList[i]].beacon_posNED.z))-correctedSlantRng[i];
-
-                    const ftype t23 = sq(posNED.x-rngBcn.dataLast[indexList[i]].beacon_posNED.x)+sq(posNED.y-rngBcn.dataLast[indexList[i]].beacon_posNED.y)+sq(posNED.z-rngBcn.dataLast[indexList[i]].beacon_posNED.z);
-                    const ftype t24 = 1.0F / safe_sqrt(t23);
-                    const ftype t25 = (((posNED.x*2.0F)+(-(rngBcn.dataLast[indexList[i]].beacon_posNED.x*2.0F)))*t24)*0.5F;
-                    const ftype t26 = (((posNED.y*2.0F)+(-(rngBcn.dataLast[indexList[i]].beacon_posNED.y*2.0F)))*t24)*0.5F;
-                    const ftype t27 = (((posNED.z*2.0F)+(-(rngBcn.dataLast[indexList[i]].beacon_posNED.z*2.0F)))*t24)*0.5F;
-
-                    Jac[i][0] = t25;
-                    Jac[i][1] = t26;
-                    Jac[i][2] = t27;
-                }
-
-                for (int i = 0; i < 3; i++) {
-                    for (int j = 0; j < 4; j++){
-                        JacTrans[i][j] = Jac[j][i];
+                    Vector3F bcnPosNED = dataForReset[i].beacon_posNED;
+                    if (bcnPosNED.x < xmin) {
+                        xmin = bcnPosNED.x;
+                    }
+                    if (bcnPosNED.x > xmax) {
+                        xmax = bcnPosNED.x;
+                    }
+                    if (bcnPosNED.y < ymin) {
+                        ymin = bcnPosNED.y;
+                    }
+                    if (bcnPosNED.y > ymax) {
+                        ymax = bcnPosNED.y;
+                    }
+                    if (bcnPosNED.z < zmin) {
+                        zmin = bcnPosNED.z;
                     }
                 }
+                rngBcn.posResetNED = Vector3F(0.5F*(xmin+xmax),0.5F*(ymin+ymax),zmin-1000.0F);
+            }
 
+            rngBcn.resetIterCount++;
+
+            // Evaluate Jacobian and residual vector
+            ftype Jac[Nmeas][3];
+            ftype res_vec[AP_BEACON_MAX_BEACONS]; // sized at max possible value for logging purposes
+            for (int i = 0; i < Nmeas; i++) {
+                const ftype deltaPosN = rngBcn.posResetNED.x - dataForReset[i].beacon_posNED.x;
+                const ftype deltaPosE = rngBcn.posResetNED.y - dataForReset[i].beacon_posNED.y;
+                const ftype deltaPosD = rngBcn.posResetNED.z - dataForReset[i].beacon_posNED.z;
+
+                const ftype rngPred = sqrtF(sq(deltaPosN) + sq(deltaPosE) + sq(deltaPosD));
+
+                if (rngPred < 1.0F) {
+                    rngBcn.resetIterCount = 0;
+                    return false;
+                }
+
+                Jac[i][0] = deltaPosN / rngPred;
+                Jac[i][1] = deltaPosE / rngPred;
+                Jac[i][2] = deltaPosD / rngPred;
+
+                res_vec[i] = rngPred - dataForReset[i].rng;
+            }
+
+            ftype JacTrans[3][Nmeas];
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < Nmeas; j++){
+                    JacTrans[i][j] = Jac[j][i];
+                }
+            }
+
+            Matrix3F JacTransJac;
+            for (int i = 0; i<3; i++) {
+                for (int j = 0; j<3; j++) {
+                    JacTransJac[i][j] = 0;
+                    for (int k = 0; k<Nmeas; k++) {
+                        JacTransJac[i][j] += JacTrans[i][k]*Jac[k][j];
+                    }
+                }
+            }
+
+            Matrix3F JacTransJacInv;
+            bool hasInverse = JacTransJac.inverse(JacTransJacInv);
+
+            if(hasInverse) {
+                ftype JacTransRes[3];
                 for (int i = 0; i < 3; i++) {
-                    gradf[i] = 0;
+                    JacTransRes[i] = 0;
                     for (int j = 0; j < Nmeas; j++) {
-                        gradf[i] += JacTrans[i][j]*res_vec[j];
+                        JacTransRes[i] += JacTrans[i][j]*res_vec[j];
                     }
                 }
 
-                for (int i = 0; i<3; i++) {
-                    for (int j = 0; j<3; j++) {
-                        JacTransJac[i][j] = 0;
-                        for (int k = 0; k<Nmeas; k++) {
-                            JacTransJac[i][j] += JacTrans[i][k]*Jac[k][j];
-                        }
+                ftype correction[3];
+                for (int i = 0; i < 3; i++) {
+                    correction[i] = 0;
+                    for (int j = 0; j < 3; j++) {
+                        correction[i] += JacTransJacInv[i][j] * JacTransRes[j];
                     }
                 }
 
-                bool test = JacTransJac.inverse(cov);
+                const ftype tuningGain = 1.0f; // adjust if stability issues are encountered
+                rngBcn.posResetNED.x -= correction[0] * tuningGain;
+                rngBcn.posResetNED.y -= correction[1] * tuningGain;
+                rngBcn.posResetNED.z -= correction[2] * tuningGain;
 
-                if(test) {
-                    for (int i = 0; i<3; i++) {
-                        for (int j = 0; j<Nmeas; j++) {
-                            covJacTrans[i][j] = 0;
-                            for (int k = 0; k<3; k++) {
-                                covJacTrans[i][j] += cov[i][k]*JacTrans[k][j];
-                            }
-                        }
-                    }
-
-                    for (int i = 0; i < 3; i++) {
-                        p[i] = 0;
-                        for (int j = 0; j < Nmeas; j++) {
-                            p[i] += covJacTrans[i][j]*res_vec[j];
-                        }
-                    }
-
-                    // p = inv(Jac'*Jac)*Jac'*res_vec;
-                    const ftype gain = 0.7F; // gain factor reduction to improve convergence stability margin
-                    posNED.x -= p[0] * gain;
-                    posNED.y -= p[1] * gain;
-                    posNED.z -= p[2] * gain;
-                    posNED.z = MIN(posNED.z, 0);
-
-                    // calculate the maximum residual normalised wrt the measurement uncertainty
-                    maxResidualRatio = 0.0F;
-                    for (int i = 0; i < Nmeas; i++) {
-                        const ftype residualRatio = fabsF(res_vec[i]) / MAX(rngBcn.dataLast[indexList[i]].rngErr, 0.1F);
-                        if (maxResidualRatio < residualRatio) {
-                            maxResidualRatio = residualRatio;
-                        }
+                // calculate the maximum residual normalised wrt the measurement uncertainty
+                ftype maxResidualRatio = 0.0F;
+                for (int i = 0; i < Nmeas; i++) {
+                    const ftype residualRatio = fabsF(res_vec[i]) / MAX(dataForReset[i].rngErr, 0.1F);
+                    if (maxResidualRatio < residualRatio) {
+                        maxResidualRatio = residualRatio;
                     }
                 }
-                // printf("iteration=%i, maxResidualRatio=%.2f, pos=%.1f,%.1f,%.1f\n",iteration,maxResidualRatio,posNED.x,posNED.y,posNED.z);
-                if (is_positive(maxResidualRatio) && maxResidualRatio < 0.5F) {
-                    break;
+
+                // continue iterating until largest residual is < 1 sigma. If run out of iterations don't accept result if residual > 3 sigma
+                reachedCountLimit = rngBcn.resetIterCount >= 20;
+                const ftype maxRatio = reachedCountLimit ? 3.0F : 1.0F;
+                if (is_positive(maxResidualRatio) && maxResidualRatio < maxRatio) {
+                    ResetPositionNE(rngBcn.posResetNED.x,rngBcn.posResetNED.y);
+                    ret = true;
                 }
+
+                AP::logger().WriteStreaming("DBG3",
+                                            "TimeUS,C,R1,R2,R3,R4,iteration",  // labels
+                                            "s#mmmm-",    // units
+                                            "F------",    // mults
+                                            "QBffffB",    // fmt
+                                            dal.micros64(),
+                                            DAL_CORE(core_index),
+                                            res_vec[0],
+                                            res_vec[1],
+                                            res_vec[2],
+                                            res_vec[3],
+                                            rngBcn.resetIterCount
+                                            );
+            } else {
+                // badly conditioned so re-start with new data
+                reachedCountLimit = true;
             }
-            if (is_positive(maxResidualRatio) && maxResidualRatio < 5.0F) {
-                ResetPositionNE(posNE.x,posNE.y);
-                ret = true;
-            }
+
+
         }
+
         break;
     }
+
     if (ret) {
         Location loc;
         loc.lat = EKF_origin.lat;
@@ -350,9 +372,14 @@ bool NavEKF3_core::ResetPosToRngBcn()
                                     DAL_CORE(core_index),
                                     loc.lat,
                                     loc.lng,
-                                    Nfound
+                                    rngBcn.posResetNumBcns
                                     );
     }
+
+    if (ret || reachedCountLimit) {
+        rngBcn.resetIterCount = 0;
+    }
+
     return ret;
 }
 

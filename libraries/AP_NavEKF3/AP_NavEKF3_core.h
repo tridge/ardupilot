@@ -1383,6 +1383,7 @@ private:
         rng_bcn_elements dataLast[AP_BEACON_MAX_BEACONS]; // Last retrieved range beacon data at the fusion time horizon for each beacon
         ftype correctedSlantRange[AP_BEACON_MAX_BEACONS]; // slant range corrected for time offset and range rate (m)
         ftype horizontalRange[AP_BEACON_MAX_BEACONS]; //  horizontal component of corrected slant range slant range (m)
+        uint8_t resetIterCount;       // number of iterations completed searching for a lest squares solution to the range measurements when resetting the position.
         uint32_t lastPassTime_ms;     // time stamp when the range beacon measurement last passed innovation consistency checks (msec)
         ftype testRatio;              // Innovation test ratio for range beacon measurements
         bool health;                  // boolean true if range beacon measurements have passed innovation consistency check
@@ -1436,6 +1437,11 @@ private:
         bool newDataToLog[AP_BEACON_MAX_BEACONS]; // true when there has been a range measurement and new data to log
         ftype verticalOffset; // offset added to vehicle vertical position wrt origin before calculating range innovation (m)
         ftype verticalOffsetVariance; // variance of verticalOffset state estimate (m^2)
+
+        // Variables requried for the least squares method used to initialise position using
+        // 4 or more beacons to iterate across multiple frames. 
+        uint8_t posResetNumBcns; // number of beacons currently in use for the position reset
+        Vector3F posResetNED; // intermediate result for storing NED position for reset (m)
     } rngBcn;
 #endif  // if EK3_FEATURE_BEACON_FUSION
 
