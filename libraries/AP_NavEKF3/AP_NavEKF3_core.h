@@ -743,7 +743,6 @@ private:
 #if EK3_FEATURE_BEACON_FUSION
     // fuse all range beacon measurements
     void FuseRngBcn();
-    void FuseRngToBcn2D(const ftype rngObs, const ftype rngObsVar);
     // FuseLowElevationRngBcns - fuse rangebeacons which are above a
     // particular elevation and look good in terms of range errors:
     void FuseLowElevationRngBcns(uint32_t new_data_mask);
