@@ -381,7 +381,6 @@ struct log_RRLT {
     int32_t alt;
     uint32_t timeStamp_ms;
     uint8_t index;
-    uint8_t Nbeacons;
     uint8_t _end;
 };
 
@@ -453,4 +452,4 @@ struct log_RRLT {
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
       "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" }, \
     { LOG_RRLT_MSG, RLOG_SIZE(RRLT),                                   \
-      "RRLT", "ffiiiIBB", "Range,Uncertainty,Lat,Lon,Alt,TS,Idx,Nbcn", "--------", "--------" },
+      "RRLT", "ffiiiIB", "Range,Uncertainty,Lat,Lon,Alt,TS,Idx", "-------", "-------" },

@@ -1036,7 +1036,7 @@ void NavEKF3_core::readRngBcnData()
 
 }
 
-void NavEKF3_core::writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms, const uint8_t index, const uint8_t Nbeacons)
+void NavEKF3_core::writeRangeToLocation(const float range, const float uncertainty, const Location &loc, const uint32_t timeStamp_ms, const uint8_t index)
 {
     if (index >= ARRAY_SIZE(rngBcn.storedRange)) {
         return;
@@ -1053,7 +1053,7 @@ void NavEKF3_core::writeRangeToLocation(const float range, const float uncertain
     rngBcnDataNew.beacon_loc = loc;
     rngBcnDataNew.beacon_ID = index;
 
-    rngBcn.N = MAX(Nbeacons, index+1);
+    rngBcn.N = MAX(rngBcn.N, index+1);  // update high-water-mark
     if (rngBcn.N > ARRAY_SIZE(rngBcn.storedRange)) {
         rngBcn.N = ARRAY_SIZE(rngBcn.storedRange);
     }
