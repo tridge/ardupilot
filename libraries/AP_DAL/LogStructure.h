@@ -452,4 +452,4 @@ struct log_RRLT {
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \
       "RBOH", "ffffffffIfffH", "Q,DPX,DPY,DPZ,DAX,DAY,DAZ,DT,TS,OX,OY,OZ,D", "-------------", "-------------" }, \
     { LOG_RRLT_MSG, RLOG_SIZE(RRLT),                                   \
-      "RRLT", "ffiiiIB", "Range,Uncertainty,Lat,Lon,Alt,TS,Idx", "-------", "-------" },
+      "RRLT", "ffiiiIB", "Range,Uncertainty,Lat,Lon,Alt,TS,Idx", "--DUm-#", "--GGB--" },
