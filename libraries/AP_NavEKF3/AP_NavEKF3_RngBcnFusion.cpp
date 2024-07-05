@@ -343,7 +343,7 @@ bool NavEKF3_core::ResetPosToRngBcn()
         loc.alt -= (int32_t)(100.0f * stateStruct.position.z);
         AP::logger().WriteStreaming("DBG2",
                                     "TimeUS,C,Lat,Lng,N",  // labels
-                                    "s#DU#",    // units
+                                    "s#DU-",    // units
                                     "F----",    // mults
                                     "QBLLB",    // fmt
                                     dal.micros64(),
