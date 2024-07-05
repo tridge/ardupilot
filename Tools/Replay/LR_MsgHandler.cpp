@@ -310,8 +310,49 @@ void LR_MsgHandler_REVH::process_message(uint8_t *msgbytes)
     AP::dal().handle_message(msg, ekf2, ekf3);
 }
 
+LR_MsgHandler_RRLT::LR_MsgHandler_RRLT(struct log_Format &_f, NavEKF2 &_ekf2, NavEKF3 &_ekf3) :
+    LR_MsgHandler_EKF(_f, _ekf2, _ekf3)
+{
+    // the checksum here is the checksum of the old log_Format entry
+    // before Nbeacons was removed.  It corresponds to
+    // log_RRLT_with_NBeacons, below.
+    if (crc_crc32(0, (uint8_t*)&_f, sizeof(_f)) == 0xB282E3A3) {
+        Nbeacons_transform_required = true;
+    }
+}
+
 void LR_MsgHandler_RRLT::process_message(uint8_t *msgbytes)
 {
+    if (Nbeacons_transform_required) {
+        // this structure was copied out of AP_DAL.cpp before being
+        // modified there.  It is the true value of the same of the
+        // msg in msgbytes.  _end has been trimmed out
+        struct log_RRLT_with_NBeacons {
+            float range;
+            float uncertainty;
+            int32_t lat;
+            int32_t lng;
+            int32_t alt;
+            uint32_t timeStamp_ms;
+            uint8_t index;
+            uint8_t nbeacons;
+        };
+        // note that if fields are added to RRLT message then this
+        // will be incorrect!
+        const log_RRLT_with_NBeacons &tmp = *((log_RRLT_with_NBeacons*)&msgbytes[3]);
+        const log_RRLT msg {
+            range        : tmp.range,
+            uncertainty  : tmp.uncertainty,
+            lat          : tmp.lat,
+            lng          : tmp.lng,
+            alt          : tmp.alt,
+            timeStamp_ms : tmp.timeStamp_ms,
+            index        : tmp.index,
+        };
+        AP::dal().handle_message(msg, ekf2, ekf3);
+        return;
+    }
+
     MSG_CREATE(RRLT, msgbytes);
     AP::dal().handle_message(msg, ekf2, ekf3);
 }

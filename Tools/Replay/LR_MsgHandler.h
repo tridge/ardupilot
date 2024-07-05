@@ -243,8 +243,10 @@ public:
 class LR_MsgHandler_RRLT : public LR_MsgHandler_EKF
 {
 public:
-    using LR_MsgHandler_EKF::LR_MsgHandler_EKF;
+    LR_MsgHandler_RRLT(struct log_Format &_f, NavEKF2 &_ekf2, NavEKF3 &_ekf3);
     void process_message(uint8_t *msg) override;
+private:
+    bool Nbeacons_transform_required;
 };
 
 class LR_MsgHandler_PARM : public LR_MsgHandler
