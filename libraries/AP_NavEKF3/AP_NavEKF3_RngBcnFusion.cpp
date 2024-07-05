@@ -44,6 +44,10 @@ void NavEKF3_core::SelectRngBcnFusion()
             new_data_mask |= (1<<i);
         }
 
+        // update covariance prediction for vertical position drift
+        rngBcn.verticalOffsetVariance += sq(frontend->rngToLocHgtOfsDriftRate * dtEkfAvg);
+        rngBcn.verticalOffsetVariance = MAX(rngBcn.verticalOffsetVariance, 0.0f);
+
         if (new_data_mask != 0) {
             // a reset using a single observation set is a last resort so wait for the slow timeout on the primary position sensors
             bool noPositionFix = (imuSampleTime_ms - lastGpsPosPassTime_ms > frontend->altPosSwitchTimeout_ms) &&
@@ -429,6 +433,7 @@ void NavEKF3_core::PushRngBcn(const rng_bcn_elements &data)
     report.innovVar = rngBcn.varInnov;
     report.rng = data.rng;
     report.testRatio = rngBcn.testRatio;
+    report.vertOffset = rngBcn.verticalOffset;
     rngBcn.newDataToLog[data.beacon_ID] = true;
 }
 
@@ -461,47 +466,34 @@ void NavEKF3_core::FuseLowElevationRngBcns(uint32_t new_data_mask)
     }
 }
 
-void NavEKF3_core::FuseRngBcn(rng_bcn_elements &dataDelayed)
+void NavEKF3_core::FuseRngBcn(rng_bcn_elements &data)
 {
-    // declarations
-    ftype pn;
-    ftype pe;
-    ftype pd;
-    ftype bcn_pn;
-    ftype bcn_pe;
-    ftype bcn_pd;
-    const ftype R_BCN = sq(MAX(dataDelayed.rngErr , 0.1f));
-    ftype rngPred;
-
     // health is set bad until test passed
     rngBcn.health = false;
 
-    if (activeHgtSource != AP_NavEKF_Source::SourceZ::BEACON) {
-        // calculate the vertical offset from EKF datum to beacon datum
-        CalcRangeBeaconPosDownOffset(dataDelayed, R_BCN, stateStruct.position, false);
-    } else {
-        rngBcn.posOffsetNED.z = 0.0f;
-    }
-
-    // copy required states to local variable names
-    pn = stateStruct.position.x;
-    pe = stateStruct.position.y;
-    pd = stateStruct.position.z;
+    const ftype R_BCN = sq(MAX(data.rngErr , 0.1f));
 
     if (rngBcn.usingRangeToLoc) {
-        dataDelayed.beacon_posNED = EKF_origin.get_distance_NED_ftype(dataDelayed.beacon_loc);
+        data.beacon_posNED = EKF_origin.get_distance_NED_ftype(data.beacon_loc);
+        // do not offset the beacon positions because they are absolute
+        rngBcn.posOffsetNED.zero();
+    } else if (activeHgtSource != AP_NavEKF_Source::SourceZ::BEACON) {
+        // calculate the vertical offset from EKF datum to beacon datum rngBcn.posOffsetNED.z
+        CalcRangeBeaconPosDownOffset(data, R_BCN, stateStruct.position, false);
+    } else {
+        // the beacons can be offset horizontally, but the vehicle vertical position
+        // datum must match the beacon vertical position datum
         rngBcn.posOffsetNED.z = 0.0f;
     }
-    bcn_pn = dataDelayed.beacon_posNED.x;
-    bcn_pe = dataDelayed.beacon_posNED.y;
-    bcn_pd = dataDelayed.beacon_posNED.z + rngBcn.posOffsetNED.z;
 
-    // predicted range
-    Vector3F deltaPosNED = stateStruct.position - dataDelayed.beacon_posNED;
-    rngPred = deltaPosNED.length();
+    // predicted range accounting for vehicle and beacon vertical position offset
+    Vector3F deltaPosNED = data.beacon_posNED - stateStruct.position;
+    deltaPosNED.z += rngBcn.posOffsetNED.z;
+    deltaPosNED.z -= rngBcn.verticalOffset;
+    const ftype rngPred = deltaPosNED.length();
 
     // calculate measurement innovation
-    rngBcn.innov = rngPred - dataDelayed.rng;
+    rngBcn.innov = rngPred - rngBcn.correctedSlantRange[data.beacon_ID];
 
     // perform fusion of range measurement
     if (rngPred > 0.1f)
@@ -509,41 +501,38 @@ void NavEKF3_core::FuseRngBcn(rng_bcn_elements &dataDelayed)
         // calculate observation jacobians
         Vector24 H_BCN;
         memset(H_BCN, 0, sizeof(H_BCN));
-        ftype t2 = bcn_pd-pd;
-        ftype t3 = bcn_pe-pe;
-        ftype t4 = bcn_pn-pn;
-        ftype t5 = t2*t2;
-        ftype t6 = t3*t3;
-        ftype t7 = t4*t4;
-        ftype t8 = t5+t6+t7;
-        ftype t9 = 1.0f/sqrtF(t8);
-        H_BCN[7] = -t4*t9;
-        H_BCN[8] = -t3*t9;
         // If we are not using the beacons as a height reference, we pretend that the beacons
         // are at the same height as the flight vehicle when calculating the observation derivatives
         // and Kalman gains
         // TODO  - less hacky way of achieving this, preferably using an alternative derivation
-        if (activeHgtSource != AP_NavEKF_Source::SourceZ::BEACON) {
-            t2 = 0.0f;
-        }
+        const ftype t2 = (activeHgtSource == AP_NavEKF_Source::SourceZ::BEACON) ? deltaPosNED.z : 0.0f;
+        const ftype t3 = deltaPosNED.y;
+        const ftype t4 = deltaPosNED.x;
+        const ftype t5 = t2*t2;
+        const ftype t6 = t3*t3;
+        const ftype t7 = t4*t4;
+        const ftype t8 = t5+t6+t7;
+        const ftype t9 = 1.0f/sqrtF(t8);
+        H_BCN[7] = -t4*t9;
+        H_BCN[8] = -t3*t9;
         H_BCN[9] = -t2*t9;
 
         // calculate Kalman gains
-        ftype t10 = P[9][9]*t2*t9;
-        ftype t11 = P[8][9]*t3*t9;
-        ftype t12 = P[7][9]*t4*t9;
-        ftype t13 = t10+t11+t12;
-        ftype t14 = t2*t9*t13;
-        ftype t15 = P[9][8]*t2*t9;
-        ftype t16 = P[8][8]*t3*t9;
-        ftype t17 = P[7][8]*t4*t9;
-        ftype t18 = t15+t16+t17;
-        ftype t19 = t3*t9*t18;
-        ftype t20 = P[9][7]*t2*t9;
-        ftype t21 = P[8][7]*t3*t9;
-        ftype t22 = P[7][7]*t4*t9;
-        ftype t23 = t20+t21+t22;
-        ftype t24 = t4*t9*t23;
+        const ftype t10 = P[9][9]*t2*t9;
+        const ftype t11 = P[8][9]*t3*t9;
+        const ftype t12 = P[7][9]*t4*t9;
+        const ftype t13 = t10+t11+t12;
+        const ftype t14 = t2*t9*t13;
+        const ftype t15 = P[9][8]*t2*t9;
+        const ftype t16 = P[8][8]*t3*t9;
+        const ftype t17 = P[7][8]*t4*t9;
+        const ftype t18 = t15+t16+t17;
+        const ftype t19 = t3*t9*t18;
+        const ftype t20 = P[9][7]*t2*t9;
+        const ftype t21 = P[8][7]*t3*t9;
+        const ftype t22 = P[7][7]*t4*t9;
+        const ftype t23 = t20+t21+t22;
+        const ftype t24 = t4*t9*t23;
         rngBcn.varInnov = R_BCN+t14+t19+t24;
         ftype t26;
         if (rngBcn.varInnov >= R_BCN) {
@@ -618,10 +607,6 @@ void NavEKF3_core::FuseRngBcn(rng_bcn_elements &dataDelayed)
             zero_range(&Kfusion[0], 22, 23);
         }
 
-        // Calculate innovation using the selected offset value
-        Vector3F delta = stateStruct.position - dataDelayed.beacon_posNED;
-        rngBcn.innov = delta.length() - rngBcn.correctedSlantRange[dataDelayed.beacon_ID];
-
         // calculate the innovation consistency test ratio
         rngBcn.testRatio = sq(rngBcn.innov) / (sq(MAX(0.01f * (ftype)frontend->_rngBcnInnovGate, 1.0f)) * rngBcn.varInnov);
 
@@ -637,105 +622,82 @@ void NavEKF3_core::FuseRngBcn(rng_bcn_elements &dataDelayed)
             // restart the counter
             rngBcn.lastPassTime_ms = imuSampleTime_ms;
 
-            // // correct the covariance P = (I - K*H)*P
-            // // take advantage of the empty columns in KH to reduce the
-            // // number of operations
-            // for (unsigned i = 0; i<=stateIndexLim; i++) {
-            //     for (unsigned j = 0; j<=6; j++) {
-            //         KH[i][j] = 0.0f;
-            //     }
-            //     for (unsigned j = 7; j<=9; j++) {
-            //         KH[i][j] = Kfusion[i] * H_BCN[j];
-            //     }
-            //     for (unsigned j = 10; j<=23; j++) {
-            //         KH[i][j] = 0.0f;
-            //     }
-            // }
-            // for (unsigned j = 0; j<=stateIndexLim; j++) {
-            //     for (unsigned i = 0; i<=stateIndexLim; i++) {
-            //         ftype res = 0;
-            //         res += KH[i][7] * P[7][j];
-            //         res += KH[i][8] * P[8][j];
-            //         res += KH[i][9] * P[9][j];
-            //         KHP[i][j] = res;
-            //     }
-            // }
-            // // Check that we are not going to drive any variances negative and skip the update if so
-            // bool healthyFusion = true;
-            // for (uint8_t i= 0; i<=stateIndexLim; i++) {
-            //     if (KHP[i][i] > P[i][i]) {
-            //         healthyFusion = false;
-            //     }
-            // }
-            // if (healthyFusion) {
-                // // update the covariance matrix
-                // for (uint8_t i= 0; i<=stateIndexLim; i++) {
-                //     for (uint8_t j= 0; j<=stateIndexLim; j++) {
-                //         P[i][j] = P[i][j] - KHP[i][j];
-                //     }
-                // }
+            // Efficient implementation of the Joseph stabilised covariance update
+            // Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
+            // P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
+            //   =      P_temp     * (I - H.T * K.T) + K * R * K.T
+            //   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
 
-                // Efficient implementation of the Joseph stabilized covariance update
-                // Based on "G. J. Bierman. Factorization Methods for Discrete Sequential Estimation. Academic Press, Dover Publications, New York, 1977, 2006"
-                // P = (I - K * H) * P * (I - K * H).T   + K * R * K.T
-                //   =      P_temp     * (I - H.T * K.T) + K * R * K.T
-                //   =      P_temp - P_temp * H.T * K.T  + K * R * K.T
-
-                // Step 1: conventional update
-                // Compute P_temp and store it in P to avoid allocating more memory
-                // P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
-                // PH = P * H_BCN where H is stored as a column vector. H is in fact H.T
-                Vector24 PH{};
-                for (uint8_t row = 0; row < 24; row++) {
-                    for (uint8_t col = 0; col < 24; col++) {
-                        PH[row] += P[row][col] * H_BCN[col];
-                    }
+            // Step 1: conventional update
+            // Compute P_temp and store it in P to avoid allocating more memory
+            // P is symmetric, so PH == H.T * P.T == H.T * P. Taking the row is faster as matrices are row-major
+            // PH = P * H_BCN where H is stored as a column vector. H is in fact H.T
+            Vector24 PH{};
+            for (uint8_t row = 0; row < 24; row++) {
+                for (uint8_t col = 0; col < 24; col++) {
+                    PH[row] += P[row][col] * H_BCN[col];
                 }
+            }
 
-                for (uint8_t row = 0; row < 24; row++) {
-                    for (uint8_t col = 0; col < 24; col++) {
-                        P[row][col] -= Kfusion[row] * PH[col]; // P is now not symmetrical if K is not optimal (e.g.: some gains have been zeroed)
-                    }
+            for (uint8_t row = 0; row < 24; row++) {
+                for (uint8_t col = 0; col < 24; col++) {
+                    P[row][col] -= Kfusion[row] * PH[col]; // P is now not symmetrical if K is not optimal (e.g.: some gains have been zeroed)
                 }
+            }
 
-                // Step 2: stabilized update
-                // PH = P * H_BCN where H is stored as a column vector. H is in fact H.T
-                for (uint8_t row = 0; row < 24; row++) {
-                    for (uint8_t col = 0; col < 24; col++) {
-                        PH[row] += P[row][col] * H_BCN[col];
-                    }
+            // Step 2: stabilized update
+            // PH = P * H_BCN where H is stored as a column vector. H is in fact H.T
+            for (uint8_t row = 0; row < 24; row++) {
+                for (uint8_t col = 0; col < 24; col++) {
+                    PH[row] += P[row][col] * H_BCN[col];
                 }
+            }
 
-                for (uint8_t row = 0; row < 24; row++) {
-                    for (unsigned col = 0; col <= row; col++) {
-                        P[row][col] = P[row][col] - PH[row] * Kfusion[col] + Kfusion[row] * R_BCN * Kfusion[col];
-                        P[col][row] = P[row][col];
-                    }
+            for (uint8_t row = 0; row < 24; row++) {
+                for (unsigned col = 0; col <= row; col++) {
+                    P[row][col] = P[row][col] - PH[row] * Kfusion[col] + Kfusion[row] * R_BCN * Kfusion[col];
+                    P[col][row] = P[row][col];
                 }
+            }
 
-                // force the covariance matrix to be symmetrical and limit the variances to prevent ill-conditioning.
-                ForceSymmetry();
-                ConstrainVariances();
+            // limit the variances to prevent ill-conditioning
+            // symmetry is already guaranteed by the Joseph stabilised covariance update
+            ConstrainVariances();
 
-                // correct the state vector
-                for (uint8_t j= 0; j<=stateIndexLim; j++) {
-                    statesArray[j] = statesArray[j] - Kfusion[j] * rngBcn.innov;
+            // correct the state vector
+            for (uint8_t j= 0; j<=stateIndexLim; j++) {
+                statesArray[j] = statesArray[j] - Kfusion[j] * rngBcn.innov;
+            }
+
+            // In this mode we are using range to beacons that are located at an absolute position
+            // but the vehicle height source will be something else, eg baro, so the height inconsistency
+            // needs to be handled. This is achieved by estimating an offset that is added to the vehicle
+            // vertical position before it is used to calculate the predicted range measurement.
+            if (rngBcn.usingRangeToLoc) {
+                ftype rngPredInv = 1.0f/rngPred;
+                const ftype offsetH = - deltaPosNED.z*rngPredInv; // observation Jacobian
+                const ftype offsetPH = rngBcn.verticalOffsetVariance * offsetH;
+                const ftype offsetHPH = offsetH * offsetPH;
+                const ftype offsetS = R_BCN + offsetHPH; //  innovation variance
+                if (offsetS >= R_BCN) {
+                    // Kalman gain K = (P . H') / S
+                    ftype offsetK = offsetPH / offsetS;
+                    rngBcn.verticalOffset -= offsetK * rngBcn.innov;
+                    // covariance update P = P - K.H.P
+                    rngBcn.verticalOffsetVariance -= offsetK * offsetPH;
                 }
+            } else {
+                rngBcn.verticalOffset = 0.0f;
+            }
 
-                // record healthy fusion
-                faultStatus.bad_rngbcn = false;
-
-            // } else {
-            //     // record bad fusion
-            //     faultStatus.bad_rngbcn = true;
-
-            // }
+            // record healthy fusion
+            faultStatus.bad_rngbcn = false;
         }
 
         // Update the fusion report
         if (rngBcn.usingRangeToLoc) {
-            PushRngBcn(dataDelayed);
-        }
+            PushRngBcn(data);
+        }                
     }
 }
 

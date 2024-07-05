@@ -1428,11 +1428,14 @@ private:
             ftype innovVar;     // innovation variance (m^2)
             ftype testRatio;    // innovation consistency test ratio
             Vector3F beaconPosNED; // beacon NED position
+            ftype vertOffset;   // vertical offset (m)
         } *fusionReport;
         uint8_t fusionReport_length;
 
         bool usingRangeToLoc; // true when using single range to location measurements
         bool newDataToLog[AP_BEACON_MAX_BEACONS]; // true when there has been a range measurement and new data to log
+        ftype verticalOffset; // offset added to vehicle vertical position wrt origin before calculating range innovation (m)
+        ftype verticalOffsetVariance; // variance of verticalOffset state estimate (m^2)
     } rngBcn;
 #endif  // if EK3_FEATURE_BEACON_FUSION
 

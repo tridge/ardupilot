@@ -387,6 +387,8 @@ void NavEKF3_core::InitialiseVariables()
     rngBcn.fuseDataReportIndex = 0;
     rngBcn.posOffsetNED.zero();
     rngBcn.originEstInit = false;
+    rngBcn.verticalOffsetVariance = 0.0f;
+    rngBcn.verticalOffset = 0.0f;
 #endif  // EK3_FEATURE_BEACON_FUSION
 
 #if EK3_FEATURE_BODY_ODOM

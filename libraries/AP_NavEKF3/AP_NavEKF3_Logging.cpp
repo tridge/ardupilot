@@ -263,6 +263,8 @@ void NavEKF3_core::Log_Write_Beacon(uint64_t time_us)
     }
     const auto &report = rngBcn.fusionReport[rngBcn.fuseDataReportIndex];
 
+    const ftype verticalOffset = rngBcn.usingRangeToLoc ? rngBcn.verticalOffset : rngBcn.receiverPos.z;
+
     const struct log_XKF0 pkt10{
         LOG_PACKET_HEADER_INIT(LOG_XKF0_MSG),
         time_us : time_us,
@@ -271,15 +273,15 @@ void NavEKF3_core::Log_Write_Beacon(uint64_t time_us)
         rng : (int16_t)(report.rng),
         innov : (int16_t)(100*report.innov),
         sqrtInnovVar : (uint16_t)(100*sqrtF(report.innovVar)),
-        testRatio : (uint16_t)(constrain_ftype(report.testRatio,0.0f,650.0f)),
+        testRatio : (uint16_t)(100*constrain_ftype(report.testRatio,0.0f,650.0f)),
         beaconPosN : (int16_t)(report.beaconPosNED.x),
         beaconPosE : (int16_t)(report.beaconPosNED.y),
         beaconPosD : (int16_t)(report.beaconPosNED.z),
-        offsetHigh : (int16_t)(rngBcn.posDownOffsetMax),
-        offsetLow : (int16_t)(rngBcn.posDownOffsetMin),
-        posN : (int16_t)(rngBcn.receiverPos.x),
-        posE : (int16_t)(rngBcn.receiverPos.y),
-        posD : (int16_t)(rngBcn.receiverPos.z)
+        offsetHigh : (int16_t)(100*rngBcn.posDownOffsetMax),
+        offsetLow : (int16_t)(100*rngBcn.posDownOffsetMin),
+        posN : (int16_t)(100*rngBcn.receiverPos.x),
+        posE : (int16_t)(100*rngBcn.receiverPos.y),
+        posD : (int16_t)(100*verticalOffset)
     };
     AP::logger().WriteBlock(&pkt10, sizeof(pkt10));
     rngBcn.newDataToLog[rngBcn.fuseDataReportIndex] = false;

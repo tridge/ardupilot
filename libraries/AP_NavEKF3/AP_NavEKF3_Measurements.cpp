@@ -821,8 +821,7 @@ void NavEKF3_core::correctEkfOriginHeight()
     ftype deltaTime = constrain_ftype(0.001f * (imuDataDelayed.time_ms - lastOriginHgtTime_ms), 0.0, 1.0);
     if (activeHgtSource == AP_NavEKF_Source::SourceZ::BARO) {
         // Use the baro drift rate
-        const ftype baroDriftRate = 0.05;
-        ekfOriginHgtVar += sq(baroDriftRate * deltaTime);
+        ekfOriginHgtVar += sq(frontend->baroDriftRate * deltaTime);
     } else if (activeHgtSource == AP_NavEKF_Source::SourceZ::RANGEFINDER) {
         // use the worse case expected terrain gradient and vehicle horizontal speed
         const ftype maxTerrGrad = 0.25;
