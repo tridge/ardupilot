@@ -25,7 +25,7 @@
 
 class AP_Beacon_Backend;
 
-#define AP_BEACON_MAX_BEACONS 4
+#define AP_BEACON_MAX_BEACONS 8
 #define AP_BEACON_TIMEOUT_MS 300
 #define AP_BEACON_MINIMUM_FENCE_BEACONS 3
 
