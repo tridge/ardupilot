@@ -1830,6 +1830,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
             (500, -50, 0),
             (-500, -50, 30),
             (-1000, 6000, 10),
+            ( 3000, 6000, 20),
         ]
 
         radio_beacon_parameters = {}
