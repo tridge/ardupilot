@@ -59,6 +59,11 @@ void NavEKF3_core::SelectRngBcnFusion()
             } else {
                 FuseLowElevationRngBcns(new_data_mask);
             }
+        } else if (rngBcn.resetIterCount > 0) {
+            // not yet completed a positiion reset using a Gauss-Newton least squares solution for 4 or more beacons
+            if (ResetPosToRngBcn()) {
+                rngBcn.lastPassTime_ms = imuSampleTime_ms;
+            }
         }
         return;
     }
@@ -101,15 +106,15 @@ bool NavEKF3_core::ResetPosToRngBcn()
     static rng_bcn_elements dataForReset[AP_BEACON_MAX_BEACONS];
 
     if (rngBcn.resetIterCount == 0) {
+        rngBcn.posResetTime_ms = imuDataDelayed.time_ms;
         rngBcn.posResetNumBcns = 0;
         for (uint8_t index=0; index<AP_BEACON_MAX_BEACONS; index++) {
             // predict range measurement to current time using delay and range rate
             const Vector3F deltaPosNED = stateStruct.position - rngBcn.dataLast[index].beacon_posNED;
             const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
             ftype delaySec = 0.001f * (ftype)((double)rngBcn.dataLast[index].delay_ms + (double)imuDataDelayed.time_ms - (double)rngBcn.dataLast[index].time_ms);
-            if (fabsF(delaySec) < 5.0f) {
+            if (fabsF(delaySec) < 2.0f) {
                 // limit time separation between measurements or else velocity errors due to turns become too large.
-                // TODO include bank angle in range correction calculation
                 const ftype correctedSlantRng = rngBcn.dataLast[index].rng + rangeRate * delaySec;
                 // calculate an equivalent horizontal range assuming vehicle and beacon height is accurate
                 ftype RHsq = sq(correctedSlantRng)-sq(rngBcn.dataLast[index].beacon_posNED.z - stateStruct.position.z);
@@ -310,41 +315,37 @@ bool NavEKF3_core::ResetPosToRngBcn()
                     }
                 }
 
-                const ftype tuningGain = 1.0f; // adjust if stability issues are encountered
+                const ftype tuningGain = 0.7f; // adjust if stability issues are encountered
                 rngBcn.posResetNED.x -= correction[0] * tuningGain;
                 rngBcn.posResetNED.y -= correction[1] * tuningGain;
                 rngBcn.posResetNED.z -= correction[2] * tuningGain;
 
                 // calculate the maximum residual normalised wrt the measurement uncertainty
-                ftype maxResidualRatio = 0.0F;
+                ftype sumOfSquares = 0.0F;
                 for (int i = 0; i < Nmeas; i++) {
-                    const ftype residualRatio = fabsF(res_vec[i]) / MAX(dataForReset[i].rngErr, 0.1F);
-                    if (maxResidualRatio < residualRatio) {
-                        maxResidualRatio = residualRatio;
-                    }
+                    sumOfSquares += sq(res_vec[i] / MAX(dataForReset[i].rngErr, 0.1f));
                 }
 
-                // continue iterating until largest residual is < 1 sigma. If run out of iterations don't accept result if residual > 3 sigma
+                // continue iterating until RSS residual is small. If run out of iterations don't accept result if > 3 sigma
                 reachedCountLimit = rngBcn.resetIterCount >= 20;
-                const ftype maxRatio = reachedCountLimit ? 3.0F : 1.0F;
-                if (is_positive(maxResidualRatio) && maxResidualRatio < maxRatio) {
+                const ftype maxRatio = reachedCountLimit ? 3.0F : 0.5F;
+                if (sqrtF(sumOfSquares) / (ftype)Nmeas < maxRatio) {
+                    ftype delaySec = 0.001f * (ftype)((double)imuDataDelayed.time_ms - (double)rngBcn.posResetTime_ms);
+                    rngBcn.posResetNED += stateStruct.velocity * delaySec;
                     ResetPositionNE(rngBcn.posResetNED.x,rngBcn.posResetNED.y);
                     ret = true;
                 }
-
                 AP::logger().WriteStreaming("DBG3",
-                                            "TimeUS,C,R1,R2,R3,R4,iteration",  // labels
-                                            "s#mmmm-",    // units
-                                            "F------",    // mults
-                                            "QBffffB",    // fmt
+                                            "TimeUS,C,Error,Count",  // labels
+                                            "s#--",    // units
+                                            "F---",    // multss
+                                            "QBfB",    // fmt
                                             dal.micros64(),
                                             DAL_CORE(core_index),
-                                            res_vec[0],
-                                            res_vec[1],
-                                            res_vec[2],
-                                            res_vec[3],
+                                            sqrtF(sumOfSquares) / (ftype)Nmeas,
                                             rngBcn.resetIterCount
                                             );
+
             } else {
                 // badly conditioned so re-start with new data
                 reachedCountLimit = true;

@@ -1442,6 +1442,7 @@ private:
         // 4 or more beacons to iterate across multiple frames. 
         uint8_t posResetNumBcns; // number of beacons currently in use for the position reset
         Vector3F posResetNED; // intermediate result for storing NED position for reset (m)
+        uint32_t posResetTime_ms; // time stamp of the range measurements used for the position reset (mSec)
     } rngBcn;
 #endif  // if EK3_FEATURE_BEACON_FUSION
 
