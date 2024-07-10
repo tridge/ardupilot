@@ -151,8 +151,8 @@ bool NavEKF3_core::ResetPosToRngBcn()
     case 2:
         {
             // find the intersection
-            const ftype DR0 = dataForReset[0].rngErr;
-            const ftype DR1 = dataForReset[1].rngErr;
+            const ftype &DR0 = dataForReset[0].rngErr;
+            const ftype &DR1 = dataForReset[1].rngErr;
             if (!is_positive(dataForReset[0].rng - DR0) || !is_positive(dataForReset[1].rng - DR1)) {
                 break;
             }
@@ -234,7 +234,7 @@ bool NavEKF3_core::ResetPosToRngBcn()
                 ftype ymax = -EK3_POSXY_STATE_LIMIT;
                 ftype zmin =  1.0e4f;
                 for (int i = 0; i < Nmeas; i++) {
-                    Vector3F bcnPosNED = dataForReset[i].beacon_posNED;
+                    const auto &bcnPosNED = dataForReset[i].beacon_posNED;
                     if (bcnPosNED.x < xmin) {
                         xmin = bcnPosNED.x;
                     }
@@ -251,7 +251,7 @@ bool NavEKF3_core::ResetPosToRngBcn()
                         zmin = bcnPosNED.z;
                     }
                 }
-                rngBcn.posResetNED = Vector3F(0.5F*(xmin+xmax),0.5F*(ymin+ymax),zmin-1000.0F);
+                rngBcn.posResetNED = Vector3F{0.5F*(xmin+xmax),0.5F*(ymin+ymax),zmin-1000.0F};
             }
 
             rngBcn.resetIterCount++;
@@ -426,8 +426,8 @@ bool NavEKF3_core::DualRangeIntersectNE(Vector2F &PosNE, const ftype R0, const f
     // Calculate the intersection points
     double rx = -dy * (h / dist);
     double ry =  dx * (h / dist);
-    Vector2F intersection1 = Vector2F(x2 + rx, y2 + ry);
-    Vector2F intersection2 = Vector2F(x2 - rx, y2 - ry);
+    const Vector2F intersection1{x2 + rx, y2 + ry};
+    const Vector2F intersection2{x2 - rx, y2 - ry};
 
     // return the solution closest to the vehicle position
     if ((intersection1-stateStruct.position.xy()).length_squared() < (intersection2-stateStruct.position.xy()).length_squared()) {
