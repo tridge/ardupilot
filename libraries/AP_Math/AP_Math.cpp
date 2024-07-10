@@ -580,7 +580,7 @@ float randn_float(void)
     // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
     float x1 = (rand_float()+1.0f)/2.0f;
     float x2 = (rand_float()+1.0f)/2.0f;
-    float randn_num = sqrt(-2.0f*log(x1))*cosf(2.0f*M_PI*x2);
+    float randn_num = sqrtf(-2.0f*logf(x1))*cosf(2.0f*M_PI*x2);
 
     return randn_num;
 }
