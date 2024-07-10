@@ -611,7 +611,7 @@ void AP_NavTerrain::process_sample(Gather &g, Sample &sample)
         if (debug > 0) {
             GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "GSF[%u] SD(%.1f,%.1f) VOFS(%.1f,%.1f)",
                           unsigned(g.ekf_lane),
-                          sqrt(pos_ofs_variance.x), sqrt(pos_ofs_variance.y), vel_ofs.x, vel_ofs.y);
+                          sqrtf(pos_ofs_variance.x), sqrtf(pos_ofs_variance.y), vel_ofs.x, vel_ofs.y);
         }
 
         AP::logger().WriteStreaming("NTK3",
