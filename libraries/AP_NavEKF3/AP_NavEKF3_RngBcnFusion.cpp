@@ -701,7 +701,7 @@ void NavEKF3_core::FuseRngBcn(rng_bcn_elements &data)
             // but the vehicle height source will be something else, eg baro, so the height inconsistency
             // needs to be handled. This is achieved by estimating an offset that is added to the vehicle
             // vertical position before it is used to calculate the predicted range measurement.
-            if (rngBcn.usingRangeToLoc) {
+            if ((frontend->_options & (int32_t)NavEKF3::Options::RangeToLocHgtOffset) && rngBcn.usingRangeToLoc) {
                 ftype rngPredInv = 1.0f/rngPred;
                 const ftype offsetH = - deltaPosNED.z*rngPredInv; // observation Jacobian
                 const ftype offsetPH = rngBcn.verticalOffsetVariance * offsetH;

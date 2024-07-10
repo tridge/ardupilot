@@ -509,6 +509,7 @@ private:
         JammingExpected     = (1<<0),
         DisableRangeFusion  = (1<<1),
         DisableSetLatLng    = (1<<2),
+        RangeToLocHgtOffset = (1<<3),
     };
 
 // Possible values for _flowUse
