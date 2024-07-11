@@ -1902,11 +1902,16 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext(f"SilvusSim: starting with {i} beacons", check_context=True)
         self.context_pop()
 
-        more_params = {
-            "SLV_GND1_IP3": 1,
-            "SLV_GND2_IP3": 3,
-            "SLV_GND3_IP3": 100,
-        }
+        more_params = {}
+        for i in range(1, len(beacon_home_relative_positions)+1):
+            more_params[f"SLV_GND{i}_IP3"] = i
+
+        # more_params = {
+        #     "SLV_GND1_IP3": 1,
+        #     "SLV_GND2_IP3": 3,
+        #     "SLV_GND3_IP3": 100,
+        # }
+
         more_params.update(radio_beacon_parameters)
         more_params.update(radio_beacon_sim_parameters)
         self.set_parameters(more_params)
