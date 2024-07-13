@@ -219,13 +219,6 @@ bool AP_DroneCAN_DNA_Server::init(uint8_t own_unique_id[], uint8_t own_unique_id
 {
     //Read the details from AP_DroneCAN
     server_state = HEALTHY;
-    /* Go through our records and look for valid NodeData, to initialise
-    occupation mask */
-    for (uint8_t i = 0; i <= MAX_NODE_ID; i++) {
-        if (isValidNodeDataAvailable(i)) {
-            occupation_mask.set(i);
-        }
-    }
 
     // Check if the magic is present
     uint16_t magic;
@@ -241,6 +234,15 @@ bool AP_DroneCAN_DNA_Server::init(uint8_t own_unique_id[], uint8_t own_unique_id
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "UC DNA database reset");
         reset();
     }
+
+    /* Go through our records and look for valid NodeData, to initialise
+    occupation mask */
+    for (uint8_t i = 0; i <= MAX_NODE_ID; i++) {
+        if (isValidNodeDataAvailable(i)) {
+            occupation_mask.set(i);
+        }
+    }
+
     // Making sure that the server is started with the same node ID
     const uint8_t stored_own_node_id = getNodeIDForUniqueID(own_unique_id, own_unique_id_len);
     static bool reset_done;
