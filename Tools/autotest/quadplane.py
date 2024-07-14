@@ -1824,17 +1824,18 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext("Silvus: starting with 0 ground radios", check_context=True)
         self.context_pop()
 
-        # set up beacons
+        # set up beacons in random locations in a 6x6 km square
         beacon_home_relative_positions = [
             # n   e    u
-            (500, -50, 0),
-            (-500, -50, 30),
-            (-1000, 6000, 10),
-            ( 3000, 6000, 20),
-            (-550, -50, 0),
-            (-1000, 12000, 10),
-            (-2000, -2000, -10),
-            (2000, 2000, 150),        ]
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+        ]
 
         radio_beacon_parameters = {}
         radio_beacon_sim_parameters = {
