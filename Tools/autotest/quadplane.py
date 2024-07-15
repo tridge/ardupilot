@@ -1875,7 +1875,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
                 beacon_home_relative_positions,
                 run_replay_step=False,
                 run_disable_beacons_step=False,
-            );
+            )
 
         self.remove_installed_script_module("json.lua")
         for script_to_uninstall in scripts_to_install:
@@ -1884,7 +1884,11 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.context_pop()
         self.reboot_sitl()
 
-    def run_tests_for_beacon_positions(self, beacon_home_relative_positions, run_replay_step=True, run_disable_beacons_step=True):
+    def run_tests_for_beacon_positions(self,
+                                       beacon_home_relative_positions,
+                                       run_replay_step=True,
+                                       run_disable_beacons_step=True,
+                                       ):
         self.context_push()
         radio_beacon_parameters = {}
         radio_beacon_sim_parameters = {
@@ -1981,7 +1985,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
                 max_allowed_divergence=5,
             )
         )
-        self.wait_statustext(f"Jump 2/", timeout=300)
+        self.wait_statustext("Jump 2/", timeout=300)
         self.context_pop()  # remove AHRS3 validation
 
         self.context_push()
@@ -1994,7 +1998,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         )
         self.progress("Remove GPS from EK3")
         self.run_auxfunc(190, 2)
-        self.wait_statustext(f"Jump 5/", timeout=600)
+        self.wait_statustext("Jump 5/", timeout=600)
         self.context_pop()
 
         self.start_subtest("Ensure we are not simply dead-reckoning by destroying wind estimate")
@@ -2008,7 +2012,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.set_parameters({
             "SIM_WIND_DIR": 90,
         })
-        self.wait_statustext(f"Jump 10/", timeout=600)
+        self.wait_statustext("Jump 10/", timeout=600)
         self.context_pop()  # will revert SIM_WIND_DIR
 
         if run_disable_beacons_step:
@@ -2034,7 +2038,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.reboot_sitl()
 
         if run_replay_step:
-            self.run_tests_for_beacon_positions_run_replay_step()
+            self.run_tests_for_beacon_positions_run_replay_step(dflog_filepath)
 
     def run_tests_for_beacon_positions_run_beacon_disable_step(self):
         self.start_subtest("Make sure that the beacons are making the difference by disabling them and demanding divergence")
@@ -2047,7 +2051,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_distance_between('SIMSTATE', 'AHRS3', 200, 20000, minimum_duration=15, timeout=300)
         self.context_pop()  # will revert SLV_ENABLE
 
-    def run_tests_for_beacon_positions_run_replay_step(self):
+    def run_tests_for_beacon_positions_run_replay_step(self, dflog_filepath):
         self.start_subtest("Ensure log is replayable")
         self.progress("Building Replay")
         util.build_SITL('tool/Replay', clean=False, configure=False)
