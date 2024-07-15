@@ -1825,27 +1825,28 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.context_pop()
 
         # set up beacons in random locations in a 6x6 km square
-        beacon_home_relative_positions = [
-            # n   e    u
+        for i in range(2):
+            beacon_home_relative_positions = [
+                # n   e    u
             (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-            # (500, -50, 0),
-            # (-500, -50, 30),
-            # (-1000, 6000, 10),
-            # ( 3000, 6000, 20),
-            # (-550, -50, 0),
-            # (-1000, 12000, 10),
-            # (-2000, -2000, -10),
-            # (2000, 2000, 150),
-        ]
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                # (500, -50, 0),
+                # (-500, -50, 30),
+                # (-1000, 6000, 10),
+                # ( 3000, 6000, 20),
+                # (-550, -50, 0),
+                # (-1000, 12000, 10),
+                # (-2000, -2000, -10),
+                # (2000, 2000, 150),
+            ]
 
-        self.run_tests_for_beacon_positions(beacon_home_relative_positions, run_replay_step=False);
+            self.run_tests_for_beacon_positions(beacon_home_relative_positions, run_replay_step=False);
 
         self.remove_installed_script_module("json.lua")
         for script_to_uninstall in scripts_to_install:
