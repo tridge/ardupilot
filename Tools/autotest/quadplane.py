@@ -1824,6 +1824,32 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext("Silvus: starting with 0 ground radios", check_context=True)
         self.context_pop()
 
+        # offsets are enu
+        reps = 200  # we RTL, so this can be high
+        self.upload_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 300, 00, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 50, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 300, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 300, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 50, 100),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_DO_JUMP,
+                p1=3,   # wp
+                p2=reps,
+            ),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_DO_LAND_START,
+            ),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 350, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 350, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 0, 25),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 0, 25),
+            # 0.1 so it gets made relhome rather than being left to
+            # the autopilot to assume "here":
+            (mavutil.mavlink.MAV_CMD_NAV_LAND, 0.1, 0, 0),
+        ])
+
         for i in range(2):  # repeat the monte-carlo this many times
             # set up beacons in random locations in a 6x6 km square
             beacon_home_relative_positions = []
@@ -1938,32 +1964,6 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext(f"SilvusSim: starting with {i} beacons", check_context=True)
         self.context_pop()
 
-        # offsets are enu
-        reps = 200  # we RTL, so this can be high
-        self.upload_simple_relhome_mission([
-            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 300, 00, 100),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 50, 100),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 300, 100),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 300, 100),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 50, 100),
-            self.create_MISSION_ITEM_INT(
-                mavutil.mavlink.MAV_CMD_DO_JUMP,
-                p1=3,   # wp
-                p2=reps,
-            ),
-            self.create_MISSION_ITEM_INT(
-                mavutil.mavlink.MAV_CMD_DO_LAND_START,
-            ),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 350, 100),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 350, 50),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 0, 25),
-            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 0, 25),
-            # 0.1 so it gets made relhome rather than being left to
-            # the autopilot to assume "here":
-            (mavutil.mavlink.MAV_CMD_NAV_LAND, 0.1, 0, 0),
-        ])
-
         self.reboot_sitl()  # so we get a clean log with final state
 
         self.change_mode('AUTO')
@@ -1981,7 +1981,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
                 max_allowed_divergence=5,
             )
         )
-        self.wait_statustext(f"Jump 2/{reps}", timeout=300)
+        self.wait_statustext(f"Jump 2/", timeout=300)
         self.context_pop()  # remove AHRS3 validation
 
         self.context_push()
@@ -1994,7 +1994,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         )
         self.progress("Remove GPS from EK3")
         self.run_auxfunc(190, 2)
-        self.wait_statustext(f"Jump 5/{reps}", timeout=600)
+        self.wait_statustext(f"Jump 5/", timeout=600)
         self.context_pop()
 
         self.start_subtest("Ensure we are not simply dead-reckoning by destroying wind estimate")
@@ -2008,7 +2008,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.set_parameters({
             "SIM_WIND_DIR": 90,
         })
-        self.wait_statustext(f"Jump 10/{reps}", timeout=600)
+        self.wait_statustext(f"Jump 10/", timeout=600)
         self.context_pop()  # will revert SIM_WIND_DIR
 
         if run_disable_beacons_step:
