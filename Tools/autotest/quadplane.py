@@ -1824,18 +1824,17 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext("Silvus: starting with 0 ground radios", check_context=True)
         self.context_pop()
 
-        # set up beacons in random locations in a 6x6 km square
-        for i in range(2):
-            beacon_home_relative_positions = [
+        for i in range(2):  # repeat the monte-carlo this many times
+            # set up beacons in random locations in a 6x6 km square
+            beacon_home_relative_positions = []
+            for i in range(8):
+                beacon_home_relative_positions.append((
+                    numpy.random.uniform(-6000, 6000, size=1),  # n
+                    numpy.random.uniform(-6000, 6000, size=1),  # e
+                    numpy.random.uniform(-10, 30, size=1)       # u
+                ))
                 # n   e    u
-            (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
-                (numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-6000, 6000, size=1), numpy.random.uniform(-10, 30, size=1)),
+                # beacon_home_relative_positions = []
                 # (500, -50, 0),
                 # (-500, -50, 30),
                 # (-1000, 6000, 10),
@@ -1844,7 +1843,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
                 # (-1000, 12000, 10),
                 # (-2000, -2000, -10),
                 # (2000, 2000, 150),
-            ]
+                # ]
 
             self.run_tests_for_beacon_positions(beacon_home_relative_positions, run_replay_step=False);
 
