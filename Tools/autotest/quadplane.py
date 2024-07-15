@@ -1850,10 +1850,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
             (mavutil.mavlink.MAV_CMD_NAV_LAND, 0.1, 0, 0),
         ])
 
-        for i in range(2):  # repeat the monte-carlo this many times
+        for run_idx in range(2):  # repeat the monte-carlo this many times
             # set up beacons in random locations in a 6x6 km square
             beacon_home_relative_positions = []
-            for i in range(8):
+            for bcn_idx in range(8):
                 beacon_home_relative_positions.append((
                     numpy.random.uniform(-6000, 6000, size=1),  # n
                     numpy.random.uniform(-6000, 6000, size=1),  # e
