@@ -1845,7 +1845,11 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
                 # (2000, 2000, 150),
                 # ]
 
-            self.run_tests_for_beacon_positions(beacon_home_relative_positions, run_replay_step=False);
+            self.run_tests_for_beacon_positions(
+                beacon_home_relative_positions,
+                run_replay_step=False,
+                run_disable_beacons_step=False,
+            );
 
         self.remove_installed_script_module("json.lua")
         for script_to_uninstall in scripts_to_install:
@@ -1854,7 +1858,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.context_pop()
         self.reboot_sitl()
 
-    def run_tests_for_beacon_positions(self, beacon_home_relative_positions, run_replay_step=True):
+    def run_tests_for_beacon_positions(self, beacon_home_relative_positions, run_replay_step=True, run_disable_beacons_step=True):
         self.context_push()
         radio_beacon_parameters = {}
         radio_beacon_sim_parameters = {
@@ -2007,15 +2011,8 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext(f"Jump 10/{reps}", timeout=600)
         self.context_pop()  # will revert SIM_WIND_DIR
 
-        self.start_subtest("Make sure that the beacons are making the difference by disabling them and demanding divergence")
-        # note that EKF3's wind estimate will have been re-learnt, but
-        # the wind is now back to its original direction.
-        self.context_push()
-        self.set_parameters({
-            "SLV_ENABLE": 0,
-        })
-        self.wait_distance_between('SIMSTATE', 'AHRS3', 200, 20000, minimum_duration=15, timeout=300)
-        self.context_pop()  # will revert SLV_ENABLE
+        if run_disable_beacons_step:
+            self.run_tests_for_beacon_positions_run_beacon_disable_step()
 
         self.progress("Return GPS to EK3")
         self.run_auxfunc(190, 0)
@@ -2038,6 +2035,17 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         if run_replay_step:
             self.run_tests_for_beacon_positions_run_replay_step()
+
+    def run_tests_for_beacon_positions_run_beacon_disable_step(self):
+        self.start_subtest("Make sure that the beacons are making the difference by disabling them and demanding divergence")
+        # note that EKF3's wind estimate will have been re-learnt, but
+        # the wind is now back to its original direction.
+        self.context_push()
+        self.set_parameters({
+            "SLV_ENABLE": 0,
+        })
+        self.wait_distance_between('SIMSTATE', 'AHRS3', 200, 20000, minimum_duration=15, timeout=300)
+        self.context_pop()  # will revert SLV_ENABLE
 
     def run_tests_for_beacon_positions_run_replay_step(self):
         self.start_subtest("Ensure log is replayable")
