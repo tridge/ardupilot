@@ -162,66 +162,66 @@ bool NavEKF3_core::ResetPosToRngBcn()
             }
         }
         break;
-    case 3:
-        {
-            // do trilateration
-            const Vector3F p1 = dataForReset[0].beacon_posNED;
-            const Vector3F p2 = dataForReset[1].beacon_posNED;
-            const Vector3F p3 = dataForReset[2].beacon_posNED;
-            const ftype r1 = dataForReset[0].rng;
-            const ftype r2 = dataForReset[1].rng;
-            const ftype r3 = dataForReset[2].rng;
+    // case 3: // This case can also be handled by the least squares method
+    //     {
+    //         // do trilateration
+    //         const Vector3F p1 = dataForReset[0].beacon_posNED;
+    //         const Vector3F p2 = dataForReset[1].beacon_posNED;
+    //         const Vector3F p3 = dataForReset[2].beacon_posNED;
+    //         const ftype r1 = dataForReset[0].rng;
+    //         const ftype r2 = dataForReset[1].rng;
+    //         const ftype r3 = dataForReset[2].rng;
 
-            // Calculate vectors
-            Vector3F ex = Vector3F(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
-            ftype d = ex.x * ex.x + ex.y * ex.y + ex.z * ex.z;
-            if (!is_positive(d)) {
-                break;
-            }
-            d = sqrtF(d);
-            ex.x /= d; ex.y /= d; ex.z /= d;
+    //         // Calculate vectors
+    //         Vector3F ex = Vector3F(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+    //         ftype d = ex.x * ex.x + ex.y * ex.y + ex.z * ex.z;
+    //         if (!is_positive(d)) {
+    //             break;
+    //         }
+    //         d = sqrtF(d);
+    //         ex.x /= d; ex.y /= d; ex.z /= d;
 
-            Vector3F temp = Vector3F(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z);
-            ftype i = ex.x * temp.x + ex.y * temp.y + ex.z * temp.z;
+    //         Vector3F temp = Vector3F(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z);
+    //         ftype i = ex.x * temp.x + ex.y * temp.y + ex.z * temp.z;
 
-            Vector3F ey = Vector3F(temp.x - i * ex.x, temp.y - i * ex.y, temp.z - i * ex.z);
-            ftype j = ey.x * ey.x + ey.y * ey.y + ey.z * ey.z;
-            if (!is_positive(j)) {
-                break;
-            }
-            j = sqrtF(j);
-            ey.x /= j; ey.y /= j; ey.z /= j;
+    //         Vector3F ey = Vector3F(temp.x - i * ex.x, temp.y - i * ex.y, temp.z - i * ex.z);
+    //         ftype j = ey.x * ey.x + ey.y * ey.y + ey.z * ey.z;
+    //         if (!is_positive(j)) {
+    //             break;
+    //         }
+    //         j = sqrtF(j);
+    //         ey.x /= j; ey.y /= j; ey.z /= j;
 
-            Vector3F ez = Vector3F(ex.y * ey.z - ex.z * ey.y, ex.z * ey.x - ex.x * ey.z, ex.x * ey.y - ex.y * ey.x);
+    //         Vector3F ez = Vector3F(ex.y * ey.z - ex.z * ey.y, ex.z * ey.x - ex.x * ey.z, ex.x * ey.y - ex.y * ey.x);
 
-            ftype x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
-            ftype y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x;
-            ftype z = r1 * r1 - x * x - y * y;
-            if (!is_positive(z)) {
-                break;
-            }
-            z = sqrtF(z);
+    //         ftype x = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+    //         ftype y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x;
+    //         ftype z = r1 * r1 - x * x - y * y;
+    //         if (!is_positive(z)) {
+    //             break;
+    //         }
+    //         z = sqrtF(z);
 
-            // There are two possible solutions for z
-            Vector3F result1 = Vector3F(p1.x + x * ex.x + y * ey.x + z * ez.x,
-                            p1.y + x * ex.y + y * ey.y + z * ez.y,
-                            p1.z + x * ex.z + y * ey.z + z * ez.z);
+    //         // There are two possible solutions for z
+    //         Vector3F result1 = Vector3F(p1.x + x * ex.x + y * ey.x + z * ez.x,
+    //                         p1.y + x * ex.y + y * ey.y + z * ez.y,
+    //                         p1.z + x * ex.z + y * ey.z + z * ez.z);
 
-            Vector3F result2 = Vector3F(p1.x + x * ex.x + y * ey.x - z * ez.x,
-                            p1.y + x * ex.y + y * ey.y - z * ez.y,
-                            p1.z + x * ex.z + y * ey.z - z * ez.z);
+    //         Vector3F result2 = Vector3F(p1.x + x * ex.x + y * ey.x - z * ez.x,
+    //                         p1.y + x * ex.y + y * ey.y - z * ez.y,
+    //                         p1.z + x * ex.z + y * ey.z - z * ez.z);
 
-            // Use the solution above the beacons (up is negative z)
-            if (result1.z < result2.z) {
-                rngBcn.posResetNED.xy() = result1.xy();
-            } else {
-                rngBcn.posResetNED.xy() = result2.xy();
-            }
+    //         // Use the solution above the beacons (up is negative z)
+    //         if (result1.z < result2.z) {
+    //             rngBcn.posResetNED.xy() = result1.xy();
+    //         } else {
+    //             rngBcn.posResetNED.xy() = result2.xy();
+    //         }
 
-            ResetPositionNE(rngBcn.posResetNED.x,rngBcn.posResetNED.y);
-            ret = true;
-        }
-        break;
+    //         ResetPositionNE(rngBcn.posResetNED.x,rngBcn.posResetNED.y);
+    //         ret = true;
+    //     }
+    //     break;
     default: // Iterative Gauss Newton least squares method
         {
             const uint8_t Nmeas = rngBcn.posResetNumBcns;
