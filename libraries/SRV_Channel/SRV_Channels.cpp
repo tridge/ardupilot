@@ -375,7 +375,7 @@ SRV_Channels::SRV_Channels(void)
 #if NUM_SERVO_CHANNELS > 16
         if (i >= 16) {
             // default to GPIO, this disables the pin and stops logging
-            channels[i].function.set_default(SRV_Channel::k_GPIO);
+            channels[i].function.set_default(SRV_Channel::k_none);
         }
 #endif
     }

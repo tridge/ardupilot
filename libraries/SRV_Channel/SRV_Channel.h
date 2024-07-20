@@ -188,6 +188,9 @@ public:
         k_rcin14_mapped         = 153,
         k_rcin15_mapped         = 154,
         k_rcin16_mapped         = 155,
+        k_motor13               = 156,
+        // 157 to 174 reserved for motors 14 to 31
+        k_motor32               = 175,
         k_nr_aux_servo_functions         ///< This must be the last enum value (only add new values _before_ this one)
     } Aux_servo_function_t;
 
@@ -529,7 +532,10 @@ public:
         if (channel < 8) {
             return SRV_Channel::Aux_servo_function_t(SRV_Channel::k_motor1+channel);
         }
-        return SRV_Channel::Aux_servo_function_t((SRV_Channel::k_motor9+(channel-8)));
+        if (channel < 12) {
+            return SRV_Channel::Aux_servo_function_t((SRV_Channel::k_motor9+(channel-8)));
+        }
+        return SRV_Channel::Aux_servo_function_t((SRV_Channel::k_motor13+(channel-12)));
     }
     
     static void cork();
