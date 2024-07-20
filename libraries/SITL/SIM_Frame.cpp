@@ -43,6 +43,53 @@ static Motor quad_x_motors[] =
     Motor(AP_MOTORS_MOT_4,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  2),
 };
 
+/*
+  a frame of 8 stacked X quad frames, for testing 32 rotor support
+ */
+static Motor quad_32_motors[] =
+{
+    // Bank 0
+    Motor(0,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 2),
+    Motor(1,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 4),
+    Motor(2,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 1),
+    Motor(3,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 3),
+    // Bank 1
+    Motor(4,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 6),
+    Motor(5,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 8),
+    Motor(6,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 5),
+    Motor(7,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 7),
+    // Bank 2
+    Motor(8,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 10),
+    Motor(9,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 12),
+    Motor(10,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 9),
+    Motor(11,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 11),
+    // Bank 3
+    Motor(12,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 14),
+    Motor(13,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 16),
+    Motor(14,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 13),
+    Motor(15,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 15),
+    // Bank 4
+    Motor(16,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 18),
+    Motor(17,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 20),
+    Motor(18,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 17),
+    Motor(19,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 19),
+    // Bank 5
+    Motor(20,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 22),
+    Motor(21,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 24),
+    Motor(22,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 21),
+    Motor(23,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 23),
+    // Bank 6
+    Motor(24,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 26),
+    Motor(25,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 28),
+    Motor(26,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 25),
+    Motor(27,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 27),
+    // Bank 7
+    Motor(28,  45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 30),
+    Motor(29,  -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 32),
+    Motor(30,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 29),
+    Motor(31,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 31),
+};
+
 // motor order to match betaflight conventions
 // See: https://fpvfrenzy.com/betaflight-motor-order/
 static Motor quad_bf_x_motors[] =
@@ -295,6 +342,7 @@ static Frame supported_frames[] =
     Frame("quad",      4, quad_plus_motors),
     Frame("copter",    4, quad_plus_motors),
     Frame("x",         4, quad_x_motors),
+    Frame("m32",       32, quad_32_motors),
     Frame("bfxrev",    4, quad_bf_x_rev_motors),
     Frame("bfx",       4, quad_bf_x_motors),
     Frame("djix",      4, quad_dji_x_motors),
@@ -409,7 +457,7 @@ void Frame::load_frame_params(const char *model_json)
     };
     char label_name[20];
     for (uint8_t i=0; i<ARRAY_SIZE(per_motor_vars); i++) {
-        for (uint8_t j=0; j<12; j++) {
+        for (uint8_t j=0; j<SIM_FRAME_MAX_ACTUATORS; j++) {
             snprintf(label_name, 20, "motor%i_%s", j+1, per_motor_vars[i].label);
             auto v = obj->get(label_name);
             if (v.is<AP_JSON::null>()) {
