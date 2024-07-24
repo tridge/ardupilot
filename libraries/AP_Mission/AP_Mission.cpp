@@ -1919,16 +1919,16 @@ uint16_t AP_Mission::get_fence_exclusion_count(void)
         if (tmp.id == MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION) {
             uint16_t count = tmp.content.fence_vertex.count;
             if (count == 0) {
-                return 0;
+                continue;
             }
             for (uint16_t j=0; j < count; j++) {
                 if (!read_cmd_from_storage(i+j, tmp)) {
-                    return 0;
+                    return zone_count;
                 }
                 if (tmp.id != MAV_CMD_NAV_FENCE_POLYGON_VERTEX_EXCLUSION ||
                     tmp.content.fence_vertex.count != count) {
                     // bad sequence
-                    return 0;
+                    return zone_count;
                 }
             }
             i += count;
