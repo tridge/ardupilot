@@ -1,3 +1,9 @@
+Release 5.2.1 25th July 2024
+------------------------------
+ - Volanti specific changes
+  - FFT has been re enabled and Pitch rate D and I gain have been changed to support it. 
+  - Q_WP_SPEED_DN set to be 200 this will increase descent time before it hits land final alt.
+
 Release 5.2.0 21th June 2024
 ------------------------------
  - Added a prearm check for a crash dump file. If one is found, arming will be blocked by the prearm. 
