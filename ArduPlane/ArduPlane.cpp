@@ -508,6 +508,11 @@ void Plane::update_fly_forward(void)
         return;
     }
 
+    if (quadplane.in_transition()) {
+        ahrs.set_fly_forward(true);
+        return;
+    }
+
     if (quadplane.in_vtol_mode() ||
         quadplane.in_assisted_flight()) {
         ahrs.set_fly_forward(false);
