@@ -5,7 +5,7 @@
  *  Attitude Rate controllers and timing
  ****************************************************************/
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED && FRAME_CONFIG != HELI_FRAME
 #pragma GCC push_options
 #pragma GCC optimize("O2")
 
@@ -340,6 +340,8 @@ void Copter::run_rate_controller_main()
         // only run the rate controller if we are not using the rate thread
         attitude_control->rate_controller_run();
     }
+    // reset sysid and other temporary inputs
+    attitude_control->rate_controller_target_reset();
 }
 
 /*************************************************************
