@@ -723,7 +723,7 @@ void Copter::one_hz_loop()
     if (!started_rate_thread && get_fast_rate_type() != FastRateType::FAST_RATE_DISABLED) {
         if (hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Copter::rate_controller_thread, void),
                                          "attitude",
-                                         1024, AP_HAL::Scheduler::PRIORITY_RCOUT, 1)) {
+                                         1536, AP_HAL::Scheduler::PRIORITY_RCOUT, 1)) {
             started_rate_thread = true;
         }
     }
