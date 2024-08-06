@@ -60,10 +60,12 @@ void ProducerConsumerTest::thread2(void)
         }
         cmtx.unlock();
 #else
-        bool ok = sem1.wait(50000);
-        update(ok);
+        sem1.wait_blocking();
+        while (bsize>0) {
+            update(true);
+        }
 #endif
-        hal.scheduler->delay_microseconds(get_random());
+        hal.scheduler->delay_microseconds(get_random()+1);
     }
 }
 
@@ -78,7 +80,7 @@ void ProducerConsumerTest::thread1(void)
         sem1.signal();
         update_sent();
 #endif
-        hal.scheduler->delay_microseconds(get_random());
+        hal.scheduler->delay_microseconds(get_random()+1);
     }
 }
 
