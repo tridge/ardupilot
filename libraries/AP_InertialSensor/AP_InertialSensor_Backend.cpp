@@ -2,6 +2,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include <AP_AHRS/AP_AHRS.h>
+#include "AP_InertialSensor_rate_config.h"
 #include "AP_InertialSensor.h"
 #include "AP_InertialSensor_Backend.h"
 #include <AP_Logger/AP_Logger.h>
@@ -15,13 +16,6 @@
 
 #ifndef AP_HEATER_IMU_INSTANCE
 #define AP_HEATER_IMU_INSTANCE 0
-#endif
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
-// hal.console can be accessed from bus threads on ChibiOS
-#define debug(fmt, args ...)  do {hal.console->printf("IMU: " fmt "\n", ## args); } while(0)
-#else
-#define debug(fmt, args ...)  do {printf("IMU: " fmt "\n", ## args); } while(0)
 #endif
 
 const extern AP_HAL::HAL& hal;
@@ -175,7 +169,7 @@ void AP_InertialSensor_Backend::_publish_gyro(uint8_t instance, const Vector3f &
         return;
     }
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
     if (!_imu.push_rate_loop_gyro(instance)) { // rate loop thread is not consuming samples
 #endif
         _imu._gyro[instance] = gyro;
@@ -183,7 +177,7 @@ void AP_InertialSensor_Backend::_publish_gyro(uint8_t instance, const Vector3f &
         // copy the gyro samples from the backend to the frontend window for FFTs sampling at less than IMU rate
         _imu._gyro_for_fft[instance] = _imu._last_gyro_for_fft[instance];
 #endif
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
     }
 #endif
 
@@ -230,9 +224,6 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
     save_gyro_window(instance, gyro, filter_phase++);
 
     Vector3f gyro_filtered = gyro;
-#if AP_AHRS_ENABLED && (AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED || AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED)
-    const uint8_t primary_gyro = AP::ahrs().get_primary_gyro_index();
-#endif
 
 #if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     // apply the harmonic notch filters
@@ -246,7 +237,7 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
         // currently active IMU we reset the inactive notch filters so
         // that if we switch IMUs we're not left with old data
         if (!notch.params.hasOption(HarmonicNotchFilterParams::Options::EnableOnAllIMUs) &&
-            instance != primary_gyro) {
+            instance != AP::ahrs().get_primary_gyro_index()) {
             inactive = true;
         }
 #endif
@@ -279,26 +270,8 @@ void AP_InertialSensor_Backend::apply_gyro_filters(const uint8_t instance, const
         _imu._gyro_filtered[instance] = gyro_filtered;
     }
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-    if (_imu.push_rate_loop_gyro(instance)) {
-        /*
-          tell the rate thread we have a new sample
-        */
-        if (++_imu.rate_decimation_count >= _imu.rate_decimation) {
-            _imu._cmutex->lock_and_signal();
-            if (!_imu._rate_loop_gyro_window.push(_imu._gyro_filtered[instance])) {
-                debug("dropped rate loop sample");
-            }
-            _imu.rate_decimation_count = 0;
-            // semaphore is already held so we can directly publish the gyro data
-            _imu._gyro[instance] = _imu._gyro_filtered[instance];
-#if HAL_GYROFFT_ENABLED
-            // copy the gyro samples from the backend to the frontend window for FFTs sampling at less than IMU rate
-            _imu._gyro_for_fft[instance] = _imu._last_gyro_for_fft[instance];
-#endif
-            _imu._cmutex->unlock();
-        }
-    }
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
+    _imu.push_next_gyro_sample(instance);
 #endif
 }
 
@@ -879,16 +852,6 @@ void AP_InertialSensor_Backend::update_accel_filters(uint8_t instance) /* front 
         _last_accel_filter_hz = _accel_filter_cutoff();
     }
 }
-
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-void AP_InertialSensor_Backend::update_filters()
-{
-    WITH_SEMAPHORE(_sem);
-
-    update_accel_filters(accel_instance);
-    update_gyro_filters(gyro_instance);
-}
-#endif
 
 #if HAL_LOGGING_ENABLED
 bool AP_InertialSensor_Backend::should_log_imu_raw() const

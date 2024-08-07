@@ -37,6 +37,7 @@
 class AP_InertialSensor_Backend;
 class AuxiliaryBus;
 class AP_AHRS;
+class FastRateBuffer;
 
 /*
   forward declare AP_Logger class. We can't include logger.h
@@ -54,6 +55,7 @@ class AP_Logger;
 class AP_InertialSensor : AP_AccelCal_Client
 {
     friend class AP_InertialSensor_Backend;
+    friend class FastRateBuffer;
 
 public:
     AP_InertialSensor();
@@ -802,31 +804,21 @@ private:
     bool raw_logging_option_set(RAW_LOGGING_OPTION option) const {
         return (raw_logging_options.get() & int32_t(option)) != 0;
     }
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
-    /*
-      binary semaphore for rate loop to use to start a rate loop when
-      we hav finished filtering the primary IMU
-     */
-    ObjectBuffer<Vector3f> _rate_loop_gyro_window{AP_INERTIAL_SENSOR_RATE_LOOP_BUFFER_SIZE};
-    uint8_t rate_decimation; // 0 means off
-    uint8_t rate_decimation_count;
-    AP_HAL::CondMutex* _cmutex;
 
+    FastRateBuffer* fast_rate_buffer;
 public:
-    void set_rate_loop_mutex(AP_HAL::CondMutex* cmutex) { _cmutex = cmutex; }
+    void enable_fast_rate_buffer();
+    void disable_fast_rate_buffer();
     bool get_next_gyro_sample(Vector3f& gyro);
-    uint32_t get_num_gyro_samples() { return _rate_loop_gyro_window.available(); }
-    void set_rate_decimation(uint8_t rdec) { rate_decimation = rdec; }
+    uint32_t get_num_gyro_samples();
+    void set_rate_decimation(uint8_t rdec);
     // are gyro samples being sourced from the rate loop buffer
-    bool use_rate_loop_gyro_samples() const { return _cmutex != nullptr; }
+    bool use_rate_loop_gyro_samples() const;
     // whether or not to push the current gyro sample
-    bool push_rate_loop_gyro(uint8_t instance) const {
-        return use_rate_loop_gyro_samples() && rate_decimation && instance == AP::ahrs().get_primary_gyro_index();
-    }
+    void push_next_gyro_sample(uint8_t instance);
     void update_backend_filters();
-
-    bool gyro_samples_available() { return  _rate_loop_gyro_window.available() > 0; }
-#endif
+private:
+    bool push_rate_loop_gyro(uint8_t instance) const;
 };
 
 namespace AP {

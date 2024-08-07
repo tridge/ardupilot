@@ -53,14 +53,13 @@ public:
      */
     virtual bool update() = 0; /* front end */
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
     /*
      * Update the filter parameters. Called by the frontend to propagate
      * filter parameters to the frontend structure via the
      * update_gyro_filters() and update_accel_filters() functions
      */
     void update_filters() __RAMFUNC__; /* front end */
-#endif
+
     /*
      * optional function to accumulate more samples. This is needed for drivers that don't use a timer to gather samples
      */
