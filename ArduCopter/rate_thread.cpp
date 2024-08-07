@@ -1,7 +1,20 @@
-#include "Copter.h"
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED && FRAME_CONFIG != HELI_FRAME
-#include <AP_HAL/CondMutex.h>
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+#include "Copter.h"
+#include <AP_InertialSensor/AP_InertialSensor_rate_config.h>
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
 
 #pragma GCC optimize("O2")
 
@@ -27,8 +40,7 @@ void Copter::rate_controller_thread()
     uint32_t rate_loop_count = 0;
     uint32_t prev_loop_count = 0;
 
-    HAL_CondMutex cmutex;
-    ins.set_rate_loop_mutex(&cmutex);
+    ins.enable_fast_rate_buffer();
     hal.rcout->set_dshot_rate(SRV_Channels::get_dshot_rate(), ins.get_raw_gyro_rate_hz() / rate_decimation);
 
     uint32_t last_run_us = AP_HAL::micros();
@@ -292,7 +304,7 @@ uint8_t Copter::rate_controller_set_rates(uint8_t rate_decimation, bool warn_cpu
     hal.rcout->set_dshot_rate(SRV_Channels::get_dshot_rate(), attitude_rate);
     motors->set_dt(1.0f / attitude_rate);
     gcs().send_text(warn_cpu_high ? MAV_SEVERITY_WARNING : MAV_SEVERITY_INFO,
-                    "Attitude CPU %s, rate set to %uHz",
+                    "Rate CPU %s, rate set to %uHz",
                     warn_cpu_high ? "high" : "normal", (unsigned) attitude_rate);
 #if HAL_LOGGING_ENABLED
     if (attitude_rate > 1000) {

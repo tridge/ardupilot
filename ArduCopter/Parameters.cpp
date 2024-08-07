@@ -1,6 +1,7 @@
 #include "Copter.h"
 
 #include <AP_Gripper/AP_Gripper.h>
+#include <AP_InertialSensor/AP_InertialSensor_rate_config.h>
 
 /*
    This program is free software: you can redistribute it and/or modify

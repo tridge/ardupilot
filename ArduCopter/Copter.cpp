@@ -75,6 +75,7 @@
  */
 
 #include "Copter.h"
+#include <AP_InertialSensor/AP_InertialSensor_rate_config.h>
 
 #define FORCE_VERSION_H_INCLUDE
 #include "version.h"
@@ -716,7 +717,7 @@ void Copter::one_hz_loop()
     custom_control.set_notch_sample_rate(AP::scheduler().get_filtered_loop_rate_hz());
 #endif
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED && FRAME_CONFIG != HELI_FRAME
+#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
     // see if we should have a separate rate thread
     if (!started_rate_thread && get_fast_rate_type() != FastRateType::FAST_RATE_DISABLED) {
         if (hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&Copter::rate_controller_thread, void),
