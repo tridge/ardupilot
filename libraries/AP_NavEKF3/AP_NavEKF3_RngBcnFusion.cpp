@@ -33,7 +33,11 @@ void NavEKF3_core::SelectRngBcnFusion()
             rngBcn.receiverPos.zero();
             // correct for time offset and range rate
             Vector3F deltaPosNED = stateStruct.position - dataDelayed.beacon_posNED;
-            const ftype rangeRate = stateStruct.velocity.xy()*(deltaPosNED.xy().normalized());
+            const auto &deltaxy = deltaPosNED.xy();
+            if (deltaxy.length() < 1) {
+                continue;
+            }
+            const ftype rangeRate = stateStruct.velocity.xy()*(deltaxy.normalized());
             ftype delaySec = 0.001f * (ftype)((double)dataDelayed.delay_ms + (double)imuDataDelayed.time_ms - (double)dataDelayed.time_ms);
             delaySec = constrain_ftype(delaySec, -1.0f, 1.0f);
             const ftype rangeCorrection = delaySec * rangeRate;
