@@ -1233,7 +1233,7 @@ const AP_Param::GroupInfo ParametersG2::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("FS_EKF_FILT", 8, ParametersG2, fs_ekf_filt_hz, FS_EKF_FILT_DEFAULT),
 
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
     // @Param: FSTRATE_ENABLE
     // @DisplayName: Enable the fast Rate thread
     // @Description: Enable the fast Rate thread

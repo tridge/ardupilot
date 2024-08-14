@@ -14,7 +14,7 @@
 */
 #include "Copter.h"
 #include <AP_InertialSensor/AP_InertialSensor_rate_config.h>
-#if AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
 
 #pragma GCC optimize("O2")
 
@@ -334,4 +334,4 @@ void Copter::rate_controller_log_update()
 #endif
 }
 
-#endif // AP_INERTIALSENSOR_RATE_LOOP_WINDOW_ENABLED
+#endif // AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
