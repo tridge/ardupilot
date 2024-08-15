@@ -40,9 +40,6 @@ void Copter::rate_controller_thread()
     uint32_t rate_loop_count = 0;
     uint32_t prev_loop_count = 0;
 
-    ins.enable_fast_rate_buffer();
-    hal.rcout->set_dshot_rate(SRV_Channels::get_dshot_rate(), ins.get_raw_gyro_rate_hz() / rate_decimation);
-
     uint32_t last_run_us = AP_HAL::micros();
     float max_dt = 0.0;
     float min_dt = 1.0;
@@ -86,11 +83,8 @@ void Copter::rate_controller_thread()
 
         // allow changing option at runtime
         if (get_fast_rate_type() == FastRateType::FAST_RATE_DISABLED || ap.motor_test) {
-            using_rate_thread = false;
             if (was_using_rate_thread) {
-                rate_controller_set_rates(calc_gyro_decimation(1, AP::scheduler().get_filtered_loop_rate_hz()), false);
-                ins.set_rate_decimation(0);
-                hal.rcout->force_trigger_groups(false);
+                disable_fast_rate_loop();
                 was_using_rate_thread = false;
             }
             hal.scheduler->delay_microseconds(500);
@@ -99,8 +93,9 @@ void Copter::rate_controller_thread()
         }
 
         // set up rate thread requirements
-        using_rate_thread = true;
-        hal.rcout->force_trigger_groups(true);
+        if (!using_rate_thread) {
+            enable_fast_rate_loop(rate_decimation);
+        }
         ins.set_rate_decimation(rate_decimation);
 
         // wait for an IMU sample
@@ -316,6 +311,22 @@ uint8_t Copter::rate_controller_set_rates(uint8_t rate_decimation, bool warn_cpu
     return 0;
 }
 
+void Copter::enable_fast_rate_loop(uint8_t rate_decimation)
+{
+    ins.enable_fast_rate_buffer();
+    rate_controller_set_rates(rate_decimation, false);
+    hal.rcout->force_trigger_groups(true);
+    using_rate_thread = true;
+}
+
+void Copter::disable_fast_rate_loop()
+{
+    using_rate_thread = false;
+    rate_controller_set_rates(calc_gyro_decimation(1, AP::scheduler().get_filtered_loop_rate_hz()), false);
+    hal.rcout->force_trigger_groups(false);
+    ins.disable_fast_rate_buffer();
+}
+
 /*
   log only those items that are updated at the rate loop rate
  */
@@ -332,6 +343,16 @@ void Copter::rate_controller_log_update()
     }
 #endif
 #endif
+}
+
+// run notch update at either loop rate or 200Hz
+void Copter::update_dynamic_notch_at_specified_rate_main()
+{
+    if (using_rate_thread) {
+        return;
+    }
+
+    update_dynamic_notch_at_specified_rate();
 }
 
 #endif // AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED

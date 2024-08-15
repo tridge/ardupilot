@@ -260,6 +260,9 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if HAL_BUTTON_ENABLED
     SCHED_TASK_CLASS(AP_Button,            &copter.button,              update,           5, 100, 168),
 #endif
+#if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
+    SCHED_TASK(update_dynamic_notch_at_specified_rate_main,                       LOOP_RATE, 200, 215),
+#endif
 };
 
 void Copter::get_scheduler_tasks(const AP_Scheduler::Task *&tasks,

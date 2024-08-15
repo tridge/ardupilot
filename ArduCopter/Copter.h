@@ -736,11 +736,16 @@ private:
     uint16_t get_pilot_speed_dn() const;
     void run_rate_controller_main();
 
+    // if AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
     uint8_t calc_gyro_decimation(uint16_t gyro_decimation, uint16_t rate_hz);
     void rate_controller_thread();
     void rate_controller_filter_update();
     void rate_controller_log_update();
     uint8_t rate_controller_set_rates(uint8_t rate_decimation, bool warn_cpu_high);
+    void enable_fast_rate_loop(uint8_t rate_decimation);
+    void disable_fast_rate_loop();
+    void update_dynamic_notch_at_specified_rate_main();
+    // endif AP_INERTIALSENSOR_FAST_SAMPLE_WINDOW_ENABLED
 
 #if AC_CUSTOMCONTROL_MULTI_ENABLED == ENABLED
     void run_custom_controller() { custom_control.update(); }
@@ -1097,6 +1102,7 @@ private:
     void exit_mode(Mode *&old_flightmode, Mode *&new_flightmode);
 
     bool started_rate_thread;
+    bool using_rate_thread;
 
 public:
     void failsafe_check();      // failsafe.cpp
