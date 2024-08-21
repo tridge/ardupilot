@@ -804,17 +804,25 @@ private:
         return (raw_logging_options.get() & int32_t(option)) != 0;
     }
 
+    // Support for the fast rate thread in copter
     FastRateBuffer* fast_rate_buffer;
+
 public:
+    // enable the fast rate buffer and start pushing samples to it
     void enable_fast_rate_buffer();
+    // disable the fast rate buffer and stop pushing samples to it
     void disable_fast_rate_buffer();
+    // get the next available gyro sample from the fast rate buffer
     bool get_next_gyro_sample(Vector3f& gyro);
+    // get the number of available gyro samples in the fast rate buffer
     uint32_t get_num_gyro_samples();
+    // set the rate at which samples are collected, unused samples are dropped
     void set_rate_decimation(uint8_t rdec);
     // are gyro samples being sourced from the rate loop buffer
     bool use_rate_loop_gyro_samples() const;
-    // whether or not to push the current gyro sample
+    // push a new gyro sample into the fast rate buffer
     void push_next_gyro_sample(uint8_t instance);
+    // run the filter parmeter update code.
     void update_backend_filters();
 private:
     bool push_rate_loop_gyro(uint8_t instance) const;
