@@ -512,8 +512,9 @@ protected:
 #if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     // update the harmonic notch
     void update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch);
-#endif
-    bool using_rate_thread;
+    // run notch update at either loop rate or 200Hz
+    void update_dynamic_notch_at_specified_rate();
+#endif // AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 
 private:
 
@@ -529,10 +530,7 @@ private:
 #if AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
     // update the harmonic notch for throttle based notch
     void update_throttle_notch(AP_InertialSensor::HarmonicNotch &notch);
-
-    // run notch update at either loop rate or 200Hz
-    void update_dynamic_notch_at_specified_rate();
-#endif
+#endif // AP_INERTIALSENSOR_HARMONICNOTCH_ENABLED
 
     // decimation for 1Hz update
     uint8_t one_Hz_counter;
@@ -566,7 +564,6 @@ private:
 
     // Bitmask of modes to disable from gcs
     AP_Int32 flight_mode_GCS_block;
-
 };
 
 namespace AP {
