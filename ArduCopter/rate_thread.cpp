@@ -18,9 +18,135 @@
 
 #pragma GCC optimize("O2")
 
-/*************************************************************
- *  Attitude Rate controller thread
- ****************************************************************/
+/*
+ Attitude Rate controller thread design.
+
+ Rationale: running rate outputs linked to fast gyro outputs achieves two goals:
+
+ 1. High frequency gyro processing allows filters to be applied with high sample rates
+    which is advantageous in removing high frequency noise and associated aliasing
+ 2. High frequency rate control reduces the latency between control and action leading to 
+    better disturbance rejection and faster responses which generally means higher
+    PIDs can be used without introducing control oscillation
+
+ (1) is already mostly achieved through the higher gyro rates that are available via
+ INS_GYRO_RATE. (2) requires running the rate controller at higher rates via a separate thread
+
+
+ Goal: the ideal scenario is to run in a single cycle:
+
+    gyro read->filter->publish->rate control->motor output
+
+ This ensures the minimum latency between gyro sample and motor output. Other functions need 
+ to also run faster than they would normally most notably logging and filter frequencies - most
+ notably the harmonic notch frequency.
+
+ Design assumptions:
+
+ 1. The sample rate of the IMUs is consistent and accurate.
+    This is the most basic underlying assumption. An alternative approach would be to rely on
+    the timing of when samples are received but this proves to not work in practice due to
+    scheduling delays. Thus the dt used by the attitude controller is the delta between IMU
+    measurements, not the delta between processing cycles in the rate thread.
+ 2. Every IMU reading must be processed or consistently sub-sampled.
+    This is an assumption that follows from (1) - so it means that attitude control should
+    process every sample or every other sample or every third sample etc. Note that these are
+    filtered samples - all incoming samples are processed for filtering purposes, it is only
+    for the purposes of rate control that we are sub-sampling.
+ 3. The data that the rate loop requires is timely, consistent and accurate.
+    Rate control essentially requires two components - the target and the actuals. The actuals
+    come from the incoming gyro sample combined with the state of the PIDs. The target comes
+    from attitude controller which is running at a slower rate in the main loop. Since the rate
+    thread can read the attitude target at any time it is important that this is always available
+    consistently and is updated consistently.
+ 4. The data that the rest of the vehicle uses is the same data that the rate thread uses.
+    Put another way any gyro value that the vehicle uses (e.g. in the EKF etc), must have already
+    been processed by the rate thread. Where this becomes important is with sub-sampling - if 
+    rate gyro values are sub-sampled we need to make sure that the vehicle is also only using
+    the sub-sampled values.
+
+ Design:
+
+ 1. Filtered gyro samples are (sub-sampled and) pushed into an ObjectBuffer from the INS backend.
+ 2. The pushed sample is published to the INS front-end so that the rest of the vehicle only
+    sees published values that have been used by the rate controller. When the rate thread is not 
+    in use the filtered samples are effectively sub-sampled at the main loop rate. The EKF is unaffected
+    as it uses delta angles calculated from the raw gyro values. (It might be possible to avoid publishing
+    from the rate thread by only updating _gyro_filtered when a value is pushed).
+ 3. A notification is sent that a sample is available
+ 4. The rate thread is blocked waiting for a sample. When it receives a notification it:
+    4a. Runs the rate controller
+    4b. Pushes the new pwm values. Periodically at the main loop rate all of the SRV_Channels::push()
+        functionality is run as well.
+ 5. The rcout dshot thread is blocked waiting for a new pwm value. When it is signalled by the
+    rate thread it wakes up and runs the dshot motor output logic.
+ 6. Periodically the rate thread:
+    6a. Logs the rate outputs (1Khz)
+    6b. Updates the notch filter centers (Gyro rate/2)
+    6c. Checks the ObjectBuffer length and main loop delay (10Hz)
+        If the ObjectBuffer length has been longer than 2 for the last 5 cycles or the main loop has
+        been slowed down then the rate thread is slowed down by telling the INS to sub-sample. This
+        mechanism is continued until the rate thread is able to keep up with the sub-sample rate.
+        The inverse of this mechanism is run if the rate thread is able to keep up but is running slower
+        than the gyro sample rate.
+    6d. Updates the PID notch centers (1Hz)
+ 7. When the rate rate changes through sub-sampling the following values are updated:
+    7a. The PID notch sample rate
+    7b. The dshot rate is constrained to be never greater than the gyro rate or rate rate
+    7c. The motors dt
+ 8. Independently of the rate thread the attitude control target is updated in the main loop. In order
+    for target values to be consistent all updates are processed using local variables and the final
+    target is only written at the end of the update as a vector. Direct control of the target (e.g. in
+    autotune) is also constrained to be on all axes simultaneously using the new desired value. The
+    target makes use of the current PIDs and the "latest" gyro, it might be possible to use a loop
+    delayed gyro value, but that is currently out-of-scope.
+
+ Performance considerations:
+
+ On an H754 using ICM42688 and gyro sampling at 4KHz and rate thread at 4Khz the main CPU users are:
+
+ ArduCopter    PRI=182 sp=0x30000600 STACK=4392/7168 LOAD=18.6%
+ idle          PRI=  1 sp=0x300217B0 STACK= 296/ 504 LOAD= 4.3%
+ rcout         PRI=181 sp=0x3001DAF0 STACK= 504/ 952 LOAD=10.7%
+ SPI1          PRI=181 sp=0x3002DAB8 STACK= 856/1464 LOAD=17.5%
+ SPI4          PRI=181 sp=0x3002D4A0 STACK= 888/1464 LOAD=18.3%
+ rate          PRI=182 sp=0x3002B1D0 STACK=1272/1976 LOAD=22.4%
+
+ There is a direct correlation between the rate rate and CPU load, so if the rate rate is half the gyro
+ rate (i.e. 2Khz) we observe the following:
+
+ ArduCopter    PRI=182 sp=0x30000600 STACK=4392/7168 LOAD=16.7%
+ idle          PRI=  1 sp=0x300217B0 STACK= 296/ 504 LOAD=21.3%
+ rcout         PRI=181 sp=0x3001DAF0 STACK= 504/ 952 LOAD= 6.2%
+ SPI1          PRI=181 sp=0x3002DAB8 STACK= 856/1464 LOAD=16.7%
+ SPI4          PRI=181 sp=0x3002D4A0 STACK= 888/1464 LOAD=17.8%
+ rate          PRI=182 sp=0x3002B1D0 STACK=1272/1976 LOAD=11.5%
+
+ So we get almost a halving of CPU load in the rate and rcout threads. This is the main way that CPU
+ load can be handled on lower-performance boards, with the other mechanism being lowering the gyro rate.
+ So at a very respectable gyro rate and rate rate both of 2Khz (still 5x standard main loop rate) we see:
+
+ ArduCopter    PRI=182 sp=0x30000600 STACK=4440/7168 LOAD=15.6%
+ idle          PRI=  1 sp=0x300217B0 STACK= 296/ 504 LOAD=39.4%
+ rcout         PRI=181 sp=0x3001DAF0 STACK= 504/ 952 LOAD= 5.9%
+ SPI1          PRI=181 sp=0x3002DAB8 STACK= 856/1464 LOAD= 8.9%
+ SPI4          PRI=181 sp=0x3002D4A0 STACK= 896/1464 LOAD= 9.1%
+ rate          PRI=182 sp=0x30029FB0 STACK=1296/1976 LOAD=11.8%
+
+ This essentially means that its possible to run this scheme successfully on all MCUs by careful setting of 
+ the maximum rates.
+
+ Enabling rate thread timing debug for 4Khz reads with fast logging and armed we get the following data:
+
+ Rate loop timing: gyro=178us, rate=13us, motors=45us, log=7us, ctrl=1us
+ Rate loop timing: gyro=178us, rate=13us, motors=45us, log=7us, ctrl=1us
+ Rate loop timing: gyro=177us, rate=13us, motors=46us, log=7us, ctrl=1us
+
+ The log output is an average since it only runs at 1Khz, so roughly 28us elapsed. So the majority of the time
+ is spent waiting for a gyro sample (higher is better here since it represents the idle time) updating the PIDs
+ and outputting to the motors. Everything else is relatively cheap. Since the total cycle time is 250us the duty
+ cycle is thus 29%
+ */
 
 #define DIV_ROUND_INT(x, d) ((x + d/2) / d)
 
