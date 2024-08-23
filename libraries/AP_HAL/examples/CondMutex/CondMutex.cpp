@@ -65,8 +65,18 @@ void ProducerConsumerTest::consumer_tick(void)
     if (!check()) {
         sem1.wait_blocking();
     }
+    // we are avoiding wait_blocking() here to cope with double notifications
+    // however it also means that, pre-existing notifications will not
+    // be waited for, this means that we can exhaust the pending data
+    // and the wait_blocking() above will immediately return. This is why
+    // the availability of data must also be checked inside the lock
+    // it also means you have to go around the loop twice to get to a blocking state
+    // when going from some data to no data
     if (!update()) {
-        return;   // we thought we had a sample, but concurrency means we actually do not
+        // we thought we had a sample, but concurrency means we actually do not
+        // the pattern requires that we are able to exit early here without processing
+        // it should only ever happen two cycles at a time so is not a busy wait
+        return; 
     }
 #endif
     hal.scheduler->delay_microseconds(100); // simluate processing delay
@@ -98,7 +108,7 @@ void ProducerConsumerTest::producer_tick(void)
 bool ProducerConsumerTest::update()
 {
     WITH_SEMAPHORE(mtx);
-    // safety check
+    // see the comment in consumer_tick() as to why this is necessary
     if (!check()) {
         return false;
     }
