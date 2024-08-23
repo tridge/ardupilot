@@ -2091,8 +2091,12 @@ AP_AHRS::EKFType AP_AHRS::_active_EKF_type(void) const
 
 AP_AHRS::EKFType AP_AHRS::fallback_active_EKF_type(void) const
 {
+
 #if AP_AHRS_DCM_ENABLED
-    return EKFType::DCM;
+    bool disable_dcm_fallback = fly_forward ? option_set(Options::DISABLE_DCM_FALLBACK_FW) : option_set(Options::DISABLE_DCM_FALLBACK_VTOL);
+    if (disable_dcm_fallback) {
+        return EKFType::DCM;
+    }
 #endif
 
 #if HAL_NAVEKF3_AVAILABLE
@@ -2111,6 +2115,11 @@ AP_AHRS::EKFType AP_AHRS::fallback_active_EKF_type(void) const
     if (external.healthy()) {
         return EKFType::EXTERNAL;
     }
+#endif
+
+#if AP_AHRS_DCM_ENABLED
+    // nothing else is available and DCM will always provide something
+    return EKFType::DCM;
 #endif
 
     // so nobody is ready yet.  Return something, even if it is not ready:
