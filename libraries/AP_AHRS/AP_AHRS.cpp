@@ -351,7 +351,12 @@ void AP_AHRS::update_state(void)
     state.quat_ok = _get_quaternion(state.quat);
     state.secondary_attitude_ok = _get_secondary_attitude(state.secondary_attitude);
     state.secondary_quat_ok = _get_secondary_quaternion(state.secondary_quat);
-    state.location_ok = _get_location(state.location);
+    Location location;
+    state.location_ok = _get_location(location);
+    if (state.location_ok || (!state.initialised && _get_origin(location))) {
+        state.location = location;
+        state.initialised = true;
+    }
     state.secondary_pos_ok = _get_secondary_position(state.secondary_pos);
     state.ground_speed_vec = _groundspeed_vector();
     state.ground_speed = _groundspeed();
