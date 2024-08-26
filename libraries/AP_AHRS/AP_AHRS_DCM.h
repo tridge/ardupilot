@@ -112,6 +112,11 @@ public:
 
     bool get_velocity_NED(Vector3f &vec) const override;
 
+    // initialse position and speed for when we have no GPS lock
+    void init_posvel(float speed, const Location &loc);
+
+    void get_relative_position_D_home(float &posD) const;
+
     // Get a derivative of the vertical position in m/s which is kinematically consistent with the vertical position is required by some control loops.
     // This is different to the vertical velocity from the EKF which is not always consistent with the vertical position due to the various errors that are being corrected for.
     bool get_vert_pos_rate_D(float &velocity) const override;
@@ -273,6 +278,9 @@ private:
 
     // time when DCM was last reset
     uint32_t _last_startup_ms;
+
+    bool _dead_reckon_baro;
+    float _dead_reckon_basealt;
 
     // last origin we returned, for DCM fallback from EKF
     Location last_origin;
