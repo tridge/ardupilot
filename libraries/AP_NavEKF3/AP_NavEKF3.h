@@ -368,6 +368,14 @@ public:
     // get a yaw estimator instance
     const EKFGSF_yaw *get_yawEstimator(void) const;
 
+    // force GPS disable on EKF3 only
+    void force_gps_disable(bool gps_disable);
+
+    // true when we will not use GPS due to AUX switch disable
+    bool gps_is_disabled(void) const {
+        return _gps_disabled;
+    }
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -580,6 +588,9 @@ private:
 
     // position, velocity and yaw source control
     AP_NavEKF_Source sources;
+
+    // true when we should not use GPS due to AUX switch disable
+    bool _gps_disabled;
 
     HAL_Semaphore _write_mutex;
 };
