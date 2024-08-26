@@ -117,6 +117,10 @@ public:
     bool get_temperature(uint8_t i, float &temperature);
     bool get_temperature(float &temperature) { return get_temperature(primary, temperature); }
 
+    // return true if the sensor is synthetic
+    bool is_synthetic(uint8_t i) const;
+    bool is_synthetic(void) const { return is_synthetic(primary); }
+    
     // set the airspeed ratio (dimensionless)
 #ifndef HAL_BUILD_AP_PERIPH
     void set_airspeed_ratio(uint8_t i, float ratio) {
@@ -192,6 +196,7 @@ public:
         TYPE_MSP=14,
         TYPE_I2C_ASP5033=15,
         TYPE_EXTERNAL=16,
+        TYPE_SYNTHETIC=17,
         TYPE_SITL=100,
     };
 
@@ -238,6 +243,8 @@ private:
     AP_Float _wind_max;
     AP_Float _wind_warn;
     AP_Float _wind_gate;
+    AP_Float _wind_direction_from;
+    AP_Float _wind_speed_mps;
 
     AP_Airspeed_Params param[AIRSPEED_MAX_SENSORS];
 
