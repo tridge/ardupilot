@@ -54,7 +54,7 @@ public:
     // return the distance in meters at which a turn should commence
     // to allow the vehicle to neatly move to the next track in the
     // mission when approaching a waypoint
-    virtual float turn_distance(float wp_radius, float turn_angle) const = 0;
+    virtual float turn_distance(float wp_radius, float turn_angle, float roll_limit_deg) const = 0;
 
     // return the target loiter radius for the current location that
     // will not cause excessive airframe loading
