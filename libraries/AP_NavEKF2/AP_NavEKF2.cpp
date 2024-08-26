@@ -1594,3 +1594,9 @@ const EKFGSF_yaw *NavEKF2::get_yawEstimator(void) const
     }
     return nullptr;
 }
+
+// return error score for currently active lane
+float NavEKF2::errorScore(void) const
+{
+    return core[primary].errorScore();
+}
