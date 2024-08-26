@@ -137,6 +137,12 @@ public:
     }
 #endif
 
+    void init_posvel(float speed, const Location &loc) {
+#if AP_AHRS_DCM_ENABLED
+        dcm.init_posvel(speed, loc);
+#endif
+    }
+
     // return the parameter AHRS_WIND_MAX in metres per second
     uint8_t get_max_wind() const {
         return _wind_max;

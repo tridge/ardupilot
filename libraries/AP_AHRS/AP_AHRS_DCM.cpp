@@ -32,6 +32,7 @@
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Compass/AP_Compass.h>
 #include <AP_Logger/AP_Logger.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
 extern const AP_HAL::HAL& hal;
@@ -1089,7 +1090,17 @@ bool AP_AHRS_DCM::airspeed_estimate(float &airspeed_ret) const
 #if AP_AIRSPEED_ENABLED
     const auto *airspeed = AP::airspeed();
     if (airspeed != nullptr) {
-        return airspeed_estimate(airspeed->get_primary(), airspeed_ret);
+        const bool ret = airspeed_estimate(airspeed->get_primary(), airspeed_ret);
+        const AP_GPS &_gps = AP::gps();
+        float airspeed_min;
+        float airspeed_max;
+        if (_gps.status() >= AP_GPS::GPS_OK_FIX_3D &&
+            AP::vehicle()->get_airspeed_min(airspeed_min) &&
+            AP::vehicle()->get_airspeed_max(airspeed_max) &&
+            _gps.ground_speed() > airspeed_min*0.5) {
+                airspeed_ret = constrain_float(airspeed_ret, airspeed_min, airspeed_max);
+        }
+        return ret;
     }
 #endif
     // airspeed_estimate will also make this nullptr check and act
@@ -1153,6 +1164,18 @@ bool AP_AHRS_DCM::get_unconstrained_airspeed_estimate(uint8_t airspeed_index, fl
     return false;
 }
 
+//  a relative ground position to home in meters, Down
+void AP_AHRS_DCM::get_relative_position_D_home(float &posD) const
+{
+    const auto &gps = AP::gps();
+    if (AP::ahrs().home_is_set() && _gps_use != GPSUse::Disable && gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
+        const Location &loc = gps.location();
+        posD = -(loc.alt - AP::ahrs().get_home().alt) * 0.01;
+    } else {
+        posD = -AP::baro().get_altitude();
+    }
+}
+
 /*
   check if the AHRS subsystem is healthy
 */
@@ -1173,6 +1196,23 @@ bool AP_AHRS_DCM::get_velocity_NED(Vector3f &vec) const
     }
     vec = _gps.velocity();
     return true;
+}
+
+/*
+  init speed and position for initial dead-reckoning support
+ */
+void AP_AHRS_DCM::init_posvel(float speed, const Location &loc)
+{
+    _last_velocity.z = 0;
+    _last_velocity.x = cosf(yaw) * speed;
+    _last_velocity.y = sinf(yaw) * speed;
+    _last_lat = loc.lat;
+    _last_lng = loc.lng;
+    _position_offset_east = _position_offset_north = 0;
+    _have_position = true;
+    _dead_reckon_baro = true;
+    _dead_reckon_basealt = loc.alt*0.01;
+    AP::baro().update_calibration();
 }
 
 // return a ground speed estimate in m/s
