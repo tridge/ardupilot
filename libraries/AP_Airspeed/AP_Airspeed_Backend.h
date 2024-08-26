@@ -42,6 +42,9 @@ public:
     // return the current temperature in degrees C, if available
     virtual bool get_temperature(float &temperature) = 0;
 
+    // return true if this is a synthetic airspeed sensor
+    virtual bool is_synthetic(void) const { return false; }
+    
     // true if sensor reads airspeed directly, not via pressure
     virtual bool has_airspeed() {return false;}
 
@@ -104,6 +107,11 @@ protected:
 #ifndef HAL_BUILD_AP_PERIPH
         frontend.param[instance].offset.set(ofs);
 #endif
+    }
+
+    void get_wind(float &direction_from_deg, float &speed_mps) const {
+        direction_from_deg = frontend._wind_direction_from;
+        speed_mps = frontend._wind_speed_mps;
     }
 
     // set use

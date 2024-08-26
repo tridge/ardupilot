@@ -49,6 +49,7 @@
 #include "AP_Airspeed_analog.h"
 #include "AP_Airspeed_ASP5033.h"
 #include "AP_Airspeed_Backend.h"
+#include "AP_Airspeed_Synthetic.h"
 #include "AP_Airspeed_DroneCAN.h"
 #include "AP_Airspeed_NMEA.h"
 #include "AP_Airspeed_MSP.h"
@@ -176,6 +177,26 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] = {
 #endif
 
     // index 30 is used by enable at the top of the table
+
+    // Note that 21 is used above by the _OPTIONS parameter.  Do not use 21.
+
+#if AP_AIRSPEED_SYNTHETIC_ENABLED
+    // @Param: WIND_DIR
+    // @DisplayName: Airspeed wind direction estimate.
+    // @Description: Airspeed wind direction estimate. Used for Synthetic Airspeed.
+    // @Range: 0 360
+    // @Units: deg
+    // @User: Advanced
+    AP_GROUPINFO("WIND_DIR",  31, AP_Airspeed, _wind_direction_from, 0),
+
+    // @Param: WIND_SPD
+    // @DisplayName: Airspeed wind estimate speed.
+    // @Description: Airspeed wind estimate speed. Used for Synthetic Airspeed.
+    // @Range: 0 50
+    // @Units: m/s
+    // @User: Advanced
+    AP_GROUPINFO("WIND_SPD",  32, AP_Airspeed, _wind_speed_mps, 0),
+#endif
 
     AP_GROUPEND
 };
@@ -424,6 +445,11 @@ void AP_Airspeed::allocate()
             sensor[i] = AP_Airspeed_DroneCAN::probe(*this, i, uint32_t(param[i].bus_id.get()));
 #endif
             break;
+        case TYPE_SYNTHETIC:
+#if AP_AIRSPEED_SYNTHETIC_ENABLED
+            sensor[i] = new AP_Airspeed_Synthetic(*this, i);
+#endif
+            break;
         case TYPE_NMEA_WATER:
 #if AP_AIRSPEED_NMEA_ENABLED
 #if APM_BUILD_TYPE(APM_BUILD_Rover) || APM_BUILD_TYPE(APM_BUILD_ArduSub) 
@@ -498,6 +524,18 @@ bool AP_Airspeed::get_temperature(uint8_t i, float &temperature)
     }
     if (sensor[i]) {
         return sensor[i]->get_temperature(temperature);
+    }
+    return false;
+}
+
+// return true if airspeed source is synthetic
+bool AP_Airspeed::is_synthetic(uint8_t i) const
+{
+    if (!enabled(i)) {
+        return false;
+    }
+    if (sensor[i]) {
+        return sensor[i]->is_synthetic();
     }
     return false;
 }
