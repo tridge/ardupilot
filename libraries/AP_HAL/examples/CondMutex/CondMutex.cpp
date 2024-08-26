@@ -14,7 +14,7 @@ void loop();
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
-#define USE_COND_MUTEX
+//#define USE_COND_MUTEX
 
 class ProducerConsumerTest {
 public:
@@ -27,6 +27,7 @@ public:
     void producer_tick(void);
     void consumer_tick(void);
     bool update();
+    void busy_wait(uint32_t us);
     void update_sent();
     bool check() { return bsize>0; }
 
@@ -38,6 +39,15 @@ public:
     HAL_Semaphore mtx;
     uint32_t delay_count;
 };
+
+/*
+  simulate use of CPU processing a sample
+ */
+void ProducerConsumerTest::busy_wait(uint32_t us)
+{
+    const uint32_t start_us = AP_HAL::micros();
+    while (AP_HAL::micros() - start_us < us) ;
+}
 
 void ProducerConsumerTest::setup(void)
 {
@@ -61,25 +71,13 @@ void ProducerConsumerTest::consumer_tick(void)
     cmtx.lock_and_wait(FUNCTOR_BIND_MEMBER(&ProducerConsumerTest::check, bool));
     update();
     cmtx.unlock();
+    busy_wait(100);
 #else
-    if (!check()) {
-        sem1.wait_blocking();
-    }
-    // we are avoiding wait_blocking() here to cope with double notifications
-    // however it also means that, pre-existing notifications will not
-    // be waited for, this means that we can exhaust the pending data
-    // and the wait_blocking() above will immediately return. This is why
-    // the availability of data must also be checked inside the lock
-    // it also means you have to go around the loop twice to get to a blocking state
-    // when going from some data to no data
-    if (!update()) {
-        // we thought we had a sample, but concurrency means we actually do not
-        // the pattern requires that we are able to exit early here without processing
-        // it should only ever happen two cycles at a time so is not a busy wait
-        return; 
+    sem1.wait_blocking();
+    while (update()) {
+        busy_wait(100);
     }
 #endif
-    hal.scheduler->delay_microseconds(100); // simluate processing delay
 }
 
 void ProducerConsumerTest::producer(void)
