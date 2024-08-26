@@ -2420,6 +2420,24 @@ uint16_t AP_Mission::get_landing_sequence_start(const Location &current_loc)
     return landing_start_index;
 }
 
+
+// find a command by type
+bool AP_Mission::find_command(uint16_t cmd_id, uint16_t start_index, uint16_t &found_index, Mission_Command& cmd)
+{
+    for (uint16_t i = MAX(1,start_index); i < num_commands(); i++) {
+        Mission_Command tmp;
+        if (!read_cmd_from_storage(i, tmp)) {
+            continue;
+        }
+        if (tmp.id == cmd_id) {
+            cmd = tmp;
+            found_index = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 /*
    find the nearest landing sequence starting point (DO_LAND_START) and
    switch to that mission item.  Returns false if no DO_LAND_START
