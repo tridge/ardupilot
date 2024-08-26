@@ -603,6 +603,9 @@ public:
     ///     accounts for do_jump commands
     bool get_next_nav_cmd(uint16_t start_index, Mission_Command& cmd);
 
+    /// find a mission command by type
+    bool find_command(uint16_t cmd_id, uint16_t start_index, uint16_t &found_index, Mission_Command& cmd);
+    
     /// get the ground course of the next navigation leg in centidegrees
     /// from 0 36000. Return default_angle if next navigation
     /// leg cannot be determined
