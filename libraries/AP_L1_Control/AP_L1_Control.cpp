@@ -135,9 +135,13 @@ float AP_L1_Control::turn_distance(float wp_radius) const
   they have reached the waypoint early, which makes things like camera
   trigger and ball drop at exact positions under mission control much easier
  */
-float AP_L1_Control::turn_distance(float wp_radius, float turn_angle) const
+float AP_L1_Control::turn_distance(float wp_radius, float turn_angle, float roll_limit_deg) const
 {
     float distance_90 = turn_distance(wp_radius);
+    const float groundspeed = _ahrs.groundspeed_vector().length();
+    const float bank_turn_dist = MIN(wp_radius, sq(groundspeed) / (GRAVITY_MSS * tanf(radians(roll_limit_deg))));
+    distance_90 = MAX(distance_90, bank_turn_dist);
+
     turn_angle = fabsf(turn_angle);
     if (turn_angle >= 90) {
         return distance_90;
