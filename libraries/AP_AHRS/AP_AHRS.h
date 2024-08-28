@@ -250,6 +250,16 @@ public:
     // The altitude element of the location is not used.
     // Returns true if the set was successful.
     bool handle_external_position_estimate(const Location &loc, float pos_accuracy, uint32_t timestamp_);
+
+    // Set the EKF's NE horizontal wind velocity states and their corresponding variances from the supplied
+    // wind speed and direction. This can be used when the EKF is dead reckoning to periodically correct
+    // for changes in wind with time and/or altitude.
+    // speed is true speed measured in m/s
+    // speed_accuracy is the 1-sigma wind speed uncertainty in m/s. Set to NaN if unknown and a default value wil be used internally.
+    // direction is the azimuth angle in degrees from true north that the wind is coming from
+    // direction_accuracy is the 1-sigma direction uncertainty in deg. Set to NaN if unknown and a default value will be used internally.
+    // Returns true if the set was successful.
+    bool handle_external_wind_estimate(float speed, float speed_accuracy, float direction, float direction_accuracy);
 #endif
 
     // returns the inertial navigation origin in lat/lon/alt
