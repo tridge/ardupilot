@@ -116,6 +116,9 @@ void NavEKF3_core::getAccelBias(Vector3f &accelBias) const
 void NavEKF3_core::getRotationBodyToNED(Matrix3f &mat) const
 {
     outputDataNew.quat.rotation_matrix(mat);
+#if APM_BUILD_TYPE(APM_BUILD_Replay)
+    return;
+#endif
     mat = mat * dal.get_rotation_vehicle_body_to_autopilot_body();
 }
 
