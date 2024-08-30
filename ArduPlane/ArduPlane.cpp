@@ -219,6 +219,13 @@ void Plane::update_speed_height(void)
         should_run_tecs = false;
     }
 #endif
+
+#if AP_PLANE_GLIDER_PULLUP_ENABLED
+    if (mode_auto.in_pullup()) {
+        should_run_tecs = false;
+    }
+#endif
+
     if (should_run_tecs) {
 	    // Call TECS 50Hz update. Note that we call this regardless of
 	    // throttle suppressed, as this needs to be running for
@@ -515,6 +522,12 @@ void Plane::update_fly_forward(void)
     }
 #endif
 
+    if (auto_state.idle_mode) {
+        // don't fuse airspeed when in balloon lift
+        ahrs.set_fly_forward(false);
+        return;
+    }
+
     if (flight_stage == AP_FixedWing::FlightStage::LAND) {
         ahrs.set_fly_forward(landing.is_flying_forward());
         return;
@@ -578,6 +591,16 @@ void Plane::update_alt()
     bool should_run_tecs = control_mode->does_auto_throttle();
 #if HAL_QUADPLANE_ENABLED
     if (quadplane.should_disable_TECS()) {
+        should_run_tecs = false;
+    }
+#endif
+
+    if (auto_state.idle_mode) {
+        should_run_tecs = false;
+    }
+
+#if AP_PLANE_GLIDER_PULLUP_ENABLED
+    if (mode_auto.in_pullup()) {
         should_run_tecs = false;
     }
 #endif
