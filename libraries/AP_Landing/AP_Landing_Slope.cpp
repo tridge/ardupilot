@@ -100,7 +100,7 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
 
     if ((on_approach_stage && below_flare_alt) ||
         (on_approach_stage && below_flare_sec && (wp_proportion > 0.5)) ||
-        (!rangefinder_state_in_range && wp_proportion >= 1) ||
+        //(!rangefinder_state_in_range && wp_proportion >= 1) ||
         probably_crashed) {
 
         if (type_slope_stage != SlopeStage::FINAL) {
@@ -136,10 +136,11 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
             aparm.min_groundspeed.load();
             aparm.throttle_cruise.load();
         }
-    } else if (type_slope_stage == SlopeStage::APPROACH && pre_flare_airspeed > 0) {
+    } else if (type_slope_stage <= SlopeStage::APPROACH && pre_flare_airspeed > 0) {
         bool reached_pre_flare_alt = pre_flare_alt > 0 && (height <= pre_flare_alt);
         bool reached_pre_flare_sec = pre_flare_sec > 0 && (height <= sink_rate * pre_flare_sec);
         if (reached_pre_flare_alt || reached_pre_flare_sec) {
+            gcs().send_text(MAV_SEVERITY_INFO, "Preflare alt %.1fm %.1fs", height, height/sink_rate);
             type_slope_stage = SlopeStage::PREFLARE;
         }
     }
@@ -366,6 +367,10 @@ int32_t AP_Landing::type_slope_get_target_airspeed_cm(void)
         break;
     }
 
+#if 1
+    return target_airspeed_cm;
+#else
+
     // when landing, add half of head-wind.
     const float head_wind_comp = constrain_float(wind_comp, 0.0f, 100.0f)*0.01;
     const int32_t head_wind_compensation_cm = ahrs.head_wind() * head_wind_comp * 100;
@@ -373,7 +378,8 @@ int32_t AP_Landing::type_slope_get_target_airspeed_cm(void)
     const uint32_t max_airspeed_cm = AP_Landing::allow_max_airspeed_on_land() ? aparm.airspeed_max*100 : aparm.airspeed_cruise*100;
     
     return constrain_int32(target_airspeed_cm + head_wind_compensation_cm, target_airspeed_cm, max_airspeed_cm);
-    
+
+#endif
 }
 
 int32_t AP_Landing::type_slope_constrain_roll(const int32_t desired_roll_cd, const int32_t level_roll_limit_cd)
@@ -390,9 +396,14 @@ bool AP_Landing::type_slope_is_flaring(void) const
     return (type_slope_stage == SlopeStage::FINAL);
 }
 
+bool AP_Landing::type_slope_is_preflaring(void) const
+{
+    return (type_slope_stage == SlopeStage::PREFLARE);
+}
+
 bool AP_Landing::type_slope_is_on_approach(void) const
 {
-    return (type_slope_stage == SlopeStage::APPROACH ||
+    return (type_slope_stage <= SlopeStage::APPROACH ||
             type_slope_stage == SlopeStage::PREFLARE);
 }
 

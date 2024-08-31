@@ -178,6 +178,13 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
 
     // additional global params should be placed in the list above TYPE to avoid the enable flag hiding the deepstall params
 
+    // @Param: PF_PITCH
+    // @DisplayName: Landing pre-flare minimum pitch
+    // @Description: Used in autoland to give the minimum pitch in the preflare stage of landing. This parameter can be used to ensure that the preflare landing attitude is appropriate for the type of aircraft. Note that it is a minimum pitch only - the landing code will control pitch above this value to try to achieve the configured landing sink rate. A value of 0 means no limit
+    // @Units: deg
+    // @User: Advanced
+    AP_GROUPINFO("PF_PITCH", 19, AP_Landing, preflare_pitch, 0),
+    
     AP_GROUPEND
 };
 
@@ -342,6 +349,21 @@ bool AP_Landing::is_flaring(void) const
 #if HAL_LANDING_DEEPSTALL_ENABLED
     case TYPE_DEEPSTALL:
 #endif
+    default:
+        return false;
+    }
+}
+
+bool AP_Landing::is_preflaring(void) const
+{
+    if (!flags.in_progress) {
+        return false;
+    }
+
+    switch (type) {
+    case TYPE_STANDARD_GLIDE_SLOPE:
+        return type_slope_is_preflaring();
+    case TYPE_DEEPSTALL:
     default:
         return false;
     }
