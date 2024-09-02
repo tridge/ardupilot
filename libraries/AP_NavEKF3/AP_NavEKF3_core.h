@@ -673,7 +673,9 @@ private:
         BARO=4,         // Use Baro height
         MAG=5,          // Use magnetometer data
         RNGFND=6,       // Use rangefinder data
-        EXTNAV=7        // Use external nav data
+        EXTNAV=7,       // Use external nav data
+        AIRDATA=8       // Use air data, eg airspeed and sideslip
+
     };
 
     // specifies the method to be used when fusing yaw observations
@@ -885,6 +887,9 @@ private:
 
     // return true if the filter to be ready to use external nav data
     bool readyToUseExtNav(void) const;
+
+    // return true if the filter to be ready to start using air data fusion
+    bool readyToUseAirData(void) const;
 
     // return true if we should use the range finder sensor
     bool useRngFinder(void) const;

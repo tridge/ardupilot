@@ -445,6 +445,12 @@ void NavEKF3_core::setAidingMode()
                  // Reset time stamps
                 lastbodyVelPassTime_ms = imuSampleTime_ms;
                 prevBodyVelFuseTime_ms = imuSampleTime_ms;
+            } else if (readyToUseAirData()) {
+                lastTasPassTime_ms = imuSampleTime_ms;
+                inhibitWindStates = false;
+                updateStateIndexLim();
+                velResetSource = resetDataSource::AIRDATA;
+                posResetSource = resetDataSource::AIRDATA;
             }
             posTimeout = true;
             velTimeout = true;
@@ -613,6 +619,13 @@ bool NavEKF3_core::readyToUseExtNav(void) const
 #else
     return false;
 #endif // EK3_FEATURE_EXTERNAL_NAV
+}
+
+// return true if the filter to be ready to start using air data fusion
+bool NavEKF3_core::readyToUseAirData(void) const
+{
+    const bool hasAirspeed = useAirspeed() || is_positive(defaultAirSpeed) || lastAspdEstIsValid;
+    return inFlight && finalInflightYawInit && hasAirspeed && assume_zero_sideslip();
 }
 
 // return true if we should use the compass
