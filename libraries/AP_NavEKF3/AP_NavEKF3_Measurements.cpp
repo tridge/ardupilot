@@ -689,17 +689,6 @@ void NavEKF3_core::readGpsData()
             INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
             return;
         }
-
-        // set the NE earth magnetic field states using the published declination
-        // and set the corresponding variances and covariances
-        alignMagStateDeclination();
-
-        // Set the height of the NED origin
-        ekfGpsRefHgt = (double)0.01 * (double)gpsloc.alt + (double)outputDataNew.position.z;
-
-        // Set the uncertainty of the GPS origin height
-        ekfOriginHgtVar = sq(gpsHgtAccuracy);
-
     }
 
     if (gpsGoodToAlign && !have_table_earth_field) {

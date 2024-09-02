@@ -689,6 +689,14 @@ bool NavEKF3_core::setOrigin(const Location &loc)
 
     EKF_origin = loc;
     ekfGpsRefHgt = (double)0.01 * (double)EKF_origin.alt;
+
+    // Set the uncertainty of the GPS origin height
+    ekfOriginHgtVar = sq(gpsHgtAccuracy);
+
+    // rotate the NE earth magnetic field states using the published declination
+    // and set the corresponding variances and covariances
+    alignMagStateDeclination();
+
     // define Earth rotation vector in the NED navigation frame at the origin
     calcEarthRateNED(earthRateNED, EKF_origin.lat);
     validOrigin = true;
@@ -700,6 +708,17 @@ bool NavEKF3_core::setOrigin(const Location &loc)
         public_origin = EKF_origin;
     }
 
+    if (!have_table_earth_field) {
+        const auto &compass = dal.compass();
+        if (compass.have_scale_factor(magSelectIndex) &&
+            compass.auto_declination_enabled()) {
+            getEarthFieldTable(loc);
+            if (frontend->_mag_ef_limit > 0) {
+                // initialise earth field from tables
+                stateStruct.earth_magfield = table_earth_field_ga;
+            }
+        }
+    }
 
     return true;
 }
