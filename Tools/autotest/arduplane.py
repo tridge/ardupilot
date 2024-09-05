@@ -4265,6 +4265,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             "quadplane-ice" : "needs ICE control channel for ignition",
             "quadplane-can" : "needs CAN periph",
             "stratoblimp" : "not expected to fly normally",
+            "sa_gd2000" : "not expected to fly normally",
             "glider" : "needs balloon lift",
         }
         for frame in sorted(vinfo_options["frames"].keys()):
