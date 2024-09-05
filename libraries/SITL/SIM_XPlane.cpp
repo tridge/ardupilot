@@ -40,7 +40,7 @@ extern const AP_HAL::HAL& hal;
 #if APM_BUILD_TYPE(APM_BUILD_Heli)
 #define XPLANE_JSON "xplane_heli.json"
 #else
-#define XPLANE_JSON "xplane_plane.json"
+#define XPLANE_JSON "sa_gd2000_xplane.json"
 #endif
 
 // DATA@ frame types. Thanks to TauLabs xplanesimulator.h
@@ -102,6 +102,8 @@ XPlane::XPlane(const char *frame_str) :
     socket_in.bind("0.0.0.0", bind_port);
     printf("Waiting for XPlane data on UDP port %u and sending to port %u\n",
            (unsigned)bind_port, (unsigned)xplane_port);
+
+    AP_Param::load_defaults_file("@ROMFS/models/sa_gd2000.parm", false);
 
     // XPlane sensor data is not good enough for EKF. Use fake EKF by default
     AP_Param::set_default_by_name("AHRS_EKF_TYPE", 10);
