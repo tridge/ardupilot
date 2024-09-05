@@ -9,7 +9,11 @@
  */
 void Plane::set_next_WP(const Location &loc)
 {
-    if (auto_state.next_wp_crosstrack) {
+    float bearing_deg = current_loc.get_bearing_to(loc) * 0.01;
+    float yaw_deg = degrees(ahrs.get_yaw());
+    float bearing_err = fabsf(bearing_deg - yaw_deg);
+
+    if (auto_state.next_wp_crosstrack && bearing_err < 25) {
         // copy the current WP into the OldWP slot
         prev_WP_loc = next_WP_loc;
         auto_state.crosstrack = true;
@@ -119,6 +123,25 @@ void Plane::set_guided_WP(const Location &loc)
 bool Plane::update_home()
 {
     if (hal.util->was_watchdog_armed()) {
+        return false;
+    }
+    if (g2.home_reset_threshold == -2) {
+        // special case for init using GPS height and terrain data,
+        // allowing for arming while not on the ground
+        float terrain_amsl;
+        Location loc;
+        if (gps.status() >= AP_GPS::GPS_OK_FIX_3D &&
+            terrain.height_amsl(current_loc, terrain_amsl, false) &&
+            ahrs.get_location(loc) &&
+            !ahrs.home_is_locked()) {
+            barometer.update_calibration();
+            ahrs.resetHeightDatum();
+            loc.alt = terrain_amsl * 100;
+            if (!AP::ahrs().set_home(loc)) {
+                // silently fail
+            }
+            return true;
+        }
         return false;
     }
     if ((g2.home_reset_threshold == -1) ||

@@ -120,6 +120,19 @@ void Plane::stabilize_roll()
         if (ahrs.roll_sensor < 0) nav_roll_cd -= 36000;
     }
 
+    if (!fly_inverted() && !righting_mode && labs(ahrs.roll_sensor) > 9500) {
+        gcs().send_text(MAV_SEVERITY_INFO, "Auto righting start roll=%d pitch=%d",
+                        int(ahrs.roll_sensor/100),
+                        int(ahrs.pitch_sensor/100));
+        righting_mode = true;
+    }
+    if (righting_mode && labs(ahrs.roll_sensor) < 6000) {
+        gcs().send_text(MAV_SEVERITY_INFO, "Auto righting done roll=%d pitch=%d",
+                        int(ahrs.roll_sensor/100),
+                        int(ahrs.pitch_sensor/100));
+        righting_mode = false;
+    }
+
     const float roll_out = stabilize_roll_get_roll_out();
     SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, roll_out);
 }
@@ -225,6 +238,11 @@ float Plane::stabilize_pitch_get_pitch_out()
         flare_mode == FlareMode::ENABLED_PITCH_TARGET &&
         throttle_at_zero()) {
         demanded_pitch = landing.get_pitch_cd();
+    }
+    
+    if (righting_mode) {
+        // try to put nose down 45 degrees
+        nav_pitch_cd = demanded_pitch = -4500;
     }
 
     return pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, speed_scaler, disable_integrator,
@@ -601,6 +619,10 @@ void Plane::calc_nav_pitch()
 void Plane::calc_nav_roll()
 {
     int32_t commanded_roll = nav_controller->nav_roll_cd();
+    if (g2.lim_roll_auto > 0) {
+        commanded_roll = constrain_int32(commanded_roll, -g2.lim_roll_auto*100, g2.lim_roll_auto*100);
+    }
+
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
     update_load_factor();
 }
@@ -614,6 +636,7 @@ void Plane::calc_nav_roll()
 void Plane::adjust_nav_pitch_throttle(void)
 {
     int8_t throttle = throttle_percentage();
+    throttle = MIN(throttle, aparm.throttle_max);
     if (throttle >= 0 && throttle < aparm.throttle_cruise && flight_stage != AP_FixedWing::FlightStage::VTOL) {
         float p = (aparm.throttle_cruise - throttle) / (float)aparm.throttle_cruise;
         nav_pitch_cd -= g.stab_pitch_down * 100.0f * p;
