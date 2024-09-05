@@ -138,7 +138,6 @@ way.txt
 *.wbproj
 *.wbproj
 segv_*out
-/scripts/
 /repl/
 /Rover/scripts/
 /Rover/repl/
