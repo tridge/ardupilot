@@ -29,6 +29,7 @@
 #include <SITL/SIM_FlightAxis.h>
 #include <SITL/SIM_Calibration.h>
 #include <SITL/SIM_XPlane.h>
+#include <SITL/SIM_SA_GD2000.h>
 #include <SITL/SIM_Submarine.h>
 #include <SITL/SIM_SilentWings.h>
 #include <SITL/SIM_Morse.h>
@@ -179,6 +180,9 @@ static const struct {
     { "JSON",               JSON::create },
     { "blimp",              Blimp::create },
     { "novehicle",          NoVehicle::create },
+#if AP_SIM_SA_GD2000_ENABLED
+    { "sa_gd2000",          SA_GD2000::create },
+#endif
 #if AP_SIM_STRATOBLIMP_ENABLED
     { "stratoblimp",        StratoBlimp::create },
 #endif

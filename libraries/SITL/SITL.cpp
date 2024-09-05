@@ -38,6 +38,7 @@
 #endif // SFML_JOYSTICK
 
 #include "SIM_StratoBlimp.h"
+#include "SIM_SA_GD2000.h"
 #include "SIM_Glider.h"
 #include "SIM_FlightAxis.h"
 
@@ -1498,6 +1499,12 @@ const AP_Param::GroupInfo SIM::ModelParm::var_info[] = {
     // @Group: RFL_
     // @Path: ./SIM_FlightAxis.cpp
     AP_SUBGROUPPTR(flightaxis_ptr, "RFL_", 5, SIM::ModelParm, FlightAxis),
+#endif
+
+#if AP_SIM_SA_GD2000_ENABLED
+    // @Group: GD2K_
+    // @Path: ./SIM_SA_GD2000.cpp
+    AP_SUBGROUPPTR(sa_gd2000_ptr, "GD2K_",  6, SIM::ModelParm, SA_GD2000),
 #endif
 
     AP_GROUPEND
