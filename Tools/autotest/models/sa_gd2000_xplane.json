@@ -1,0 +1,15 @@
+# XPlane DREF map file for a simple plane
+# assumes: Aileron, Elevator, Throttle, Rudder, flaps
+
+{
+    "settings" : { "debug" : 0 },
+
+    "sim/operation/override/override_control_surfaces" : { "type" : "fixed", "value" : 1 },
+
+    # ailerons
+    "sim/flightmodel2/wing/elevator1_deg[12]" : { "type" : "angle", "range" : 20, "channel" : 4 }, # right rear
+    "sim/flightmodel2/wing/elevator1_deg[13]" : { "type" : "angle", "range" : -20, "channel" : 2 }, # left rear
+    "sim/flightmodel2/wing/elevator1_deg[14]" : { "type" : "angle", "range" : 20, "channel" : 1 }, # front right
+    "sim/flightmodel2/wing/elevator1_deg[15]" : { "type" : "angle", "range" : -20, "channel" : 3 } # front left
+
+}
