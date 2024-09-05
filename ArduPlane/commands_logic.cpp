@@ -217,7 +217,11 @@ Return true if we do not recognize the command so that we move on to the next co
 
 bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Returns true if command complete
 {
-    switch(cmd.id) {
+    uint16_t id = cmd.id;
+    if (in_auto_land()) {
+        id = MAV_CMD_NAV_LAND;
+    }
+    switch(id) {
 
     case MAV_CMD_NAV_TAKEOFF:
 #if HAL_QUADPLANE_ENABLED
@@ -248,6 +252,15 @@ bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
             // correction as otherwise we will flare early on rising
             // ground
             height -= auto_state.terrain_correction;
+
+            // to cope with lidar failure we also check GPS height
+            if (!is_equal(auto_state.land_alt_amsl,-1.0f) &&
+                gps.status() >= AP_GPS::GPS_OK_FIX_3D &&
+                AP_HAL::millis() - auto_state.started_3D_fix_ms > 10000) {
+                const float gps_margin = 15.0;
+                float gps_alt = (gps.location().alt*0.01 - auto_state.land_alt_amsl) + gps_margin;
+                height = MIN(gps_alt, height);
+            }
             return landing.verify_land(prev_WP_loc, next_WP_loc, current_loc,
                                        height, auto_state.sink_rate, auto_state.wp_proportion, auto_state.last_flying_ms, arming.is_armed(), is_flying(),
                                        rangefinder_active);
@@ -679,7 +692,8 @@ bool Plane::verify_nav_wp(const AP_Mission::Mission_Command& cmd)
         // allow user to override acceptance radius
         acceptance_distance_m = cmd_acceptance_distance;
     } else if (cmd_passby == 0) {
-        acceptance_distance_m = nav_controller->turn_distance(get_wp_radius(), auto_state.next_turn_angle);
+        const float roll_limit = is_positive(g2.lim_roll_auto)?g2.lim_roll_auto:aparm.roll_limit;
+        acceptance_distance_m = nav_controller->turn_distance(get_wp_radius(), auto_state.next_turn_angle, roll_limit*0.75);
     }
     const float wp_dist = current_loc.get_distance(flex_next_WP_loc);
     if (wp_dist <= acceptance_distance_m) {

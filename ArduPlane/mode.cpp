@@ -42,6 +42,8 @@ bool Mode::enter()
     // reset landing check
     plane.auto_state.checked_for_autoland = false;
 
+    plane.auto_state.started_landing = false;
+
     // zero locked course
     plane.steer_state.locked_course_err = 0;
     plane.steer_state.locked_course = false;
@@ -88,6 +90,9 @@ bool Mode::enter()
     // set VTOL auto state
     plane.auto_state.vtol_mode = is_vtol_mode();
     plane.auto_state.vtol_loiter = false;
+
+    plane.auto_state.emergency_land = false;
+    plane.auto_state.land_alt_amsl = -1;
 
     // initialize speed variable used in AUTO and GUIDED for DO_CHANGE_SPEED commands
     plane.new_airspeed_cm = -1;

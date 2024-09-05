@@ -450,7 +450,14 @@ void Plane::airspeed_ratio_update(void)
  */
 void Plane::update_GPS_50Hz(void)
 {
+    const auto old_status = gps.status();
     gps.update();
+
+    const auto status = gps.status();
+    if (old_status < AP_GPS::GPS_OK_FIX_3D && status >= AP_GPS::GPS_OK_FIX_3D) {
+        // remember when we got a 3D fix
+        auto_state.started_3D_fix_ms = AP_HAL::millis();
+    }
 
     update_current_loc();
 }
@@ -656,6 +663,16 @@ void Plane::update_alt()
             tecs_target_alt_cm = MAX(tecs_target_alt_cm, prev_WP_loc.alt - home.alt) + (g2.rtl_climb_min+10)*100;
         }
 
+        /*
+          project forward the desired height
+         */
+        float groundspeed = sqrtf(sq(vel.x)+sq(vel.y));
+        float desired_climb_m = (next_WP_loc.alt - current_loc.alt) * 0.01;
+        float wp_time = auto_state.wp_distance / MAX(groundspeed,1);
+        float desired_climb_rate = desired_climb_m / MAX(wp_time,0.1);
+        float projection_time = 5;
+        tecs_target_alt_cm = tecs_target_alt_cm + desired_climb_rate*projection_time*100;
+
         TECS_controller.update_pitch_throttle(tecs_target_alt_cm,
                                                  target_airspeed_cm,
                                                  flight_stage,
@@ -685,7 +702,7 @@ void Plane::update_flight_stage(void)
             if (auto_state.takeoff_complete == false) {
                 set_flight_stage(AP_FixedWing::FlightStage::TAKEOFF);
                 return;
-            } else if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND) {
+            } else if (in_auto_land()) {
                 if (landing.is_commanded_go_around() || flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING) {
                     // abort mode is sticky, it must complete while executing NAV_LAND
                     set_flight_stage(AP_FixedWing::FlightStage::ABORT_LANDING);
@@ -927,6 +944,75 @@ bool Plane::get_target_location(Location& target_loc)
 }
 
 /*
+  check if we should be in auto land (fixed wing) mode. Allows for
+  land mid-waypoint based on rangefinder data
+ */
+bool Plane::in_auto_land(void)
+{
+    if (control_mode != &mode_auto) {
+        auto_state.started_landing = false;
+        return false;
+    }
+    if (mission.get_current_nav_cmd().id == MAV_CMD_NAV_LAND) {
+        return true;
+    }
+    if (mission.get_current_nav_cmd().id != MAV_CMD_NAV_WAYPOINT) {
+        return false;
+    }
+    if (!(g2.flight_options & FlightOptions::AUTO_LAND_ALT)) {
+        auto_state.started_landing = false;
+        return false;
+    }
+
+    if (!hal.util->get_soft_armed() ||
+        (AP_HAL::millis() - auto_state.arming_time_ms < 20000)) {
+        // don't do emergency landing when not armed for at least 20s
+        return false;
+    }
+
+    const float rangefinder_last_change = fabsf(rangefinder_state.prev_distance - rangefinder_state.last_distance);
+    if (g.rangefinder_landing && rangefinder_state.in_range &&
+        rangefinder.status_orient(ROTATION_PITCH_270) == RangeFinder::Status::Good &&
+        rangefinder_state.height_estimate < landing.get_preflare_alt() &&
+        smoothed_airspeed >= aparm.airspeed_min &&
+        rangefinder_last_change > 0 &&
+        rangefinder_last_change < 10) {
+        auto_state.emergency_land = true;
+    }
+
+    // also trigger emergency landing by GPS alt above NAV_LAND
+    if (is_equal(auto_state.land_alt_amsl,-1.0f)) {
+        AP_Mission::Mission_Command cmd;
+        uint16_t idx;
+        int32_t alt_amsl_cm;
+        if (mission.find_command(MAV_CMD_NAV_LAND, 0, idx, cmd) &&
+            cmd.content.location.get_alt_cm(Location::AltFrame::ABSOLUTE, alt_amsl_cm)) {
+            auto_state.land_alt_amsl = alt_amsl_cm * 0.01;
+        }
+    }
+
+    const float gps_error_margin = 20;
+    if (!is_equal(auto_state.land_alt_amsl,-1.0f) &&
+        gps.status() >= AP_GPS::GPS_OK_FIX_3D &&
+        AP_HAL::millis() - auto_state.started_3D_fix_ms > 10000 &&
+        gps.location().alt*0.01 < auto_state.land_alt_amsl + (landing.get_preflare_alt()-gps_error_margin)) {
+        auto_state.emergency_land = true;
+    }
+
+
+    // check if we have dropped below preflare height while flying, if
+    // so then start landing immediately
+    if (auto_state.started_landing || auto_state.emergency_land) {
+        if (!auto_state.started_landing) {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Emergency Land: %.1fm", rangefinder_state.height_estimate);
+            auto_state.started_landing = true;
+        }
+        return true;
+    }
+    return false;
+}
+
+/*
   update_target_location() works in all auto navigation modes
  */
 bool Plane::update_target_location(const Location &old_loc, const Location &new_loc)
@@ -1030,6 +1116,18 @@ void Plane::get_osd_roll_pitch_rad(float &roll, float &pitch) const
     }
 }
 
+bool Plane::get_airspeed_min(float &airspeed_min)
+{
+    airspeed_min = aparm.airspeed_min;
+    return true;
+}
+
+bool Plane::get_airspeed_max(float &airspeed_max)
+{
+    airspeed_max = aparm.airspeed_max;
+    return true;
+}
+
 /*
   update current_loc Location
  */
@@ -1073,3 +1171,4 @@ void Plane::update_quicktune(void)
 #endif
 
 AP_HAL_MAIN_CALLBACKS(&plane);
+

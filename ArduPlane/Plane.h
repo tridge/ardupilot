@@ -355,7 +355,8 @@ private:
 
     // last time we ran roll/pitch stabilization
     uint32_t last_stabilize_ms;
-
+    bool righting_mode;
+    
     // Failsafe
     struct {
         // Used to track if the value on channel 3 (throttle) has fallen below the failsafe threshold
@@ -551,6 +552,15 @@ private:
 
         // how much correction have we added for terrain data
         float terrain_correction;
+
+        // have we started an emergency landing?
+        bool started_landing;
+
+        bool emergency_land;
+        float land_alt_amsl = -1;
+
+        uint32_t started_3D_fix_ms;
+        uint32_t arming_time_ms;
 
         // last home altitude for detecting changes
         int32_t last_home_alt_cm;
@@ -1205,6 +1215,8 @@ private:
     void update_soaring();
 #endif
 
+    bool in_auto_land(void);
+
     // RC_Channel.cpp
     bool emergency_landing;
 
@@ -1233,7 +1245,10 @@ private:
     void set_rudder_offset(float rudder_pct, bool run_yaw_rate_controller) override;
     bool nav_scripting_enable(uint8_t mode) override;
 #endif
- 
+
+    bool get_airspeed_min(float &airspeed_min) override;
+    bool get_airspeed_max(float &airspeed_max) override;
+
     enum Failsafe_Action {
         Failsafe_Action_None      = 0,
         Failsafe_Action_RTL       = 1,

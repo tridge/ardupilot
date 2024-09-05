@@ -588,6 +588,11 @@ float Plane::mission_alt_offset(void)
  */
 float Plane::height_above_target(void)
 {
+    if (plane.auto_state.emergency_land &&
+        !is_equal(plane.auto_state.land_alt_amsl,-1.0f)) {
+        // use emergency landing alt for target
+        return current_loc.alt*0.01 - plane.auto_state.land_alt_amsl;
+    }
     float target_alt = next_WP_loc.alt*0.01;
     if (!next_WP_loc.relative_alt) {
         target_alt -= ahrs.get_home().alt*0.01f;
@@ -781,6 +786,7 @@ void Plane::rangefinder_height_update(void)
                 gcs().send_text(MAV_SEVERITY_INFO, "Rangefinder engaged at %.2fm", (double)rangefinder_state.height_estimate);
             }
         }
+        rangefinder_state.prev_distance = rangefinder_state.last_distance;
         rangefinder_state.last_distance = distance;
     } else {
         rangefinder_state.in_range_count = 0;
