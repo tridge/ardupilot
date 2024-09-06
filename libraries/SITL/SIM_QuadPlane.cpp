@@ -27,7 +27,7 @@ QuadPlane::QuadPlane(const char *frame_str) :
 {
     // default to X frame
     const char *frame_type = "x";
-    uint8_t motor_offset = 4;
+    uint8_t motor_offset = 0;
 
     ground_behavior = GROUND_BEHAVIOR_NO_MOVEMENT;
 
