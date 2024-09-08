@@ -246,7 +246,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
     // @Description: This allows the enabling of special features in the speed/height controller.
-    // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup
+    // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup,2:IgnoreHeightErrorDuringFlare
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
 
@@ -620,6 +620,14 @@ void AP_TECS::_update_height_demand(void)
             p = 1.0f;
         }
         _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
+
+        if (_options & OPTION_IGNORE_FLARE_HEIGHT_ERROR) {
+            // optionally ignore height error and only do sink rate control
+            _flare_hgt_dem_ideal = _height;
+            _flare_hgt_dem_adj = _height;
+            _hgt_dem = _height;
+            return;
+        }
 
         _flare_hgt_dem_ideal += _DT * _hgt_rate_dem; // the ideal height profile to follow
         _flare_hgt_dem_adj   += _DT * _hgt_rate_dem; // the demanded height profile that includes the pre-flare height tracking offset

@@ -212,7 +212,8 @@ private:
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
-        OPTION_DESCENT_SPEEDUP=(1<<1)
+        OPTION_DESCENT_SPEEDUP=(1<<1),
+        OPTION_IGNORE_FLARE_HEIGHT_ERROR=(1<<2)
     };
 
     AP_Float _pitch_ff_v0;
