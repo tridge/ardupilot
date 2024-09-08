@@ -159,6 +159,11 @@ public:
         return _RFRN.ahrs_airspeed_sensor_enabled;
     }
 
+    // random methods that AP_NavEKF3 wants to call on AHRS:
+    bool airspeed_is_synthetic(void) const {
+        return _RFRN.ahrs_airspeed_is_synthetic;
+    }
+
     // this replaces AP::ahrs()->EAS2TAS(), which should probably go
     // away in favour of just using the Baro method.
     // get apparent to true airspeed ratio
