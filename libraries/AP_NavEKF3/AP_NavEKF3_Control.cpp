@@ -527,7 +527,8 @@ void NavEKF3_core::checkAttitudeAlignmentStatus()
 // return true if we should use the airspeed sensor
 bool NavEKF3_core::useAirspeed(void) const
 {
-    return dal.airspeed_sensor_enabled();
+    const auto *aspeed = dal.airspeed();
+    return aspeed && dal.airspeed_sensor_enabled() && !dal.airspeed_is_synthetic() && aspeed->get_airspeed() > 10.0f;
 }
 
 // return true if we should use the range finder sensor
