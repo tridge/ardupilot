@@ -361,6 +361,9 @@ void NavEKF3_core::detectFlight()
         }
 
         if (motorsArmed) {
+            if (onGround) {
+                onGroundChange_ms = AP_HAL::millis();
+            }
             onGround = false;
             if (highGndSpd && (dal.get_takeoff_expected() || highAirSpd || largeHgtChange)) {
                 // to a high certainty we are flying
@@ -377,6 +380,9 @@ void NavEKF3_core::detectFlight()
 
         // If the motors are armed then we could be flying and if they are not armed then we are definitely not flying
         if (motorsArmed) {
+            if (onGround) {
+                onGroundChange_ms = AP_HAL::millis();
+            }
             onGround = false;
         } else {
             inFlight = false;
