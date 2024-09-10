@@ -46,7 +46,13 @@ public:
     static const struct AP_Param::GroupInfo var_info[];
 
 private:
-    AP_Float param_mass;
+
+    bool has_launched;
+
+    struct {
+        AP_Float mass;
+        AP_Float launch_alt;
+    } params;
 };
 
 }
