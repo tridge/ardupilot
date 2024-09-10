@@ -48,9 +48,10 @@ const AP_Param::GroupInfo SA_GD2000::var_info[] = {
 SA_GD2000::SA_GD2000(const char *frame_str) :
     Plane(frame_str)
 {
+    AP_Param::load_defaults_file("@ROMFS/models/sa_gd2000.parm", false);
+    AP::sitl()->models.sa_gd2000_ptr = this;
     AP_Param::setup_object_defaults(this, var_info);
 
-    AP_Param::load_defaults_file("@ROMFS/models/sa_gd2000.parm", false);
 
     mass = params.mass.get();
     thrust_scale = 0;
