@@ -57,6 +57,57 @@ SA_GD2000::SA_GD2000(const char *frame_str) :
     thrust_scale = 0;
 
     coefficient.c_drag_p = 0.05;
+
+  // SITL param
+  AP_Param::set_by_name("SERVO1_FUNCTION",19);
+  AP_Param::set_by_name("SERVO1_MAX",2000);
+  AP_Param::set_by_name("SERVO1_MIN",1000);
+  AP_Param::set_by_name("SERVO1_REVERSED",0);
+  AP_Param::set_by_name("SERVO1_TRIM",1500);
+  AP_Param::set_by_name("SERVO2_FUNCTION",4);
+  AP_Param::set_by_name("SERVO2_MAX",2000);
+  AP_Param::set_by_name("SERVO2_MIN",1000);
+  AP_Param::set_by_name("SERVO2_REVERSED",1);
+  AP_Param::set_by_name("SERVO2_TRIM",1500);
+  AP_Param::set_by_name("SERVO3_FUNCTION",19);
+  AP_Param::set_by_name("SERVO3_MAX",2000);
+  AP_Param::set_by_name("SERVO3_MIN",1000);
+  AP_Param::set_by_name("SERVO3_REVERSED",1);
+  AP_Param::set_by_name("SERVO3_TRIM",1500);
+  AP_Param::set_by_name("SERVO4_FUNCTION",4);
+  AP_Param::set_by_name("SERVO4_MAX",2000);
+  AP_Param::set_by_name("SERVO4_MIN",1000);
+  AP_Param::set_by_name("SERVO4_REVERSED",1);
+  AP_Param::set_by_name("SERVO4_TRIM",1500);
+
+
+
+// xplane and HW param
+// SERVO1_FUNCTION,19
+// SERVO1_MAX,2000
+// SERVO1_MIN,1000
+// SERVO1_REVERSED,0
+// SERVO1_TRIM,1500
+// SERVO2_FUNCTION,4
+// SERVO2_MAX,2000
+// SERVO2_MIN,1000
+// SERVO2_REVERSED,1
+// SERVO2_TRIM,1500
+// SERVO3_FUNCTION,19
+// SERVO3_MAX,2000
+// SERVO3_MIN,1000
+// SERVO3_REVERSED,1
+// SERVO3_TRIM,1500
+// SERVO4_FUNCTION,4
+// SERVO4_MAX,2000
+// SERVO4_MIN,1000
+// SERVO4_REVERSED,1
+// SERVO4_TRIM,1500
+
+
+
+
+
 }
 
 /*
