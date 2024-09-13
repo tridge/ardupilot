@@ -3,7 +3,9 @@
 #include "tf2_msgs/msg/TFMessage.h"
 #include "sensor_msgs/msg/BatteryState.h"
 #include "geographic_msgs/msg/GeoPoseStamped.h"
+#if AP_DDS_IMU_PUB_ENABLED
 #include "sensor_msgs/msg/Imu.h"
+#endif //AP_DDS_IMU_PUB_ENABLED
 
 #include "uxr/client/client.h"
 
@@ -16,7 +18,9 @@ enum class TopicIndex: uint8_t {
     NAV_SAT_FIX_PUB,
     STATIC_TRANSFORMS_PUB,
     BATTERY_STATE_PUB,
+#if AP_DDS_IMU_PUB_ENABLED
     IMU_PUB,
+#endif //AP_DDS_IMU_PUB_ENABLED
     LOCAL_POSE_PUB,
     LOCAL_VELOCITY_PUB,
     GEOPOSE_PUB,
@@ -76,6 +80,7 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "batterystate0__dw",
         .dr_profile_label = "",
     },
+#if AP_DDS_IMU_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::IMU_PUB),
         .pub_id = to_underlying(TopicIndex::IMU_PUB),
@@ -86,6 +91,7 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "imu__dw",
         .dr_profile_label = "",
     },
+#endif //AP_DDS_IMU_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::LOCAL_POSE_PUB),
         .pub_id = to_underlying(TopicIndex::LOCAL_POSE_PUB),
