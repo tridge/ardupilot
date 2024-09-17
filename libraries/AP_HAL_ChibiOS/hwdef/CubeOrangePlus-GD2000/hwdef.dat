@@ -1,0 +1,4 @@
+
+include ../CubeOrangePlus/hwdef.dat
+
+include ../CubeOrange-GD2000/GD2000.inc
