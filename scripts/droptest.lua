@@ -756,7 +756,7 @@ function update()
       notify:handle_rgb(255,255,255,10)
       return
    end
-   if not arming:is_armed() and create_mission_check() then
+   if create_mission_check() then
       create_mission()
    end
    local t = 0.001 * millis():tofloat()
