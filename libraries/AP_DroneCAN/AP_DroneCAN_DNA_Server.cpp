@@ -44,9 +44,9 @@ extern const AP_HAL::HAL& hal;
 AP_DroneCAN_DNA_Server::Database AP_DroneCAN_DNA_Server::db;
 
 AP_DroneCAN_DNA_Server::AP_DroneCAN_DNA_Server(AP_DroneCAN &ap_dronecan, CanardInterface &canard_iface, uint8_t driver_index) :
+    storage(StorageManager::StorageCANDNA),
     _ap_dronecan(ap_dronecan),
     _canard_iface(canard_iface),
-    storage(StorageManager::StorageCANDNA),
     allocation_sub(allocation_cb, driver_index),
     node_status_sub(node_status_cb, driver_index),
     node_info_client(_canard_iface, node_info_cb) {}
