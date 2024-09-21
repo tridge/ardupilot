@@ -733,7 +733,9 @@ private:
     EKFType active_EKF_type(void) const { return state.active_EKF; }
 
     bool always_use_EKF() const {
-        return _ekf_flags & FLAG_ALWAYS_USE_EKF;
+        const bool disable_dcm_fallback = fly_forward?
+        option_set(Options::DISABLE_DCM_FALLBACK_FW) : option_set(Options::DISABLE_DCM_FALLBACK_VTOL);
+        return (_ekf_flags & FLAG_ALWAYS_USE_EKF) || disable_dcm_fallback;
     }
 
     // check all cores providing consistent attitudes for prearm checks
