@@ -14,22 +14,48 @@
 // Can use jinja to template (like Flask)
 
 enum class TopicIndex: uint8_t {
+#if AP_DDS_TIME_PUB_ENABLED
     TIME_PUB,
+#endif // AP_DDS_TIME_PUB_ENABLED
+#if AP_DDS_NAVSATFIX_PUB_ENABLED
     NAV_SAT_FIX_PUB,
+#endif // AP_DDS_NAVSATFIX_PUB_ENABLED
+#if AP_DDS_STATIC_TF_PUB_ENABLED
     STATIC_TRANSFORMS_PUB,
+#endif // AP_DDS_STATIC_TF_PUB_ENABLED
+#if AP_DDS_BATTERY_STATE_PUB_ENABLED
     BATTERY_STATE_PUB,
+#endif // AP_DDS_BATTERY_STATE_PUB_ENABLED
 #if AP_DDS_IMU_PUB_ENABLED
     IMU_PUB,
 #endif //AP_DDS_IMU_PUB_ENABLED
+#if AP_DDS_LOCAL_POSE_PUB_ENABLED
     LOCAL_POSE_PUB,
+#endif // AP_DDS_LOCAL_POSE_PUB_ENABLED
+#if AP_DDS_LOCAL_VEL_PUB_ENABLED
     LOCAL_VELOCITY_PUB,
+#endif // AP_DDS_LOCAL_VEL_PUB_ENABLED
+#if AP_DDS_GEOPOSE_PUB_ENABLED
     GEOPOSE_PUB,
+#endif // AP_DDS_GEOPOSE_PUB_ENABLED
+#if AP_DDS_CLOCK_PUB_ENABLED
     CLOCK_PUB,
+#endif // AP_DDS_CLOCK_PUB_ENABLED
+#if AP_DDS_GPS_GLOBAL_ORIGIN_PUB_ENABLED
     GPS_GLOBAL_ORIGIN_PUB,
+#endif // AP_DDS_GPS_GLOBAL_ORIGIN_PUB_ENABLED
+#if AP_DDS_JOY_SUB_ENABLED
     JOY_SUB,
+#endif // AP_DDS_JOY_SUB_ENABLED
+#if AP_DDS_DYNAMIC_TF_SUB
     DYNAMIC_TRANSFORMS_SUB,
+#endif // AP_DDS_DYNAMIC_TF_SUB
+#if AP_DDS_VEL_CTRL_ENABLED
     VELOCITY_CONTROL_SUB,
+#endif // AP_DDS_VEL_CTRL_ENABLED
+#if AP_DDS_GLOBAL_POS_CTRL_ENABLED
     GLOBAL_POSITION_SUB,
+#endif // AP_DDS_GLOBAL_POS_CTRL_ENABLED
 };
 
 static inline constexpr uint8_t to_underlying(const TopicIndex index)
@@ -40,6 +66,7 @@ static inline constexpr uint8_t to_underlying(const TopicIndex index)
 
 
 constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
+#if AP_DDS_TIME_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::TIME_PUB),
         .pub_id = to_underlying(TopicIndex::TIME_PUB),
@@ -50,6 +77,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "time__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_TIME_PUB_ENABLED
+#if AP_DDS_NAVSATFIX_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::NAV_SAT_FIX_PUB),
         .pub_id = to_underlying(TopicIndex::NAV_SAT_FIX_PUB),
@@ -60,6 +89,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "navsatfix0__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_NAVSATFIX_PUB_ENABLED
+#if AP_DDS_STATIC_TF_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::STATIC_TRANSFORMS_PUB),
         .pub_id = to_underlying(TopicIndex::STATIC_TRANSFORMS_PUB),
@@ -70,6 +101,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "statictransforms__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_STATIC_TF_PUB_ENABLED
+#if AP_DDS_BATTERY_STATE_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::BATTERY_STATE_PUB),
         .pub_id = to_underlying(TopicIndex::BATTERY_STATE_PUB),
@@ -80,6 +113,7 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "batterystate0__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_BATTERY_STATE_PUB_ENABLED
 #if AP_DDS_IMU_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::IMU_PUB),
@@ -92,6 +126,7 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dr_profile_label = "",
     },
 #endif //AP_DDS_IMU_PUB_ENABLED
+#if AP_DDS_LOCAL_POSE_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::LOCAL_POSE_PUB),
         .pub_id = to_underlying(TopicIndex::LOCAL_POSE_PUB),
@@ -102,6 +137,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "localpose__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_LOCAL_POSE_PUB_ENABLED
+#if AP_DDS_LOCAL_VEL_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::LOCAL_VELOCITY_PUB),
         .pub_id = to_underlying(TopicIndex::LOCAL_VELOCITY_PUB),
@@ -112,6 +149,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "localvelocity__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_LOCAL_VEL_PUB_ENABLED
+#if AP_DDS_GEOPOSE_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::GEOPOSE_PUB),
         .pub_id = to_underlying(TopicIndex::GEOPOSE_PUB),
@@ -122,6 +161,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "geopose__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_GEOPOSE_PUB_ENABLED
+#if AP_DDS_CLOCK_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::CLOCK_PUB),
         .pub_id = to_underlying(TopicIndex::CLOCK_PUB),
@@ -132,6 +173,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "clock__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_CLOCK_PUB_ENABLED
+#if AP_DDS_GPS_GLOBAL_ORIGIN_PUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::GPS_GLOBAL_ORIGIN_PUB),
         .pub_id = to_underlying(TopicIndex::GPS_GLOBAL_ORIGIN_PUB),
@@ -142,6 +185,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "gps_global_origin__dw",
         .dr_profile_label = "",
     },
+#endif // AP_DDS_GPS_GLOBAL_ORIGIN_PUB_ENABLED
+#if AP_DDS_JOY_SUB_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::JOY_SUB),
         .pub_id = to_underlying(TopicIndex::JOY_SUB),
@@ -152,6 +197,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "",
         .dr_profile_label = "joy__dr",
     },
+#endif // AP_DDS_JOY_SUB_ENABLED
+#if AP_DDS_DYNAMIC_TF_SUB
     {
         .topic_id = to_underlying(TopicIndex::DYNAMIC_TRANSFORMS_SUB),
         .pub_id = to_underlying(TopicIndex::DYNAMIC_TRANSFORMS_SUB),
@@ -162,6 +209,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "",
         .dr_profile_label = "dynamictf__dr",
     },
+#endif // AP_DDS_DYNAMIC_TF_SUB
+#if AP_DDS_VEL_CTRL_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::VELOCITY_CONTROL_SUB),
         .pub_id = to_underlying(TopicIndex::VELOCITY_CONTROL_SUB),
@@ -172,6 +221,8 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "",
         .dr_profile_label = "velocitycontrol__dr",
     },
+#endif // AP_DDS_VEL_CTRL_ENABLED
+#if AP_DDS_GLOBAL_POS_CTRL_ENABLED
     {
         .topic_id = to_underlying(TopicIndex::GLOBAL_POSITION_SUB),
         .pub_id = to_underlying(TopicIndex::GLOBAL_POSITION_SUB),
@@ -182,4 +233,5 @@ constexpr struct AP_DDS_Client::Topic_table AP_DDS_Client::topics[] = {
         .dw_profile_label = "",
         .dr_profile_label = "globalposcontrol__dr",
     },
+#endif // AP_DDS_GLOBAL_POS_CTRL_ENABLED
 };
