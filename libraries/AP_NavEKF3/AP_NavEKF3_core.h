@@ -121,6 +121,10 @@
 // maximum GPs ground course uncertainty allowed for yaw alignment (deg)
 #define GPS_VEL_YAW_ALIGN_MAX_ANG_ERR 15.0F
 
+#if EK3_FEATURE_POSITION_RESET
+#define WIND_SPD_UNCERTAINTY 0.5F
+#endif
+
 class NavEKF3_core : public NavEKF_core_common
 {
 public:

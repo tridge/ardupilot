@@ -32,16 +32,9 @@ void NavEKF3_core::ResetVelocity(resetDataSource velResetSource)
         stateStruct.quat.to_euler(tempEuler.x, tempEuler.y, tempEuler.z);
         stateStruct.velocity.x = tasDataDelayed.tas * cosF(tempEuler.z);
         stateStruct.velocity.y = tasDataDelayed.tas * sinF(tempEuler.z);
-        if (lastExtWindVelSet_ms > 0) {
-            // use previously specified wind to correct for wind drift
-            stateStruct.velocity.xy() += stateStruct.wind_vel;
-            velVarNE.x += P[22][22];
-            velVarNE.y += P[23][23];
-        } else {
-            zeroRows(P,22,23);
-            zeroCols(P,22,23);
-            P[22][22] = P[23][23] = sq(WIND_SPD_UNCERTAINTY);
-        }
+        zeroRows(P,22,23);
+        zeroCols(P,22,23);
+        P[22][22] = P[23][23] = sq(WIND_SPD_UNCERTAINTY);
 
         zeroRows(P,4,5);
         zeroCols(P,4,5);
