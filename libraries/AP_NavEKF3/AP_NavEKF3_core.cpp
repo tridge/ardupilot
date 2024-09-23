@@ -443,6 +443,7 @@ void NavEKF3_core::InitialiseVariables()
 
 #if EK3_FEATURE_POSITION_RESET
     lastSetLatLngTime_ms = 0;
+    lastExtWindVelSet_ms = 0;
 #endif // EK3_FEATURE_POSITION_RESET
 
     // initialise pre-arm message
