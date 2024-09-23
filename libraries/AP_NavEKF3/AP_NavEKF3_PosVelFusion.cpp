@@ -172,9 +172,8 @@ void NavEKF3_core::ResetPosition(resetDataSource posResetSource)
 // Returns true if the set was successful
 bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t timestamp_ms)
 {
-    if ((imuSampleTime_ms - lastGpsPosPassTime_ms) < frontend->deadReckonDeclare_ms ||
-        (PV_AidingMode == AID_NONE)
-        || !validOrigin) {
+    if (!validOrigin ||
+        ((PV_AidingMode == AID_ABSOLUTE) && (imuSampleTime_ms - lastGpsPosPassTime_ms) < frontend->deadReckonDeclare_ms)) {
         return false;
     }
 
@@ -214,6 +213,10 @@ void NavEKF3_core::ResetPositionNE(ftype posN, ftype posE)
     // Set the position states to the new position
     stateStruct.position.x = posN;
     stateStruct.position.y = posE;
+
+    if (PV_AidingMode == AID_NONE) {
+        lastKnownPositionNE = stateStruct.position.xy();
+    }
 
     // Calculate the position offset due to the reset
     posResetNE.x = stateStruct.position.x - posOrig.x;
