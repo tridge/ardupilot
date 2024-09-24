@@ -196,6 +196,8 @@ bool NavEKF3_core::setLatLng(const Location &loc, float posAccuracy, uint32_t ti
     const Vector2F newPosNE = EKF_origin.get_distance_NE_ftype(loc) + stateStruct.velocity.xy() * delaySec;
     ResetPositionNE(newPosNE.x,newPosNE.y);
 
+    lastSetLatLngTime_ms = imuDataDelayed.time_ms;
+
     return true;
 }
 #endif // EK3_FEATURE_POSITION_RESET

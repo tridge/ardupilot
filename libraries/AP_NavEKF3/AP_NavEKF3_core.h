@@ -1499,6 +1499,10 @@ private:
 #endif // EK3_FEATURE_EXTERNAL_NAV
     bool useExtNavVel;                  // true if external nav velocity should be used
 
+#if EK3_FEATURE_POSITION_RESET
+    uint32_t lastSetLatLngTime_ms;     // record when the global position was externally set
+#endif // EK3_FEATURE_POSITION_RESET
+
     // flags indicating severe numerical errors in innovation variance calculation for different fusion operations
     struct {
         bool bad_xmag:1;

@@ -302,7 +302,21 @@ bool NavEKF3_core::getLLH(Location &loc) const
     Location origin;
     if (getOriginLLH(origin)) {
         float posD;
-        if (getPosD_local(posD) && PV_AidingMode != AID_NONE) {
+        const bool hasPosD = getPosD_local(posD);
+#if EK3_FEATURE_POSITION_RESET
+
+        if (hasPosD && PV_AidingMode == AID_NONE && imuSampleTime_ms - lastSetLatLngTime_ms < 2000) {
+            // special case to report externally set position for a short period to enable external
+            // position displays to update.
+            loc.lat = EKF_origin.lat;
+            loc.lng = EKF_origin.lng;
+            loc.offset(outputDataNew.position.x + posOffsetNED.x,
+                        outputDataNew.position.y + posOffsetNED.y);
+            return true;
+        } else if (hasPosD) {
+#else
+        if (hasPosD && PV_AidingMode != AID_NONE)
+#endif
             // Altitude returned is an absolute altitude relative to the WGS-84 spherioid
             loc.set_alt_cm(origin.alt - posD*100.0, Location::AltFrame::ABSOLUTE);
             if (filterStatus.flags.horiz_pos_abs || filterStatus.flags.horiz_pos_rel) {
