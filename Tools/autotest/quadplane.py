@@ -1884,12 +1884,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.context_pop()
         self.reboot_sitl()
 
-    def run_tests_for_beacon_positions(self,
-                                       beacon_home_relative_positions,
-                                       run_replay_step=True,
-                                       run_disable_beacons_step=True,
-                                       ):
-        self.context_push()
+    def configure_silvus_for_beacon_positions(self, beacon_home_relative_positions):
         radio_beacon_parameters = {}
         radio_beacon_sim_parameters = {
             "SSIM_AGE_MAX_MS": 330.3,
@@ -1968,6 +1963,13 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         self.wait_statustext(f"SilvusSim: starting with {i} beacons", check_context=True)
         self.context_pop()
 
+    def run_tests_for_beacon_positions(self,
+                                       beacon_home_relative_positions,
+                                       run_replay_step=True,
+                                       run_disable_beacons_step=True,
+                                       ):
+        self.context_push()
+        self.configure_silvus_for_beacon_positions(beacon_home_relative_positions)
         self.reboot_sitl()  # so we get a clean log with final state
 
         self.change_mode('AUTO')
@@ -2074,6 +2076,137 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         if not passed:
             raise NotAchievedException("Did not get expected messages from Replay")
 
+    def TOFRadiosNoGPS(self):
+        '''test using radios with absolutely no GPS available'''
+        # offsets are enu
+        reps = 200  # we RTL, so this can be high
+        self.upload_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 300, 00, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 50, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 500, 300, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 300, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 50, 100),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_DO_JUMP,
+                p1=3,   # wp
+                p2=reps,
+            ),
+            self.create_MISSION_ITEM_INT(
+                mavutil.mavlink.MAV_CMD_DO_LAND_START,
+            ),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 350, 100),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 350, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -600, 0, 25),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, -500, 0, 25),
+            # 0.1 so it gets made relhome rather than being left to
+            # the autopilot to assume "here":
+            (mavutil.mavlink.MAV_CMD_NAV_LAND, 0.1, 0, 0),
+        ])
+
+        home = self.poll_home_position()
+
+        self.context_push()
+
+        self.progress("Install scripts")
+        # replace these with install_applet_script_context:
+        scripts_to_install = "silvus_monitor.lua", "silvus_tof_sim.lua"
+        scripts_base = "ArduPlane/SilvusQuery/scripts"
+        for scriptname in scripts_to_install:
+            p = util.reltopdir(f"{scripts_base}/{scriptname}")
+            self.install_script(p, scriptname)
+        # replace this with install_script_module_context:
+        p = util.reltopdir(f"{scripts_base}/modules/json.lua")
+        self.install_script_module(p, "json.lua")
+
+        self.progress("Enable scripting and base configuration")
+        self.set_parameters({
+            "AHRS_OPTIONS": 3,  # no DCM fallback
+            "SCR_ENABLE": 1,
+            'LOG_REPLAY': 1,
+            'EK2_ENABLE': 1,
+            'EK2_IMU_MASK': 1,
+            'EK3_OPTIONS': 4,
+            'EK3_IMU_MASK': 1,
+            'RTL_AUTOLAND': 2,
+            'SIM_WIND_SPD': 5,  # need to keep this under control or we end up transitioning when switching wind direction
+            'SIM_WIND_DIR': 0,
+            'SIM_IMU_COUNT': 3,
+            #            'SCR_DEBUG_OPTS': 8,  # runtime memory usage and time
+            'SCR_VM_I_COUNT': 1000000,
+            'INS_ACC3OFFS_X': 0.00001,
+            'INS_ACC3OFFS_Y': 0.00001,
+            'INS_ACC3OFFS_Z': 0.00001,
+            'INS_ACCSCAL_X': 1,
+            'INS_ACCSCAL_Y': 1,
+            'INS_ACCSCAL_Z': 1,
+            'EK3_SRC1_POSXY': 0,
+            'EK3_SRC1_VELXY': 0,
+            'EK3_SRC1_VELZ': 0,
+        })
+        # need to force the IMU calibrations into storage:
+        self.run_cmd_int(mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION, p5=76)
+
+        self.context_push()
+        self.context_collect('STATUSTEXT')
+        self.reboot_sitl()
+
+        self.wait_statustext("Silvus: starting with 0 ground radios", check_context=True)
+        self.context_pop()
+
+        beacon_home_relative_positions = [
+            # n   e    u
+            (500, -50, 0),
+            (-500, -50, 30),
+            (-1000, 6000, 10),
+            (3000, 6000, 20),
+            (-550, -50, 0),
+            (-1000, 12000, 10),
+            (-2000, -2000, -10),
+            (2000, 2000, 150),
+        ]
+        self.configure_silvus_for_beacon_positions(beacon_home_relative_positions)
+        self.set_parameters({
+            'SIM_GPS_DISABLE': 1,
+            'GPS_TYPE': 0,
+        })
+
+        self.reboot_sitl()  # so we get a clean log with final state
+
+        # set origin
+        self.mav.mav.set_gps_global_origin_send(
+            self.mav.target_system,
+            home.latitude,
+            home.longitude,
+            home.altitude
+        )
+        self.run_cmd_int(
+            mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+            p5=home.latitude,
+            p6=home.longitude,
+            p7=home.altitude * 0.001,
+        )
+
+        self.change_mode('QHOVER')
+        self.wait_prearm_sys_status_healthy(timeout=30)
+        self.arm_vehicle()
+
+        self.set_rc(3, 2000)
+        self.wait_altitude(home.altitude*0.001+20, home.altitude*0.001+25, altitude_source='SIM_STATE.alt')
+        self.set_rc(3, 1000)
+
+        self.change_mode('CRUISE')
+        self.wait_airspeed(23, 25, timeout=120)
+        self.set_rc(1, 1700)
+        self.delay_sim_time(120)
+
+        self.remove_installed_script_module("json.lua")
+        for script_to_uninstall in scripts_to_install:
+            self.remove_installed_script(script_to_uninstall)
+
+        self.context_pop()
+        self.reboot_sitl()
+
     def tests(self):
         '''return list of all tests'''
 
@@ -2121,5 +2254,6 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
             self.RTL_AUTOLAND_1,  # as in fly-home then go to landing sequence
             self.RTL_AUTOLAND_1_FROM_GUIDED,  # as in fly-home then go to landing sequence
             self.TOFRadios,
+            self.TOFRadiosNoGPS,
         ])
         return ret
