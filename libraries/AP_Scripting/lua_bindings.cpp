@@ -877,11 +877,24 @@ int SocketAPM_recv(lua_State *L) {
         return 0;
     }
 
-    // push to lua string
+    int retcount = 1;
+
+    // push data to lua string
     lua_pushlstring(L, (const char *)data, ret);
+
+    // also push the address and port if available
+    uint32_t ip_addr;
+    uint16_t port;
+    if (ud->last_recv_address(ip_addr, port)) {
+        new_uint32_t(L);
+        *check_uint32_t(L, -1) = ip_addr;
+        lua_pushinteger(L, port);
+        retcount += 2;
+    }
+
     free(data);
 
-    return 1;
+    return retcount;
 }
 
 /*
@@ -909,6 +922,32 @@ int SocketAPM_accept(lua_State *L) {
 
     // out of socket slots, return nil, caller can retry
     return 0;
+}
+
+/*
+  convert a uint32_t ipv4 address to a string
+ */
+int SocketAPM_ipv4_addr_to_string(lua_State *L) {
+    binding_argcheck(L, 1);
+    const uint32_t ip_addr = get_uint32(L, 1, 0, UINT32_MAX);
+    char buf[IP4_STR_LEN];
+    const char *ret = SocketAPM::inet_addr_to_str(ip_addr, buf, sizeof(buf));
+    if (ret == nullptr) {
+        return 0;
+    }
+    lua_pushlstring(L, (const char *)ret, strlen(ret));
+    return 1;
+}
+
+/*
+  convert a ipv4 string address to a uint32_t
+ */
+int SocketAPM_string_to_ipv4_addr(lua_State *L) {
+    binding_argcheck(L, 1);
+    const char *str = luaL_checkstring(L, 1);
+    new_uint32_t(L);
+    *check_uint32_t(L, -1) = SocketAPM::inet_str_to_addr(str);
+    return 1;
 }
 
 #endif // AP_NETWORKING_ENABLED
