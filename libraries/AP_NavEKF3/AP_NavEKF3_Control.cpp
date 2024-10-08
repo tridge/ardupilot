@@ -321,6 +321,9 @@ void NavEKF3_core::setAidingMode()
             bool bodyOdmFusionTimeout = ((imuSampleTime_ms - prevBodyVelFuseTime_ms) > 5000);
             // Check if the fusion of air data measurements has timed out
             bool airDataTimeout = ((imuSampleTime_ms - lastTasPassTime_ms) > 5000) && ((imuSampleTime_ms - lastDragPassTime_ms) > 5000);
+
+            windStateIsObservable = !inhibitWindStates && rngBcn.usingRangeToLoc;
+
             // Enable switch to absolute position mode if GPS or range beacon data is available
             // If GPS or range beacons data is not available and flow fusion has timed out, then fall-back to no-aiding
             if (readyToUseGPS() || readyToUseRangeBeacon() || readyToUseExtNav()) {
