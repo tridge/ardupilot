@@ -598,7 +598,7 @@ private:
     AP_NavEKF_Source sources;
 
     // true when we should not use GPS due to AUX switch disable
-    bool _gps_disabled;
+    bool _gps_disabled = true;
 
     HAL_Semaphore _write_mutex;
 };
