@@ -284,6 +284,10 @@ void AP_Scripting::repl_stop(void) {
 #pragma GCC optimize ("O0")
 
 void AP_Scripting::thread(void) {
+
+    // ensure we wait for full system startup, including LOG_DISARMED != 0
+    hal.scheduler->delay(2000);
+
     while (true) {
         // reset flags
         _stop = false;
