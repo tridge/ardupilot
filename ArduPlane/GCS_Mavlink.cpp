@@ -749,7 +749,7 @@ bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd)
 void GCS_MAVLINK_Plane::handle_change_alt_request(AP_Mission::Mission_Command &cmd)
 {
     plane.next_WP_loc.alt = cmd.content.location.alt;
-    if (cmd.content.location.relative_alt) {
+    if (cmd.content.location.relative_alt && !cmd.content.location.terrain_alt) {
         plane.next_WP_loc.alt += plane.home.alt;
     }
     plane.next_WP_loc.relative_alt = false;
