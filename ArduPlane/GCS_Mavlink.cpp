@@ -865,7 +865,7 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_do_reposition(const mavlink_com
         plane.set_mode(plane.mode_guided, ModeReason::GCS_COMMAND);
 
         // add home alt if needed
-        if (requested_position.relative_alt) {
+        if (requested_position.relative_alt && !requested_position.terrain_alt) {
             requested_position.alt += plane.home.alt;
             requested_position.relative_alt = 0;
         }
