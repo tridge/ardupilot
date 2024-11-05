@@ -547,8 +547,9 @@ void AP_Vehicle::update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch)
         case HarmonicNotchDynamicMode::UpdateGyroFFT: // FFT based tracking
             // set the harmonic notch filter frequency scaled on measured frequency
             if (notch.params.hasOption(HarmonicNotchFilterParams::Options::DynamicHarmonic)) {
-                float notches[INS_MAX_NOTCHES];
-                const uint8_t peaks = gyro_fft.get_weighted_noise_center_frequencies_hz(notch.num_dynamic_notches, notches);
+                //float notches[INS_MAX_NOTCHES] { 12.9, 14.8, 16.6 };
+                float notches[INS_MAX_NOTCHES] { 8, 8, 8 };
+                const uint8_t peaks = 3;
 
                 notch.update_frequencies_hz(peaks, notches);
             } else {
