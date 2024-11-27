@@ -525,9 +525,9 @@ void AP_Vehicle::update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch)
         case HarmonicNotchDynamicMode::UpdateBLHeli: // BLHeli based tracking
             // set the harmonic notch filter frequency scaled on measured frequency
             if (notch.params.hasOption(HarmonicNotchFilterParams::Options::DynamicHarmonic)) {
-                float notches[INS_MAX_NOTCHES];
+                float notches[INS_MAX_NOTCHES] { 100, 100, 100, 100, 0 };
                 // ESC telemetry will return 0 for missing data, but only after 1s
-                const uint8_t num_notches = AP::esc_telem().get_motor_frequencies_hz(INS_MAX_NOTCHES, notches);
+                const uint8_t num_notches = 5;
                 for (uint8_t i = 0; i < num_notches; i++) {
                     if (!is_zero(notches[i])) {
                         notches[i] =  MAX(ref_freq, notches[i]);
@@ -547,8 +547,8 @@ void AP_Vehicle::update_dynamic_notch(AP_InertialSensor::HarmonicNotch &notch)
         case HarmonicNotchDynamicMode::UpdateGyroFFT: // FFT based tracking
             // set the harmonic notch filter frequency scaled on measured frequency
             if (notch.params.hasOption(HarmonicNotchFilterParams::Options::DynamicHarmonic)) {
-                float notches[INS_MAX_NOTCHES];
-                const uint8_t peaks = gyro_fft.get_weighted_noise_center_frequencies_hz(notch.num_dynamic_notches, notches);
+                float notches[INS_MAX_NOTCHES] { 8, 8, 8 };
+                const uint8_t peaks = 3;
 
                 notch.update_frequencies_hz(peaks, notches);
             } else {
@@ -738,4 +738,3 @@ AP_Vehicle *vehicle()
 }
 
 };
-
