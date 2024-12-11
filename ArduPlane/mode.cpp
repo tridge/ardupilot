@@ -142,6 +142,9 @@ bool Mode::enter()
         // Make sure the flight stage is correct for the new mode
         plane.update_flight_stage();
 
+        // reset landing state
+        plane.landing.reset();
+
 #if HAL_QUADPLANE_ENABLED
         if (quadplane.enabled()) {
             float aspeed;
