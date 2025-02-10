@@ -172,9 +172,16 @@ private:
     void report_FPS(void);
     void socket_creator(void);
 
+    static const uint8_t RF_MAX_ACTUATORS = 12;
+    static const uint8_t RF_NUM_FILTERS = 3;
+
     struct sitl_input last_input;
+    uint32_t last_input_us;
+    float scaled_servos[RF_MAX_ACTUATORS];
 
     AP_Int32 _options;
+    AP_Int32 _filter_masks[RF_NUM_FILTERS];
+    AP_Float _filter_cutoffs[RF_NUM_FILTERS];
 
     enum class Option : uint32_t{
         ResetPosition = (1U<<0),
@@ -210,6 +217,8 @@ private:
     pid_t socket_pid;
     uint32_t sock_error_count;
     double last_recv_sec;
+
+    LowPassFilterFloat filters[RF_MAX_ACTUATORS][RF_NUM_FILTERS];
 };
 
 

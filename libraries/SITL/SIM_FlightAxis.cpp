@@ -46,6 +46,52 @@ const AP_Param::GroupInfo FlightAxis::var_info[] = {
     // @Bitmask: 3: Don't print frame rate stats
     // @User: Advanced
     AP_GROUPINFO("OPTS", 1, FlightAxis, _options, uint32_t(Option::ResetPosition)),
+
+    // @Param: FLT1_MSK
+    // @DisplayName: FlightAxis filter 1 mask
+    // @Description: Bitmask of which outputs to apply filter 1 cutoff to
+    // @Bitmask: 0:Channel1,1:Channel2,2:Channel3,3:Channel4,4:Channel5,5:Channel6,6:Channel7,7:Channel8,8:Channel9,9:Channel10,10:Channel11,11:Channel12
+    // @User: Advanced
+    AP_GROUPINFO("FLT1_MSK", 2, FlightAxis, _filter_masks[0], 0),
+
+    // @Param: FLT1_HZ
+    // @DisplayName: FlightAxis filter 1 cutoff frequency
+    // @Description: Cutoff frequency of first output filter, 0 to disable
+    // @Range: 0 20
+    // @Units: Hz
+    // @User: Advanced
+    AP_GROUPINFO("FLT1_HZ", 3, FlightAxis, _filter_cutoffs[0], 0),
+
+    // @Param: FLT2_MSK
+    // @DisplayName: FlightAxis filter 2 mask
+    // @Description: Bitmask of which outputs to apply filter 2 cutoff to
+    // @Bitmask: 0:Channel1,1:Channel2,2:Channel3,3:Channel4,4:Channel5,5:Channel6,6:Channel7,7:Channel8,8:Channel9,9:Channel10,10:Channel11,11:Channel12
+    // @User: Advanced
+    AP_GROUPINFO("FLT2_MSK", 4, FlightAxis, _filter_masks[1], 0),
+
+    // @Param: FLT2_HZ
+    // @DisplayName: FlightAxis filter 2 cutoff frequency
+    // @Description: Cutoff frequency of second output filter, 0 to disable
+    // @Range: 0 20
+    // @Units: Hz
+    // @User: Advanced
+    AP_GROUPINFO("FLT2_HZ", 5, FlightAxis, _filter_cutoffs[1], 0),
+
+    // @Param: FLT3_MSK
+    // @DisplayName: FlightAxis filter 3 mask
+    // @Description: Bitmask of which outputs to apply filter 3 cutoff to
+    // @Bitmask: 0:Channel1,1:Channel2,2:Channel3,3:Channel4,4:Channel5,5:Channel6,6:Channel7,7:Channel8,8:Channel9,9:Channel10,10:Channel11,11:Channel12
+    // @User: Advanced
+    AP_GROUPINFO("FLT3_MSK", 6, FlightAxis, _filter_masks[2], 0),
+
+    // @Param: FLT3_HZ
+    // @DisplayName: FlightAxis filter 3 cutoff frequency
+    // @Description: Cutoff frequency of third output filter, 0 to disable
+    // @Range: 0 20
+    // @Units: Hz
+    // @User: Advanced
+    AP_GROUPINFO("FLT3_HZ", 7, FlightAxis, _filter_cutoffs[2], 0),
+    
     AP_GROUPEND
 };
 
@@ -325,11 +371,33 @@ void FlightAxis::exchange_data(const struct sitl_input &input)
         controller_started = true;
     }
 
-    // maximum number of servos to send is 12 with new FlightAxis
-    float scaled_servos[12];
-    for (uint8_t i=0; i<ARRAY_SIZE(scaled_servos); i++) {
-        scaled_servos[i] = (input.servos[i] - 1000) / 1000.0f;
+    if (memcmp(last_input.servos, input.servos, sizeof(input.servos)) != 0) {
+        // input has changed, re-calculate and filter
+        const uint32_t now_us = AP_HAL::micros();
+        if (last_input_us == 0) {
+            last_input_us = now_us;
+        }
+        const uint32_t dt_us = now_us - last_input_us;
+        const float dt_s = MAX(dt_us * 1.0e-6, 1.0e-6);
+
+        for (uint8_t i=0; i<ARRAY_SIZE(scaled_servos); i++) {
+            scaled_servos[i] = (input.servos[i] - 1000) / 1000.0f;
+
+            // apply output filters if enabled
+            for (uint8_t f=0; f<RF_NUM_FILTERS; f++) {
+                const float cutoff = _filter_cutoffs[f].get();
+                const uint32_t mask = uint32_t(_filter_masks[f].get());
+                if ((mask & (1U<<i)) != 0) {
+                    filters[i][f].set_cutoff_frequency(cutoff);
+                    scaled_servos[i] = filters[i][f].apply(scaled_servos[i], dt_s);
+                }
+            }
+        }
+
+        last_input = input;
+        last_input_us = now_us;
     }
+
 
     if (option_is_set(Option::Rev4Servos)) {
         // swap first 4 and last 4 servos, for quadplane testing
@@ -432,7 +500,6 @@ void FlightAxis::exchange_data(const struct sitl_input &input)
  */
 void FlightAxis::update(const struct sitl_input &input)
 {
-    last_input = input;
     exchange_data(input);
 
     double dt_seconds = state.m_currentPhysicsTime_SEC - last_time_s;
