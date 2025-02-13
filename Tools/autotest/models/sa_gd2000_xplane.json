@@ -5,11 +5,13 @@
 
     "sim/operation/override/override_control_surfaces" : { "type" : "fixed", "value" : 1 },
 
-    # ailerons
-    "sim/flightmodel2/wing/elevator1_deg[12]" : { "type" : "angle", "range" : 20, "channel" : 4 }, # right rear
-    "sim/flightmodel2/wing/elevator1_deg[13]" : { "type" : "angle", "range" : -20, "channel" : 2 }, # left rear
-    "sim/flightmodel2/wing/elevator1_deg[14]" : { "type" : "angle", "range" : 20, "channel" : 1 }, # front right
-    "sim/flightmodel2/wing/elevator1_deg[15]" : { "type" : "angle", "range" : -20, "channel" : 3 }, # front left
+    # surfaces. For all 4 surfaces, an increase in input causes right roll
+    # for channels 3 and 4 an increase in input causes pitch up
+    # for channels 1 and 2 an increase in input causes pitch down
+    "sim/flightmodel2/wing/elevator1_deg[12]" : { "type" : "angle", "range" : -20, "channel" : 4 }, # right rear
+    "sim/flightmodel2/wing/elevator1_deg[13]" : { "type" : "angle", "range" : 20, "channel" : 2 }, # left rear
+    "sim/flightmodel2/wing/elevator1_deg[14]" : { "type" : "angle", "range" : -20, "channel" : 1 }, # front right
+    "sim/flightmodel2/wing/elevator1_deg[15]" : { "type" : "angle", "range" : 20, "channel" : 3 }, # front left
 
     # joystick inputs
     "axis6" : { "type" : "joyaxis", "channel" : 1, "input_min" : 0.2, "input_max" : 0.8 },

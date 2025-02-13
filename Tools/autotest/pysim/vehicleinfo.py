@@ -327,6 +327,10 @@ class VehicleInfo(object):
                 "waf_target": "bin/arduplane",
                 "default_params_filename": "default_params/glider.parm",
             },
+            "sa_gd2000": {
+                "waf_target": "bin/arduplane",
+                "default_params_filename": "models/sa_gd2000.parm",
+            },
             "quadplane-copter_tailsitter": {
                 "waf_target": "bin/arduplane",
                 "default_params_filename": ["default_params/quadplane.parm","default_params/quadplane-copter_tailsitter.parm"],
