@@ -34,13 +34,13 @@ const AP_Param::GroupInfo SA_GD2000::var_info[] = {
     // @DisplayName: mass
     // @Description: mass of SA_GD2000
     // @Units: kg
-    AP_GROUPINFO("MASS",     1, SA_GD2000,  params.mass, 5), // 907kg = 2000lbs
+    AP_GROUPINFO("MASS",     1, SA_GD2000,  params.mass, 907), // 907kg = 2000lbs
 
     // @Param: ALT
     // @DisplayName: launch alt MSL
     // @Description: launch alt MSL
     // @Units: m
-    AP_GROUPINFO("ALT",     2, SA_GD2000,  params.launch_alt, 3810), // 3810m == 125000 ft
+    AP_GROUPINFO("ALT",     2, SA_GD2000,  params.launch_alt, 3810), // 3810m == 12500 ft
 
     AP_GROUPEND
 };
@@ -56,10 +56,31 @@ SA_GD2000::SA_GD2000(const char *frame_str) :
 
     mass = params.mass.get();
     thrust_scale = 0;
+    dspoilers = true;
 
     coefficient.c_drag_p = 0.05;
-
 }
+
+/*
+  map inputs to mixer for AETR
+*/
+void SA_GD2000::input_mixer(const struct sitl_input &input, float &aileron, float &elevator, float &throttle, float &rudder)
+{
+    /*
+      For all 4 surfaces, an increase in input causes right roll
+       for channels 3 and 4 an increase in input causes pitch up
+       for channels 1 and 2 an increase in input causes pitch down
+    */
+    const float surface_front_right  = filtered_servo_angle(input, 0);
+    const float surface_rear_left  = filtered_servo_angle(input, 1);
+    const float surface_front_left  = filtered_servo_angle(input, 2);
+    const float surface_rear_right  = filtered_servo_angle(input, 3);
+    aileron = (surface_front_right + surface_rear_left + surface_front_left + surface_rear_right) * 0.25;
+    elevator = (surface_front_left + surface_rear_right - (surface_front_right + surface_rear_left)) * 0.25;
+    rudder = 0;
+    throttle = 0;
+}
+
 
 /*
   update the vehicle simulation by one time step
