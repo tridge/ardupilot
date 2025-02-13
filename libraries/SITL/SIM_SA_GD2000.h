@@ -53,6 +53,11 @@ private:
         AP_Float mass;
         AP_Float launch_alt;
     } params;
+
+    /*
+      map inputs to mixer for AETR
+    */
+    void input_mixer(const struct sitl_input &input, float &aileron, float &elevator, float &throttle, float &rudder) override;
 };
 
 }

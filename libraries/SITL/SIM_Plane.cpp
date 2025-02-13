@@ -272,13 +272,14 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
     return Vector3f(ax, ay, az);
 }
 
-void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
+/*
+  map inputs to mixer for AETR
+ */
+void Plane::input_mixer(const struct sitl_input &input, float &aileron, float &elevator, float &throttle, float &rudder)
 {
-    float aileron  = filtered_servo_angle(input, 0);
-    float elevator = filtered_servo_angle(input, 1);
-    float rudder   = filtered_servo_angle(input, 3);
-    bool launch_triggered = input.servos[6] > 1700;
-    float throttle;
+    aileron  = filtered_servo_angle(input, 0);
+    elevator = filtered_servo_angle(input, 1);
+    rudder   = filtered_servo_angle(input, 3);
     if (reverse_elevator_rudder) {
         elevator = -elevator;
         rudder = -rudder;
@@ -319,7 +320,13 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     } else {
         throttle = filtered_servo_range(input, 2);
     }
-    
+}
+
+void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel)
+{
+    float aileron, elevator, throttle, rudder;
+    input_mixer(input, aileron, elevator, throttle, rudder);
+
     float thrust     = throttle;
 
     battery_voltage = sitl->batt_voltage - 0.7*throttle;
@@ -349,6 +356,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         /*
           simple simulation of a launcher
          */
+        bool launch_triggered = input.servos[6] > 1700;
         if (launch_triggered) {
             uint64_t now = AP_HAL::millis64();
             if (launch_start_ms == 0) {
