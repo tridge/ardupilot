@@ -1,5 +1,4 @@
-# XPlane DREF map file for a simple plane
-# assumes: Aileron, Elevator, Throttle, Rudder, flaps
+# XPlane DREF map file for GD2000 model
 
 {
     "settings" : { "debug" : 0 },
@@ -10,6 +9,17 @@
     "sim/flightmodel2/wing/elevator1_deg[12]" : { "type" : "angle", "range" : 20, "channel" : 4 }, # right rear
     "sim/flightmodel2/wing/elevator1_deg[13]" : { "type" : "angle", "range" : -20, "channel" : 2 }, # left rear
     "sim/flightmodel2/wing/elevator1_deg[14]" : { "type" : "angle", "range" : 20, "channel" : 1 }, # front right
-    "sim/flightmodel2/wing/elevator1_deg[15]" : { "type" : "angle", "range" : -20, "channel" : 3 } # front left
+    "sim/flightmodel2/wing/elevator1_deg[15]" : { "type" : "angle", "range" : -20, "channel" : 3 }, # front left
+
+    # joystick inputs
+    "axis6" : { "type" : "joyaxis", "channel" : 1, "input_min" : 0.2, "input_max" : 0.8 },
+    "axis5" : { "type" : "joyaxis", "channel" : 2, "input_min" : 0.2, "input_max" : 0.8 },
+    "axis4" : { "type" : "joyaxis", "channel" : 3, "input_min" : 0.8, "input_max" : 0.2 },
+    "axis2" : { "type" : "joyaxis", "channel" : 4, "input_min" : 0.2, "input_max" : 0.9 },
+    "axis3" : { "type" : "joyaxis", "channel" : 5, "input_min" : 0.2, "input_max" : 0.9 },
+    "button1" : { "channel" : 6, "mask" : 1 },
+    "button2" : { "channel" : 7, "mask" : 2 },
+    "button3" : { "type" : "joybutton", "channel" : 8, "mask" : 24 },
+    "button4" : { "type" : "joybutton", "channel" : 9, "mask" : 4 }
 
 }
