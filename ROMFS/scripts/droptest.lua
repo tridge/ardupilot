@@ -461,7 +461,9 @@ function set_standby()
       gcs:send_text(0, string.format("forcing standby MANUAL"))
       vehicle:set_mode(MODE_MANUAL)
       arming:disarm()
-      mission:set_current_cmd(1)
+      if mission:num_commands() > 0 then
+          mission:set_current_cmd(1)
+      end
       -- maybe LOITER mode if no GPS lock?
    end
    local gps_status = gps:status(0)
@@ -769,7 +771,6 @@ function update()
       state = button:get_button_state(button_number)
    end
 
-   local button_state = button:get_button_state(button_number)
    if state ~= button_state then
       gcs:send_text(0, string.format("release: " .. tostring(state)))
       button_state = state
