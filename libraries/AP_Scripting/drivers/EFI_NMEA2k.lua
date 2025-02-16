@@ -140,6 +140,11 @@ local function parse_engine_param_rapid(data)
    end
 end
 
+local function celsiusToFahrenheit(celsius)
+    return celsius * 9.0 / 5 + 32
+end
+
+
 --[[
    parse the lower rate engine data, giving other engine data
 --]]
@@ -158,6 +163,8 @@ local function parse_engine_param_dynamic(data)
    efi_state:intake_manifold_pressure_kpa(state.cool_press*100*0.001)
    efi_state:fuel_pressure(state.fuel_press)
    efi_state:engine_load_percent(state.eload)
+   gcs:send_named_float('N2K_TEMPF', celsiusToFahrenheit(state.temp_K*0.01-273.15))
+   gcs:send_named_float('N2K_VOLT', state.alt_V*0.01)
 end
 
 function update()
@@ -192,5 +199,7 @@ function update()
 
    return update, 2
 end
+
+gcs:send_text(MAV_SEVERITY.INFO, "Loaded EFI_NMEA2K")
 
 return update()
