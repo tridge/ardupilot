@@ -6,7 +6,80 @@
 -- tests to run
 -- check on loss of GPS, that we switch to pitot airspeed
 
-done_init = false
+
+PARAM_TABLE_KEY = 49
+PARAM_TABLE_PREFIX = "SA_"
+
+local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTICE=5, INFO=6, DEBUG=7}
+
+-- bind a parameter to a variable given
+function bind_param(name)
+    local p = Parameter(name)
+    assert(p, string.format('could not find %s parameter', name))
+    return p
+end
+
+-- add a parameter and bind it to a variable
+function bind_add_param(name, idx, default_value)
+    assert(param:add_param(PARAM_TABLE_KEY, idx, name, default_value), string.format('could not add param %s', name))
+    return bind_param(PARAM_TABLE_PREFIX .. name)
+end
+
+-- Setup EFI Parameters
+assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 20), 'droptest: could not add param table')
+
+--[[
+  // @Param: SA_ENABLE
+  // @DisplayName: Enable SilentArrow automation
+  // @Description: Enable SilentArrow automation
+  // @Values: 0:Disabled,1:Enabled
+  // @User: Standard
+--]]
+local SA_ENABLE = bind_add_param('ENABLE',  1, 1)
+
+--[[
+  // @Param: SA_REL_DELAY
+  // @DisplayName: SilentArrow release delay
+  // @Description: SilentArrow release delay
+  // @Range: 0 3
+  // @User: Standard
+--]]
+local SA_REL_DELAY = bind_add_param('REL_DELAY',  2, 1.5)
+
+--[[
+  // @Param: SA_GLIDE_SLOPE
+  // @DisplayName: SilentArrow glide slope
+  // @Description: SilentArrow glide slope
+  // @Range: 1 10
+  // @User: Standard
+--]]
+local SA_GLIDE_SLOPE = bind_add_param('GLIDE_SLOPE',  3, 5)
+
+--[[
+  // @Param: SA_MISS_CREATION
+  // @DisplayName: SilentArrow mission creation
+  // @Description: SilentArrow mission creation
+  // @Values: 0:Disabled,1:Enabled
+  // @User: Standard
+--]]
+local SA_MISS_CREATION = bind_add_param('MISS_CREATION',  4, 1)
+
+--[[
+  // @Param: SA_DEBUG_LEVEL
+  // @DisplayName: SilentArrow debug level
+  // @Description: SilentArrow debug level
+  // @Range: 0 3
+  // @User: Standard
+--]]
+local SA_DEBUG_LEVEL = bind_add_param('DEBUG_LEVEL',  5, 1)
+
+if SA_ENABLE:get() < 1 then
+   gcs:send_text(MAV_SEVERITY.WARNING, "SA droptest disabled")
+   return
+end
+
+
+local done_init = false
 local button_number = 1
 local button_state = 0
 
@@ -65,7 +138,7 @@ local is_SITL = param:get('SIM_SPEEDUP')
 local TARGET_AIRSPEED = param:get('AIRSPEED_CRUISE')
 
 function get_glide_slope()
-   GLIDE_SLOPE = param:get('SCR_USER2')
+   GLIDE_SLOPE = SA_GLIDE_SLOPE:get()
    if GLIDE_SLOPE <= 0 then
       GLIDE_SLOPE = 6.0
    end
@@ -500,7 +573,9 @@ function fix_WP_heights()
          local current_alt = m:z()
          local new_alt = LANDING_AMSL + dist / GLIDE_SLOPE
          if math.abs(current_alt - new_alt) > -1 or m:frame() ~= 0 then
-            gcs:send_text(0, string.format("Fixing WP[%u] d=%.0f alt %.1f->%.1f", i, dist, current_alt, new_alt))
+            if SA_DEBUG_LEVEL:get() > 1 then
+                gcs:send_text(0, string.format("Fixing WP[%u] d=%.0f alt %.1f->%.1f", i, dist, current_alt, new_alt))
+            end
             m:z(new_alt)
             m:frame(0)
             mission:set_item(i, m)
@@ -750,6 +825,9 @@ function airspeed_update(dt)
 end
 
 function update()
+   if SA_ENABLE:get() <= 0 then
+       return
+   end
    if not done_init then
       init()
    end
@@ -758,7 +836,7 @@ function update()
       notify:handle_rgb(255,255,255,10)
       return
    end
-   if create_mission_check() then
+   if SA_MISS_CREATION:get() == 1 and create_mission_check() then
       create_mission()
    end
    local t = 0.001 * millis():tofloat()
@@ -779,7 +857,7 @@ function update()
       end
    end
 
-   if button_state and release_start_t > 0 and (t - release_start_t) > param:get('SCR_USER1') then
+   if button_state and release_start_t > 0 and (t - release_start_t) > SA_REL_DELAY:get() then
       release_trigger()
       release_start_t = 0.0
       release_t = t
@@ -810,6 +888,8 @@ function set_fault_led()
    -- setup LED for lua fault condition
    notify:handle_rgb(255,255,0,2)
 end
+
+gcs:send_text(MAV_SEVERITY.INFO, "SA droptest loaded")
 
 -- wrapper around update(). This calls update() at 10Hz
 -- and if update faults then an error is displayed, but the script is not stopped
