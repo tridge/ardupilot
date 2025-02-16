@@ -164,6 +164,13 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("WIND_COMP", 18, AP_Landing, wind_comp, 50),
 
+    // @Param: PF_PITCH
+    // @DisplayName: Landing pre-flare minimum pitch
+    // @Description: Used in autoland to give the minimum pitch in the preflare stage of landing. This parameter can be used to ensure that the preflare landing attitude is appropriate for the type of aircraft. Note that it is a minimum pitch only - the landing code will control pitch above this value to try to achieve the configured landing sink rate. A value of 0 means no limit
+    // @Units: deg
+    // @User: Advanced
+    AP_GROUPINFO("PF_PITCH", 19, AP_Landing, preflare_pitch, 0),
+    
     // @Param: TYPE
     // @DisplayName: Auto-landing type
     // @Description: Specifies the auto-landing type to use
@@ -179,13 +186,6 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
 
     // additional global params should be placed in the list above TYPE to avoid the enable flag hiding the deepstall params
 
-    // @Param: PF_PITCH
-    // @DisplayName: Landing pre-flare minimum pitch
-    // @Description: Used in autoland to give the minimum pitch in the preflare stage of landing. This parameter can be used to ensure that the preflare landing attitude is appropriate for the type of aircraft. Note that it is a minimum pitch only - the landing code will control pitch above this value to try to achieve the configured landing sink rate. A value of 0 means no limit
-    // @Units: deg
-    // @User: Advanced
-    AP_GROUPINFO("PF_PITCH", 19, AP_Landing, preflare_pitch, 0),
-    
     AP_GROUPEND
 };
 
