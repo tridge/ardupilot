@@ -3,13 +3,6 @@ AIRSPEED_MAX           55
 AIRSPEED_MIN           40
 TECS_LAND_ARSPD        60
 
-# NOT YET IMPLEMENTED in 4.6
-TECS_FLARE_AOA         17
-TECS_FLARE_TIME       1.5
-TECS_FLARE_ELEV       2.3
-LAND_PF_PITCH_CD     -300
-PTCH_RATE_TCONST     1.0
-
 # yaw 180
 AHRS_ORIENTATION        4
 
@@ -91,6 +84,7 @@ LAND_PF_ALT            60
 LAND_PF_ARSPD           0
 LAND_PF_SEC            10
 LAND_PITCH_DEG         8
+LAND_PF_PITCH         -3
 
 PTCH_LIM_MAX_DEG       10
 PTCH_LIM_MIN_DEG       -40
