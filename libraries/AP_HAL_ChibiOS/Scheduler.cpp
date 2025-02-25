@@ -623,6 +623,15 @@ void Scheduler::check_low_memory_is_zero()
         }
 #pragma GCC diagnostic pop
     }
+
+    if (hal.util->get_soft_armed()) {
+        mpuConfigureRegion(MPU_REGION_7,
+                           0x0,
+                           MPU_RASR_ATTR_AP_RO_RO |
+                           MPU_RASR_SIZE_1K |
+                           MPU_RASR_ENABLE);
+        mpuEnable(MPU_CTRL_PRIVDEFENA | MPU_CTRL_ENABLE);
+    }
 }
 #endif // STM32H7
 
