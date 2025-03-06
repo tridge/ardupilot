@@ -778,12 +778,14 @@ function create_mission()
 
    adjust_approach_dist(land2_loc, dls_loc, bearing21)
    APPROACH_DIST_MAX = math.max(APPROACH_DIST_MAX, 3*runway_length)
-   
-   -- setup DLS2
-   wp_add(dls_loc,DO_LAND_START,0,0)
 
-   -- second pattern
-   create_pattern(wp, land2_loc, bearing21, base_angle, runway_length)
+   if SA_MISS_CREATION:get() == 2 then
+       -- setup DLS2
+       wp_add(dls_loc,DO_LAND_START,0,0)
+
+       -- second pattern
+       create_pattern(wp, land2_loc, bearing21, base_angle, runway_length)
+   end
 
    fix_WP_heights()
 end
