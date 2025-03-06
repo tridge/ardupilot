@@ -225,7 +225,7 @@ RNGFND1_RMETRIC         1
 RNGFND1_SCALING         1
 RNGFND1_STOP_PIN       -1
 RNGFND1_TYPE            8
-RNGFND_LANDING          1
+RNGFND_LANDING          0
 RSSI_ANA_PIN            0
 RSSI_CHANNEL            0
 RSSI_CHAN_HIGH       2000
@@ -239,7 +239,7 @@ SCHED_LOOP_RATE       300
 SCR_DEBUG_LVL           0
 SCR_ENABLE              1
 SCR_HEAP_SIZE      100000
-SCR_USER1               1.5
+SCR_USER1               0.5
 SCR_USER2               5.0
 SCR_USER3               0
 SCR_USER4               0
@@ -277,7 +277,7 @@ TECS_LAND_SPDWGT        1
 TECS_LAND_SRC           0.2000
 TECS_LAND_TCONST        5
 TECS_OPTIONS            1
-TECS_PITCH_MAX         -6
+TECS_PITCH_MAX         -1
 TECS_PITCH_MIN        -12
 TECS_SINK_MAX          15
 TECS_SINK_MIN          10
