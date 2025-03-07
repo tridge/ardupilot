@@ -144,7 +144,8 @@ void Plane::stabilize_pitch(float speed_scaler)
 
     SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, 
                                                                                            speed_scaler, 
-                                                                                           disable_integrator));
+                                                                                           disable_integrator,
+                                                                                           landing.is_flaring()));
 }
 
 /*
