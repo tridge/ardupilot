@@ -1324,7 +1324,7 @@ private:
 
     void service_statustext(void);
 #if HAL_MEM_CLASS <= HAL_MEM_CLASS_192 || CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    static const uint8_t _status_capacity = 7;
+    static const uint8_t _status_capacity = 50;
 #else
     static const uint8_t _status_capacity = 30;
 #endif
