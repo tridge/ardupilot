@@ -77,10 +77,31 @@ local SA_DEBUG_LEVEL = bind_add_param('DEBUG_LEVEL',  5, 1)
   // @Param: SA_TURN_LOSS
   // @DisplayName: SilentArrow loss of height in turn
   // @Description: height loss for 180 degree turn
-  // @Range: 0 3
+  // @Range: 0 300
   // @User: Standard
 --]]
 local SA_TURN_LOSS = bind_add_param('TURN_LOSS',  6, 180)
+
+--[[
+  // @Param: SA_OPTIONS
+  // @DisplayName: SilentArrow options
+  // @Description: debug options
+  // @Range: 0 3
+  // @User: Standard
+--]]
+local SA_OPTIONS = bind_add_param('OPTIONS',  7, 0)
+
+--[[
+  // @Param: SA_NUM_ALT
+  // @DisplayName: SilentArrow num alternates
+  // @Description: SilentArrow num alternates
+  // @Range: 4 50
+  // @User: Standard
+--]]
+local SA_NUM_ALT = bind_add_param('NUM_ALT',  8, 20)
+
+local SA_OPTION_SHOW_GS = (1<<0)
+
 
 if SA_ENABLE:get() < 1 then
    gcs:send_text(MAV_SEVERITY.WARNING, "SA droptest disabled")
@@ -524,6 +545,33 @@ function mission_update()
    end
 end
 
+
+local last_gs_show = millis()
+
+--[[
+    debug function to show glide slopes of alternatives
+--]]
+function show_glide_slopes()
+    local now_ms = millis()
+    local dt_s = (now_ms - last_gs_show):tofloat() * 0.001
+    if dt_s < 5 then
+        return
+    end
+    last_gs_show = now_ms
+    local N = mission:num_commands()
+    local best = cnum
+    local loc = gps:location(0)
+    local curr_alt = loc:alt() * 0.01
+    gcs:send_text(0, string.format("GS ALT %.1f", curr_alt))
+    for i = 1, N-3 do
+        if is_candidate(i) then
+            local dist = distance_to_land(i)
+            local slope = dist / curr_alt
+          gcs:send_text(0, string.format("CNUM[%d] dist=%.0f slope=%.2f", i, dist, slope))
+        end
+    end
+end
+
 function release_trigger()
    gcs:send_text(0, string.format("release trigger"))
    vehicle:set_mode(MODE_AUTO)
@@ -696,9 +744,7 @@ function create_pattern(wp, basepos, angle, base_angle, runway_length)
    wp_add(loc,NAV_LAND,0,0)
 
    local step = runway_length*STEP_RATIO
-   NUM_ALTERNATES = math.min(70,math.floor((APPROACH_DIST_MAX - runway_length*1.5) / step))
-
-   gcs:send_text(0, string.format("NUM_ALTERNATES=%u", NUM_ALTERNATES))
+   local NUM_ALTERNATES = SA_NUM_ALT:get()
 
    for i = 1, NUM_ALTERNATES do
       loc = Location()
@@ -848,6 +894,10 @@ function update()
       create_mission()
    end
    local t = 0.001 * millis():tofloat()
+
+   if (SA_OPTIONS:get() & SA_OPTION_SHOW_GS) ~= 0 then
+       show_glide_slopes()
+   end
 
    local state
    if is_SITL then
