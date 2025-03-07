@@ -129,7 +129,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
  4) minimum FBW airspeed (metres/sec)
  5) maximum FBW airspeed (metres/sec)
 */
-int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed)
+int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool disable_integrator, float aspeed, bool in_flare)
 {
 	uint32_t tnow = AP_HAL::millis();
 	uint32_t dt = tnow - _last_t;
@@ -156,7 +156,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	// This means elevator trim offset doesn't change as the value of scaler changes with airspeed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
 	if (!disable_integrator && gains.I > 0) {
-        float k_I = gains.I;
+        float k_I = gains.I * (in_flare?2:1);
         if (is_zero(gains.FF)) {
             /*
               if the user hasn't set a direct FF then assume they are
@@ -321,7 +321,7 @@ float AP_PitchController::_get_coordination_rate_offset(float &aspeed, bool &inv
 // 4) minimum FBW airspeed (metres/sec)
 // 5) maximum FBW airspeed (metres/sec)
 //
-int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool disable_integrator)
+int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool disable_integrator, bool in_flare)
 {
 	// Calculate offset to pitch rate demand required to maintain pitch angle whilst banking
 	// Calculate ideal turn rate from bank angle and airspeed assuming a level coordinated turn
@@ -357,7 +357,7 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 	// Apply the turn correction offset
 	desired_rate = desired_rate + rate_offset;
 
-    return _get_rate_out(desired_rate, scaler, disable_integrator, aspeed);
+    return _get_rate_out(desired_rate, scaler, disable_integrator, aspeed, in_flare);
 }
 
 void AP_PitchController::reset_I()
