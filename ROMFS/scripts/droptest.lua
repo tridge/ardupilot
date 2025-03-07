@@ -73,6 +73,15 @@ local SA_MISS_CREATION = bind_add_param('MISS_CREATION',  4, 1)
 --]]
 local SA_DEBUG_LEVEL = bind_add_param('DEBUG_LEVEL',  5, 1)
 
+--[[
+  // @Param: SA_TURN_LOSS
+  // @DisplayName: SilentArrow loss of height in turn
+  // @Description: height loss for 180 degree turn
+  // @Range: 0 3
+  // @User: Standard
+--]]
+local SA_TURN_LOSS = bind_add_param('TURN_LOSS',  6, 180)
+
 if SA_ENABLE:get() < 1 then
    gcs:send_text(MAV_SEVERITY.WARNING, "SA droptest disabled")
    return
@@ -95,9 +104,6 @@ local GLIDE_SLOPE = 6.0
 local MAX_WIND = 10.0
 
 local SMALL_WP_DIST = 500
-
--- expected height loss for a 180 degree turn, meters
-local TURN_HEIGHT_LOSS = 180
 
 local release_start_t = 0.0
 local last_tick_t = 0.0
@@ -351,7 +357,7 @@ function wind_adjustment(loc1, loc2)
 end
 
 function turn_adjustment(bearing_change_deg)
-   local height_loss = TURN_HEIGHT_LOSS * math.abs(bearing_change_deg / 180.0)
+   local height_loss = SA_TURN_LOSS:get() * math.abs(bearing_change_deg / 180.0)
    return height_loss * GLIDE_SLOPE
 end
 
