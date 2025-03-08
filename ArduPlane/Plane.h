@@ -522,6 +522,9 @@ private:
 
         uint32_t started_3D_fix_ms;
         uint32_t arming_time_ms;
+
+        // have we had GPS lock since entering AUTO?
+        bool had_gps;
     } auto_state;
 
     struct {

@@ -27,6 +27,8 @@ bool ModeAuto::_enter()
     plane.g2.soaring_controller.init_cruising();
 #endif
 
+    plane.auto_state.had_gps = false;
+
     return true;
 }
 
@@ -46,6 +48,10 @@ void ModeAuto::_exit()
 
 void ModeAuto::update()
 {
+    if (plane.gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
+        plane.auto_state.had_gps = true;
+    }
+
     if (plane.mission.state() != AP_Mission::MISSION_RUNNING) {
         // this could happen if AP_Landing::restart_landing_sequence() returns false which would only happen if:
         // restart_landing_sequence() is called when not executing a NAV_LAND or there is no previous nav point
