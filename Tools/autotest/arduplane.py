@@ -1182,9 +1182,9 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         if (not (m.onboard_control_sensors_present & receiver_bit)):
             raise NotAchievedException("Receiver not present")
         # skip this until RC is fixed
-#        self.progress("Testing receiver health")
-#        if (m.onboard_control_sensors_health & receiver_bit):
-#            raise NotAchievedException("Sensor healthy when it shouldn't be")
+        #        self.progress("Testing receiver health")
+        #        if (m.onboard_control_sensors_health & receiver_bit):
+        #            raise NotAchievedException("Sensor healthy when it shouldn't be")
         self.set_parameter("SIM_RC_FAIL", 0)
         # have to allow time for RC to be fetched from SITL
         self.delay_sim_time(0.5)
@@ -1247,7 +1247,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         })
         self.wait_statustext("Long failsafe on", check_context=True)
         self.wait_mode("RTL")
-#            self.context_clear_collection("STATUSTEXT")
+        #            self.context_clear_collection("STATUSTEXT")
         self.set_parameter("SIM_RC_FAIL", 0)
         self.wait_text("Long Failsafe Cleared", check_context=True)
         self.change_mode("MANUAL")
@@ -2856,6 +2856,66 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.fly_mission_waypoints(num_wp-1, mission_timeout=600)
 
         if max_alt < 200:
+            raise NotAchievedException("Did not follow terrain")
+
+    def TerrainMissionInterrupt(self):
+        '''Test terrain following when resuming a mission'''
+        self.install_terrain_handlers_context()
+
+        num_wp = self.load_mission("ap-terrain.txt")
+
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+
+        # Keep track of the maximum terrain alt.
+        global max_terrain_alt
+        max_terrain_alt = 0
+        def record_maxalt(mav, m):
+            global max_terrain_alt
+            if m.get_type() != 'TERRAIN_REPORT':
+                return
+            if m.current_height > max_terrain_alt:
+                max_terrain_alt = m.current_height
+
+        self.context_push()
+
+        self.set_parameter("WP_RADIUS", 100)  # Ensure the aircraft will get within 100.0m of the waypoint.
+
+        # Start the mission.
+        self.set_current_waypoint(0, check_afterwards=False)
+        self.change_mode('AUTO')
+
+        # After waypoint 2, go to GUIDED.
+        self.wait_waypoint(3, 3, max_dist=3150, timeout=600)
+        self.progress("Entering guided and flying somewhere constant")
+        self.change_mode("GUIDED")
+        loc = self.mav.location()
+        self.location_offset_ne(loc, 350, 0)
+        new_alt = 290
+        self.run_cmd_int(
+            mavutil.mavlink.MAV_CMD_DO_REPOSITION,
+            p5=int(loc.lat * 1e7),
+            p6=int(loc.lng * 1e7),
+            p7=new_alt,  # alt
+            frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
+        )
+
+        # Resume auto when we are close to the GUIDED waypoint and start tracking maximum terrain alt.
+        self.wait_location(loc, accuracy=100)  # based on loiter radius
+        self.change_mode('AUTO')
+        self.install_message_hook(record_maxalt)
+
+        self.wait_waypoint(3, 3, max_dist=100, timeout=600)
+
+        self.remove_message_hook(record_maxalt)
+
+        self.context_pop()
+
+        # We've flown enough.
+        self.disarm_vehicle(force=True)
+
+        # self.fly_mission_waypoints(num_wp-1, mission_timeout=600)
+        if max_terrain_alt > 120:
             raise NotAchievedException("Did not follow terrain")
 
     def Terrain(self):
@@ -6493,22 +6553,22 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
 
         dfreader = self.dfreader_for_current_onboard_log()
         seen_hello_world = False
-#        runtime = None
+        #        runtime = None
         while True:
             m = dfreader.recv_match(type=['SCR'])
             if m is None:
                 break
             if m.Name == "simple_loop.lua":
                 seen_hello_world = True
-#            if m.Name == "math.lua":
-#                runtime = m.Runtime
+        #            if m.Name == "math.lua":
+        #                runtime = m.Runtime
 
         if not seen_hello_world:
             raise NotAchievedException("Did not see simple_loop.lua script")
 
-#        self.progress(f"math took {runtime} seconds to run over {delay} seconds")
-#        if runtime == 0:
-#            raise NotAchievedException("Expected non-zero runtime for math")
+        #        self.progress(f"math took {runtime} seconds to run over {delay} seconds")
+        #        if runtime == 0:
+        #            raise NotAchievedException("Expected non-zero runtime for math")
 
         self.context_pop()
         self.reboot_sitl()
@@ -6981,6 +7041,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             self.Soaring,
             self.Terrain,
             self.TerrainMission,
+            self.TerrainMissionInterrupt,
             self.UniversalAutoLandScript,
         ])
         return ret
