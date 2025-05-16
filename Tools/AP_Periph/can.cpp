@@ -524,6 +524,21 @@ void AP_Periph_FW::handle_arming_status(CanardInstance* canard_instance, CanardR
 }
 
 
+#if AP_PERIPH_RTC_GLOBALTIME_ENABLED
+/*
+  handle GlobalTime
+ */
+void AP_Periph_FW::handle_globaltime(CanardInstance* canard_instance, CanardRxTransfer* transfer)
+{
+    dronecan_protocol_GlobalTime req;
+    if (dronecan_protocol_GlobalTime_decode(transfer, &req)) {
+        return;
+    }
+    AP::rtc().set_utc_usec(req.timestamp.usec, AP_RTC::source_type::SOURCE_GPS);
+}
+#endif // AP_PERIPH_RTC_GLOBALTIME_ENABLED
+
+
 
 #if defined(AP_PERIPH_HAVE_LED_WITHOUT_NOTIFY) || defined(HAL_PERIPH_ENABLE_NOTIFY)
 void AP_Periph_FW::set_rgb_led(uint8_t red, uint8_t green, uint8_t blue)
@@ -877,6 +892,11 @@ void AP_Periph_FW::onTransferReceived(CanardInstance* canard_instance,
         handle_hardpoint_command(canard_instance, transfer);
         break;
 #endif
+#if AP_PERIPH_RTC_GLOBALTIME_ENABLED
+    case DRONECAN_PROTOCOL_GLOBALTIME_ID:
+        handle_globaltime(canard_instance, transfer);
+        break;
+#endif
 
     }
 }
@@ -990,6 +1010,11 @@ bool AP_Periph_FW::shouldAcceptTransfer(const CanardInstance* canard_instance,
 #ifdef HAL_PERIPH_ENABLE_RELAY
     case UAVCAN_EQUIPMENT_HARDPOINT_COMMAND_ID:
         *out_data_type_signature = UAVCAN_EQUIPMENT_HARDPOINT_COMMAND_SIGNATURE;
+        return true;
+#endif
+#if AP_PERIPH_RTC_GLOBALTIME_ENABLED
+    case DRONECAN_PROTOCOL_GLOBALTIME_ID:
+        *out_data_type_signature = DRONECAN_PROTOCOL_GLOBALTIME_SIGNATURE;
         return true;
 #endif
     default:
