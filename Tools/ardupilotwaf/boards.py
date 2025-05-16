@@ -921,6 +921,8 @@ class sitl_periph(sitl):
             HAL_SUPPORT_RCOUT_SERIAL = 0,
             AP_TERRAIN_AVAILABLE = 0,
             AP_CUSTOMROTATIONS_ENABLED = 0,
+            AP_PERIPH_RTC_GLOBALTIME_ENABLED = 0,
+            AP_PERIPH_BATTERY_TAG_ENABLED = 0,
         )
 
         try:
@@ -982,6 +984,25 @@ class sitl_periph_battmon(sitl_periph):
             HAL_PERIPH_ENABLE_BATTERY = 1,
         )
 
+class sitl_periph_battery_tag(sitl_periph):
+    def configure_env(self, cfg, env):
+        cfg.env.AP_PERIPH = 1
+        super(sitl_periph_battery_tag, self).configure_env(cfg, env)
+        env.DEFINES.update(
+            HAL_BUILD_AP_PERIPH = 1,
+            PERIPH_FW = 1,
+            CAN_APP_NODE_NAME = '"org.ardupilot.battery_tag"',
+            APJ_BOARD_ID = 101,
+
+            AP_SIM_PARAM_ENABLED = 0,
+            AP_KDECAN_ENABLED = 0,
+            AP_TEMPERATURE_SENSOR_ENABLED = 0,
+            AP_PERIPH_BATTERY_TAG_ENABLED = 1,
+            AP_RTC_ENABLED = 1,
+            AP_PERIPH_RTC_ENABLED = 1,
+            AP_PERIPH_RTC_GLOBALTIME_ENABLED = 1,
+        )
+        
 class esp32(Board):
     abstract = True
     toolchain = 'xtensa-esp32-elf'
