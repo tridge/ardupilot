@@ -156,6 +156,10 @@
 #define AP_RELAY_ENABLED 0
 #endif
 
+#ifndef AP_PERIPH_BATTERY_TAG_ENABLED
+#define AP_PERIPH_BATTERY_TAG_ENABLED 0
+#endif
+
 /*
  * GPS Backends - we selectively turn backends on.
  *   Note also that f103-GPS explicitly disables some of these backends.
