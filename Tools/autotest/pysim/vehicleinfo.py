@@ -80,6 +80,11 @@ class VehicleInfo(object):
                     "default_params/copter-octaquad-cwx.parm"
                 ],
             },
+            "octa-quadr": {
+                "waf_target": "bin/arducopter",
+                "default_params_filename": ["default_params/copter.parm",
+                                            "default_params/copter-octaquadr.parm" ],
+            },
             "octa-quad": {
                 "waf_target": "bin/arducopter",
                 "default_params_filename": ["default_params/copter.parm",
@@ -441,6 +446,3 @@ class VehicleInfo(object):
             ret["waf_target"] = opts.build_target
 
         return ret
-
-
-
