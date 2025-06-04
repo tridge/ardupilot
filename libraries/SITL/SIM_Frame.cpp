@@ -177,6 +177,18 @@ static Motor octa_quad_motors[] =
     Motor(AP_MOTORS_MOT_8, -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  6)
 };
 
+static Motor octa_quadr_motors[] =
+{
+    Motor(AP_MOTORS_MOT_1,   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 1),
+    Motor(AP_MOTORS_MOT_2,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  7),
+    Motor(AP_MOTORS_MOT_3, -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 5),
+    Motor(AP_MOTORS_MOT_4,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  3),
+    Motor(AP_MOTORS_MOT_5,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 8),
+    Motor(AP_MOTORS_MOT_6,   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  2),
+    Motor(AP_MOTORS_MOT_7,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 4),
+    Motor(AP_MOTORS_MOT_8, -135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW,  6)
+};
+
 static Motor octa_quad_cw_x_motors[] =
 {
     Motor(AP_MOTORS_MOT_1,   45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 1),
@@ -299,6 +311,7 @@ static Frame supported_frames[] =
     Frame("octa-cwx",  8, octa_cw_x_motors),
     Frame("octa-dji",  8, octa_dji_x_motors),
     Frame("octa-quad-cwx",8, octa_quad_cw_x_motors),
+    Frame("octa-quadr", 8, octa_quadr_motors),
     Frame("octa-quad", 8, octa_quad_motors),
     Frame("octa",      8, octa_motors),
     Frame("deca",     10, deca_motors),
