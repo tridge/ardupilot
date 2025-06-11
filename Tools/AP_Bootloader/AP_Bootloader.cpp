@@ -74,10 +74,6 @@ int main(void)
 
     flash_init();
 
-#if defined(STM32H7) && CH_CFG_USE_HEAP
-    check_ecc_errors();
-#endif
-    
 #ifdef STM32F427xx
     if (BOARD_FLASH_SIZE > 1024 && check_limit_flash_1M()) {
         board_info.fw_size = (1024 - (FLASH_BOOTLOADER_LOAD_KB + APP_START_OFFSET_KB))*1024;
@@ -210,6 +206,11 @@ int main(void)
 #if defined(BOOTLOADER_DEV_LIST)
     init_uarts();
 #endif
+
+#if defined(STM32H7) && CH_CFG_USE_HEAP
+    check_ecc_errors();
+#endif
+
 #if HAL_USE_CAN == TRUE || HAL_NUM_CAN_IFACES
     can_start();
 #endif

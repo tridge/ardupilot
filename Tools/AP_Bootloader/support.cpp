@@ -20,7 +20,7 @@
 #include "mcu_l4.h"
 
 // optional uprintf() code for debug
-// #define BOOTLOADER_DEBUG SD1
+#define BOOTLOADER_DEBUG SDU1
 
 #ifndef AP_BOOTLOADER_ALWAYS_ERASE
 #define AP_BOOTLOADER_ALWAYS_ERASE 0
@@ -335,14 +335,7 @@ void uprintf(const char *fmt, ...)
 {
 #ifdef BOOTLOADER_DEBUG
     va_list ap;
-    static bool initialised;
-    static SerialConfig debug_sercfg;
     char umsg[200];
-    if (!initialised) {
-        initialised = true;
-        debug_sercfg.speed = 57600;
-        sdStart(&BOOTLOADER_DEBUG, &debug_sercfg);
-    }
     va_start(ap, fmt);
     uint32_t n = vsnprintf(umsg, sizeof(umsg), fmt, ap);
     va_end(ap);
@@ -564,6 +557,14 @@ void check_ecc_errors(void)
     }
     uint32_t ofs = 0;
     while (ofs < BOARD_FLASH_SIZE*1024) {
+        memset(buf, 0xAA, ECC_CHECK_CHUNK_SIZE);
+        stm32_cacheBufferFlush(buf, ECC_CHECK_CHUNK_SIZE);
+        dmaStartMemCopy(dma,
+                        STM32_DMA_CR_PL(0) | STM32_DMA_CR_PSIZE_BYTE |
+                        STM32_DMA_CR_MSIZE_BYTE,
+                        ofs+(uint8_t*)FLASH_BASE, buf, ECC_CHECK_CHUNK_SIZE);
+        dmaWaitCompletion(dma);
+        stm32_cacheBufferInvalidate(buf, ECC_CHECK_CHUNK_SIZE);
         if (FLASH->SR1 & (FLASH_SR_SNECCERR | FLASH_SR_DBECCERR)) {
             break;
         }
@@ -572,22 +573,28 @@ void check_ecc_errors(void)
             break;
         }
 #endif
-        dmaStartMemCopy(dma,
-                        STM32_DMA_CR_PL(0) | STM32_DMA_CR_PSIZE_BYTE |
-                        STM32_DMA_CR_MSIZE_BYTE,
-                        ofs+(uint8_t*)FLASH_BASE, buf, ECC_CHECK_CHUNK_SIZE);
-        dmaWaitCompletion(dma);
         ofs += ECC_CHECK_CHUNK_SIZE;
     }
+    const uint32_t SR1 = FLASH->SR1;
+    const uint32_t SR2 = FLASH->SR2;
     dmaStreamFree(dma);
-    
+
     if (ofs < BOARD_FLASH_SIZE*1024) {
-        // we must have ECC errors in flash
-        flash_set_keep_unlocked(true);
-        for (uint32_t i=0; i<num_pages; i++) {
-            stm32_flash_erasepage(flash_base_page+i);
+        // clear fault before we re-enable IRQ
+        SCB->CFSR |= SCB_CFSR_PRECISERR_Msk;
+        SCB->CFSR |= SCB_CFSR_BFARVALID_Msk;
+        __enable_fault_irq();
+        while (true) {
+            uprintf("ECC error! ofs=0x%08x SR1=0x%08x SR2=0x%08x\r\n", unsigned(ofs), unsigned(SR1), unsigned(SR2));
+            for (uint8_t i=0; i<4; i++) {
+                uprintf("ECC: 0x%08x: ", unsigned(ofs) + i*8*sizeof(uint32_t));
+                for (uint8_t j=0; j<8; j++) {
+                    uprintf("0x%08x ", unsigned(buf[i*8+j]));
+                }
+                uprintf("\r\n");
+            }
+            thread_sleep_ms(1000);
         }
-        flash_set_keep_unlocked(false);
     }
     __enable_fault_irq();
 }
