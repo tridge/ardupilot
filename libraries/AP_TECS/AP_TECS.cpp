@@ -977,7 +977,7 @@ void AP_TECS::_update_pitch(void)
     if (_options & STRONG_UNDERSPEED_PROTECTION) {
         // If airspeed drops, increase speed weight to prevent underspeed which will prevent
         // the vehicle raising the nose and stalling when trying to gain height if flying slowly.
-        const float weight_min = linear_interpolate(_SKE_weighting, 2.0f, _TAS_state, _TASmax, _TASmin);
+        const float weight_min = linear_interpolate(_SKE_weighting, 2.0f, MIN(_TAS_state, _TAS_dem_adj), _TASmin * 1.3f, _TASmin);
         const float coef = _DT / (_DT + timeConstant());
         _SKE_weight_min = MIN(_SKE_weight_min * (1.0f - coef) + weight_min * coef, weight_min);
         _SKE_weighting = MAX(_SKE_weighting, _SKE_weight_min);
