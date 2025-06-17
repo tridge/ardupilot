@@ -213,7 +213,8 @@ private:
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
-        OPTION_DESCENT_SPEEDUP=(1<<1)
+        OPTION_DESCENT_SPEEDUP=(1<<1),
+        STRONG_UNDERSPEED_PROTECTION = (1<<2),
     };
 
     AP_Float _pitch_ff_v0;
@@ -437,6 +438,8 @@ private:
     bool _flag_have_reset_after_takeoff;
 
     float _SKE_weighting;
+
+    float _SKE_weight_min;
 
     AP_Int8 _use_synthetic_airspeed;
     

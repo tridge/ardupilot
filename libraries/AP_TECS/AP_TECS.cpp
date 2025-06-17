@@ -246,7 +246,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
     // @Description: This allows the enabling of special features in the speed/height controller.
-    // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup
+    // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup,2:StrongUnderSpeedProtection
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
 
@@ -973,6 +973,16 @@ void AP_TECS::_update_pitch(void)
     // A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
     // rises above the demanded value, the pitch angle will be increased by the TECS controller.
     _SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
+
+    if (_options & STRONG_UNDERSPEED_PROTECTION) {
+        // If airspeed drops, increase speed weight to prevent underspeed which will prevent
+        // the vehicle raising the nose and stalling when trying to gain height if flying slowly.
+        const float weight_min = linear_interpolate(_SKE_weighting, 2.0f, _TAS_state, _TASmax, _TASmin);
+        const float coef = _DT / (_DT + timeConstant());
+        _SKE_weight_min = MIN(_SKE_weight_min * (1.0f - coef) + weight_min * coef, weight_min);
+        _SKE_weighting = MAX(_SKE_weighting, _SKE_weight_min);
+    }
+
     if (!(_ahrs.using_airspeed_sensor() || _use_synthetic_airspeed)) {
         _SKE_weighting = 0.0f;
     } else if (_flight_stage == AP_FixedWing::FlightStage::VTOL) {
@@ -1147,6 +1157,7 @@ void AP_TECS::_initialise_states(float hgt_afe)
 
     if (_DT > 0.2f || _need_reset) {
         _SKE_weighting        = 1.0f;
+        _SKE_weight_min       = 1.0f;
         _integTHR_state       = 0.0f;
         _integSEBdot          = 0.0f;
         _integKE              = 0.0f;
