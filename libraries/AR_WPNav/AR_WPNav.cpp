@@ -234,9 +234,24 @@ bool AR_WPNav::set_desired_location(const Location& destination, Location next_d
     // convert origin and destination to offset from EKF origin
     Vector2f origin_NE;
     Vector2f destination_NE;
-    if (!_origin.get_vector_xy_from_origin_NE_cm(origin_NE) ||
-        !_destination.get_vector_xy_from_origin_NE_cm(destination_NE)) {
+    if (!_origin.get_vector_xy_from_origin_NE_cm(origin_NE)) {
+#if 0
+        GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "%d %d %d",
+                      int(_origin.lat),
+                      int(_origin.lng),
+                      int(_origin.alt));
+        //INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+#endif
+        return false;
+    }
+    if (!_destination.get_vector_xy_from_origin_NE_cm(destination_NE)) {
+#if 0
+        GCS_SEND_TEXT(MAV_SEVERITY_CRITICAL, "%d %d %d",
+                      int(_destination.lat),
+                      int(_destination.lng),
+                      int(_destination.alt));
         INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
+#endif
         return false;
     }
     origin_NE *= 0.01f;
