@@ -760,7 +760,7 @@ def start_vehicle(binary, opts, stuff, spawns=None):
     if opts.strace:
         cmd_name += " (strace)"
         cmd.append("strace")
-        strace_options = ['-o', binary + '.strace', '-s', '8000', '-ttt']
+        strace_options = ['-o', binary + '.strace', '-f', '-s', '8000', '-ttt']
         cmd.extend(strace_options)
 
     cmd.append(binary)
