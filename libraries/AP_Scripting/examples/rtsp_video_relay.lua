@@ -7,10 +7,10 @@
 -- ==== Defaults you can override via parameters ====
 local RTSP_PATH      = "/0/SUB"     -- default to H.264 substream
 local RTSP_USER      = "user1"
-local RTSP_PASSWORD  = "yyy"
+local RTSP_PASSWORD  = "Samba123"
 
 local MEDIAMTX_PUBLISH_USER = "publisher"
-local MEDIAMTX_PUBLISH_PASS = "xxx"
+local MEDIAMTX_PUBLISH_PASS = "publish123"
 
 local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTICE=5, INFO=6, DEBUG=7}
 
