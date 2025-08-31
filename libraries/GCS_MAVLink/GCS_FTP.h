@@ -11,7 +11,7 @@
 #include "GCS.h"
 
 #ifndef AP_MAVLINK_FTP_MAX_SESSIONS
-#define AP_MAVLINK_FTP_MAX_SESSIONS 5
+#define AP_MAVLINK_FTP_MAX_SESSIONS 20
 #endif
 
 class GCS_FTP {
