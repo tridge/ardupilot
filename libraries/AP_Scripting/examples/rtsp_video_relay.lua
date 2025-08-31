@@ -16,6 +16,27 @@ local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTI
 
 -- convenient CRLF
 local CRLF = string.char(13,10)
+-- Camera SDP info (used when ANNOUNCEing to MediaMTX)
+local cam_pt = 96        -- default dynamic PT for H264
+local cam_fmtp = nil     -- e.g., sprop-parameter-sets, packetization-mode, profile-level-id
+-- Sanitize H264 sprop-parameter-sets: pad Base64 parts to multiple of 4 chars
+function _b64pad(s)
+   local r = #s % 4
+   if r ~= 0 then s = s .. string.rep('=', 4 - r) end
+   return s
+end
+function sanitize_fmtp_sprop(fmtp)
+   if not fmtp then return fmtp end
+   local sprop = fmtp:match('sprop%-parameter%-sets=([^;]+)')
+   if not sprop then return fmtp end
+   local p1, p2 = sprop:match('^([^,]+),([^,]+)')
+   if not (p1 and p2) then return fmtp end
+   p1 = _b64pad((p1:gsub('%s','')))
+   p2 = _b64pad((p2:gsub('%s','')))
+   local fixed = 'sprop-parameter-sets=' .. p1 .. ',' .. p2
+   fmtp = fmtp:gsub('sprop%-parameter%-sets=[^;]+', fixed)
+   return fmtp
+end
 
 local MAX_BUFFER = 200000
 
@@ -433,6 +454,21 @@ local function cam_update()
                cseq_cam=cseq_cam+1
                cam_state='DESCRIBE'
             elseif cam_state=='DESCRIBE' then
+               -- Parse camera SDP to obtain H264 payload type and fmtp, using CRLF boundaries
+               do
+                  local sdp = m.body or ''
+                  local pt = sdp:match('a=rtpmap:(%d+)%s+H264/%d+')
+                  if pt then cam_pt = tonumber(pt) or cam_pt end
+                  local pre = 'a=fmtp:' .. tostring(cam_pt)
+                  local i = sdp:find(pre, 1, true)
+                  if i then
+                     local j = sdp:find(CRLF, i, true)
+                     local line
+                     if j then line = sdp:sub(i, j - #CRLF) else line = sdp:sub(i) end
+                     local params = line:match('a=fmtp:%d+%s+(.+)')
+                     if params then cam_fmtp = params end
+                  end
+               end
                rtsp_send(cam_rtsp,'SETUP',cam_uri(),cseq_cam,{cam_auth(),'User-Agent: ArduPilot-Lua','Transport: RTP/AVP/TCP;unicast;interleaved=0-1'})
                cseq_cam=cseq_cam+1
                cam_state='SETUP'
@@ -492,17 +528,24 @@ local function mtx_auth()
 end
 
 local function announce_sdp_h264()
-   -- Minimal H264 SDP
-   return table.concat({
-         'v=0',
-         'o=- 0 0 IN IP4 0.0.0.0',
-         's=Relay Stream',
-         'c=IN IP4 0.0.0.0',
-         't=0 0',
-         'm=video 0 RTP/AVP 96',
-         'a=rtpmap:96 H264/90000',
-         'a=control:trackID=0'
-                       }, CRLF) .. CRLF
+   -- Build ANNOUNCE SDP from the camera SDP (fast start; always join with CRLF)
+   local pt = cam_pt or 96
+   local lines = {
+      'v=0',
+      'o=- 0 0 IN IP4 0.0.0.0',
+      's=Relay Stream',
+      'c=IN IP4 0.0.0.0',
+      't=0 0',
+      ('m=video 0 RTP/AVP %d'):format(pt),
+      ('a=rtpmap:%d H264/90000'):format(pt),
+      'a=control:trackID=0'
+   }
+   if cam_fmtp and #cam_fmtp > 0 then
+      local fmtp = sanitize_fmtp_sprop(cam_fmtp)
+      lines[#lines+1] = ('a=fmtp:%d %s'):format(pt, fmtp)
+   end
+   return table.concat(lines, CRLF) .. CRLF
+
 end
 
 --[[
