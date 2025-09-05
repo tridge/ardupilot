@@ -312,7 +312,7 @@ local function socket_wrapper(sockname)
      end
      local ret = sock:recv(n)
      if not ret or #ret <= 0 then
-        gcs:send_text(MAV_SEVERITY.INFO, string.format("%s: EOF read", name))
+        gcs:send_text(MAV_SEVERITY.INFO, string.format("%s: EOF read %d", name, n))
         self:close()
         return nil
      end
@@ -443,7 +443,7 @@ local function cam_update()
       return
    end
 
-   local chunk = cam_rtsp:recv(8192); if chunk and #chunk>0 then cam_ibuf = cam_ibuf..chunk end
+   local chunk = cam_rtsp:recv(4096); if chunk and #chunk>0 then cam_ibuf = cam_ibuf..chunk end
    local msgs; msgs, cam_ibuf = read_messages(cam_ibuf)
    for i=1,#msgs do
       local m=msgs[i]
