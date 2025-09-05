@@ -1259,7 +1259,14 @@ local function step_CONNECTED()
             if #cmux.buffers[DLC_AT] > 0 then
                 last_parse_ms = now_ms
                 --gcs:send_text(MAV_SEVERITY.INFO, string.format("AT reply %d", #cmux.buffers[DLC_AT]))
-                handle_AT_reply(cmux.buffers[DLC_AT])
+                --[[
+                    the parsing of AT command replies involves complex strings that may trigger an exception
+                    avoid killing the link when this happens
+                --]]
+                ok, res = pcall(handle_AT_reply, cmux.buffers[DLC_AT])
+                if not ok then
+                    gcs:send_text(MAV_SEVERITY.ERROR, 'LTE_modem AT: ' .. tostring(res))
+                end
                 cmux.buffers[DLC_AT] = ""
             end
             if #cmux.buffers[DLC_DATA] > 0 then
