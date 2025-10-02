@@ -1,2 +1,7 @@
 
 include ../CubeOrange/hwdef-bl.dat
+
+undef PE13
+undef PE11
+PE13 AUX2 OUTPUT LOW PULLDOWN GPIO(51)
+PE11 AUX3 OUTPUT LOW PULLDOWN GPIO(52)
