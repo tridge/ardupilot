@@ -62,6 +62,11 @@ const AP_Param::GroupInfo Plane::var_info[] = {
     // @DisplayName: plane size scale factor
     // @Description: plane size scale factor
     AP_GROUPINFO("SCALE", 7, Plane, params.scale, 1),
+
+    // @Param: FRAME
+    // @DisplayName: plane frame layout
+    // @Description: plane frame layout
+    AP_GROUPINFO("FRAME", 8, Plane, params.frame, 0),
     
     AP_GROUPEND
 };
@@ -323,9 +328,28 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
  */
 void Plane::input_mixer(const struct sitl_input &input, float &aileron, float &elevator, float &throttle, float &rudder)
 {
-    aileron  = filtered_servo_angle(input, 0);
-    elevator = filtered_servo_angle(input, 1);
-    rudder   = filtered_servo_angle(input, 3);
+    FWFrameType frametype = params.frame;
+    uint8_t thr_chan = 2;
+
+    switch (frametype) {
+    case FWFrameType::STANDARD:
+    default: {
+        aileron  = filtered_servo_angle(input, 0);
+        elevator = filtered_servo_angle(input, 1);
+        rudder   = filtered_servo_angle(input, 3);
+        thr_chan = 2;
+        break;
+    }
+
+    case FWFrameType::CANARD: {
+        aileron  = (filtered_servo_angle(input, 1) + filtered_servo_angle(input, 3)) * 0.5;
+        elevator = (filtered_servo_angle(input, 2) - filtered_servo_angle(input, 0)) * 0.5;
+        rudder   = 0;
+        thr_chan = 4;
+        break;
+    }
+    }
+
     if (reverse_elevator_rudder) {
         elevator = -elevator;
         rudder = -rudder;
@@ -362,9 +386,9 @@ void Plane::input_mixer(const struct sitl_input &input, float &aileron, float &e
     //printf("Aileron: %.1f elevator: %.1f rudder: %.1f\n", aileron, elevator, rudder);
 
     if (reverse_thrust) {
-        throttle = filtered_servo_angle(input, 2);
+        throttle = filtered_servo_angle(input, thr_chan);
     } else {
-        throttle = filtered_servo_range(input, 2);
+        throttle = filtered_servo_range(input, thr_chan);
     }
 }
 

@@ -41,6 +41,11 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
+    enum class FWFrameType : uint8_t {
+        STANDARD = 0,
+        CANARD = 1,
+    };
+
 protected:
 
     struct {
@@ -51,6 +56,7 @@ protected:
         AP_Float thrust_mul;
         AP_Vector3f cog_adjust;
         AP_Float scale;
+        AP_Enum<FWFrameType> frame;
     } params;
 
     float angle_of_attack;
