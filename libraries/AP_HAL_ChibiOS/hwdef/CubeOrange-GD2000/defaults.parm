@@ -204,6 +204,7 @@ WP_RADIUS             750
 
 ########################
 # CLS200 parm overrides
+AHRS_ORIENTATION        0
 PTCH_LIM_MAX_DEG 15
 PTCH_LIM_MIN_DEG -15
 AIRSPEED_CRUISE  56.5

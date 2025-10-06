@@ -86,3 +86,4 @@ ROMFS scripts/droptest.lua ROMFS/scripts/droptest.lua
 ROMFS scripts/adc_in.lua ROMFS/scripts/adc_in.lua
 ROMFS scripts/EFI_NMEA2k.lua ROMFS/scripts/EFI_NMEA2k.lua
 ROMFS scripts/modules/NMEA_2000.lua ROMFS/scripts/modules/NMEA_2000.lua
+ROMFS scripts/telem.lua ROMFS/scripts/telem.lua
