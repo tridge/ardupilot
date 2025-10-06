@@ -39,8 +39,20 @@ public:
         return NEW_NOTHROW Plane(frame_str);
     }
 
+    static const struct AP_Param::GroupInfo var_info[];
+
 protected:
-    const float hover_throttle = 0.7f;
+
+    struct {
+        AP_Float mass;
+        AP_Float hover_throttle;
+        AP_Float lift_mul;
+        AP_Float drag_mul;
+        AP_Float thrust_mul;
+        AP_Vector3f cog_adjust;
+        AP_Float scale;
+    } params;
+
     float angle_of_attack;
     float beta;
 

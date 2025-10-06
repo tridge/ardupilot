@@ -24,28 +24,71 @@
 
 using namespace SITL;
 
+// SITL plane parameters
+const AP_Param::GroupInfo Plane::var_info[] = {
+
+    // @Param: MASS
+    // @DisplayName: plane mass
+    // @Description: plane mass
+    // @Units: kg
+    AP_GROUPINFO("MASS", 1, Plane, params.mass, 2),
+
+    // @Param: HV_THR
+    // @DisplayName: plane hover throttle
+    // @Description: plane hover throttle
+    AP_GROUPINFO("HV_THR", 2, Plane, params.hover_throttle, 0.7),
+
+    // @Param: LIFT_MUL
+    // @DisplayName: plane lift multiplier
+    // @Description: plane lift multiplier
+    AP_GROUPINFO("LIFT_MUL", 3, Plane, params.lift_mul, 1.0),
+
+    // @Param: DRAG_MUL
+    // @DisplayName: plane drag multiplier
+    // @Description: plane drag multiplier
+    AP_GROUPINFO("DRAG_MUL", 4, Plane, params.drag_mul, 1.0),
+
+    // @Param: THST_MUL
+    // @DisplayName: plane thrust multiplier
+    // @Description: plane thrust multiplier
+    AP_GROUPINFO("THST_MUL", 5, Plane, params.thrust_mul, 1.0),
+
+    // @Param: CG_OF
+    // @DisplayName: plane CoG adjustment
+    // @Description: plane CoG adjustment
+    AP_GROUPINFO("CG_OF", 6, Plane, params.cog_adjust, 0),
+
+    // @Param: SCALE
+    // @DisplayName: plane size scale factor
+    // @Description: plane size scale factor
+    AP_GROUPINFO("SCALE", 7, Plane, params.scale, 1),
+    
+    AP_GROUPEND
+};
+
 Plane::Plane(const char *frame_str) :
     Aircraft(frame_str)
 {
-    mass = 2.0f;
+    AP::sitl()->models.plane_ptr = this;
+    AP_Param::setup_object_defaults(this, var_info);
 
     /*
        scaling from motor power to Newtons. Allows the plane to hold
        vertically against gravity when the motor is at hover_throttle
     */
-    thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
+    thrust_scale = (params.mass * GRAVITY_MSS) / params.hover_throttle;
     frame_height = 0.1f;
 
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
     lock_step_scheduled = true;
 
     if (strstr(frame_str, "-heavy")) {
-        mass = 8;
+        params.mass.set(8);
     }
     if (strstr(frame_str, "-jet")) {
         // a 22kg "jet", level top speed is 102m/s
-        mass = 22;
-        thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
+        params.mass.set(22);
+        thrust_scale = (params.mass * GRAVITY_MSS) / params.hover_throttle;
     }
     if (strstr(frame_str, "-revthrust")) {
         reverse_thrust = true;
@@ -99,7 +142,7 @@ Plane::Plane(const char *frame_str) :
     }
 
     if (strstr(frame_str, "-soaring")) {
-        mass = 2.0;
+        params.mass.set(2.0);
         coefficient.c_drag_p = 0.05;
     }
 }
@@ -128,13 +171,14 @@ float Plane::liftCoeff(float alpha) const
 	double flatPlate = sigmoid*(2*copysign(1,alpha)*pow(sin(alpha),2)*cos(alpha)); //Lift beyond stall
 
 	float result  = linear+flatPlate;
-	return result;
+
+    return result * params.lift_mul;
 }
 
 float Plane::dragCoeff(float alpha) const
 {
-    const float b = coefficient.b;
-    const float s = coefficient.s;
+    const float b = coefficient.b * params.scale;
+    const float s = coefficient.s * params.scale;
     const float c_drag_p = coefficient.c_drag_p;
     const float c_lift_0 = coefficient.c_lift_0;
     const float c_lift_a0 = coefficient.c_lift_a;
@@ -143,7 +187,7 @@ float Plane::dragCoeff(float alpha) const
 	double AR = pow(b,2)/s;
 	double c_drag_a = c_drag_p + pow(c_lift_0+c_lift_a0*alpha,2)/(M_PI*oswald*AR);
 
-	return c_drag_a;
+    return c_drag_a * params.drag_mul;
 }
 
 // Torque calculation function
@@ -164,9 +208,9 @@ Vector3f Plane::getTorque(float inputAileron, float inputElevator, float inputRu
         alpha *= constrain_float(1 - inputThrust, 0, 1);
     }
     
-    const float s = coefficient.s;
-    const float c = coefficient.c;
-    const float b = coefficient.b;
+    const float s = coefficient.s * params.scale;
+    const float c = coefficient.c * params.scale;
+    const float b = coefficient.b * params.scale;
     const float c_l_0 = coefficient.c_l_0;
     const float c_l_b = coefficient.c_l_b;
     const float c_l_p = coefficient.c_l_p;
@@ -183,7 +227,9 @@ Vector3f Plane::getTorque(float inputAileron, float inputElevator, float inputRu
     const float c_n_r = coefficient.c_n_r;
     const float c_n_deltaa = coefficient.c_n_deltaa;
     const float c_n_deltar = coefficient.c_n_deltar;
-    const Vector3f &CGOffset = coefficient.CGOffset;
+    Vector3f CGOffset = coefficient.CGOffset;
+
+    CGOffset += params.cog_adjust;
     
     float rho = air_density;
 
@@ -223,9 +269,9 @@ Vector3f Plane::getForce(float inputAileron, float inputElevator, float inputRud
     const float alpha = angle_of_attack;
     const float c_drag_q = coefficient.c_drag_q;
     const float c_lift_q = coefficient.c_lift_q;
-    const float s = coefficient.s;
-    const float c = coefficient.c;
-    const float b = coefficient.b;
+    const float s = coefficient.s * params.scale;
+    const float c = coefficient.c * params.scale;
+    const float b = coefficient.b * params.scale;
     const float c_drag_deltae = coefficient.c_drag_deltae;
     const float c_lift_deltae = coefficient.c_lift_deltae;
     const float c_y_0 = coefficient.c_y_0;
@@ -336,6 +382,8 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         thrust = icengine.update(input);
     }
 
+    thrust *= params.thrust_mul;
+
     // calculate angle of attack
     angle_of_attack = atan2f(velocity_air_bf.z, velocity_air_bf.x);
     beta = atan2f(velocity_air_bf.y,velocity_air_bf.x);
@@ -363,8 +411,8 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
                 launch_start_ms = now;
             }
             if (now - launch_start_ms < launch_time*1000) {
-                force.x += mass * launch_accel;
-                force.z += mass * launch_accel/3;
+                force.x += params.mass * launch_accel;
+                force.z += params.mass * launch_accel/3;
             }
         } else {
             // allow reset of catapult
@@ -380,7 +428,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     thrust *= thrust_scale;
 
     accel_body = Vector3f(thrust, 0, 0) + force;
-    accel_body /= mass;
+    accel_body /= params.mass;
 
     // add some noise
     if (thrust_scale > 0) {

@@ -40,6 +40,7 @@
 #include "SIM_StratoBlimp.h"
 #include "SIM_SA_GD2000.h"
 #include "SIM_Glider.h"
+#include "SIM_Plane.h"
 #include "SIM_FlightAxis.h"
 
 extern const AP_HAL::HAL& hal;
@@ -1505,6 +1506,12 @@ const AP_Param::GroupInfo SIM::ModelParm::var_info[] = {
     // @Group: GD2K_
     // @Path: ./SIM_SA_GD2000.cpp
     AP_SUBGROUPPTR(sa_gd2000_ptr, "GD2K_",  6, SIM::ModelParm, SA_GD2000),
+#endif
+
+#if AP_SIM_PLANE_ENABLED
+    // @Group: PLN_
+    // @Path: ./SIM_Plane.cpp
+    AP_SUBGROUPPTR(plane_ptr, "PLN_",  7, SIM::ModelParm, Plane),
 #endif
 
     AP_GROUPEND

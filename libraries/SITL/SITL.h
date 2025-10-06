@@ -52,6 +52,7 @@ struct float_array {
 class StratoBlimp;
 class SA_GD2000;
 class Glider;
+class Plane;
 class FlightAxis;
 
 struct sitl_fdm {
@@ -329,6 +330,9 @@ public:
 #endif
 #if AP_SIM_GLIDER_ENABLED
         Glider *glider_ptr;
+#endif
+#if AP_SIM_PLANE_ENABLED
+        Plane *plane_ptr;
 #endif
 #if AP_SIM_SLUNGPAYLOAD_ENABLED
         SlungPayloadSim slung_payload_sim;
