@@ -56,6 +56,40 @@ NAV_WAYPOINT = 16
 NAV_LAND = 21
 DO_LAND_START = 189
 
+local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTICE=5, INFO=6, DEBUG=7}
+
+local PARAM_TABLE_KEY = 131
+local PARAM_TABLE_PREFIX = "SA_"
+
+-- bind a parameter to a variable
+function bind_param(name)
+   local p = Parameter()
+   assert(p:init(name), string.format('could not find %s parameter', name))
+   return p
+end
+
+-- add a parameter and bind it to a variable
+function bind_add_param(name, idx, default_value)
+   assert(param:add_param(PARAM_TABLE_KEY, idx, name, default_value), string.format('could not add param %s', name))
+   return bind_param(PARAM_TABLE_PREFIX .. name)
+end
+
+-- setup quicktune specific parameters
+assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 32), 'droptest: could not add param table')
+
+local SA_ENABLE = bind_add_param('ENABLE', 1, 1)
+local SA_AUTO_MISSION = bind_add_param('AUTO_MISSION', 2, 1)
+local SA_TRIG_WP = bind_add_param('TRIP_WP', 3, 2)
+
+if SA_ENABLE:get() == 0 then
+    return
+end
+
+local function auto_mission_enabled()
+    return SA_AUTO_MISSION:get() > 0
+end
+
+
 local APPROACH_DIST_MAX = 6400
 local BASE_DIST = 1390
 local STEP_RATIO = 0.5
@@ -449,8 +483,8 @@ function release_trigger()
    gcs:send_text(0, string.format("release trigger"))
    vehicle:set_mode(MODE_AUTO)
    arming:arm_force()
-   if mission:num_commands() > 2 then
-      mission:set_current_cmd(2) -- ?
+   if mission:num_commands() > SA_TRIG_WP:get() then
+       mission:set_current_cmd(SA_TRIG_WP:get())
    end
    notify:handle_rgb(0,255,0,0)
 end
@@ -508,6 +542,7 @@ function fix_WP_heights()
       end
    end
 end
+
 -- see if mission is setup for auto-creation
 function create_mission_check()
    if mission:num_commands() ~= 4 then
@@ -715,13 +750,15 @@ end
 
 -- init system
 function init()
-   button_state = button:get_button_state(button_number)
-   get_landing_AMSL()
-   get_glide_slope()
+    button_state = button:get_button_state(button_number)
+    if auto_mission_enabled() then
+        get_landing_AMSL()
+        get_glide_slope()
 
-   gcs:send_text(0, string.format("LANDING_AMSL %.1f GLIDE_SLOPE %.1f", LANDING_AMSL, GLIDE_SLOPE))
+        gcs:send_text(0, string.format("LANDING_AMSL %.1f GLIDE_SLOPE %.1f", LANDING_AMSL, GLIDE_SLOPE))
 
-   fix_WP_heights()
+        fix_WP_heights()
+    end
    done_init = true
 end
 
@@ -756,9 +793,9 @@ function update()
    if not is_SITL and rc:has_valid_input() and rc:get_pwm(8) > 1800 then
       -- disable automation
       notify:handle_rgb(255,255,255,10)
-      return
+      return true
    end
-   if create_mission_check() then
+   if auto_mission_enabled() and create_mission_check() then
       create_mission()
    end
    local t = 0.001 * millis():tofloat()
@@ -786,9 +823,11 @@ function update()
    end
 
    if t - last_mission_setup_t >= 1.0 then
-      last_mission_setup_t = t
-      get_glide_slope()
-      get_landing_AMSL()
+       last_mission_setup_t = t
+       if auto_mission_enabled() then
+           get_glide_slope()
+           get_landing_AMSL()
+       end
    end
 
    if not button_state then
@@ -799,11 +838,15 @@ function update()
    elseif t - last_mission_update_t >= 1.0 then
       last_mission_update_t = t
       notify:handle_rgb(0,255,0,0)
-      mission_update()
+      if auto_mission_enabled() then
+          mission_update()
+      end
       if release_t > 0 then
          airspeed_update(t-release_t)
       end
    end
+
+   return true
 end
 
 function set_fault_led()
@@ -826,5 +869,13 @@ function protected_wrapper()
   return protected_wrapper, 100
 end
 
+if auto_mission_enabled() then
+    gcs:send_text(MAV_SEVERITY.INFO, "droptest: AUTO_MISSION enabled")
+else
+    gcs:send_text(MAV_SEVERITY.INFO, "droptest: AUTO_MISSION DISABLED")
+end
+
 -- start running update loop
 return protected_wrapper()
+
+
