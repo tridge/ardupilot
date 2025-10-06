@@ -76,8 +76,13 @@ define AP_AIRSPEED_DRONECAN_ENABLED HAL_ENABLE_DRONECAN_DRIVERS
 define AP_MISSION_NAV_PAYLOAD_PLACE_ENABLED 0
 define AC_PAYLOAD_PLACE_ENABLED 0
 
+define HAL_QUADPLANE_ENABLED 0
+
 # disable extra camera messages
 define AP_CAMERA_INFO_FROM_SCRIPT_ENABLED 0
 define AP_MAVLINK_MSG_VIDEO_STREAM_INFORMATION_ENABLED 0
 
 ROMFS scripts/droptest.lua ROMFS/scripts/droptest.lua
+ROMFS scripts/adc_in.lua ROMFS/scripts/adc_in.lua
+ROMFS scripts/EFI_NMEA2k.lua ROMFS/scripts/EFI_NMEA2k.lua
+

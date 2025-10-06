@@ -78,8 +78,8 @@ end
 assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 32), 'droptest: could not add param table')
 
 local SA_ENABLE = bind_add_param('ENABLE', 1, 1)
-local SA_AUTO_MISSION = bind_add_param('AUTO_MISSION', 2, 1)
-local SA_TRIG_WP = bind_add_param('TRIP_WP', 3, 2)
+local SA_AUTO_MISSION = bind_add_param('AUTO_MISSION', 2, 0)
+local SA_TRIG_WP = bind_add_param('TRIP_WP', 3, 1)
 
 if SA_ENABLE:get() == 0 then
     return
