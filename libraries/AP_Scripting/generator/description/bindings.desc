@@ -1043,3 +1043,9 @@ include SITL/SITL.h depends AP_SIM_ENABLED
 singleton SITL::SIM depends AP_SIM_ENABLED
 singleton SITL::SIM rename sim
 singleton SITL::SIM method set_pose boolean uint8_t'skip_check Location Quaternion Vector3f Vector3f
+
+include AP_Airspeed/AP_Airspeed.h
+
+singleton AP_Airspeed rename airspeed
+singleton AP_Airspeed depends AP_AIRSPEED_ENABLED
+singleton AP_Airspeed method get_airspeed float uint8_t'skip_check
