@@ -112,6 +112,21 @@ local state = {}
 state.fuel_used_gallons = 0.0
 state.last_update_ms = nil
 
+--[[
+    correct temp readings for 1k resistor
+--]]
+local function correct_temp(temp_celsius)
+    -- Quadratic coefficients
+    local a = 0.107146
+    local b = -2.8503
+    local c = 46.1315
+    
+    -- Calculate: f(x) = ax² + bx + c
+    local result = a * temp_celsius * temp_celsius + b * temp_celsius + c
+    
+    return result
+end
+
 local function log_frame(frame)
    local id = frame:id()
    logger:write("CANF",'Id,DLC,FC,B0,B1,B2,B3,B4,B5,B6,B7','IBIBBBBBBBB',
@@ -168,7 +183,9 @@ local function parse_engine_param_dynamic(data)
    efi_state:intake_manifold_pressure_kpa(state.cool_press*100*0.001)
    efi_state:fuel_pressure(state.fuel_press)
    efi_state:engine_load_percent(state.eload)
-   gcs:send_named_float('N2K_TEMPF', celsiusToFahrenheit(state.temp_K*0.01-273.15))
+   local temp_C = state.temp_K*0.01-273.15
+   gcs:send_named_float('N2K_TEMPF', celsiusToFahrenheit(temp_C))
+   gcs:send_named_float('N2K_TEMPF2', celsiusToFahrenheit(correct_temp(temp_C)))
    gcs:send_named_float('N2K_VOLT', state.alt_V*0.01)
    local fuel_rate_gh = fuel_rate_cm3pm * 0.000264172 * 60
    gcs:send_named_float('FUEL_FLOW', fuel_rate_gh)
