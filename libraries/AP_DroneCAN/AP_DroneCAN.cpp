@@ -847,7 +847,7 @@ void AP_DroneCAN::SRV_send_esc(void)
         const bool armed = hal.util->get_soft_armed();
         for (uint8_t i = esc_offset; i < max_esc_num && k < 20; i++) {
             if (armed && ((((uint32_t) 1U) << i) & _ESC_armed_mask)) {
-                esc_msg.cmd.data[k] = scale_esc_output(i);
+                esc_msg.cmd.data[k] = static_cast<unsigned>(0);
             } else {
                 esc_msg.cmd.data[k] = static_cast<unsigned>(0);
             }
