@@ -100,6 +100,9 @@ function wrap_180(angle)
    if angle > 180 then
       angle = angle - 360.0
    end
+   if angle < -180 then
+      angle = angle + 360.0
+   end
    return angle
 end
 
