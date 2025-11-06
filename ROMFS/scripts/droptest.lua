@@ -55,6 +55,7 @@ DO_JUMP = 177
 NAV_WAYPOINT = 16
 NAV_LAND = 21
 DO_LAND_START = 189
+JUMP_TAG = 600
 
 local MAV_SEVERITY = {EMERGENCY=0, ALERT=1, CRITICAL=2, ERROR=3, WARNING=4, NOTICE=5, INFO=6, DEBUG=7}
 
@@ -79,6 +80,7 @@ assert(param:add_table(PARAM_TABLE_KEY, PARAM_TABLE_PREFIX, 32), 'droptest: coul
 
 local SA_ENABLE = bind_add_param('ENABLE', 1, 1)
 local SA_AUTO_MISSION = bind_add_param('AUTO_MISSION', 2, 0)
+local SA_AUTO_SELECT = bind_add_param('AUTO_SELECT', 4, 0)
 local SA_TRIG_WP = bind_add_param('TRIP_WP', 3, 1)
 
 if SA_ENABLE:get() == 0 then
@@ -89,6 +91,9 @@ local function auto_mission_enabled()
     return SA_AUTO_MISSION:get() > 0
 end
 
+local function auto_select_enabled()
+    return auto_mission_enabled() or SA_AUTO_SELECT:get() > 0
+end
 
 local APPROACH_DIST_MAX = 6400
 local BASE_DIST = 1390
@@ -177,8 +182,12 @@ end
 
 function resolve_jump(i)
    local m = mission:get_item(i)
-   while m:command() == DO_JUMP do
-      i = math.floor(m:param1())
+   while m:command() == DO_JUMP or m:command() == JUMP_TAG do
+      if m:command() == DO_JUMP then
+         i = math.floor(m:param1())
+      elseif m:command() == JUMP_TAG then
+         i = i+1
+      end
       m = mission:get_item(i)
    end
    return i
@@ -186,17 +195,8 @@ end
 
 -- return true if cnum is a candidate for wp selection
 function is_candidate(cnum)
-   local N = mission:num_commands()
-   if cnum > N-3 then
-      return false
-   end
-   m = mission:get_item(cnum)
-   m2 = mission:get_item(cnum+1)
-   m3 = mission:get_item(cnum+2)
-   if m:command() == NAV_WAYPOINT and m2:command() == NAV_WAYPOINT and (m3:command() == DO_JUMP or m3:command() == NAV_WAYPOINT or m3:command() == NAV_LAND) then
-      return true
-   end
-   return false
+   local m = mission:get_item(cnum-1)
+   return m~=nil and m:command()==JUMP_TAG
 end
 
 
@@ -339,21 +339,23 @@ function distance_to_land_nopos(cnum)
 
       local d1 = loc1:get_distance(loc2)
 
-      distance = distance + d1
+      if d1 > 1 then
+         distance = distance + d1
+         
+         -- gcs:send_text(0, string.format("WP%u->WP%u d=%.0f dist=%.0f", i, i2, d1, distance))
 
-      -- gcs:send_text(0, string.format("WP%u->WP%u d=%.0f dist=%.0f", i, i2, d1, distance))
-
-      -- account for height lost in turns
-      local bearing = wrap_180(math.deg(loc1:get_bearing(loc2)))
-      if i == cnum then
+         -- account for height lost in turns
+         local bearing = wrap_180(math.deg(loc1:get_bearing(loc2)))
+         if i == cnum then
+            last_bearing = bearing
+         end
+         local bearing_change = math.abs(wrap_180(bearing - last_bearing))
          last_bearing = bearing
-      end
-      local bearing_change = math.abs(wrap_180(bearing - last_bearing))
-      last_bearing = bearing
-      distance = distance + turn_adjustment(bearing_change)
+         distance = distance + turn_adjustment(bearing_change)
 
-      -- account for wind
-      distance = distance + wind_adjustment(loc1, loc2)
+         -- account for wind
+         distance = distance + wind_adjustment(loc1, loc2)
+      end
 
       i = i2
    end
@@ -661,6 +663,8 @@ function create_pattern(wp, basepos, angle, base_angle, runway_length)
       loc = Location()
       wp_add(loc,DO_JUMP,jump_target,-1)
 
+      wp_add(loc,JUMP_TAG,0,0)
+
       loc = loc_copy(basepos)
       loc:offset_bearing(angle,APPROACH_DIST_MAX - step*i)
       loc:offset_bearing(base_angle,BASE_DIST)
@@ -827,7 +831,7 @@ function update()
 
    if t - last_mission_setup_t >= 1.0 then
        last_mission_setup_t = t
-       if auto_mission_enabled() then
+       if auto_select_enabled() then
            get_glide_slope()
            get_landing_AMSL()
        end
@@ -841,7 +845,7 @@ function update()
    elseif t - last_mission_update_t >= 1.0 then
       last_mission_update_t = t
       notify:handle_rgb(0,255,0,0)
-      if auto_mission_enabled() then
+      if auto_select_enabled() then
           mission_update()
       end
       if release_t > 0 then
