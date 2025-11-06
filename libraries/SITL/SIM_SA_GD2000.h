@@ -52,6 +52,8 @@ private:
     struct {
         AP_Float mass;
         AP_Float launch_alt;
+        AP_Float launch_vel;
+        AP_Float launch_dir;
     } params;
 
     /*

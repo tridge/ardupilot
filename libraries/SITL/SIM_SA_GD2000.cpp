@@ -42,6 +42,18 @@ const AP_Param::GroupInfo SA_GD2000::var_info[] = {
     // @Units: m
     AP_GROUPINFO("ALT",     2, SA_GD2000,  params.launch_alt, 3810), // 3810m == 12500 ft
 
+    // @Param: VEL
+    // @DisplayName: launch velocity
+    // @Description: launch velocity
+    // @Units: m/s
+    AP_GROUPINFO("VEL",     3, SA_GD2000,  params.launch_vel, 10),
+
+    // @Param: DIR
+    // @DisplayName: launch direction
+    // @Description: launch direction
+    // @Units: degrees
+    AP_GROUPINFO("DIR",     4, SA_GD2000,  params.launch_dir, 0),
+
     AP_GROUPEND
 };
 
@@ -90,7 +102,8 @@ void SA_GD2000::update(const struct sitl_input &input)
     if (!has_launched) {
         // we're in a pre-launch state cruising in the launch vehicle (like a C-130)
         position.z = -1 * params.launch_alt; // 3810 == 12500ft 
-        velocity_ef.x = 10;
+        velocity_ef.x = cos(radians(params.launch_dir)) * params.launch_vel;
+        velocity_ef.y = sin(radians(params.launch_dir)) * params.launch_vel;
 
         if (hal.util->get_soft_armed()) {
             has_launched = true;
