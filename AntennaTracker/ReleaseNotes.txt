@@ -1,0 +1,306 @@
+Antenna Tracker Release Notes:
+------------------------------------------------------------------
+Release 4.5.5 1st Aug 2024
+
+No changes from 4.5.5-beta2
+------------------------------------------------------------------
+Release 4.5.5-beta2 27 July 2024
+
+Changes from 4.5.5-beta1
+
+1) Board specific enhancements and bug fixes
+
+- CubeRed's second core disabled at boot to avoid spurious writes to RAM
+- CubeRed bootloader's dual endpoint update method fixed
+------------------------------------------------------------------
+Release 4.5.5-beta1 1st July 2024
+
+Changes from 4.5.4
+
+1) Board specific enhancements and bug fixes
+
+- fixed IOMCU transmission errors when using bdshot
+- update relay parameter names on various boards
+- add ASP5033 airspeed in minimal builds
+- added RadiolinkPIX6
+- fix Aocoda-RC H743Dual motor issue
+- use ICM45686 as an ICM20649 alternative in CubeRedPrimary
+
+2) System level minor enhancements and bug fixes
+
+- correct use-after-free in script statistics
+- added arming check for eeprom full
+- fixed a block logging issue which caused log messages to be dropped
+- enable Socket SO_REUSEADDR on LwIP
+- removed IST8310 overrun message
+- added Siyi ZT6 support
+- added BTFL sidebar symbols to the OSD
+- added CRSF extended link stats to the OSD
+- use the ESC with the highest RPM in the OSD when only one can be displayed
+- support all Tramp power levels on high power VTXs
+- emit jump count in missions even if no limit
+- improve the bitmask indicating persistent parameters on bootloader flash	
+- fix duplicate error condition in the MicroStrain7
+
+5) Other minor enhancements and bug fixes
+
+- specify pymonocypher version in more places
+- added DroneCAN dependencies to custom builds
+
+------------------------------------------------------------------
+Release 4.5.4 12th June 2024
+
+Changes from 4.5.3
+
+Disable highres IMU sampling on ICM42670 fixing an issue on some versions of Pixhawk6X
+
+------------------------------------------------------------------
+Release 4.5.3 28th May 2024
+
+No changes from 4.5.3-beta1
+------------------------------------------------------------------
+Release 4.5.3-beta1 16th May 2024
+
+Changes from 4.5.2
+
+1) Board specific enhancements and bug fixes
+
+- correct default GPS port on MambaH743v4
+- added SDMODELV2
+- added iFlight Blitz H7 Pro
+- added BLITZ Wing H743
+- added highres IMU sampling on Pixhawk6X
+
+2) System level minor enhancements and bug fixes
+
+- fixed rare crash bug in lua scripting on script fault handling
+- fixed Neopixel pulse proportions to work with more LED variants
+- fixed timeout in lua rangefinder drivers
+- workaround hardware issue in IST8310 compass
+- allow FIFO rate logging for highres IMU sampling
+
+------------------------------------------------------------------
+Release 4.5.2 14th May 2024
+
+No changes from 4.5.2-beta1
+------------------------------------------------------------------
+Release 4.5.2-beta1 29th April 2024
+
+Changes from 4.5.1
+
+1) Board specific enhancements and bug fixes
+
+- FoxeerF405v2 support
+- iFlight BLITZ Mini F745 support
+- Pixhawk5X, Pixhawk6C, Pixhawk6X, Durandal power peripherals immediately at startup
+
+2) System level minor enhancements and bug fixes
+
+- Camera lens (e.g. RGB, IR) can be selected from GCS or during missions using set-camera-source
+- Crashdump pre-arm check added
+- Gimbal gets improved yaw lock reporting to GCS
+- Gimbal default mode fixed (MNTx_DEFLT_MODE was being overriden by RC input)
+- RM3100 compass SPI bus speed reduced to 1Mhz
+- SBUS output fix for channels 1 to 8 also applying to 9 to 16
+- ViewPro gimbal supports enable/disable rangefinder from RC aux switch
+- Visual Odometry delay fixed (was always using 1ms delay, see VISO_DELAY_MS)
+- fixed serial passthrough to avoid data loss at high data rates
+
+3) AHRS / EKF fixes
+
+- Compass learning disabled when using GPS-for-yaw
+- GSF reset minimum speed reduced to 1m/s (except Plane which remains 5m/s)
+- MicroStrain7 External AHRS position quantization bug fix
+- MicroStrain7 init failure warning added
+- MicroStrain5 and 7 position and velocity variance reporting fix
+
+4) Other minor enhancements and bug fixes
+
+- DDS_UDP_PORT parameter renamed (was DDS_PORT)
+- Harmonic Notch bitmask parameter conversion fix (see INS_HNTCH_HMNCS)
+
+------------------------------------------------------------------
+Release 4.5.1 8th April 2024
+
+This release fixes a critical bug in the CRSF R/C protocol parser that
+can lead to a handfault and a vehicle crashing. A similar fix was
+applied to the GHST protocol, although we believe that GHST could not
+be affected by the bug, so this was just a precaution.
+
+There are no other changes in this release.
+
+------------------------------------------------------------------
+Release 4.5.0 2nd April 2024
+
+No changes from 4.5.0-beta4
+------------------------------------------------------------------
+Release 4.5.0 2nd April 2024
+
+No changes from 4.5.0-beta4
+------------------------------------------------------------------
+Release 4.5.0 2nd April 2024
+
+No changes from 4.5.0-beta4
+------------------------------------------------------------------
+Release 4.5.0 2nd April 2024
+
+No changes from 4.5.0-beta4
+------------------------------------------------------------------
+Release 4.5.0-beta4 22nd March 2024
+Changes from 4.5.0-beta3
+1) system changes
+
+- fixed a cache corruption issue with microSD card data on H7 based boards
+- rename parameter NET_ENABLED to NET_ENABLE
+- fixed FDCAN labels for adding new H7 boards
+- avoid logging dma.txt to save CPU
+- fixed roll/pitch in viewpro driver
+- added band X in VideoTX
+- fixed quaternion attitude reporting for Microstrain external AHRS
+- add RPLidarC1 proximity support
+
+2) new boards
+- added MicoAir405v2
+- add Orqa F405 Pro
+
+------------------------------------------------------------------
+AntennaTracker 4.5.0 beta3 14-Mar-2024
+Changes from 4.5.0 beta1
+
+Board specific changes
+- added PixFlamingo F7 board
+- support ICM42688 on BlitzF745AIO
+- fixed IMU orientation of CubeRedSecondary
+- enable all FPV features on SpeedyBeeF405WING
+
+System level changes
+
+- improved robustness of CRSF parser
+- reduced memory used by DDS/ROS2
+- added filesystem crc32 binding in lua scripting
+- support visual odometry quality metric and added autoswitching lua script
+- allow for expansion of fence storage to microSD for larger pologon fences
+- allow FTP upload of fence and rally points
+- fixed vehicle type of ship simulation for ship landing
+- make severity level depend on generator error level in IE 2400 generator
+- speed up initial GPS probe by using SERIALn_BAUD first
+- allow NanoRadar radar and proximity sensor to share the CAN bus
+- added MR72 CAN proximity sensor
+- only produce *_with_bl.hex not *.hex in builds if bootloader available
+- fixed check for GPS antenna separation in moving baseline yaw
+- added GPS_DRV_OPTIONS options for fully parsing RTCMv3 stream
+- fixed logging of RTCM fragments in GPS driver
+- fixed video recording while armed
+- robostness and logging improvements for ExternalAHRS
+- fixed RPM from bdshot on boards with IOMCU
+- fixed accel cal simple to remove unused IMUs
+- fixed float rounding issue in HAL_Linux millis and micros functions
+- fixed loading of defaults.parm parameters for dynamic parameter subtrees
+- fixed discrimination between GHST and CRSF protocols
+- fixed bug in DroneCAN packet parsing for corrupt packets that could cause a crash
+- fixed handling of network sockets in scripting when used after close
+- fixed bit timing of CANFD buses
+
+New Autopilots supported
+ - YJUAV_A6Ultra
+ - AnyLeaf H7
+
+- do relay parameter conversion for parachute parameters if ever has been used
+- broaden acceptance criteria for GPS yaw measurement for moving baseline yaw
+
+------------------------------------------------------------------
+AntennaTracker 4.5.0 beta1 22-Feb-2024
+Changes from 4.2.0
+1) Innumerable system-level improvements; see Copter and Plane release notes
+2) fix EKF2/EKF3 parameters
+3) improve logging
+------------------------------------------------------------------
+AntennaTracker 4.2.0 beta1 25-May-2022
+Changes from 1.1.0
+1) Many new supported boards
+2) New sensor support
+3) PID improvements
+4) Filtering improvements
+5) Integrate AP_Stats library
+6) Scripting support
+7) Logging improvements
+8) Improvements to GCS communications
+9) Option to scan before vehicle found
+10) Innumerable system-level improvements; see Copter and Plane 4.2 release notes
+------------------------------------------------------------------
+AntennaTracker 1.1.0 3-Aug-2019
+Changes from 1.1.0-rc1
+1) Instantiate battery monitor instance
+2) Correct continuous servo rotation bug
+------------------------------------------------------------------
+AntennaTracker 1.1.0-rc1 26-Apr-2019
+Changes from 1.0.0
+1) ChibiOS support including support for many new flight controllers
+2) Large numbers of architectural changes but few behavioural changes
+3) Battery monitoring enabled
+------------------------------------------------------------------
+AntennaTracker 1.0.0 28-Jul-2016
+Changes from 0.8.0
+1) Compensate for tracker tilt by converting earth-frame angle targets to body-frame servo outputs
+2) Tracker location provided by EKF (still falls back to raw GPS if EKF is unable to provide position estimate)
+3) PITCH_MIN, PITCH_MAX parameters replace PITCH_RANGE
+------------------------------------------------------------------
+AntennaTracker 0.8.0 22-Jun-2016
+Changes from 0.7.8
+1) Added PITCH2SRV_FILT, YAW2SRV_FILT added to smooth input to controllers.  Lower values lead to more delay but smoother motion.
+2) Estimate vehicle's altitude between telemetry updates when using ALT_SOURCE = GPS
+3) Bug fix to vehicle position estimate (was using vehicle's heading instead of 3D velocity vector)
+4) Added MAV_UPDATE_RATE parameter to allow more easily setting the rate the vehicle sends position data
+------------------------------------------------------------------
+AntennaTracker 0.7.8 10-Jun-2016
+Changes from 0.7.7
+1) Bug fix to VBAR dataflash logging
+2) VPOS dataflash logging message captures vehicle position
+------------------------------------------------------------------
+AntennaTracker 0.7.7 31-May-2016
+Changes from 0.7.6
+1) SERVO_TYPE parameter split into SERVO_PITCH_TYPE, SERVO_YAW_TYPE to allow different servo types for each axis
+2) ALT_SOURCE parameter added to allow selecting vehicle's GPS as an altitude source instead of vehicle's baro
+3) VBAR dataflash log message added to capture vehicle barometer data
+------------------------------------------------------------------
+AntennaTracker 0.7.6 08-Feb-2016
+Changes from 0.7.5
+1) Fix logging of attitude and mode to dataflash 
+------------------------------------------------------------------
+AntennaTracker 0.7.5 27-Dec-2015
+Changes from 0.7.4
+1) Add dataflash logging
+------------------------------------------------------------------
+AntennaTracker 0.7.4 23-Dec-2015
+Changes from 0.7.2
+1) Request baro pressure from vehicle at 1hz
+------------------------------------------------------------------
+AntennaTracker 0.7.2 1-Aug-2015
+Changes from 0.7.1
+1) Fixed Pitch
+------------------------------------------------------------------
+AntennaTracker 0.7.1 29-May-2015
+Changes from 0.7
+1) Added support for continuous rotation (CR) servos
+------------------------------------------------------------------
+AntennaTracker 0.7 17-May-2015
+Changes from 0.5 (skipped 0.6 to avoid confusion after the wrong version number was communicated on diydrones.com)
+1) added support for 4th MAVLink channel
+------------------------------------------------------------------
+AntennaTracker 0.5 29-Apr-2015
+Changes from 0.4
+1) add SERVO_TEST mode which moves the servos to the position specified by a do-set-servo command (normally from MP's extended tuning page)
+2) add DISTANCE_MIN parameter (default to 5m).  Vehicles must be at least this distance away for the tracker to track them.
+3) add SYSID_TARGET parameter to specify which vehicle to follow which is useful if multiple vehicles are sharing the same network.  This param defaults to zero which means track the first vehicle.  Set to "0" to track the first vehicle found.
+4) send request to vehicle for position updates at 1hz.  Improves reliability when used with copter which won't sent position data by default.
+5) Listens for vehicle position updates on all channels
+6) bug fix for LED on pixhawk so it flashes blue or green (instead of yellow) when waiting for he vehicle's position
+------------------------------------------------------------------
+AntennaTracker 0.4 31-Jan-2015
+Changes from 0.3
+1) Init Telem2 port so it can be used to communicate with GCS
+------------------------------------------------------------------
+AntennaTracker 0.3 28-Jan-2015
+Changes from 0.2
+1) MAVLink routing replaces Proxy mode
+------------------------------------------------------------------

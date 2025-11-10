@@ -1,0 +1,504 @@
+/*
+   Generic RGBLed driver
+*/
+
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+*/
+
+
+#include <AP_HAL/AP_HAL.h>
+#include <AP_GPS/AP_GPS.h>
+#include <AP_Logger/AP_Logger.h>
+#include "RGBLed.h"
+#include "AP_Notify.h"
+
+extern const AP_HAL::HAL& hal;
+
+RGBLed::RGBLed(uint8_t led_off, uint8_t led_bright, uint8_t led_medium, uint8_t led_dim):
+    _led_off(led_off),
+    _led_bright(led_bright),
+    _led_medium(led_medium),
+    _led_dim(led_dim)
+{
+    hold_flight_mode_fail = false;
+    hold_flight_mode_change = false;
+    hold_arming_fail = false;
+    hold_servo_low_voltage = false;
+}
+
+// set_rgb - set color as a combination of red, green and blue values
+void RGBLed::_set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (red != _red_curr ||
+        green != _green_curr ||
+        blue != _blue_curr) {
+        // call the hardware update routine
+        if (hw_set_rgb(red, green, blue)) {
+            _red_curr = red;
+            _green_curr = green;
+            _blue_curr = blue;
+        }
+    }
+}
+
+RGBLed::rgb_source_t RGBLed::rgb_source() const
+{
+    return rgb_source_t(pNotify->_rgb_led_override.get());
+}
+
+// set_rgb - set color as a combination of red, green and blue values
+void RGBLed::set_rgb(uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (rgb_source() == mavlink) {
+        // don't set if in override mode
+        return;
+    }
+    _set_rgb(red, green, blue);
+}
+
+uint8_t RGBLed::get_brightness(void) const
+{
+    uint8_t brightness = _led_bright;
+
+    switch (pNotify->_rgb_led_brightness) {
+    case RGB_LED_OFF:
+        brightness = _led_off;
+        break;
+    case RGB_LED_LOW:
+        brightness = _led_dim;
+        break;
+    case RGB_LED_MEDIUM:
+        brightness = _led_medium;
+        break;
+    case RGB_LED_HIGH:
+        brightness = _led_bright;
+        break;
+    }
+
+    // use dim light when connected through USB
+    if (hal.gpio->usb_connected() && brightness > _led_dim) {
+        brightness = _led_dim;
+    }
+    return brightness;
+}
+
+uint32_t RGBLed::get_colour_sequence_obc(void) const
+{
+    if (AP_Notify::flags.armed) {
+        return DEFINE_COLOUR_SEQUENCE_SOLID(RED);
+    }
+    return DEFINE_COLOUR_SEQUENCE_SOLID(GREEN);
+}
+
+// _scheduled_update - updates _red, _green, _blue according to notify flags
+uint32_t RGBLed::get_colour_sequence(void)
+{
+    if(AP_Notify::events.arming_failed){
+		hold_arming_fail = true;
+		hold_flight_mode_fail = false;
+		hold_flight_mode_change= false;
+		step_hold_flag = true;
+		sequence_counter = 0;
+		step_timer=0;
+	}else if(AP_Notify::events.user_mode_change_failed){
+		hold_arming_fail = false;
+		hold_flight_mode_fail = true;
+		hold_flight_mode_change= false;
+		sequence_counter = 0;
+		step_timer=0;
+		step_hold_flag = true;
+	}else if(AP_Notify::events.user_mode_change){
+		hold_arming_fail = false;
+		hold_flight_mode_fail = false;
+		hold_flight_mode_change= true;
+		sequence_counter = 0;
+		step_timer=0;
+		step_hold_flag = true;
+	}else if(AP_Notify::flags.low_servo_voltage){
+
+		hold_arming_fail = false;
+		hold_flight_mode_fail = false;
+		hold_flight_mode_change= false;
+		hold_servo_low_voltage = true;
+		sequence_counter = 0;
+		step_timer=0;
+		step_hold_flag = true;
+	}
+
+	if(!hold_arming_fail and !hold_flight_mode_fail and !hold_flight_mode_change and !hold_servo_low_voltage){
+		hold_counter = 0;
+	}else{
+
+		hold_counter++;
+
+		if(hold_counter == 50){
+			hold_counter = 0;
+			sequence_counter = 0;
+			step_timer=0;
+			hold_arming_fail = false;
+			hold_flight_mode_fail = false;
+			hold_flight_mode_change = false;
+			hold_servo_low_voltage = false;
+
+			AP_Notify::flags.low_servo_voltage = false;
+		}
+
+
+		if(hold_arming_fail){
+			return sequence_arming_failed;
+
+		}else if(hold_flight_mode_fail){
+			return sequence_flight_mode_change_fail;
+
+		}else if(hold_flight_mode_change){
+			return sequence_flight_mode_change;
+		}else if(hold_servo_low_voltage){
+			return sequence_low_servo_voltage;
+		}
+	}
+
+    // initialising pattern
+    if (AP_Notify::flags.initialising) {
+        return sequence_initialising;
+    }
+
+    // save trim or any calibration pattern
+    if (AP_Notify::flags.save_trim ||
+        AP_Notify::flags.esc_calibration ||
+        AP_Notify::flags.compass_cal_running ||
+        AP_Notify::flags.temp_cal_running) {
+        return sequence_trim_or_esc;
+    }
+
+    if (AP_Notify::flags.arming) {
+    	if(AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D){
+    		return sequence_arming_gps;
+    	}else{
+    		return sequence_arming_no_gps;
+    	}
+    }
+
+    // radio and battery failsafe patter: flash yellow
+    // gps failsafe pattern : flashing yellow and blue
+    // ekf_bad pattern : flashing yellow and red
+    if (AP_Notify::flags.failsafe_radio ||
+        AP_Notify::flags.failsafe_gcs ||
+        AP_Notify::flags.failsafe_battery ||
+        AP_Notify::flags.ekf_bad ||
+        AP_Notify::flags.gps_glitching ||
+        AP_Notify::flags.leak_detected) {
+
+        if (AP_Notify::flags.leak_detected) {
+            // purple if leak detected
+            return sequence_failsafe_leak;
+        } else if (AP_Notify::flags.ekf_bad) {
+            // red on if ekf bad
+            return sequence_failsafe_ekf;
+        } else if (AP_Notify::flags.gps_glitching) {
+            // blue on gps glitch
+            return sequence_failsafe_gps_glitching;
+        }else if(AP_Notify::flags.failsafe_radio){
+        	// white for radio failsafe
+        	return sequence_failsafe_radio;
+        }
+        //  off for battery failsafe
+        return sequence_failsafe_battery;
+    }
+
+    if(AP_Notify::flags.no_RC_in and AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D){
+        return sequence_no_RC_in_GPS;
+    }else if(AP_Notify::flags.no_RC_in){
+        return sequence_no_RC_in_no_GPS;
+    }
+
+    // solid green or blue if armed
+    if (AP_Notify::flags.armed) {
+#if AP_GPS_ENABLED
+        // solid green if armed with GPS 3d lock
+        if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D) {
+            return sequence_armed;
+        }
+#endif
+        // solid blue if armed with no GPS lock
+        return sequence_armed_nogps;
+    }
+
+    // double flash yellow if failing pre-arm checks
+    // if (!AP_Notify::flags.pre_arm_check) {
+    //     return sequence_prearm_failing;
+    // }
+#if AP_GPS_ENABLED
+    if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D_DGPS && AP_Notify::flags.pre_arm_gps_check and AP_Notify::flags.ekf_nav_good) {
+        return sequence_disarmed_good_dgps;
+    }
+
+    if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D && AP_Notify::flags.pre_arm_gps_check and AP_Notify::flags.ekf_nav_good) {
+        return sequence_disarmed_good_gps;
+    }
+#endif
+
+    return sequence_disarmed_bad_gps;
+}
+
+uint32_t RGBLed::get_colour_sequence_traffic_light(void) const
+{
+    if (AP_Notify::flags.initialising) {
+        return DEFINE_COLOUR_SEQUENCE(RED,GREEN,BLUE,RED,GREEN,BLUE,RED,GREEN,BLUE,BLACK);
+    }
+
+    if (AP_Notify::flags.armed) {
+        return DEFINE_COLOUR_SEQUENCE_SLOW(RED);
+    }
+
+    if (hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED) {
+        if (!AP_Notify::flags.pre_arm_check) {
+            return DEFINE_COLOUR_SEQUENCE_ALTERNATE(YELLOW, BLACK);
+        } else {
+            return DEFINE_COLOUR_SEQUENCE_SLOW(YELLOW);
+        }
+    }
+
+    if (!AP_Notify::flags.pre_arm_check) {
+        return DEFINE_COLOUR_SEQUENCE_ALTERNATE(GREEN, BLACK);
+    }
+    return DEFINE_COLOUR_SEQUENCE_SLOW(GREEN);
+}
+
+// update - updates led according to timed_updated.  Should be called
+// at 50Hz
+void RGBLed::update()
+{
+    uint32_t current_colour_sequence = 0;
+
+    switch (rgb_source()) {
+    case mavlink:
+        update_override();
+        return; // note this is a return not a break!
+    case standard:
+        current_colour_sequence = get_colour_sequence();
+        break;
+    case obc:
+        current_colour_sequence = get_colour_sequence_obc();
+        break;
+    case traffic_light:
+        current_colour_sequence = get_colour_sequence_traffic_light();
+        break;
+    }
+
+    const uint8_t brightness = get_brightness();
+
+    if(hold_arming_fail or hold_flight_mode_fail or hold_flight_mode_change){
+        // Action failure, intercept and stick to the same pattern for a while
+
+    	if(step_timer < 5){
+    		step_timer++;
+    		return;
+    	}else{
+    		step_timer = 0;
+    	}
+
+        const uint8_t colour = (current_colour_sequence >> (sequence_counter*3)) & 7;
+
+        _red_des_1 = (colour & RED) ? brightness : 0;
+        _green_des_1 = (colour & GREEN) ? brightness : 0;
+        _blue_des_1 = (colour & BLUE) ? brightness : 0;
+
+    _red_des_2 = (colour & RED) ? brightness : 0;
+        _green_des_2 = (colour & GREEN) ? brightness : 0;
+        _blue_des_2 = (colour & BLUE) ? brightness : 0;
+
+        sequence_counter++;
+
+        if(sequence_counter > 10){
+        	sequence_counter = 0;
+        }
+
+    } else {
+
+        uint8_t step = (AP_HAL::millis()/100) % 10;
+
+        // ensure we can't skip a step even with awful timing
+        if (step != last_step) {
+            step = (last_step+1) % 10;
+            last_step = step;
+        }
+
+        //check for failsafe so all lights can be triggered
+        bool active_warning = ( AP_Notify::flags.failsafe_radio ||
+                                AP_Notify::flags.failsafe_gcs ||
+                                AP_Notify::flags.failsafe_battery ||
+                                AP_Notify::flags.ekf_bad ||
+                                AP_Notify::flags.gps_glitching ||
+                                AP_Notify::flags.leak_detected);
+
+        if(AP_Notify::flags.armed and !active_warning){ // Force white on front
+
+            const uint8_t colour = (current_colour_sequence >> (step*3)) & 7;
+
+            _red_des_1 = (colour & WHITE) ? brightness : 0;
+            _green_des_1 = (colour & WHITE) ? brightness : 0;
+            _blue_des_1 = (colour & WHITE) ? brightness : 0;
+
+            _red_des_2 = (colour & RED) ? brightness : 0;
+            _green_des_2 = (colour & GREEN) ? brightness : 0;
+            _blue_des_2 = (colour & BLUE) ? brightness : 0;
+
+        }else if (AP_Notify::flags.arming){ // Same front and back to notify users
+
+            const uint8_t colour = (current_colour_sequence >> (step*3)) & 7;
+
+            _red_des_1 = (colour & RED) ? brightness : 0;
+            _green_des_1 = (colour & GREEN) ? brightness : 0;
+            _blue_des_1 = (colour & BLUE) ? brightness : 0;
+
+            _red_des_2 = (colour & RED) ? brightness : 0;
+            _green_des_2 = (colour & GREEN) ? brightness : 0;
+            _blue_des_2 = (colour & BLUE) ? brightness : 0;
+
+        }else if (active_warning){ // Force Yellow on front
+
+            const uint8_t colour = (current_colour_sequence >> (step*3)) & 7;
+
+            _red_des_1 = brightness;
+            _green_des_1 = brightness;
+            _blue_des_1 = 0;
+
+            _red_des_2 = (colour & RED) ? brightness : 0;
+            _green_des_2 = (colour & GREEN) ? brightness : 0;
+            _blue_des_2 = (colour & BLUE) ? brightness : 0;
+
+        }else {  // On ground, front is OFF
+            const uint8_t colour = (current_colour_sequence >> (step*3)) & 7;
+
+            _red_des_1 = (colour & BLACK) ? brightness : 0;
+            _green_des_1 = (colour & BLACK) ? brightness : 0;
+            _blue_des_1 = (colour & BLACK) ? brightness : 0;
+
+            _red_des_2 = (colour & RED) ? brightness : 0;
+            _green_des_2 = (colour & GREEN) ? brightness : 0;
+            _blue_des_2 = (colour & BLUE) ? brightness : 0;
+
+        }
+    }
+
+    set_rgb(_red_des_1, _green_des_1, _blue_des_1,_red_des_2, _green_des_2, _blue_des_2);
+
+    const uint8_t current_color = (_red_curr_1 > 0)   << 0 | // Bit 0
+                                  (_green_curr_1 > 0) << 1 | // Bit 1
+                                  (_blue_curr_1 > 0)  << 2 | // Bit 2, leaving a space intentionally
+                                  (_red_curr_2 > 0)   << 4 | // Bit 4
+                                  (_green_curr_2 > 0) << 5 | // Bit 5
+                                  (_blue_curr_2 > 0)  << 6 ; // Bit 6
+
+    AP_Logger *logger = AP_Logger::get_singleton();
+    logger->Write_LED_State(current_color);
+}
+
+#if AP_NOTIFY_MAVLINK_LED_CONTROL_SUPPORT_ENABLED
+/*
+  handle LED control, only used when LED_OVERRIDE=1
+*/
+void RGBLed::handle_led_control(const mavlink_message_t &msg)
+{
+    if (rgb_source() != mavlink) {
+        // ignore LED_CONTROL commands if not in LED_OVERRIDE mode
+        return;
+    }
+
+    // decode mavlink message
+    mavlink_led_control_t packet;
+    mavlink_msg_led_control_decode(&msg, &packet);
+
+    _led_override.start_ms = AP_HAL::millis();
+
+    uint8_t rate_hz = 0;
+    switch (packet.custom_len) {
+    case 4:
+        rate_hz = packet.custom_bytes[3];
+        FALLTHROUGH;
+    case 3:
+        rgb_control(packet.custom_bytes[0], packet.custom_bytes[1], packet.custom_bytes[2], rate_hz);
+        break;
+    }
+}
+#endif
+
+/*
+  update LED when in override mode
+ */
+void RGBLed::update_override(void)
+{
+    if (_led_override.rate_hz == 0) {
+        // solid colour
+        _set_rgb(_led_override.r, _led_override.g, _led_override.b);
+        return;
+    }
+    // blinking
+    uint32_t ms_per_cycle = 1000 / _led_override.rate_hz;
+    uint32_t cycle = (AP_HAL::millis() - _led_override.start_ms) % ms_per_cycle;
+    if (cycle > ms_per_cycle / 2) {
+        // on
+        _set_rgb(_led_override.r, _led_override.g, _led_override.b);
+    } else {
+        _set_rgb(0, 0, 0);
+    }
+}
+
+/*
+  RGB control
+  give RGB and flash rate, used with scripting
+*/
+void RGBLed::rgb_control(uint8_t r, uint8_t g, uint8_t b, uint8_t rate_hz)
+{
+    _led_override.rate_hz = rate_hz;
+    _led_override.r = r;
+    _led_override.g = g;
+    _led_override.b = b;
+}
+
+void RGBLed::_set_rgb(uint8_t red_1, uint8_t green_1, uint8_t blue_1, uint8_t red_2, uint8_t green_2, uint8_t blue_2)
+{
+
+    if (red_1 != _red_curr_1 ||
+        green_1 != _green_curr_1 ||
+        blue_1 != _blue_curr_1 ||
+        red_2 != _red_curr_2 ||
+        green_2 != _green_curr_2 ||
+        blue_2 != _blue_curr_2) {
+        // call the hardware update routine
+        if (hw_set_rgb(red_1, green_1, blue_1, red_2, green_2, blue_2)) {
+            _red_curr_1 = red_1;
+            _green_curr_1 = green_1;
+            _blue_curr_1 = blue_1;
+
+            _red_curr_2 = red_2;
+            _green_curr_2 = green_2;
+            _blue_curr_2 = blue_2;
+        }
+    }
+}
+
+void RGBLed::set_rgb(uint8_t red_1, uint8_t green_1, uint8_t blue_1, uint8_t red_2, uint8_t green_2, uint8_t blue_2 )
+{
+    if (pNotify->_rgb_led_override) {
+        // don't set if in override mode
+        return;
+    }
+    _set_rgb(red_1, green_1, blue_1, red_2, green_2, blue_2);
+}
+
+// Basic function for all LEDs. Will be overriden if the right LEDs are enabled.
+bool RGBLed::hw_set_rgb(uint8_t red_1, uint8_t green_1, uint8_t blue_1, uint8_t red_2, uint8_t green_2, uint8_t blue_2)
+{
+    return hw_set_rgb(red_1, green_1, blue_1);
+}

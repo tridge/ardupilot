@@ -1,0 +1,360 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+import subprocess
+import os
+import os.path as p
+import sys
+import shutil
+
+if len(sys.argv) != 2:
+    print("Please enter version string as follows ./spirit_build 4_1_3")
+    sys.exit(1)
+
+ver = sys.argv[1]
+fw_prefix = "SPIRIT_FW_V" + ver
+d = p.dirname(p.realpath(__file__))
+waf_source = p.join(d, 'waf')
+
+python = sys.executable
+
+distclean = ["distclean"]
+generic_configure = ["configure"]
+spirit_config = ["configure","--board","CubeOrange","--disable-scripting"]
+spirit_config_odid = ["configure","--board","CubeOrange-ODID"]
+spirit_config_dev = ["configure","--board","CubeOrange","--out=./build/CubeOrange-dev"]
+
+spirit_config_plus = ["configure","--board","CubeOrangePlus","--disable-scripting"]
+spirit_config_odid_plus = ["configure","--board","CubeOrangePlus-ODID"]
+spirit_config_dev_plus = ["configure","--board","CubeOrangePlus","--out=./build/CubeOrangePlus-dev"]
+
+co_path = p.join(d, "build/CubeOrange/bin/arducopter.apj")
+co_dev_path = p.join(d, "build/CubeOrange-dev/CubeOrange/bin/arducopter.apj")
+co_odid_path = p.join(d, "build/CubeOrange-ODID/bin/arducopter.apj")
+cop_path = p.join(d, "build/CubeOrangePlus/bin/arducopter.apj")
+cop_dev_path = p.join(d, "build/CubeOrangePlus-dev/CubeOrangePlus/bin/arducopter.apj")
+cop_odid_path = p.join(d, "build/CubeOrangePlus-ODID/bin/arducopter.apj")
+
+build_paths = [p.join(d, "build/CubeOrange/bin/arducopter.apj"),
+                p.join(d, "build/CubeOrange-dev/CubeOrange/bin/arducopter.apj"),
+                p.join(d, "build/CubeOrange-ODID/bin/arducopter.apj"),
+                p.join(d, "build/CubeOrangePlus/bin/arducopter.apj"),
+                p.join(d, "build/CubeOrangePlus-dev/CubeOrangePlus/bin/arducopter.apj"),
+                p.join(d, "build/CubeOrangePlus-ODID/bin/arducopter.apj")]
+
+releases_dir = p.join(d, "released")
+
+co_path_r = p.join(releases_dir, (fw_prefix + "_noRID_CO.apj"))
+co_dev_path_r = p.join(releases_dir, (fw_prefix + "_DEV_CO.apj"))
+co_odid_path_r = p.join(releases_dir, (fw_prefix + "_ODID_CO.apj"))
+cop_path_r = p.join(releases_dir, (fw_prefix + "_noRID_COP.apj"))
+cop_dev_path_r = p.join(releases_dir, (fw_prefix + "_DEV_COP.apj"))
+cop_odid_path_r = p.join(releases_dir, (fw_prefix + "_ODID_COP.apj"))
+
+spirit_args = ["copter","-j8"]
+
+####################################
+##DISTCLEAN
+try:
+    subprocess.check_call([python, waf_source] + distclean)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+##INITIAL CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + generic_configure)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## NON ODID BOARD CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + spirit_config)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+##BUILD FOR NON ODID
+try:
+    subprocess.check_call([python, waf_source] + spirit_args)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## DEV BOARD CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + spirit_config_dev)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## BUILD FOR DEV
+try:
+    subprocess.check_call([python, waf_source] + spirit_args)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+    ####################################
+## ODID BOARD CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + spirit_config_odid)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## BUILD FOR ODID
+try:
+    subprocess.check_call([python, waf_source] + spirit_args)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+
+
+
+
+
+
+
+
+    ####################################
+## NON ODID BOARD CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + spirit_config_plus)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+##BUILD FOR NON ODID
+try:
+    subprocess.check_call([python, waf_source] + spirit_args)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## DEV BOARD CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + spirit_config_dev_plus)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## BUILD FOR DEV
+try:
+    subprocess.check_call([python, waf_source] + spirit_args)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+    ####################################
+## ODID BOARD CONFIGURE
+try:
+    subprocess.check_call([python, waf_source] + spirit_config_odid_plus)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+####################################
+## BUILD FOR ODID
+try:
+    subprocess.check_call([python, waf_source] + spirit_args)
+except subprocess.CalledProcessError as e:
+    if e.returncode != 2 or p.isfile(waf_source):
+        sys.exit(1)
+
+    print('Missing waf submodule. Trying to get it')
+
+    try:
+        subprocess.check_call(['git', 'submodule', 'update', '--init',
+                               'modules/waf'])
+    except subprocess.CalledProcessError:
+        print('Could not update submodule', file=sys.stderr)
+        sys.exit(1)
+
+    print('Submodules OK, try running again')
+
+for path in build_paths:
+    if not os.path.isfile(path):
+        print(f"The file {path} does not exist.")
+
+if not os.path.exists(releases_dir):
+    os.makedirs(releases_dir)
+
+try:
+    shutil.move(co_path, co_path_r)
+except Exception as e:
+    print(f"Error occurred: {e}")
+try:
+    shutil.move(co_dev_path, co_dev_path_r)
+except Exception as e:
+    print(f"Error occurred: {e}")
+try:
+    shutil.move(co_odid_path, co_odid_path_r)
+except Exception as e:
+    print(f"Error occurred: {e}")
+try:
+    shutil.move(cop_path, cop_path_r)
+except Exception as e:
+    print(f"Error occurred: {e}")
+try:
+    shutil.move(cop_dev_path, cop_dev_path_r)
+except Exception as e:
+    print(f"Error occurred: {e}")
+try:
+    shutil.move(cop_odid_path, cop_odid_path_r)
+except Exception as e:
+    print(f"Error occurred: {e}")
