@@ -214,8 +214,8 @@ void AP_Button::update(void)
 
 #if HAL_GCS_ENABLED
     if (last_debounce_ms != 0 &&
-        (AP_HAL::millis() - last_report_ms) > AP_BUTTON_REPORT_PERIOD_MS &&
-        (AP_HAL::millis64() - last_debounce_ms) < report_send_time*1000ULL) {
+        (AP_HAL::millis() - last_report_ms) > AP_BUTTON_REPORT_PERIOD_MS){ //&&
+        //(AP_HAL::millis64() - last_debounce_ms) < report_send_time*1000ULL) {
         // send a change report
         last_report_ms = AP_HAL::millis();
 

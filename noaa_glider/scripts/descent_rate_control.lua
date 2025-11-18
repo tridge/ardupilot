@@ -73,7 +73,7 @@ local function update()
         end
 
 
-        if math.abs(_vz_err) > 0.5 then 
+        if math.abs(_vz_err) > 0.35 then 
         --if _vz_err < 1.0 then
             local loc = ahrs:get_position()
             local alt = loc:alt() * 0.01
