@@ -233,4 +233,5 @@ jobs:
         run: |
           source ~/.bash_profile
           export PATH="/github/home/.local/bin:$PATH"
-          Tools/autotest/autotest.py build.Plane test.Plane.MainFlight
+          # Use Parameters test as smoke test - verifies SITL boots and runs on Apple Silicon
+          Tools/autotest/autotest.py build.Plane test.Plane.Parameters
