@@ -246,7 +246,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Param: OPTIONS
     // @DisplayName: Extra TECS options
     // @Description: This allows the enabling of special features in the speed/height controller.
-    // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup
+    // @Bitmask: 0:GliderOnly,1:AllowDescentSpeedup,2:DoAcclnControl,3:InhibitClipStatus
     // @User: Advanced
     AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
 
@@ -290,6 +290,44 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Increment: 0.2
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 33, AP_TECS, _hgt_dem_tconst, 3.0f),
+
+    // @Param: HGT_ACC_BW
+    // @DisplayName: Acceleration Control Mode Height Gain
+    // @Description: This sets the gain from height error to height acceleration used when TECS_OPTIONS bit 2 is set.
+    // @Range: 0.1 1.0
+    // @Units: 1/s^2
+    // @User: Advanced
+    AP_GROUPINFO("HGT_ACC_BW", 34, AP_TECS, _hgt_accln_gain, 0.4f),
+
+    // @Param: HGT_ACC_DMP
+    // @DisplayName: Acceleration Control Mode Height Damping Ratio
+    // @Description: This sets the damping ratio of the height acceleration control loop used when TECS_OPTIONS bit 2 is set.
+    // @Range: 0.5 1.1
+    // @User: Advanced
+    AP_GROUPINFO("HGT_ACC_DMP", 35, AP_TECS, _hgt_accln_damping_ratio, 0.85f),
+
+    // @Param: THR_PID_P
+    // @DisplayName: Throttle PID P gain
+    // @Description: Gain from speed error to throttle fraction used when TECS_OPTIONS bit 2 is set.
+    // @Range: 0.01 1.0
+    // @Units: 1/(m/s)
+    // @User: Advanced
+    AP_GROUPINFO("THR_PID_P", 36, AP_TECS, _thr_pid_p_gain, 0.1f),
+
+    // @Param: THR_PID_I
+    // @DisplayName: Throttle PID I gain
+    // @Description: Gain from speed error integral to throttle fraction used when TECS_OPTIONS bit 2 is set.
+    // @Units: 1/m
+    // @Range: 0.0 1.0
+    // @User: Advanced
+    AP_GROUPINFO("THR_PID_I", 37, AP_TECS, _thr_pid_i_gain, 0.1f),
+
+    // @Param: THR_PID_D
+    // @DisplayName: Throttle PID D gain
+    // @Description: Gain from speed error derivative to throttle fraction used when TECS_OPTIONS bit 2 is set.
+    // @Range: 0.0 0.1
+    // @User: Advanced
+    AP_GROUPINFO("THR_PID_D", 38, AP_TECS, _thr_pid_d, 0.05f),
 
     AP_GROUPEND
 };
@@ -387,12 +425,27 @@ void AP_TECS::_update_speed(float DT)
         _vdot_filter.reset();
         _vel_dot_lpf = _vel_dot;
     } else {
-        // Get DCM
-        const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
-        // Calculate speed rate of change
-        float temp = rotMat.c.x * GRAVITY_MSS + AP::ins().get_accel().x;
-        // take 5 point moving average
-        _vel_dot = _vdot_filter.apply(temp);
+        Vector3f vel_NED, vel_wind_NED;
+        if (_ahrs.get_velocity_NED(vel_NED) && _ahrs.wind_estimate(vel_wind_NED)) {
+            // Calculate a wind relative flight path unit vector
+            Vector3f flight_path_NED = (vel_NED - vel_wind_NED);
+            flight_path_NED.normalize();
+            // Get rate of change of velocity vector along wind relative flight path
+            Vector3f vel_dot_NED = _ahrs.get_accel_ef();
+            vel_dot_NED.z += GRAVITY_MSS;
+            // * operator is overloaded as a dot product
+            const float temp = vel_dot_NED * flight_path_NED;
+            // take 5 point moving average
+            _vel_dot = _vdot_filter.apply(temp);
+        } else {
+            // If no wind relative velocity data is available, use less accurate method
+            // that uses acceleration along X axis and is subject to pitch coupling
+            const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
+            // Calculate speed rate of change
+            const float temp = rotMat.c.x * GRAVITY_MSS + AP::ins().get_accel().x;
+            // take 5 point moving average
+            _vel_dot = _vdot_filter.apply(temp);
+        }
         const float alpha = DT / (DT + timeConstant());
         _vel_dot_lpf = _vel_dot_lpf * (1.0f - alpha) + _vel_dot * alpha;
     }
@@ -889,6 +942,11 @@ void AP_TECS::constrain_throttle() {
     } else {
         _thr_clip_status = clipStatus::NONE;
     }
+    _alt_thr_clip_status = _thr_clip_status;
+    if (option_is_set(Option::HGT_ACCLN_CTRL) ||
+        option_is_set(Option::INHIBIT_CLIPSTATUS)) {
+        _thr_clip_status = clipStatus::NONE;
+    }
 }
 
 float AP_TECS::_get_i_gain(void)
@@ -928,7 +986,12 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge, float pi
     const float pitch_demand_hpf = _pitch_dem - _pitch_demand_lpf.get();
     _pitch_measured_lpf.apply(_ahrs.get_pitch_rad(), _DT);
     const float pitch_corrected_lpf = _pitch_measured_lpf.get() - radians(pitch_trim_deg);
-    const float pitch_blended = pitch_demand_hpf + pitch_corrected_lpf;
+    float pitch_blended;
+    if (option_is_set(Option::HGT_ACCLN_CTRL)) {
+        pitch_blended = pitch_corrected_lpf;
+    } else {
+        pitch_blended = pitch_demand_hpf + pitch_corrected_lpf;
+    }
 
     if (pitch_blended > 0.0f && _PITCHmaxf > 0.0f)
     {
@@ -1029,10 +1092,20 @@ void AP_TECS::_update_pitch(void)
     const float SEBdot_dem_max = _maxClimbRate * GRAVITY_MSS;
     if (SEBdot_dem < SEBdot_dem_min) {
         SEBdot_dem = SEBdot_dem_min;
-        _SEBdot_dem_clip = clipStatus::MIN;
+        // The vertical accln control method is incompatible with the height demand
+        // profile mechanism controlled by _SEBdot_dem_clip
+        if (!option_is_set(Option::HGT_ACCLN_CTRL) &&
+            !option_is_set(Option::INHIBIT_CLIPSTATUS)) {
+            _SEBdot_dem_clip = clipStatus::MIN;
+        }
     } else if (SEBdot_dem > SEBdot_dem_max) {
         SEBdot_dem = SEBdot_dem_max;
-        _SEBdot_dem_clip = clipStatus::MAX;
+        // The vertical accln control method is incompatible with the height demand
+        // profile mechanism controlled by _SEBdot_dem_clip
+        if (!option_is_set(Option::HGT_ACCLN_CTRL) &&
+            !option_is_set(Option::INHIBIT_CLIPSTATUS)) {
+            _SEBdot_dem_clip = clipStatus::MAX;
+        }
     } else {
         _SEBdot_dem_clip = clipStatus::NONE;
     }
@@ -1202,6 +1275,8 @@ void AP_TECS::_initialise_states(float hgt_afe)
         _pitch_demand_lpf.reset(_ahrs.get_pitch_rad());
         _pitch_measured_lpf.reset(_ahrs.get_pitch_rad());
 
+        _thr_PID_I_term = 0.0f;
+
     } else if (_flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING) {
         
         if (!_flag_throttle_forced) {
@@ -1233,6 +1308,8 @@ void AP_TECS::_initialise_states(float hgt_afe)
             _flags.reset          = true;
             _flag_have_reset_after_takeoff  = true;
         }
+
+        _thr_PID_I_term = 0.0f;
     }
 
     if (_flight_stage != AP_FixedWing::FlightStage::TAKEOFF && _flight_stage != AP_FixedWing::FlightStage::ABORT_LANDING) {
@@ -1337,14 +1414,71 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // Calculate pitch demand
     _update_pitch();
 
-    // Calculate throttle demand - use simple pitch to throttle if no airspeed estimate.
-    if (use_airspeed()) {
-        _update_throttle_with_airspeed();
-        _use_synthetic_airspeed_once = false;
-        _using_airspeed_for_throttle = true;
-    } else {
+    if (option_is_set(Option::HGT_ACCLN_CTRL)) {
+        _calc_vert_accel_demand();
+        // keep integrators to legacy TECS loops zeroed.
+        _integTHR_state = 0.0f;
+        _integSEBdot = 0.0f;
+        _integKE = 0.0f;
+
+        // get throttle demand setpoint, then adjust using a PID control scheme if airspeed available
         _update_throttle_without_airspeed(throttle_nudge, pitch_trim_deg);
-        _using_airspeed_for_throttle = false;
+        if (_ahrs.using_airspeed_sensor() || _use_synthetic_airspeed) {
+            const float FF = _throttle_dem;
+            const float P = (_TAS_dem - _TAS_state) * _thr_pid_p_gain;
+            const float D = (_TAS_rate_dem_lpf - _vel_dot) * _thr_pid_d;
+            // check for saturation and prevent integrator windup
+            _throttle_dem = FF + P + _thr_PID_I_term + D;
+            constrain_throttle();
+            if (_alt_thr_clip_status == clipStatus::MAX) {
+                _thr_PID_I_term +=  MIN(P * _thr_pid_i_gain, 0.0f);
+            } else if (_alt_thr_clip_status == clipStatus::MIN) {
+                _thr_PID_I_term +=  MAX(P * _thr_pid_i_gain, 0.0f);
+            } else {
+                _thr_PID_I_term += P * _thr_pid_i_gain;
+            }
+            // sum components
+            _throttle_dem = FF + P + _thr_PID_I_term + D;
+
+            // @LoggerMessage: TEC5
+            // @Vehicles: Plane
+            // @Description: TECS log for alternative height and speed control method
+            // @URL: http://ardupilot.org/plane/docs/tecs-total-energy-control-system-for-speed-height-tuning-guide.html
+            // @Field: TimeUS: Time since system startup
+            // @Field: FF: throttle feedforward from pitch-based mapping
+            // @Field: P: throttle PID proportional term
+            // @Field: D: throttle PID derivative term
+            // @Field: I: throttle PID integral term
+            // @Field: TD: true airspeed demand
+            // @Field: TM: true airspeed measured (state estimate)
+            // @Field: TRD: true airspeed rate demand (low-pass filtered)
+            // @Field: Tdem: final throttle demand
+            AP::logger().WriteStreaming("TEC5","TimeUS,FF,P,D,I,TD,TM,TRD,Tdem",
+                                        "Qffffffff",
+                                        AP_HAL::micros64(),
+                                        (double)FF,
+                                        (double)P,
+                                        (double)D,
+                                        (double)_thr_PID_I_term,
+                                        (double)_TAS_dem,
+                                        (double)_TAS_state,
+                                        (double)_TAS_rate_dem_lpf,
+                                        (double)_throttle_dem);
+        }
+    } else {
+        // Calculate throttle demand - use simple pitch to throttle if no
+        // airspeed sensor.
+        // Note that caller can demand the use of
+        // synthetic airspeed for one loop if needed. This is required
+        // during QuadPlane transition when pitch is constrained
+        if (use_airspeed()) {
+            _update_throttle_with_airspeed();
+            _use_synthetic_airspeed_once = false;
+            _using_airspeed_for_throttle = true;
+        } else {
+            _update_throttle_without_airspeed(throttle_nudge, pitch_trim_deg);
+            _using_airspeed_for_throttle = false;
+        }
     }
 
     // Detect bad descent due to demanded airspeed being too high
@@ -1590,4 +1724,45 @@ bool AP_TECS::use_airspeed() const
     // synthetic airspeed for one loop if needed. This is required
     // during QuadPlane transition when pitch is constrained
     return _ahrs.using_airspeed_sensor() || _use_synthetic_airspeed || _use_synthetic_airspeed_once;
+}
+
+/*
+  calculate vertical acceleration demand
+ */
+void AP_TECS::_calc_vert_accel_demand(void)
+{
+    const float pos_gain = MAX(_hgt_accln_gain, 0.1f);
+    const float vel_gain = 2.0f * _hgt_accln_damping_ratio * sqrtf(pos_gain);
+
+    // constrain position error to respect vertical velocity limits
+    const float down_error_limit = (vel_gain / pos_gain) * _sink_rate_limit;
+    const float up_error_limit = (vel_gain / pos_gain) * _climb_rate_limit;
+    _hgt_accel_dem = constrain_float(_hgt_dem - _height, -down_error_limit, up_error_limit) * pos_gain +
+                       (_hgt_rate_dem - _climb_rate) * vel_gain;
+    _hgt_accel_dem = constrain_float(_hgt_accel_dem, -_vertAccLim, _vertAccLim);
+
+    // @LoggerMessage: TEC6
+    // @Vehicles: Plane
+    // @Description: TECS log for vertical acceleration demand calculation
+    // @URL: http://ardupilot.org/plane/docs/tecs-total-energy-control-system-for-speed-height-tuning-guide.html
+    // @Field: TimeUS: Time since system startup
+    // @Field: HAD: height acceleration demand
+    // @Field: UEL: upward position error limit
+    // @Field: DEL: downward position error limit
+    // @Field: HD: height demand
+    // @Field: H: current height estimate
+    // @Field: HRD: height rate demand
+    // @Field: CR: current climb rate
+    // @Field: VAL: vertical acceleration limit
+    AP::logger().WriteStreaming("TEC6","TimeUS,HAD,UEL,DEL,HD,H,HRD,CR,VAL",
+                                "Qffffffff",
+                                AP_HAL::micros64(),
+                                (double)_hgt_accel_dem,
+                                (double)up_error_limit,
+                                (double)down_error_limit,
+                                (double)_hgt_dem,
+                                (double)_height,
+                                (double)_hgt_rate_dem,
+                                (double)_climb_rate,
+                                (double)_vertAccLim);
 }
