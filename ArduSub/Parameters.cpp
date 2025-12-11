@@ -828,12 +828,12 @@ void Sub::load_parameters()
 
     // PARAMETER_CONVERSION - Added: Mar-2022
 #if AP_FENCE_ENABLED
-    AP_Param::convert_class(g.k_param_fence_old, &fence, fence.var_info, 0, true);
+    AP_Param::convert_class(g.k_param_fence_old, &fence, fence.var_info, 0);
 #endif
 
     // PARAMETER_CONVERSION - Added: July-2025 for ArduPilot-4.7
 #if AP_RPM_ENABLED
-    AP_Param::convert_class(g.k_param_rpm_sensor_old, &rpm_sensor, rpm_sensor.var_info, 0, true, true);
+    AP_Param::convert_class(g.k_param_rpm_sensor_old, &rpm_sensor, rpm_sensor.var_info, 0, true);
 #endif
 
     static const AP_Param::G2ObjectConversion g2_conversions[] {
@@ -859,7 +859,7 @@ void Sub::load_parameters()
 
     // PARAMETER_CONVERSION - Added: Feb-2024
 #if HAL_LOGGING_ENABLED
-    AP_Param::convert_class(g.k_param_logger, &logger, logger.var_info, 0, true);
+    AP_Param::convert_class(g.k_param_logger, &logger, logger.var_info, 0);
 #endif
 
     static const AP_Param::TopLevelObjectConversion toplevel_conversions[] {
