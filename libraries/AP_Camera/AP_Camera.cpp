@@ -978,7 +978,7 @@ void AP_Camera::convert_params()
         rc_type = int8_t(CameraType::RUNCAM);
         _backends[1] = NEW_NOTHROW AP_RunCam(*this, _params[1], 1, _runcam_instances);
         _backend_var_info[1] = AP_RunCam::var_info;
-        AP_Param::convert_class(k_param_vehicle_key, &_backends[1], _backend_var_info[1], 1, false);
+        AP_Param::convert_class(k_param_vehicle_key, &_backends[1], _backend_var_info[1], 1);
         AP_Param::invalidate_count();
         _runcam_instances++;
     }
