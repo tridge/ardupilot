@@ -1472,7 +1472,7 @@ void Plane::load_parameters(void)
     {
         const uint16_t old_key = g.k_param_airspeed;
         const uint16_t old_index = 0;       // Old parameter index in the tree
-        AP_Param::convert_class(old_key, &airspeed, airspeed.var_info, old_index, true);
+        AP_Param::convert_class(old_key, &airspeed, airspeed.var_info, old_index);
     }
 #endif
 
@@ -1495,12 +1495,12 @@ void Plane::load_parameters(void)
 
     // PARAMETER_CONVERSION - Added: Mar-2022
 #if AP_FENCE_ENABLED
-    AP_Param::convert_class(g.k_param_fence, &fence, fence.var_info, 0, true);
+    AP_Param::convert_class(g.k_param_fence, &fence, fence.var_info, 0);
 #endif
 
     // PARAMETER_CONVERSION - Added: July-2025 for ArduPilot-4.7
 #if AP_RPM_ENABLED
-    AP_Param::convert_class(g.k_param_rpm_sensor_old, &rpm_sensor, rpm_sensor.var_info, 0, true, true);
+    AP_Param::convert_class(g.k_param_rpm_sensor_old, &rpm_sensor, rpm_sensor.var_info, 0, true);
 #endif
 
     // PARAMETER_CONVERSION - Added: Dec 2023
@@ -1539,7 +1539,7 @@ void Plane::load_parameters(void)
 
     // PARAMETER_CONVERSION - Added: Feb-2024 for Copter-4.6
 #if HAL_LOGGING_ENABLED
-    AP_Param::convert_class(g.k_param_logger, &logger, logger.var_info, 0, true);
+    AP_Param::convert_class(g.k_param_logger, &logger, logger.var_info, 0);
 #endif
 
     static const AP_Param::TopLevelObjectConversion toplevel_conversions[] {
