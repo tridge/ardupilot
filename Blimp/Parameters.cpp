@@ -795,7 +795,7 @@ void Blimp::load_parameters(void)
 
     // PARAMETER_CONVERSION - Added: Feb-2024
 #if HAL_LOGGING_ENABLED
-    AP_Param::convert_class(g.k_param_logger, &logger, logger.var_info, 0, true);
+    AP_Param::convert_class(g.k_param_logger, &logger, logger.var_info, 0);
 #endif
 
     static const AP_Param::TopLevelObjectConversion toplevel_conversions[] {
