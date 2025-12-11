@@ -400,7 +400,7 @@ void AP_GPS::convert_parameters()
     for (uint8_t i=0; i<MIN(2, GPS_MAX_RECEIVERS); i++) {
         // the old _MB parameters were 25 and 26:
         const uint8_t old_index = 25 + i;
-        AP_Param::convert_class(k_param_gps_key, &params[i].mb_params, params[i].mb_params.var_info, old_index, false);
+        AP_Param::convert_class(k_param_gps_key, &params[i].mb_params, params[i].mb_params.var_info, old_index);
     }
 #endif  // GPS_MOVING_BASELINE
 }
