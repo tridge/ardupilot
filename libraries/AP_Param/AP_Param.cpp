@@ -2059,11 +2059,31 @@ void AP_Param::convert_old_parameters_scaled(const struct ConversionInfo *conver
 // move all parameters from a class to a new location
 // is_top_level: Is true if the class had its own top level key, param_key. It is false if the class was a subgroup
 void AP_Param::convert_class(uint16_t param_key, void *object_pointer,
-                                    const struct AP_Param::GroupInfo *group_info,
-                                    uint16_t old_index, bool is_top_level, bool recurse_sub_groups)
+                             const struct AP_Param::GroupInfo *group_info,
+                             uint16_t old_index, bool recurse_sub_groups)
 {
-    const uint8_t group_shift = is_top_level ? 0 : 6;
+    if (group_info[0].type == AP_PARAM_NONE) {
+        // empty table
+        return;
+    }
 
+    // get a pointer to the first parameter in the group
+    AP_Param *p0 = (AP_Param *)((ptrdiff_t)object_pointer + group_info[0].offset);
+
+    // find that parameter in the tree, getting its nesting
+    uint32_t group_element = 0;
+    const struct GroupInfo *ginfo;
+    struct GroupNesting group_nesting {};
+    uint8_t eidx;
+    if (p0->find_var_info(&group_element, ginfo, group_nesting, &eidx) == nullptr) {
+        return;
+    }
+
+    // use the level of nesting to work out the base group ID for the parameters in this class
+    const uint8_t level = group_nesting.level;
+    bool is_top_level = (level == 0);
+    uint32_t old_group_base = is_top_level? 0 : ((group_element & ~(0x3f<<(level*6))) & ~(0x3F<<(level-1)*6)) | (old_index<<(level-1)*6);
+    
     for (uint8_t i=0; group_info[i].type != AP_PARAM_NONE; i++) {
         struct ConversionInfo info;
         info.old_key = param_key;
@@ -2071,7 +2091,7 @@ void AP_Param::convert_class(uint16_t param_key, void *object_pointer,
         info.new_name = nullptr;
 
         uint16_t idx = group_info[i].idx;
-        if (group_shift != 0 && idx == 0) {
+        if (!is_top_level != 0 && idx == 0) {
             // Note: Index 0 is treated as 63 for group bit shifting purposes. See group_id()
             idx = 63;
         }
@@ -2080,12 +2100,14 @@ void AP_Param::convert_class(uint16_t param_key, void *object_pointer,
             // Convert subgroups if enabled
             if (recurse_sub_groups) {
                 // Only recurse once
-                convert_class(param_key, (uint8_t *)object_pointer + group_info[i].offset, get_group_info(group_info[i]), idx, false, false);
+                convert_class(param_key, (uint8_t *)object_pointer + group_info[i].offset, get_group_info(group_info[i]), idx, recurse_sub_groups);
             }
             continue;
         }
 
-        info.old_group_element = (idx << group_shift) + old_index;
+        // work out the group ID for the old parameter by taking the old base and adding
+        // the index of this parameter shifted to the right level
+        info.old_group_element = old_group_base | (idx << (level*6));
 
         uint8_t old_value[type_size(info.type)];
         AP_Param *ap = (AP_Param *)&old_value[0];
@@ -2121,7 +2143,7 @@ void AP_Param::convert_g2_objects(const void *g2, const G2ObjectConversion g2_co
     }
     for (uint8_t i=0; i<num_conversions; i++) {
         const auto &c { g2_conversions[i] };
-        convert_class(info.old_key, c.object_pointer, c.var_info, c.old_index, false);
+        convert_class(info.old_key, c.object_pointer, c.var_info, c.old_index);
     }
 }
 
@@ -2129,7 +2151,7 @@ void AP_Param::convert_toplevel_objects(const TopLevelObjectConversion conversio
 {
     for (uint8_t i=0; i<num_conversions; i++) {
         const auto &c { conversions[i] };
-        convert_class(c.old_index, c.object_pointer, c.var_info, 0, true);
+        convert_class(c.old_index, c.object_pointer, c.var_info, 0);
     }
 }
 
