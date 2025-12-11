@@ -1854,13 +1854,13 @@ void AC_PosControl::convert_parameters()
 
     // parameters that are simply moved with no scaling.  Params that have already been moved above are not affected
     // move _pid_vel_d_m parameters from slot 3 to slot 12.  _VELZ_ has become _D_VEL_
-    AP_Param::convert_class(k_param_psc_key, &_pid_vel_d_m, _pid_vel_d_m.var_info, 3, false);
+    AP_Param::convert_class(k_param_psc_key, &_pid_vel_d_m, _pid_vel_d_m.var_info, 3);
 
     // move _pid_accel_d_m from slot 4 to 13.  _ACCZ_ has become _D_ACC_
-    AP_Param::convert_class(k_param_psc_key, &_pid_accel_d_m, _pid_accel_d_m.var_info, 4, false);
+    AP_Param::convert_class(k_param_psc_key, &_pid_accel_d_m, _pid_accel_d_m.var_info, 4);
 
     // move _pid_vel_ne_m from 6 to 14.  _VELXY_ has become _NE_VEL_
-    AP_Param::convert_class(k_param_psc_key, &_pid_vel_ne_m, _pid_vel_ne_m.var_info, 6, false);
+    AP_Param::convert_class(k_param_psc_key, &_pid_vel_ne_m, _pid_vel_ne_m.var_info, 6);
 
     // store PSC_D_ACC_P as flag that parameter conversion was completed
     _pid_accel_d_m.kP().save(true);
