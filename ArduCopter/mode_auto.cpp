@@ -2257,10 +2257,8 @@ bool ModeAuto::verify_circle(const AP_Mission::Mission_Command& cmd)
 {
     // check if we've reached the edge
     if (_mode == SubMode::CIRCLE_MOVE_TO_EDGE) {
-        if (copter.wp_nav->reached_wp_destination()) {
-            // start circling
-            circle_start();
-        }
+        // start circling
+        circle_start();
         return false;
     }
 
