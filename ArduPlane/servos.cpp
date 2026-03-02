@@ -361,6 +361,7 @@ void ModeAuto::wiggle_servos()
 
     int16_t servo_valueElevator;
     int16_t servo_valueAileronRudder;
+    int16_t servo_valueFlap;
     // Wiggle the control surfaces in stages: elevators first, then rudders + ailerons, through the full range over 4 seconds
     if (wiggle.stage != 0) {
         wiggle.stage += 1;
@@ -368,33 +369,44 @@ void ModeAuto::wiggle_servos()
     if (wiggle.stage == 0) {
         servo_valueElevator = 0;
         servo_valueAileronRudder = 0;
+        servo_valueFlap = 0;
     } else if (wiggle.stage < 25) { 
-        servo_valueElevator = wiggle.stage * (4500 / 25);      
+        servo_valueElevator = wiggle.stage * (4500 / 25);     
+        servo_valueFlap = wiggle.stage;  // also tried =servo_valueElevator
         servo_valueAileronRudder = 0;
     } else if (wiggle.stage < 75) {
         servo_valueElevator = (50 - wiggle.stage) * (4500 / 25);        
+        servo_valueFlap = 0;
         servo_valueAileronRudder = 0;
     } else if (wiggle.stage < 100) {
         servo_valueElevator = (wiggle.stage - 100) * (4500 / 25);        
+        servo_valueFlap = 0;
         servo_valueAileronRudder = 0;
     } else if (wiggle.stage < 125) {
         servo_valueElevator = 0;
+        servo_valueFlap = 0;
         servo_valueAileronRudder = (wiggle.stage - 100) * (4500 / 25);
     } else if (wiggle.stage < 175) {
         servo_valueElevator = 0;
+        servo_valueFlap = 0;
         servo_valueAileronRudder = (150 - wiggle.stage) * (4500 / 25);  
     } else if (wiggle.stage < 200) {
         servo_valueElevator = 0;
+        servo_valueFlap = 0;
         servo_valueAileronRudder = (wiggle.stage - 200) * (4500 / 25); 
     } else {
         wiggle.stage = 0;
         servo_valueElevator = 0;
         servo_valueAileronRudder = 0;
+        servo_valueFlap = 0;
     }
+
+
+    servo_valueFlap = 50; 
     SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, servo_valueAileronRudder);
     SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, servo_valueElevator);
     SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, servo_valueAileronRudder);
-
+    SRV_Channels::set_output_scaled(SRV_Channel::k_flap_auto, servo_valueFlap); // Guessing this command isn't taking? 
 }
 
 
@@ -714,6 +726,12 @@ void Plane::set_servos_flaps(void)
     if (abs(manual_flap_percent) > auto_flap_percent) {
         auto_flap_percent = manual_flap_percent;
     }
+
+#if AP_PLANE_GLIDER_PULLUP_ENABLED
+    if (mode_auto.wiggle.stage > 0 && mode_auto.wiggle.stage <= 25) {
+        auto_flap_percent=25.0;
+    }
+#endif
 
     SRV_Channels::set_output_scaled(SRV_Channel::k_flap_auto, auto_flap_percent);
     SRV_Channels::set_output_scaled(SRV_Channel::k_flap, manual_flap_percent);
