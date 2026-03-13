@@ -18,9 +18,9 @@ local GLD_LED_PWM_OFF= bind_add_param('PWM_OFF', 3, 1100)
 
 function update()
     if arming:is_armed() then
-        SRV_Channels:set_output_pwm_chan(GLD_LED_CH:get(), GLD_LED_PWM_ON:get())
+        SRV_Channels:set_output_pwm_chan(GLD_LED_CH:get()-1, GLD_LED_PWM_ON:get())
     else
-        SRV_Channels:set_output_pwm_chan(GLD_LED_CH:get(), GLD_LED_PWM_OFF:get())
+        SRV_Channels:set_output_pwm_chan(GLD_LED_CH:get()-1, GLD_LED_PWM_OFF:get())
     end
 
     return update, 1000  -- run every 1000 ms

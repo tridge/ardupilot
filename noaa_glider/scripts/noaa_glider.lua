@@ -13,12 +13,13 @@ function bind_add_param(name, idx, default_value)
    return Parameter(PARAM_TABLE_PREFIX .. name)
 end
 
-local GLD_AFS_FENCE_FS_ENABLE = bind_add_param('FENCE_MARGIN_KM', 1, 0)
-local GLD_AFS_FENCE_MARGIN_KM = bind_add_param('FENCE_MARGIN_KM', 2, 30)
-local GLD_AFS_CHUTE_MIN_FS_EN = bind_add_param('CHUTE_MIN_FS_EN', 3, 0)
-local GLD_AFS_CHUTE_MIN_MSL = bind_add_param('CHUTE_MIN_MSL', 4, -1)
+local GLD_AFS_FENCE_FS_ENABLE = bind_add_param('FNC_EN', 1, 0)
+local GLD_AFS_FENCE_MARGIN_KM = bind_add_param('FNC_MARG', 2, 30)
+local GLD_AFS_CHUTE_MIN_FS_EN = bind_add_param('CHT_FSEN', 3, 0)
+local GLD_AFS_CHUTE_MIN_MSL = bind_add_param('CHT_MMSL', 4, -1)
 
 local MODE_AUTO = 10
+local MODE_RTL = 11
 local MISSION_WAIT_ALT_CMD = 83
 local BALLOON_RELEASE_AUX_FUNC = 221 -- See https://github.com/ArduPilot/ardupilot/pull/30962/changes/46626d64a15e6b4293add4
 local BALLOON_RELEASE_AUX_VALUE = 2 -- 0 low, 1 mid, 2 high
@@ -41,7 +42,7 @@ local K_PARACHUTE = 27
 local BALLOON_RELEASE_CHAN = 10
 
 local last_mfs_state = 0
-local last_mfs_alt = 0
+local last_mfs_alt = -9999
 local prev_fence_margin = -999
 
 -- chute checking is enabled when 50m above chute deploy alt
@@ -86,7 +87,7 @@ function balloon_has_released()
 end
 
 function check_chute()
-   local chute_min_en = GLD_AFS_CHUTE_MIN_FS_EN
+   local chute_min_en = GLD_AFS_CHUTE_MIN_FS_EN:get()
    if chute_min_en > 0 then
 
       if chute_alt >= 0 then
@@ -132,51 +133,79 @@ function check_AFS()
 
       --local margin = vehicle:fence_distance_inside()
       local margin = fence:get_breach_distance(4)
+      
+
+      margin = -margin
 
       -- only enable the fence if the ac is released and 
       -- we are inside the margin
-      if (balloon_has_released() or margin >= fence_margin) then
-         if not vehicle:fence_enabled() then
-            if vehicle:enable_fence() then
-               gcs:send_text(0, "LUA: Enabled fence")
-            else
-               gcs:send_text(0, "LUA: Fence enable FAILED")
-            end
-         end
-      end
+      -- if (balloon_has_released() or margin >= fence_margin) then
+      --    if not vehicle:fence_enabled() then
+      --       if vehicle:enable_fence() then
+      --          gcs:send_text(0, "LUA: Enabled fence")
+      --       else
+      --          gcs:send_text(0, "LUA: Fence enable FAILED")
+      --       end
+      --    end
+      -- end
+
+      -- This needs to be rewritten so that fence is enabled all the time, and we 
+      -- cut the balloon if we breach before balloon release, and we RTL if we breach after balloon release.
 
       -- check if balloon not released, and in margin buffer, 
       -- advance mission waypoint to trigger balloon release.
       -- GLD_AFS_FENCE_FS_ENABLE enables Margin Failsafe
-      if not balloon_has_released()  and GLD_AFS_FENCE_FS_ENABLE:get() > 0 then
-         if last_mfs_state == 2 then
-            local i = mission:get_current_nav_index()
+      if GLD_AFS_FENCE_FS_ENABLE:get() > 0 then
+         if not balloon_has_released() then
+            if last_mfs_state == 2 then
+               local i = mission:get_current_nav_index()
 
-            if mission:get_current_nav_id() == MISSION_WAIT_ALT_CMD then 
-               --mission:set_current_cmd(i+1)
-               --gcs:send_text(0, "Mission Advanced to Pullup")
+               if mission:get_current_nav_id() == MISSION_WAIT_ALT_CMD then 
+                  --mission:set_current_cmd(i+1)
+                  --gcs:send_text(0, "Mission Advanced to Pullup")
 
-               -- Send AUX command to advance to pullup
-               gcs:send_text(0, "LUA Balloon MFS: Forcing Balloon Release!!!!")
-               rc:run_aux_function(BALLOON_RELEASE_AUX_FUNC,BALLOON_RELEASE_AUX_VALUE)
+                  -- Send AUX command to advance to pullup
+                  gcs:send_text(0, "LUA Balloon MFS: Forcing Balloon Release!!!!")
+                  rc:run_aux_function(BALLOON_RELEASE_AUX_FUNC,BALLOON_RELEASE_AUX_VALUE)
+               end
+               last_mfs_state = 3
+            elseif margin < fence_margin and last_mfs_state < 2 then
+               last_mfs_state = 2
+               gcs:send_text(0, "!! Fence Margin Failsafe !!")
+
+            elseif margin < 2*fence_margin and last_mfs_state < 1 then
+                  gcs:send_text(0, string.format("LUA: MFS Near %.0f / %.0f", margin,fence_margin))
+                  last_mfs_state = 1
+            elseif margin >= 2*fence_margin and last_mfs_state > 0 then
+               last_mfs_state = 0
+               gcs:send_text(0, string.format("LUA: MFS Clear %.0f / %.0f", margin,fence_margin))
             end
-            last_mfs_state = 3
-         elseif margin < fence_margin and last_mfs_state < 2 then
-            last_mfs_state = 2
-            gcs:send_text(0, "!! Fence Margin Failsafe !!")
-
-         elseif margin < 2*fence_margin and last_mfs_state < 1 then
-               gcs:send_text(0, string.format("LUA: MFS Near %.0f / %.0f", margin,fence_margin))
-               last_mfs_state = 1
+         else
+            -- balloon has released
+            if fence:get_breaches() > 0 then
+               local breach_time = millis() - fence:get_breach_time()
+               if vehicle:get_mode() == MODE_AUTO and mission:get_current_nav_id() == MISSION_WAIT_ALT_CMD and breach_time < 10000 then 
+                  gcs:send_text("Waiting to RTL %.0f",breach_time/1000.0)
+               elseif vehicle:get_mode() ~= MODE_RTL then 
+                  vehicle:set_mode(MODE_RTL) -- RTL
+                  gcs:send_text(0, "LUA: Fence Breached, RTL mode enabled")
+               end
+            end
+            last_mfs_state = 0 -- reset in case we come back into fence after balloon release
          end
-         
       end
 
+
       local position = ahrs:get_position()
-      local altitude_absolute = position:alt()
+      local altitude_absolute = position:alt() / 100.0
       if (math.abs(altitude_absolute - last_mfs_alt) > 1000) then
          last_mfs_alt = altitude_absolute
-         gcs:send_text(0, string.format("LUA: Fence Dist %.0f / %.0f", margin,fence_margin))
+         if fence:get_enabled_fences() & 4 == 0 then
+            gcs:send_text(0, string.format("LUA: WARNING: Fence not enabled"))
+         else
+            gcs:send_text(0, string.format("LUA: Fence Dist %.0f / %.0f", margin,fence_margin))
+         end
+         
       end
 
       if AFS:should_crash_vehicle() and not balloon_has_released() then
