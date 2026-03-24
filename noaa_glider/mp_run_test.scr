@@ -1,0 +1,10 @@
+set altreadout 0
+module load graph
+
+
+arm throttle
+auto
+servo set 6 2000
+graph VFR_HUD.alt
+graph VFR_HUD.airspeed 
+graph VFR_HUD.climb
