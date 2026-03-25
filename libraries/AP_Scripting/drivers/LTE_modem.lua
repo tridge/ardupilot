@@ -1121,7 +1121,11 @@ local function check_CPSI(s)
     local system_mode, operation_mode, mcc_mnc, tac_str, scell_id_str, pcid_str, earfcn_band, ul_freq_str, dl_freq_str, tdd_cfg_str, rsrq_str, rsrp_str, rssi_str, sinr_str =
     s:match("+CPSI:%s*([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([%-]?%d+),([%-]?%d+),([%-]?%d+),([%-]?%d+)")
 
-    if system_mode and sinr_str then
+    if not system_mode or not sinr_str then
+        return false
+    end
+
+    local ok, err = pcall(function()
         -- Convert strings to numbers
         local tac = tonumber(tac_str:match("0x(%w+)"), 16) or tonumber(tac_str) or 0
         local scell_id = tonumber(scell_id_str) or 0
@@ -1148,9 +1152,12 @@ local function check_CPSI(s)
                 gcs:send_named_float('LTE_MCCMNC', mcc*100+mnc)
             end
         end
-        return true
+    end)
+    if not ok then
+        gcs:send_text(MAV_SEVERITY.INFO, "LTE: CPSI parse error: " .. tostring(err))
+        return false
     end
-    return false
+    return true
 end
 
 --[[
