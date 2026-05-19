@@ -308,6 +308,9 @@ void Plane::update_logging25(void)
 
     if (should_log(MASK_LOG_IMU))
         AP::ins().Write_Vibration();
+
+    // hack for rapid changeover of servo function
+    AP::srv().enable_aux_servos();
 }
 #endif  // HAL_LOGGING_ENABLED
 
