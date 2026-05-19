@@ -254,6 +254,7 @@ void SRV_Channel::set_angle(int16_t angle)
     type_angle = true;
     high_out = angle;    
     type_setup = true;
+    last_function = function;
 }
 
 // set range of scaled output
@@ -262,7 +263,9 @@ void SRV_Channel::set_range(uint16_t high)
     type_angle = false;
     high_out = high;
     type_setup = true;
+    last_function = function;
 }
+
 
 /*
   get normalised output from -1 to 1, assuming 0 at mid point of servo_min/servo_max

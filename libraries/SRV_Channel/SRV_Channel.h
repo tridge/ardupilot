@@ -295,6 +295,7 @@ private:
     // reversal, following convention that 1 means reversed, 0 means normal
     AP_Int8 reversed;
     AP_Enum16<Aux_servo_function_t> function;
+    AP_Enum16<Aux_servo_function_t> last_function;
 
     // a pending output value as PWM
     uint16_t output_pwm;

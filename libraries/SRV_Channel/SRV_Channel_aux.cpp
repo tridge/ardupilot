@@ -133,7 +133,7 @@ SRV_Channel::Aux_servo_function_t SRV_Channels::channel_function(uint8_t channel
 */
 void SRV_Channel::aux_servo_function_setup(void)
 {
-    if (type_setup) {
+    if (type_setup && last_function.get() == function.get()) {
         return;
     }
     switch (function.get()) {
