@@ -110,7 +110,7 @@ local frame_count = 0
 local state = {}
 
 state.fuel_used_gallons = 0.0
-state.last_update_ms = nil
+state.last_updated_ms = nil
 
 --[[
     correct temp readings for 1k resistor
@@ -178,8 +178,8 @@ local function parse_engine_param_dynamic(data)
    efi_state:oil_temperature(state.oil_temp*0.1)
    cylinder_state:cylinder_head_temperature(state.temp_K*0.01)
    efi_state:ignition_voltage(state.alt_V*0.01)
-   local fuel_rate_cm3pm = state.fuel_rate*0.1*1000.0/3600.0
-   efi_state:fuel_consumption_rate_cm3pm(state.fuel_rate*0.1*1000.0/3600.0)
+   local fuel_rate_cm3pm = state.fuel_rate*0.1*1000.0/60.0
+   efi_state:fuel_consumption_rate_cm3pm(fuel_rate_cm3pm)
    efi_state:intake_manifold_pressure_kpa(state.cool_press*100*0.001)
    efi_state:fuel_pressure(state.fuel_press)
    efi_state:engine_load_percent(state.eload)
@@ -198,8 +198,8 @@ local function parse_engine_param_dynamic(data)
        return
    end
    local dt = (now - state.last_updated_ms):tofloat() * 0.001
+   state.last_updated_ms = now
    if dt > 2.0 then
-       state.last_updated_ms = now
        return
    end
    local delta_fuel_gallons = dt * fuel_rate_gh / 3600
