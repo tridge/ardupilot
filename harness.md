@@ -251,6 +251,38 @@ the fence loaded reproduces the eeprom-based run to within noise:
 Note the .parm file is applied as *defaults*, so any value already saved in eeprom.bin
 wins. Editing it and restarting does nothing unless the eeprom is deleted first.
 
+## TRAP: SIM_BATT_VOLTAGE also sets state of charge, and running the pack flat
+## silently replaces the whole battery model
+
+`SIM_BATT_VOLTAGE` is not "the starting voltage". It sets the simulated pack's **state
+of charge**, through the per-cell table in `SIM_Battery.cpp`. On a 12S pack, 46 V is
+3.83 V/cell, which starts the sim at 59 % - 22.8 Ah of a 39 Ah pack - while the
+autopilot's coulomb counter starts at 100 % of `BATT_CAPACITY`. Nothing warns about the
+disagreement, and `RemPct` is the autopilot's count, so it reads 100 % either way and
+hides it completely.
+
+The simulated pack then runs dry roughly 40 % early. Its voltage collapses to zero, and
+`AP_HAL_SITL/SITL_State_common.cpp` does this:
+
+    if (_sitl->state.battery_voltage <= 0) {
+        voltage = _sitl->batt_voltage - 0.7f * throttle;
+        current = 50.0f * throttle;
+    }
+
+The entire battery model is abandoned for a legacy stand-in, with no message. What it
+looks like from the log is a vehicle fault: current jumps to ~30 A with the VTOL motors
+provably off, and voltage recovers from near zero to a constant ~45.6 V and stays there
+while the reported percentage keeps falling. It is neither - it is `50 * throttle`.
+
+Identify it by that signature rather than by guessing. If `I ~= 50*throttle` and
+`V ~= SIM_BATT_VOLTAGE - 0.7*throttle`, the model is gone. Both matched to better than
+0.5 % when this was tracked down.
+
+Set `SIM_BATT_VOLTAGE` to the full-charge voltage - 50.4 V for 12S - so the simulated
+pack and the autopilot agree. Endurance missions are exactly the case that trips it: an
+82 minute flight used 17.2 Ah and stayed inside the 22.8 Ah the sim actually had, so it
+looked fine, while a 137 minute one ran straight through it.
+
 ## TRAP: SIM_BATT_VOLTAGE is coupled to VTOL thrust
 
 `SIM_Motor.cpp:38` scales motor thrust by `voltage / voltage_max`, where
