@@ -582,6 +582,43 @@ void Frame::init(const char *frame_str, Battery *_battery)
     model = default_model;
     battery = _battery;
 
+    if (strstr(frame_str, "quadplane") != nullptr) {
+        /*
+          ARACE Phoenix runs a 12S pack. This has to be set on the FRAME, not
+          just via SIM_BATT_VOLTAGE: SIM_Motor scales thrust by
+          voltage/voltage_max, and voltage_max comes from model.maxVoltage.
+          With the 3S default, raising SIM_BATT_VOLTAGE to 50.4 on its own
+          gives the lift motors 4x their design voltage - they make ~4x thrust
+          and the aircraft climbs vertically at 34 m/s instead of transitioning.
+
+          refCurrent is scaled to hold refCurrent*refVoltage (the hover power,
+          and hence power_factor) at its previous value, so this changes only
+          the pack voltage, not the frame's thrust or power behaviour.
+
+          The default of SIM_BATT_VOLTAGE is taken from maxVoltage further down,
+          so this keeps the parameter and the motor model consistent.
+         */
+        model.maxVoltage = 4.2 * 12;                 // 50.4 V, 12S full charge
+        model.refVoltage = 48.0;                     // 4.0 V/cell at hover
+        model.refCurrent = 29.3 * 12.09 / 48.0;      // hold hover power constant
+
+        // measured from log2.bin by regressing pack voltage against current
+        // over short windows (so pack discharge does not bias it). At 41 mOhm
+        // the 72 A VTOL peak sags 3.0 V, against 0.7 V with the 3S default -
+        // the difference decides whether a battery failsafe trips.
+        model.refBatRes = 0.041;
+
+        // 11.5 kg all-up. QuadPlane scales the frame mass by 1.5 for the plane
+        // components, so the frame carries 2/3 of it. Without this the model
+        // flew at the generic 4.5 kg, which needed absurd drag to match the
+        // measured cruise throttle and left it gliding at L/D 2.6 instead of
+        // the measured 8.4 - matching the numbers by coincidence rather than
+        // physics, and wrong as soon as speed or climb rate changes.
+        const float mass_scale = (11.5 / 1.5) / model.mass;
+        model.mass = 11.5 / 1.5;
+        model.refCurrent *= mass_scale;              // hold hover W/N constant
+    }
+
     const char *colon = strchr(frame_str, ':');
     size_t slen = strlen(frame_str);
     if (colon != nullptr && slen > 5 && strcmp(&frame_str[slen-5], ".json") == 0) {

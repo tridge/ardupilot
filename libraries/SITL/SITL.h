@@ -225,6 +225,14 @@ public:
 
     AP_Float batt_voltage; // battery voltage base
     AP_Float batt_capacity_ah; // battery capacity in Ah
+
+    // forward-motor electrical model for quadplanes:
+    //   I = FWD_THR_A * throttle^FWD_THR_EXP + FWD_I_FIXED
+    // defaults reproduce the previous hard-coded "20A at full throttle, linear, no fixed load"
+    AP_Float fwd_thr_A;    // current at full forward throttle (A)
+    AP_Float fwd_thr_exp;  // throttle exponent
+    AP_Float fwd_i_fixed;  // constant non-propulsive load (A)
+
     AP_Int8  rc_fail;     // fail RC input
     AP_Int8  rc_chancount; // channel count
     AP_Int8  float_exception; // enable floating point exception checks

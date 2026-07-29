@@ -107,6 +107,7 @@ QuadPlane::QuadPlane(const char *frame_str) :
     mass = frame->get_mass() * 1.5;
     frame->set_mass(mass);
 
+
     lock_step_scheduled = true;
 }
 
@@ -135,20 +136,42 @@ void QuadPlane::update(const struct sitl_input &input)
         quad_accel_body.rotate(ROTATION_PITCH_270);
     }
 
-    // estimate voltage and current
-    frame->current_and_voltage(battery_voltage, battery_current);
+    /*
+      forward motor electrical model:
+        I = SIM_FWD_THR_A * throttle^SIM_FWD_THR_EXP + SIM_FWD_I_FIXED
 
-    battery.set_current(battery_current);
-
-    float throttle;
-    if (reverse_thrust) {
-        throttle = filtered_servo_angle(input, 2);
-    } else {
-        throttle = filtered_servo_range(input, 2);
+      The old model was a hard-coded linear "20A at full throttle" with no
+      constant term. That is wrong in two ways that matter when integrating
+      energy over a long mission: a real prop is strongly non-linear in
+      throttle, and a real aircraft has a fixed avionics/payload load that never
+      goes away. Defaults keep the old behaviour; see PhoenixSITL.parm for a
+      set fitted to a real aircraft.
+     */
+    float fwd_current = 0;
+    if (!is_zero(thrust_scale)) {
+        // frames with thrust_scale 0 (firefly, tilt variants, cl84) have no
+        // separate forward motor - servo 3 there is a lift motor, already
+        // accounted for by the frame, so it must not be charged twice
+        float throttle;
+        if (reverse_thrust) {
+            throttle = filtered_servo_angle(input, 2);
+        } else {
+            throttle = filtered_servo_range(input, 2);
+        }
+        const float fwd_exp = MAX(0.1f, sitl->fwd_thr_exp.get());
+        fwd_current = sitl->fwd_thr_A * powf(fabsf(throttle), fwd_exp) + sitl->fwd_i_fixed;
     }
-    // assume 20A at full fwd throttle
-    throttle = fabsf(throttle);
-    battery_current += 20 * throttle;
+
+    /*
+      Total current must be known BEFORE the battery is updated, otherwise the
+      forward motor neither discharges the pack nor causes any voltage sag -
+      which in fixed-wing cruise (lift motors off) meant essentially no
+      discharge at all.
+     */
+    frame->current_and_voltage(battery_voltage, battery_current);
+    battery_current += fwd_current;
+    battery.set_current(battery_current);
+    battery_voltage = battery.get_voltage();
     
     rot_accel += quad_rot_accel;
     accel_body += quad_accel_body;

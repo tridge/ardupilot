@@ -659,6 +659,29 @@ const AP_Param::GroupInfo SIM::var_info3[] = {
     AP_SUBGROUPEXTENSION("",      63, SIM,  var_sfml_joystick),
 #endif // SFML_JOYSTICK
 
+    // @Param: FWD_THR_A
+    // @DisplayName: SITL quadplane forward motor current at full throttle
+    // @Description: Current drawn by the forward motor(s) at full throttle, in the model I = FWD_THR_A * throttle^FWD_THR_EXP + FWD_I_FIXED. Defaults reproduce the historic hard-coded linear model.
+    // @Units: A
+    // @Range: 0 500
+    // @User: Advanced
+    AP_GROUPINFO("FWD_THR_A", 57, SIM, fwd_thr_A, 20.0f),
+
+    // @Param: FWD_THR_EXP
+    // @DisplayName: SITL quadplane forward motor throttle exponent
+    // @Description: Exponent relating forward throttle to current. 1.0 is linear (the historic behaviour). A real propeller is far steeper than linear.
+    // @Range: 0.5 8.0
+    // @User: Advanced
+    AP_GROUPINFO("FWD_THR_EXP", 58, SIM, fwd_thr_exp, 1.0f),
+
+    // @Param: FWD_I_FIXED
+    // @DisplayName: SITL constant non-propulsive current
+    // @Description: Constant current draw independent of throttle - avionics, payload, comms, servos.
+    // @Units: A
+    // @Range: 0 50
+    // @User: Advanced
+    AP_GROUPINFO("FWD_I_FIXED", 59, SIM, fwd_i_fixed, 0.0f),
+
     AP_GROUPEND
 };
 
