@@ -94,6 +94,11 @@ protected:
     struct Coefficients coefficient;
 
     float thrust_scale;
+    // thrust = thrust_scale * throttle^thrust_exp. 1.0 is the historic linear model
+    float thrust_exp = 1.0f;
+    // if non-zero, use a propeller model instead:
+    //   thrust = thrust_scale * MAX(0, throttle^2 - thrust_kv*throttle*airspeed/20)
+    float thrust_kv = 0.0f;
     bool reverse_thrust;
     bool elevons;
     bool vtail;

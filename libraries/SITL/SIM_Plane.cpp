@@ -58,6 +58,46 @@ Plane::Plane(const char *frame_str) :
         mass = 22;
         thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
     }
+    if (strstr(frame_str, "quadplane")) {
+        /*
+          ARACE Phoenix drag polar, at the correct 11.5 kg all-up mass.
+
+          Derived from the measured zero-thrust glide L/D of 8.44 (log2.bin,
+          2026-07-27) rather than by fitting throttle. At 20.0 m/s and 11.5 kg
+          the wing needs CL 1.02, so with AR 7.86 and e 0.9 the induced term is
+          0.047 of a total 0.123 - a third of the drag. The earlier fit was made
+          at the generic 4.5 kg, where induced drag looks negligible, so all of
+          it landed on the parasitic term (0.162) and the aircraft glided at
+          L/D 2.6. It reproduced the measured cruise throttle, but only because
+          thrust_scale had been fitted to the same wrong number; the polar shape
+          was wrong, and with it best-range speed and the cost of climbing.
+
+          The Phoenix carries a Starlink Mini on top, which is why even 8.4 is
+          low for an airframe of this size.
+         */
+        coefficient.c_drag_p = 0.076;
+
+        /*
+          Forward thrust, using the propeller model rather than a throttle
+          exponent. Fitted to the two measured level-flight points: 13.4 N at
+          58.6 % throttle (cruise drag from the L/D above) and 31.7 N at 70.9 %
+          (the same plus m*g*Vz/V for the measured 3.25 m/s climb).
+
+          A pure throttle exponent would need 4.53 to span those two points. The
+          same log gives 4.48 for the exponent of current against throttle, and
+          current is proportional to thrust at fixed airspeed, so the two agree
+          to 1 % - good evidence the steepness is real and not an artefact. But
+          4.53 leaves nothing at low throttle (0.15 N at 20 %), so the aircraft
+          cannot transition; an earlier attempt at 3.69 failed exactly this way.
+
+          The propeller model resolves that: the steepness comes from thrust
+          falling off with airspeed, so it is steep at 20 m/s and still makes
+          7 N at 20 % throttle when static. Thrust reaches zero below ~46 %
+          throttle at 20 m/s, which matches the aircraft gliding at idle.
+                 */
+        thrust_scale = 178.0;
+        thrust_kv = 0.458;
+    }
     if (strstr(frame_str, "-revthrust")) {
         reverse_thrust = true;
     }
@@ -499,6 +539,16 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     rpm[2] = thrust * 7000;
     
     // scale thrust to newtons
+    if (!is_zero(thrust_kv) && thrust > 0) {
+        // propeller model, linear in advance ratio: thrust falls off with
+        // airspeed at a given throttle. That fall-off is what makes throttle
+        // response look so steep in level flight, while still leaving usable
+        // thrust at the low airspeeds of a transition - a pure throttle
+        // exponent steep enough to match level flight has none
+        thrust = MAX(0.0f, sq(thrust) - thrust_kv * thrust * airspeed * 0.05f);
+    } else if (!is_equal(thrust_exp, 1.0f)) {
+        thrust = (thrust >= 0 ? 1.0f : -1.0f) * powf(fabsf(thrust), thrust_exp);
+    }
     thrust *= thrust_scale;
 
     accel_body = Vector3f(thrust, 0, 0) + force;
