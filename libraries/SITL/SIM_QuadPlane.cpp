@@ -131,7 +131,7 @@ void QuadPlane::update(const struct sitl_input &input)
     Vector3f quad_accel_body;
 
     motor_mask |= ((1U<<frame->num_motors)-1U) << frame->motor_offset;
-    frame->calculate_forces(*this, input, quad_rot_accel, quad_accel_body, rpm, false);
+    frame->calculate_forces(*this, input, quad_rot_accel, quad_accel_body, rpm, true);
 
     // rotate frames for copter tailsitters
     if (copter_tailsitter) {
