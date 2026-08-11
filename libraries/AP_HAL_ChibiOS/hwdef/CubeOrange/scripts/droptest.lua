@@ -31,7 +31,6 @@ local last_tick_t = 0.0
 local last_mission_update_t = 0.0
 local last_mission_setup_t = 0.0
 local last_wp_change_t = 0.0
-local release_t = 0
 
 logfile = io.open("log.txt", "w")
 
@@ -505,29 +504,7 @@ function init()
    done_init = true
 end
 
---[[
-   airspeed schedule in 30s steps, stops on final airspeed
---]]
-local AIRSPEED_SCHEDULE_MPH = {
-   140,
-   130,
-   120,
-   130
-}
 
-function airspeed_update(dt)
-   local stage = math.floor(dt / 30.0)
-   stage = math.min(stage, #AIRSPEED_SCHEDULE_MPH-1)
-   local spd_mph = AIRSPEED_SCHEDULE_MPH[stage+1]
-   local spd_mps = spd_mph * 0.44704
-   local spd_cms = math.floor(spd_mps*100)
-   local target_airspeed = TRIM_ARSPD_CM
-   if target_airspeed ~= spd_cms then
-      gcs:send_text(0, string.format("Target airspeed %.1f mph", spd_mph))
-      param:set('TRIM_ARSPD_CM', spd_cms)
-      TRIM_ARSPD_CM = spd_cms
-   end
-end
 
 function update()
    if not done_init then
@@ -560,7 +537,6 @@ function update()
    if button_state and release_start_t > 0 and (t - release_start_t) > param:get('SCR_USER1') then
       release_trigger()
       release_start_t = 0.0
-      release_t = t
    end
 
    if t - last_mission_setup_t >= 1.0 then
@@ -578,9 +554,6 @@ function update()
       last_mission_update_t = t
       notify:handle_rgb(0,255,0,0)
       mission_update()
-      if release_t > 0 then
-         airspeed_update(t-release_t)
-      end
    end
 end
 
