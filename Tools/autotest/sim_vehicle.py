@@ -420,7 +420,7 @@ def get_user_locations_path():
 def find_offsets(instances, file_path):
     offsets = {}
     swarminit_filepath = os.path.join(autotest_dir, "swarminit.txt")
-    comment_regex = re.compile("\s*#.*")
+    comment_regex = re.compile(r"\s*#.*")
     for path in [file_path, swarminit_filepath]:
         if os.path.isfile(path):
             with open(path, 'r') as fd:
@@ -449,7 +449,7 @@ def find_location_by_name(locname):
     locations_userpath = os.environ.get('ARDUPILOT_LOCATIONS',
                                         get_user_locations_path())
     locations_filepath = os.path.join(autotest_dir, "locations.txt")
-    comment_regex = re.compile("\s*#.*")
+    comment_regex = re.compile(r"\s*#.*")
     for path in [locations_userpath, locations_filepath]:
         if not os.path.isfile(path):
             continue
