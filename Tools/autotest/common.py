@@ -4303,8 +4303,11 @@ Also, ignores heartbeats not from our target system'''
             "wipe": True,
         }
         start_sitl_args.update(**sitl_args)
-        if ("defaults_filepath" not in start_sitl_args or
-            start_sitl_args["defaults_filepath"] is None):
+        if start_sitl_args.get("defaults_filepath") is False:
+            # An explicit False requests the vehicle's built-in defaults only.
+            start_sitl_args["defaults_filepath"] = None
+        elif ("defaults_filepath" not in start_sitl_args or
+              start_sitl_args["defaults_filepath"] is None):
             start_sitl_args["defaults_filepath"] = self.defaults_filepath()
 
         if "model" not in start_sitl_args or start_sitl_args["model"] is None:

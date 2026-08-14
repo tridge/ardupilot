@@ -2005,6 +2005,56 @@ class AutoTestPlane(AutoTest):
         if ex is not None:
             raise ex
 
+    def test_sa(self):
+        model = "SA"
+        defaults = False
+
+        self.customise_SITL_commandline([],
+                                        model=model,
+                                        defaults_filepath=defaults,
+                                        wipe=True)
+
+        mission = os.path.join(testdir,
+                               self.current_test_name_directory,
+                               "CMAC-mission.txt")
+        self.mavproxy.send("wp load %s\n" % mission)
+        self.mavproxy.expect("Loaded 55 waypoints from")
+        self.mavproxy.expect("Flight plan received")
+        self.mavproxy.send("wp status\n")
+        self.mavproxy.expect("Have 55 of 55")
+
+        # Restart without wiping so the Lua script sees the uploaded mission
+        # during its one-time initialisation.
+        self.customise_SITL_commandline([],
+                                        model=model,
+                                        defaults_filepath=defaults,
+                                        wipe=False)
+
+        self.context_collect("STATUSTEXT")
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+
+        # Arming releases the SA model and changes GPIO 5.  Exercise the
+        # same button path used by the real aircraft.
+        self.wait_statustext("release: true",
+                             timeout=30,
+                             check_context=True)
+        self.wait_statustext("release trigger",
+                             timeout=30,
+                             check_context=True)
+        self.wait_mode("AUTO")
+
+        self.wait_statustext("Mission: 5 Land",
+                             timeout=600,
+                             check_context=True)
+        self.wait_statustext("SIM Hit ground",
+                             timeout=120,
+                             check_context=True)
+        self.wait_groundspeed(0, 1, timeout=15)
+
+        # Plane does not auto-disarm after landing in this old tree.
+        self.disarm_vehicle()
+
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestPlane, self).tests()
@@ -2125,6 +2175,10 @@ class AutoTestPlane(AutoTest):
             ("EKFlaneswitch",
              "Test EKF3 Affinity and Lane Switching",
              self.ekf_lane_switch),
+
+            ("TestSA",
+             "Fly the Silent Arrow CMAC mission",
+             self.test_sa),
 
             ("LogUpload",
              "Log upload",
