@@ -163,6 +163,9 @@ class VehicleInfo(object):
         "default_frame": "plane",
         "frames": {
             # PLANE
+            "SA": {
+                "waf_target": "bin/arduplane",
+            },
             "quadplane-tilttri": {
                 "make_target": "sitl",
                 "waf_target": "bin/arduplane",
@@ -369,6 +372,3 @@ class VehicleInfo(object):
             ret["waf_target"] = opts.build_target
 
         return ret
-
-
-

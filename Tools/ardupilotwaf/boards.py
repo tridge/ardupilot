@@ -460,6 +460,12 @@ class sitl(Board):
                 if fnmatch.fnmatch(f, "*.lua"):
                     env.ROMFS_FILES += [('scripts/'+f,'ROMFS/scripts/'+f)]
 
+        # Keep the mission-control script at its flight-board source path,
+        # while also making that exact file available to SITL for SA tests.
+        droptest_script = 'libraries/AP_HAL_ChibiOS/hwdef/CubeOrange/scripts/droptest.lua'
+        if os.path.exists(droptest_script):
+            env.ROMFS_FILES += [('scripts/droptest.lua', droptest_script)]
+
         if len(env.ROMFS_FILES) > 0:
             env.CXXFLAGS += ['-DHAL_HAVE_AP_ROMFS_EMBEDDED_H']
 

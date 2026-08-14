@@ -43,9 +43,6 @@ DO_JUMP = 177
 NAV_WAYPOINT = 16
 NAV_LAND = 21
 
--- see if we are running on SITL
-local is_SITL = param:get('SIM_SPEEDUP')
-
 local TRIM_ARSPD_CM = param:get('TRIM_ARSPD_CM')
 local TARGET_AIRSPEED = TRIM_ARSPD_CM * 0.01
 
@@ -513,20 +510,12 @@ function update()
    if not done_init then
       init()
    end
-   if not is_SITL and rc:has_valid_input() and rc:get_pwm(8) > 1800 then
+   if rc:has_valid_input() and rc:get_pwm(8) > 1800 then
       -- disable automation
       notify:handle_rgb(255,255,255,10)
       return
    end
    local t = 0.001 * millis():tofloat()
-
-   local state
-   if is_SITL then
-      -- use armed state for button in SITL
-      state = arming:is_armed()
-   else
-      state = button:get_button_state(button_number)
-   end
 
    local state = button:get_button_state(button_number)
    if state ~= button_state then

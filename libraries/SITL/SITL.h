@@ -384,6 +384,9 @@ public:
     SIM_Precland precland_sim;
     RichenPower richenpower_sim;
 
+    // model-specific parameter group, set when the SA model is created
+    class SA *sa_ptr = nullptr;
+
     struct {
         // LED state, for serial LED emulation
         struct {

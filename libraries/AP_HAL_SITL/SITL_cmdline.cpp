@@ -13,6 +13,7 @@
 #include <SITL/SIM_Helicopter.h>
 #include <SITL/SIM_SingleCopter.h>
 #include <SITL/SIM_Plane.h>
+#include <SITL/SIM_SA.h>
 #include <SITL/SIM_QuadPlane.h>
 #include <SITL/SIM_Rover.h>
 #include <SITL/SIM_BalanceBot.h>
@@ -141,6 +142,7 @@ static const struct {
     { "last_letter",        last_letter::create },
     { "tracker",            Tracker::create },
     { "balloon",            Balloon::create },
+    { "SA",                 SA::create },
     { "plane",              Plane::create },
     { "calibration",        Calibration::create },
     { "vectored",           Submarine::create },
@@ -248,6 +250,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         {"disable-fgview",  false,  0, CMDLINE_FGVIEW},
         {"autotest-dir",    true,   0, CMDLINE_AUTOTESTDIR},
         {"defaults",        true,   0, CMDLINE_DEFAULTS},
+        {"serial0",         true,   0, CMDLINE_UARTA},
         {"uartA",           true,   0, CMDLINE_UARTA},
         {"uartB",           true,   0, CMDLINE_UARTB},
         {"uartC",           true,   0, CMDLINE_UARTC},

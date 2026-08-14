@@ -18,6 +18,7 @@
 */
 
 #include "SITL.h"
+#include "SIM_SA.h"
 
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
@@ -179,6 +180,10 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
 // third table of user settable parameters for SITL. 
 const AP_Param::GroupInfo SITL::var_info3[] = {
     AP_GROUPINFO("ODOM_ENABLE",   1, SITL,  odom_enable, 0),
+
+    // @Group: SA_
+    // @Path: ./SIM_SA.cpp
+    AP_SUBGROUPPTR(sa_ptr, "SA_", 2, SITL, SA),
 
     AP_GROUPINFO("LED_LAYOUT",    11, SITL, led_layout, 0),
 
