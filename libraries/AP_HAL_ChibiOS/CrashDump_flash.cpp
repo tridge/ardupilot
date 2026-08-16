@@ -17,7 +17,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 
-#if AP_CRASHDUMP_ENABLED
+#if AP_CRASHDUMP_ENABLED && AP_CRASHDUMP_FLASH_ENABLED
 
 #include <CrashCatcher.h>
 #include <ch.h>
@@ -242,18 +242,18 @@ void crashdump_flash_write(const void *memory,
             dump_buffer[buf_off++] = bytes[count++];
             break;
         case CRASH_CATCHER_HALFWORD: {
-            dump_buffer[buf_off++] = uint16_t(*bytes) & 0xFFU;
+            const uint16_t value = reinterpret_cast<const uint16_t *>(memory)[count++];
+            dump_buffer[buf_off++] = value & 0xFFU;
             flush_dump_buffer();
-            dump_buffer[buf_off++] = uint16_t(*bytes) >> 8U;
-            count++;
+            dump_buffer[buf_off++] = value >> 8U;
             break;
         }
         case CRASH_CATCHER_WORD: {
-            for (uint8_t i = 0; i < sizeof(uint32_t); i++) {
-                dump_buffer[buf_off++] = (uint32_t(*bytes) >> (8U * i)) & 0xFFU;
+            const uint32_t value = reinterpret_cast<const uint32_t *>(memory)[count++];
+            for (uint8_t i = 0; i < sizeof(value); i++) {
+                dump_buffer[buf_off++] = (value >> (8U * i)) & 0xFFU;
                 flush_dump_buffer();
             }
-            count++;
             break;
         }
         }
@@ -299,4 +299,4 @@ CrashCatcherReturnCodes crashdump_flash_end(CrashCatcherReturnCodes return_code,
     return return_code;
 }
 
-#endif // AP_CRASHDUMP_ENABLED
+#endif // AP_CRASHDUMP_ENABLED && AP_CRASHDUMP_FLASH_ENABLED

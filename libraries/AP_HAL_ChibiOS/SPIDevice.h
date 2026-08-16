@@ -147,6 +147,15 @@ public:
 
     SPIDriver * get_driver();
 
+    void get_crashdump_config(bool high_speed, uint32_t &config1,
+                              uint32_t &config2) const;
+
+    ioline_t get_chip_select_line() const { return device_desc.pal_line; }
+    struct bouncebuffer_t *prepare_crashdump_buffer(uint32_t size) {
+        return bus.prepare_crashdump_buffer(size);
+    }
+    void crashdump_deassert_all_cs();
+
 #ifdef HAL_SPI_CHECK_CLOCK_FREQ
     // used to measure clock frequencies
     static void test_clock_freq(void);

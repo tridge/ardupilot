@@ -1113,12 +1113,58 @@ class ChibiOSHWDef(hwdef.HWDef):
             if self.is_bootloader_fw():
                 f.write('#define STORAGE_FLASH_START_PAGE %u\n' % storage_flash_page)
 
-        crashdump_enabled = bool(self.intdefines.get('AP_CRASHDUMP_ENABLED', (flash_size >= 2048 and not self.is_bootloader_fw())))  # noqa
+        crashdump_default = flash_size >= 2048 and not self.is_bootloader_fw()
+        crashdump_enabled = (bool(self.intdefines.get('AP_CRASHDUMP_ENABLED', crashdump_default)) and
+                             not self.is_periph_fw())
         # lets pick a flash sector for Crash log
-        f.write('#ifndef AP_CRASHDUMP_ENABLED\n')
-        f.write('#define AP_CRASHDUMP_ENABLED %u\n' % crashdump_enabled)
-        f.write('#endif\n')
+        if self.is_periph_fw():
+            f.write('#undef AP_CRASHDUMP_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_ENABLED 0\n')
+        else:
+            f.write('#ifndef AP_CRASHDUMP_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_ENABLED %u\n' % crashdump_enabled)
+            f.write('#endif\n')
         self.env_vars['ENABLE_CRASHDUMP'] = crashdump_enabled
+
+        has_sdmmc = self.have_type_prefix('SDMMC')
+        has_sdio = self.have_type_prefix('SDIO')
+        has_sdcard_spi = self.has_sdcard_spi()
+        has_fatfs_sdcard = (
+            len(self.dataflash_list) == 0 and
+            (has_sdmmc or has_sdio or has_sdcard_spi))
+        supported_sdc = (
+            (self.mcu_series.startswith(('STM32H7', 'STM32F7', 'STM32L4')) and has_sdmmc) or
+            (self.mcu_series.startswith('STM32F4') and has_sdio))
+        supported_spi = (
+            self.mcu_series.startswith(('STM32H7', 'STM32F7', 'STM32F4', 'STM32L4')) and
+            has_sdcard_spi)
+        crashdump_fatfs_supported = has_fatfs_sdcard and (supported_sdc or supported_spi)
+        crashdump_flash_requested = bool(self.intdefines.get('AP_CRASHDUMP_FLASH_ENABLED', False))
+        crashdump_fatfs_default = (crashdump_enabled and crashdump_fatfs_supported and
+                                   not crashdump_flash_requested)
+        crashdump_fatfs = (bool(self.intdefines.get('AP_CRASHDUMP_FATFS_ENABLED',
+                                                    crashdump_fatfs_default)) and
+                           crashdump_fatfs_supported)
+        crashdump_flash_default = crashdump_enabled and not crashdump_fatfs_supported
+        crashdump_flash = bool(self.intdefines.get('AP_CRASHDUMP_FLASH_ENABLED',
+                                                   crashdump_flash_default))
+        if crashdump_fatfs_supported:
+            f.write('#ifndef AP_CRASHDUMP_FATFS_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FATFS_ENABLED %u\n' % crashdump_fatfs)
+            f.write('#endif\n')
+        else:
+            # Do not allow a build option to select a backend without a usable transport.
+            f.write('#undef AP_CRASHDUMP_FATFS_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FATFS_ENABLED 0\n')
+        f.write('#ifndef AP_CRASHDUMP_FLASH_ENABLED\n')
+        f.write('#define AP_CRASHDUMP_FLASH_ENABLED %u\n' % crashdump_flash)
+        f.write('#endif\n')
+        f.write('#if !AP_CRASHDUMP_ENABLED\n')
+        f.write('#undef AP_CRASHDUMP_FATFS_ENABLED\n')
+        f.write('#define AP_CRASHDUMP_FATFS_ENABLED 0\n')
+        f.write('#undef AP_CRASHDUMP_FLASH_ENABLED\n')
+        f.write('#define AP_CRASHDUMP_FLASH_ENABLED 0\n')
+        f.write('#endif\n')
 
         if self.is_bootloader_fw():
             if self.env_vars['EXT_FLASH_SIZE_MB'] and not self.env_vars['INT_FLASH_PRIMARY']:
@@ -1142,9 +1188,11 @@ class ChibiOSHWDef(hwdef.HWDef):
         regions = []
         cc_regions = []
         total_memory = 0
+        cc_total_memory = 0
         for (address, size, flags) in ram_map:
             size *= 1024
             cc_regions.append('{0x%08x, 0x%08x, CRASH_CATCHER_BYTE }' % (address, address + size))
+            cc_total_memory += size
             if address == ram0_start_address:
                 address += ram_reserve_start
                 size -= ram_reserve_start
@@ -1152,6 +1200,7 @@ class ChibiOSHWDef(hwdef.HWDef):
             total_memory += size
         f.write('#define HAL_MEMORY_REGIONS %s\n' % ', '.join(regions))
         f.write('#define HAL_CC_MEMORY_REGIONS %s\n' % ', '.join(cc_regions))
+        f.write('#define HAL_CC_MEMORY_TOTAL_BYTES %u\n' % cc_total_memory)
         f.write('#define HAL_MEMORY_TOTAL_KB %u\n' % (total_memory/1024))
 
         f.write('\n// CPU serial number (12 bytes)\n')

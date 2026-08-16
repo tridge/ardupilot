@@ -145,6 +145,29 @@ SPIDriver * SPIDevice::get_driver() {
 	return spi_devices[device_desc.bus].driver;
 }
 
+void SPIDevice::get_crashdump_config(bool high_speed, uint32_t &config1,
+                                     uint32_t &config2) const
+{
+    const uint32_t frequency_config = high_speed ? freq_flag_high : freq_flag_low;
+#if defined(STM32H7)
+    config1 = frequency_config;
+    config2 = device_desc.mode;
+#else
+    config1 = frequency_config | device_desc.mode;
+    config2 = 0;
+#endif
+}
+
+/* Deassert every configured device on this bus without taking RTOS locks. */
+void SPIDevice::crashdump_deassert_all_cs()
+{
+    for (const auto &desc : SPIDeviceManager::device_table) {
+        if (desc.bus == device_desc.bus) {
+            palSetLine(desc.pal_line);
+        }
+    }
+}
+
 bool SPIDevice::set_speed(AP_HAL::Device::Speed speed)
 {
     switch (speed) {
