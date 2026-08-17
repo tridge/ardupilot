@@ -137,9 +137,15 @@ const CrashCatcherMemoryRegion *crashdump_flash_memory_regions(bool active)
     uint32_t total_dump_size = dump_size + buf_off + REMAINDER_MEM_REGION_SIZE;
     uint8_t curr_region = 2;
 
-    for (thread_t *tp = chRegFirstThread();
-         tp != nullptr && curr_region < ARRAY_SIZE(regions) - 1U;
-         tp = chRegNextThread(tp)) {
+    for (thread_t *tp = chRegFirstThread(); tp != nullptr; tp = chRegNextThread(tp)) {
+        const bool add_name = tp->name != nullptr &&
+                              is_address_in_memory(const_cast<char *>(tp->name));
+        const uint8_t required_regions = add_name ? 3U : 2U;
+        // Leave one entry for the terminating sentinel.
+        if (curr_region + required_regions >= ARRAY_SIZE(regions)) {
+            goto finalise;
+        }
+
         uint32_t total_stack;
         if (tp->wabase == static_cast<void *>(&__main_thread_stack_base__)) {
             total_stack = uint32_t(reinterpret_cast<const uint8_t *>(&__main_thread_stack_end__) -
@@ -149,7 +155,7 @@ const CrashCatcherMemoryRegion *crashdump_flash_memory_regions(bool active)
                                    reinterpret_cast<uintptr_t>(tp->wabase));
         }
 
-        if (tp->name != nullptr && is_address_in_memory(const_cast<char *>(tp->name))) {
+        if (add_name) {
             regions[curr_region].elementSize = CRASH_CATCHER_BYTE;
             regions[curr_region].startAddress = uint32_t(reinterpret_cast<uintptr_t>(tp->name));
             regions[curr_region++].endAddress = uint32_t(reinterpret_cast<uintptr_t>(tp->name)) + 13U;
