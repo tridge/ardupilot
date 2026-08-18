@@ -31,10 +31,6 @@ CRASH_CATCHER_TEST_WRITEABLE CrashCatcherReturnCodes g_crashCatcherDumpEndReturn
 static CrashCatcherInfo g_info;
 static bool do_flash_crash_dump = true;
 
-#if defined(HAL_CRASH_SERIAL_PORT)
-static bool do_serial_crash_dump = false;
-#endif
-
 const CrashCatcherMemoryRegion *CrashCatcher_GetMemoryRegions(void)
 {
     return crashdump_flash_memory_regions(do_flash_crash_dump);
@@ -44,11 +40,6 @@ void CrashCatcher_DumpMemory(const void *memory,
                              CrashCatcherElementSizes element_size,
                              size_t element_count)
 {
-#if defined(HAL_CRASH_SERIAL_PORT)
-    if (do_serial_crash_dump) {
-        crashdump_serial_write(memory, element_size, element_count);
-    }
-#endif
     if (do_flash_crash_dump) {
         crashdump_flash_write(memory, element_size, element_count);
     }
@@ -61,11 +52,6 @@ void CrashCatcher_DumpStart(const CrashCatcherInfo *info)
     FaultType fault_type = static_cast<FaultType>(__get_IPSR());
     save_fault_watchdog(__LINE__, fault_type, info->sp, ctx->lr_thd);
     g_info = *info;
-#if defined(HAL_CRASH_SERIAL_PORT)
-    if (do_serial_crash_dump) {
-        crashdump_serial_start(info);
-    }
-#endif
     if (do_flash_crash_dump) {
         do_flash_crash_dump = crashdump_flash_start(info);
     }
@@ -73,18 +59,10 @@ void CrashCatcher_DumpStart(const CrashCatcherInfo *info)
 
 CrashCatcherReturnCodes CrashCatcher_DumpEnd(void)
 {
-#if defined(HAL_CRASH_SERIAL_PORT)
-    if (do_serial_crash_dump) {
-        return crashdump_serial_end(g_crashCatcherDumpEndReturn);
-    }
-#endif
     if (do_flash_crash_dump) {
         return crashdump_flash_end(g_crashCatcherDumpEndReturn, g_info.isBKPT);
     }
     do_flash_crash_dump = false;
-#if defined(HAL_CRASH_SERIAL_PORT)
-    do_serial_crash_dump = true;
-#endif
     return CRASH_CATCHER_TRY_AGAIN;
 }
 

@@ -25,11 +25,3 @@ void crashdump_flash_write(const void *memory,
                            size_t element_count);
 CrashCatcherReturnCodes crashdump_flash_end(CrashCatcherReturnCodes return_code,
         bool is_breakpoint);
-
-#if defined(HAL_CRASH_SERIAL_PORT)
-void crashdump_serial_start(const CrashCatcherInfo *info);
-void crashdump_serial_write(const void *memory,
-                            CrashCatcherElementSizes element_size,
-                            size_t element_count);
-CrashCatcherReturnCodes crashdump_serial_end(CrashCatcherReturnCodes return_code);
-#endif
