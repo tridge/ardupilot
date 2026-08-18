@@ -29,11 +29,6 @@
 #error "SD and flash crash dump backends cannot be enabled together"
 #endif
 
-#if AP_CRASHDUMP_ENABLED && !AP_CRASHDUMP_FATFS_ENABLED && \
-    !AP_CRASHDUMP_FLASH_ENABLED
-#error "Crash dumping is enabled without a backend"
-#endif
-
 #if defined(STM32F4) || defined(STM32F7) || defined(STM32H7) || \
     defined(STM32L4) || defined(STM32L4PLUS)
 #define CRASHDUMP_SD_SPI_SUPPORTED_MCU 1

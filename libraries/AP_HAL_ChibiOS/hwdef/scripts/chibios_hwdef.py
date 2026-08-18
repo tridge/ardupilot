@@ -917,6 +917,62 @@ class ChibiOSHWDef(hwdef.HWDef):
 #define CH_CFG_USE_MAILBOXES 1
 ''')
 
+    def write_crashdump_config(self, f, flash_size):
+        '''write crashdump config defines'''
+        is_periph = self.is_periph_fw()
+        crashdump_default = (flash_size >= 2048 and
+                             not self.is_bootloader_fw() and
+                             not is_periph)
+        has_sdmmc = self.have_type_prefix('SDMMC')
+        has_sdio = self.have_type_prefix('SDIO')
+        has_sdcard_spi = self.has_sdcard_spi()
+        has_fatfs_sdcard = (
+            len(self.dataflash_list) == 0 and
+            (has_sdmmc or has_sdio or has_sdcard_spi))
+        supported_sdc = (
+            (self.mcu_series.startswith(('STM32H7', 'STM32F7', 'STM32L4')) and has_sdmmc) or
+            (self.mcu_series.startswith('STM32F4') and has_sdio))
+        supported_spi = (
+            self.mcu_series.startswith(('STM32H7', 'STM32F7', 'STM32F4', 'STM32L4')) and
+            has_sdcard_spi)
+        crashdump_fatfs_supported = has_fatfs_sdcard and (supported_sdc or supported_spi)
+        crashdump_flash_requested = bool(self.intdefines.get('AP_CRASHDUMP_FLASH_ENABLED', False))
+        crashdump_fatfs_default = (crashdump_default and crashdump_fatfs_supported and
+                                   not crashdump_flash_requested)
+        crashdump_fatfs = (bool(self.intdefines.get('AP_CRASHDUMP_FATFS_ENABLED',
+                                                    crashdump_fatfs_default)) and
+                           crashdump_fatfs_supported)
+        crashdump_flash_default = crashdump_default and not crashdump_fatfs_supported
+        crashdump_flash = bool(self.intdefines.get('AP_CRASHDUMP_FLASH_ENABLED',
+                                                   crashdump_flash_default))
+        if is_periph:
+            crashdump_fatfs = False
+            crashdump_flash = False
+            f.write('#undef AP_CRASHDUMP_FATFS_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FATFS_ENABLED 0\n')
+        elif crashdump_fatfs_supported:
+            f.write('#ifndef AP_CRASHDUMP_FATFS_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FATFS_ENABLED %u\n' % crashdump_fatfs)
+            f.write('#endif\n')
+        else:
+            # Do not allow a build option to select a backend without a usable transport.
+            f.write('#undef AP_CRASHDUMP_FATFS_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FATFS_ENABLED 0\n')
+        if is_periph:
+            f.write('#undef AP_CRASHDUMP_FLASH_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FLASH_ENABLED 0\n')
+        else:
+            f.write('#ifndef AP_CRASHDUMP_FLASH_ENABLED\n')
+            f.write('#define AP_CRASHDUMP_FLASH_ENABLED %u\n' % crashdump_flash)
+            f.write('#endif\n')
+        f.write('#undef AP_CRASHDUMP_ENABLED\n')
+        f.write('#define AP_CRASHDUMP_ENABLED (AP_CRASHDUMP_FATFS_ENABLED || AP_CRASHDUMP_FLASH_ENABLED)\n')
+
+        self.env_vars['CRASHDUMP_FATFS_SUPPORTED'] = crashdump_fatfs_supported
+        self.env_vars['ENABLE_CRASHDUMP_FATFS'] = crashdump_fatfs
+        self.env_vars['ENABLE_CRASHDUMP_FLASH'] = crashdump_flash
+        self.env_vars['ENABLE_CRASHDUMP'] = crashdump_fatfs or crashdump_flash
+
     def write_mcu_config(self, f):
         '''write MCU config defines'''
         f.write('#define CHIBIOS_BOARD_NAME "%s"\n' % os.path.basename(os.path.dirname(self.hwdef[0])))
@@ -1113,58 +1169,7 @@ class ChibiOSHWDef(hwdef.HWDef):
             if self.is_bootloader_fw():
                 f.write('#define STORAGE_FLASH_START_PAGE %u\n' % storage_flash_page)
 
-        crashdump_default = flash_size >= 2048 and not self.is_bootloader_fw()
-        crashdump_enabled = (bool(self.intdefines.get('AP_CRASHDUMP_ENABLED', crashdump_default)) and
-                             not self.is_periph_fw())
-        # lets pick a flash sector for Crash log
-        if self.is_periph_fw():
-            f.write('#undef AP_CRASHDUMP_ENABLED\n')
-            f.write('#define AP_CRASHDUMP_ENABLED 0\n')
-        else:
-            f.write('#ifndef AP_CRASHDUMP_ENABLED\n')
-            f.write('#define AP_CRASHDUMP_ENABLED %u\n' % crashdump_enabled)
-            f.write('#endif\n')
-        self.env_vars['ENABLE_CRASHDUMP'] = crashdump_enabled
-
-        has_sdmmc = self.have_type_prefix('SDMMC')
-        has_sdio = self.have_type_prefix('SDIO')
-        has_sdcard_spi = self.has_sdcard_spi()
-        has_fatfs_sdcard = (
-            len(self.dataflash_list) == 0 and
-            (has_sdmmc or has_sdio or has_sdcard_spi))
-        supported_sdc = (
-            (self.mcu_series.startswith(('STM32H7', 'STM32F7', 'STM32L4')) and has_sdmmc) or
-            (self.mcu_series.startswith('STM32F4') and has_sdio))
-        supported_spi = (
-            self.mcu_series.startswith(('STM32H7', 'STM32F7', 'STM32F4', 'STM32L4')) and
-            has_sdcard_spi)
-        crashdump_fatfs_supported = has_fatfs_sdcard and (supported_sdc or supported_spi)
-        crashdump_flash_requested = bool(self.intdefines.get('AP_CRASHDUMP_FLASH_ENABLED', False))
-        crashdump_fatfs_default = (crashdump_enabled and crashdump_fatfs_supported and
-                                   not crashdump_flash_requested)
-        crashdump_fatfs = (bool(self.intdefines.get('AP_CRASHDUMP_FATFS_ENABLED',
-                                                    crashdump_fatfs_default)) and
-                           crashdump_fatfs_supported)
-        crashdump_flash_default = crashdump_enabled and not crashdump_fatfs_supported
-        crashdump_flash = bool(self.intdefines.get('AP_CRASHDUMP_FLASH_ENABLED',
-                                                   crashdump_flash_default))
-        if crashdump_fatfs_supported:
-            f.write('#ifndef AP_CRASHDUMP_FATFS_ENABLED\n')
-            f.write('#define AP_CRASHDUMP_FATFS_ENABLED %u\n' % crashdump_fatfs)
-            f.write('#endif\n')
-        else:
-            # Do not allow a build option to select a backend without a usable transport.
-            f.write('#undef AP_CRASHDUMP_FATFS_ENABLED\n')
-            f.write('#define AP_CRASHDUMP_FATFS_ENABLED 0\n')
-        f.write('#ifndef AP_CRASHDUMP_FLASH_ENABLED\n')
-        f.write('#define AP_CRASHDUMP_FLASH_ENABLED %u\n' % crashdump_flash)
-        f.write('#endif\n')
-        f.write('#if !AP_CRASHDUMP_ENABLED\n')
-        f.write('#undef AP_CRASHDUMP_FATFS_ENABLED\n')
-        f.write('#define AP_CRASHDUMP_FATFS_ENABLED 0\n')
-        f.write('#undef AP_CRASHDUMP_FLASH_ENABLED\n')
-        f.write('#define AP_CRASHDUMP_FLASH_ENABLED 0\n')
-        f.write('#endif\n')
+        self.write_crashdump_config(f, flash_size)
 
         if self.is_bootloader_fw():
             if self.env_vars['EXT_FLASH_SIZE_MB'] and not self.env_vars['INT_FLASH_PRIMARY']:
