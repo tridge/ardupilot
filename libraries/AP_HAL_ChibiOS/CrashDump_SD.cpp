@@ -64,11 +64,11 @@
 
 /*
   SD crash dumps cannot use FatFs or ChibiOS synchronization from a fault
-  handler. At boot a file is allocated and its physical sector extents are
-  recorded. The fault handler then drives SDMMC directly in polling mode.
+  handler. At boot a contiguous file is allocated and its physical start
+  sector is recorded. The fault handler then drives SDMMC directly in polling
+  mode.
  */
 
-#define CRASHDUMP_SD_MAX_EXTENTS 64U
 #define CRASHDUMP_OVERHEAD (8U * 1024U)
 #if CRASHDUMP_SD_SDMMCV2
 #define SDMMC_ICR_ALL_FLAGS 0xFFFFFFFFU
@@ -119,13 +119,7 @@ extern "C" {
     extern const uint8_t __firmware_crc_ext_end__;
 }
 
-struct CrashDumpExtent {
-    uint32_t start_sector;
-    uint32_t sector_count;
-};
-
-static CrashDumpExtent *sd_extents;
-static uint16_t sd_extent_count;
+static uint32_t sd_start_sector;
 static uint32_t sd_total_sectors;
 #if HAL_USE_SDC
 static SDCDriver *sd_sdcp;
@@ -187,13 +181,10 @@ enum class CrashDumpDiagnostic : uint8_t {
     SYNC_RESERVED = 11,
     INVALID_RESERVED_SIZE = 12,
     REOPEN_RESERVED = 13,
-    EXTENT_WORK_ALLOCATION = 14,
-    EXTENT_SEEK = 15,
-    EXTENT_COUNT = 16,
-    EXTENT_INVALID = 17,
-    EXTENT_INCOMPLETE = 18,
-    EXTENT_FINAL_ALLOCATION = 19,
     RESERVE_CREATE_ARMED = 20,
+    EXPAND_RESERVED = 21,
+    CONTIGUOUS_SEEK = 22,
+    RESERVED_FRAGMENTED = 23,
 };
 
 static bool unlink_if_exists(const char *path)
@@ -340,84 +331,55 @@ static void calculate_firmware_identity()
     sd_firmware_git_hash = AP::fwversion().fw_hash;
 }
 
-/*
-  Convert a file sector offset to an SD sector and return the number of
-  physically contiguous sectors remaining in the extent.
- */
+/* Convert a file sector offset to an SD sector. */
 static bool sector_mapping(uint32_t sector_offset, uint32_t &sector, uint32_t &available)
 {
-    for (uint16_t i = 0; i < sd_extent_count; i++) {
-        if (sector_offset < sd_extents[i].sector_count) {
-            sector = sd_extents[i].start_sector + sector_offset;
-            available = sd_extents[i].sector_count - sector_offset;
-            return true;
-        }
-        sector_offset -= sd_extents[i].sector_count;
+    if (sector_offset >= sd_total_sectors) {
+        return false;
     }
-    return false;
+    sector = sd_start_sector + sector_offset;
+    available = sd_total_sectors - sector_offset;
+    return true;
 }
 
-/* Build sector extents by walking the file one cluster at a time. */
-static bool build_extent_list(FIL &fp, uint32_t num_sectors)
+/* Check file contiguity and return its first physical sector. */
+static FRESULT check_contiguous_file(FIL &fp, bool &contiguous,
+                                     uint32_t &start_sector)
 {
-    CrashDumpExtent *const max_extents = NEW_NOTHROW CrashDumpExtent[CRASHDUMP_SD_MAX_EXTENTS];
-    if (max_extents == nullptr) {
-        return init_failed(CrashDumpDiagnostic::EXTENT_WORK_ALLOCATION);
+    contiguous = false;
+    start_sector = 0;
+
+    FRESULT result = f_lseek(&fp, 0);
+    if (result != FR_OK) {
+        return result;
     }
 
     FATFS *const fs = fp.obj.fs;
-    uint16_t extent_count = 0;
-    uint32_t total_sectors = 0;
-    uint32_t sectors_remaining = num_sectors;
-    while (sectors_remaining > 0) {
-        const uint32_t sector_count = min_u32(fs->csize, sectors_remaining);
-        // FatFs leaves fp.clust at the cluster containing seek_offset - 1.
-        // Cluster-end seeks are sector-aligned and advance the chain linearly.
-        const FSIZE_t seek_offset = FSIZE_t(total_sectors + sector_count) * MMCSD_BLOCK_SIZE;
-        const FRESULT seek_result = f_lseek(&fp, seek_offset);
-        if (seek_result != FR_OK || f_tell(&fp) != seek_offset) {
-            delete[] max_extents;
-            return init_failed(CrashDumpDiagnostic::EXTENT_SEEK, seek_result);
-        }
+    const uint32_t cluster_size = uint32_t(fs->csize) * MMCSD_BLOCK_SIZE;
+    FSIZE_t remaining = f_size(&fp);
+    if (remaining == 0 || fp.obj.sclust < 2U ||
+        fp.obj.sclust >= fs->n_fatent) {
+        return FR_OK;
+    }
 
-        const uint32_t cluster = fp.clust;
-        if (cluster < 2U || cluster >= fs->n_fatent) {
-            delete[] max_extents;
-            return init_failed(CrashDumpDiagnostic::EXTENT_INVALID);
+    uint32_t cluster = fp.obj.sclust - 1U;
+    while (remaining > 0) {
+        const uint32_t step = min_u32(remaining, cluster_size);
+        result = f_lseek(&fp, f_tell(&fp) + step);
+        if (result != FR_OK) {
+            return result;
         }
-        const uint32_t start_sector = fs->database +
-                                      (cluster - 2U) * fs->csize;
-        if (extent_count > 0 &&
-            max_extents[extent_count - 1U].start_sector +
-            max_extents[extent_count - 1U].sector_count == start_sector) {
-            max_extents[extent_count - 1U].sector_count += sector_count;
-        } else {
-            if (extent_count >= CRASHDUMP_SD_MAX_EXTENTS) {
-                delete[] max_extents;
-                return init_failed(CrashDumpDiagnostic::EXTENT_COUNT,
-                                   CRASHDUMP_SD_MAX_EXTENTS);
-            }
-            max_extents[extent_count++] = {start_sector, sector_count};
+        if (fp.clust != cluster + 1U) {
+            return FR_OK;
         }
-        total_sectors += sector_count;
-        sectors_remaining -= sector_count;
+        cluster = fp.clust;
+        remaining -= step;
         stm32_watchdog_pat();
     }
-    if (extent_count == 0) {
-        delete[] max_extents;
-        return init_failed(CrashDumpDiagnostic::EXTENT_INCOMPLETE);
-    }
 
-    sd_extents = NEW_NOTHROW CrashDumpExtent[extent_count];
-    if (sd_extents == nullptr) {
-        delete[] max_extents;
-        return init_failed(CrashDumpDiagnostic::EXTENT_FINAL_ALLOCATION);
-    }
-    memcpy(sd_extents, max_extents, extent_count * sizeof(*sd_extents));
-    sd_extent_count = extent_count;
-    sd_total_sectors = total_sectors;
-    delete[] max_extents;
-    return true;
+    start_sector = fs->database + (fp.obj.sclust - 2U) * fs->csize;
+    contiguous = true;
+    return FR_OK;
 }
 
 #if CRASHDUMP_SD_SPI
@@ -1232,9 +1194,7 @@ bool crashdump_sd_init()
 {
     sd_is_ready = false;
     sd_dump_size = 0;
-    delete[] sd_extents;
-    sd_extents = nullptr;
-    sd_extent_count = 0;
+    sd_start_sector = 0;
     sd_total_sectors = 0;
 
 #if CRASHDUMP_SD_SPI
@@ -1315,7 +1275,17 @@ bool crashdump_sd_init()
         return init_failed(CrashDumpDiagnostic::OPEN_RESERVED, result);
     }
 
-    if (reset_reserved || new_reserved || f_size(&fp) != target_size) {
+    bool contiguous = false;
+    uint32_t start_sector;
+    if (!reset_reserved && !new_reserved && f_size(&fp) == target_size) {
+        result = check_contiguous_file(fp, contiguous, start_sector);
+        if (result != FR_OK) {
+            f_close(&fp);
+            return init_failed(CrashDumpDiagnostic::CONTIGUOUS_SEEK, result);
+        }
+    }
+
+    if (reset_reserved || new_reserved || f_size(&fp) != target_size || !contiguous) {
         if (armed) {
             f_close(&fp);
             return init_failed(CrashDumpDiagnostic::RESERVE_CREATE_ARMED);
@@ -1327,6 +1297,12 @@ bool crashdump_sd_init()
             if (result != FR_OK) {
                 return init_failed(CrashDumpDiagnostic::RECREATE_RESERVED, result);
             }
+        }
+
+        result = f_expand(&fp, target_size, 1);
+        if (result != FR_OK) {
+            f_close(&fp);
+            return init_failed(CrashDumpDiagnostic::EXPAND_RESERVED, result);
         }
 
         memset(sd_dma_buf, 0xFF, sd_dma_buf_size);
@@ -1361,11 +1337,16 @@ bool crashdump_sd_init()
         return init_failed(CrashDumpDiagnostic::REOPEN_RESERVED, result);
     }
     const uint8_t filesystem_type = fp.obj.fs->fs_type;
-    const bool extent_list_ok = build_extent_list(fp, file_size / MMCSD_BLOCK_SIZE);
+    result = check_contiguous_file(fp, contiguous, start_sector);
     f_close(&fp);
-    if (!extent_list_ok) {
-        return false;
+    if (result != FR_OK) {
+        return init_failed(CrashDumpDiagnostic::CONTIGUOUS_SEEK, result);
     }
+    if (!contiguous) {
+        return init_failed(CrashDumpDiagnostic::RESERVED_FRAGMENTED);
+    }
+    sd_start_sector = start_sector;
+    sd_total_sectors = file_size / MMCSD_BLOCK_SIZE;
 
     calculate_firmware_identity();
     if (get_dump_state(crashdump_published_path, sd_dump_size) !=
@@ -1374,9 +1355,9 @@ bool crashdump_sd_init()
     }
     sd_dump_check_ms = AP_HAL::millis();
 
-    printf("CrashDumpSD: fs %u, %u extents, %u sectors, %u byte buffer, firmware %08x/%u\n",
+    printf("CrashDumpSD: fs %u, start %u, %u sectors, %u byte buffer, firmware %08x/%u\n",
            unsigned(filesystem_type),
-           unsigned(sd_extent_count), unsigned(sd_total_sectors),
+           unsigned(sd_start_sector), unsigned(sd_total_sectors),
            unsigned(sd_dma_buf_size), unsigned(sd_firmware_crc),
            unsigned(sd_firmware_size));
     sd_is_ready = true;
