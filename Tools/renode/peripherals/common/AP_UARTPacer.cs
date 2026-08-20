@@ -1,11 +1,12 @@
 // STM32F7_USART advertises buffer-state flow control, causing a host terminal
 // to inject a complete socket write as one atomic virtual-time event. Real
 // UART bytes arrive over time, giving firmware time to consume each DMA
-// request. Pace host-to-firmware traffic at the configured baud rate and
-// do not release the next host byte until the USART has consumed the
-// previous one; firmware output remains immediate.
+// request. Accept each host socket burst into a queue, then pace that queue
+// in virtual time. Backpressuring the host after every byte makes latency
+// depend on host/emulation thread handoffs; firmware output remains immediate.
 //
 using System;
+using System.Collections.Concurrent;
 using Antmicro.Migrant;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Peripherals;
@@ -21,38 +22,34 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             this.machine = machine;
             this.uart = uart;
+            pending = new ConcurrentQueue<byte>();
             uartWithBufferState = uart as IUARTWithBufferState;
             if(uartWithBufferState != null)
             {
                 uartWithBufferState.BufferStateChanged += UnderlyingBufferStateChanged;
             }
             uart.CharReceived += value => CharReceived?.Invoke(value);
+            BufferState = BufferState.Ready;
         }
 
         public void Reset()
         {
             generation++;
+            while(pending.TryDequeue(out _))
+            {
+            }
             frameTimeElapsed = true;
-            BufferState = BufferState.Empty;
+            BufferState = BufferState.Ready;
         }
 
         public void WriteChar(byte value)
         {
-            BufferState = BufferState.Full;
-            frameTimeElapsed = false;
-            var scheduledGeneration = ++generation;
-            uart.WriteChar(value);
-
-            var baudRate = BaudRate;
-            var delayUs = (uint)Math.Ceiling(FrameBits * 1000000.0 / baudRate);
-            machine.ScheduleAction(TimeInterval.FromMicroseconds(delayUs), _ =>
+            pending.Enqueue(value);
+            if(pending.Count >= MaxPendingBytes)
             {
-                if(scheduledGeneration == generation)
-                {
-                    frameTimeElapsed = true;
-                    TryReleaseHostByte();
-                }
-            }, name: "AP UART host input");
+                BufferState = BufferState.Full;
+            }
+            machine.LocalTimeSource.ExecuteInNearestSyncedState(_ => TryTransmit());
         }
 
         public uint BaudRate
@@ -100,18 +97,39 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             if(state == BufferState.Empty)
             {
-                TryReleaseHostByte();
+                machine.LocalTimeSource.ExecuteInNearestSyncedState(_ => TryTransmit());
             }
         }
 
-        private void TryReleaseHostByte()
+        private void TryTransmit()
         {
             if(!frameTimeElapsed || (uartWithBufferState != null &&
                 uartWithBufferState.BufferState != BufferState.Empty))
             {
                 return;
             }
-            BufferState = BufferState.Ready;
+            if(!pending.TryDequeue(out var value))
+            {
+                return;
+            }
+            if(BufferState == BufferState.Full && pending.Count <= ResumePendingBytes)
+            {
+                BufferState = BufferState.Ready;
+            }
+
+            frameTimeElapsed = false;
+            uart.WriteChar(value);
+            var scheduledGeneration = generation;
+            var baudRate = BaudRate;
+            var delayUs = (uint)Math.Ceiling(FrameBits * 1000000.0 / baudRate);
+            machine.ScheduleAction(TimeInterval.FromMicroseconds(delayUs), _ =>
+            {
+                if(scheduledGeneration == generation)
+                {
+                    frameTimeElapsed = true;
+                    TryTransmit();
+                }
+            }, name: "AP UART host input");
         }
 
         private double FrameBits
@@ -148,6 +166,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private readonly IMachine machine;
         private readonly IUART uart;
         private readonly IUARTWithBufferState uartWithBufferState;
+        private readonly ConcurrentQueue<byte> pending;
         private BufferState bufferState;
         private bool frameTimeElapsed = true;
         private uint generation;
@@ -156,5 +175,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         // One start bit plus the eight data bits modeled by STM32F7_USART.
         private const uint StartAndDataBits = 9;
         private const uint DefaultBaudRate = 115200;
+        private const int MaxPendingBytes = 4096;
+        private const int ResumePendingBytes = MaxPendingBytes / 2;
     }
 }

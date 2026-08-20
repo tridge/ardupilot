@@ -45,7 +45,9 @@ FLIGHT_FIRMWARE = (
 CAN_BASES = (8, 6, 4, 2)
 MAVPROXY_SUCCESS = re.compile(r'Received (\d+) parameters \(ftp\)')
 MAVPROXY_HEARTBEAT = re.compile(r'Detected vehicle \d+:\d+ on link \d+')
+MAVPROXY_PING = re.compile(r'ping response: ([0-9.]+)ms')
 RENODE_STARTED = re.compile(r'Machine started\.')
+MAX_PING_MS = 500
 
 
 def dronecan_param_test(bus, timeout):
@@ -292,6 +294,14 @@ def test_mavlink(mavproxy, uart_port, state_dir, deadline):
     try:
         wait_for_pattern(process, output, MAVPROXY_HEARTBEAT, deadline,
                          'a MAVLink heartbeat')
+        process.stdin.write('ping\n')
+        process.stdin.flush()
+        ping_match = wait_for_pattern(process, output, MAVPROXY_PING, deadline,
+                                      'a MAVLink ping response')
+        ping_ms = float(ping_match.group(1))
+        if ping_ms > MAX_PING_MS:
+            raise RuntimeError('MAVLink ping took %.1fms (maximum %.1fms)' %
+                               (ping_ms, MAX_PING_MS))
         # Parameter enumeration can still change during vehicle setup. Delay
         # loading the param module so its automatic first fetch, and our
         # explicit FTP fetch, both see the stable table.
@@ -303,7 +313,7 @@ def test_mavlink(mavproxy, uart_port, state_dir, deadline):
         count = int(match.group(1))
         if count == 0:
             raise RuntimeError('MAVProxy downloaded an empty parameter table')
-        return '%u MAVLink parameters via FTP' % count
+        return '%u MAVLink parameters via FTP, %.1fms ping' % (count, ping_ms)
     except Exception as error:
         raise ClientFailure(str(error), output.text()) from error
     finally:
