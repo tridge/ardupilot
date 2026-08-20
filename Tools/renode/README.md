@@ -684,30 +684,6 @@ roughly 20 seconds in a paced Pixhawk6X run; serial MAVLink should continue
 during calibration, and Ethernet should respond after the firmware reports its
 address.
 
-### STM32H743 BLHeli/Shared_DMA reproduction
-
-BlitzWingH743 ArduPlane can causally reproduce issue #33926. The test creates a
-stale BLHeli motor mapping after initialization, then enters the normal
-connection-test and RCOutput serial-DMA path:
-
-```sh
-./waf configure --board BlitzWingH743 --enable-APJ_TOOL_PARAMETERS \
-    --default-parameters=Tools/renode/params/pr33933.parm
-./waf plane
-Tools/renode/run.py BlitzWingH743 --vehicle arduplane \
-    --reproduce-pr33933 vulnerable
-```
-
-The vulnerable run naturally selects a PWM group whose DMA handle was never
-initialized and pauses after CrashCatcher writes its dump. Nothing writes or
-clears a DMA field. Use `--reproduce-pr33933 fixed` with the AP_BLHeli fix; it
-pauses when the stale mapping is rejected before RCOutput. The older
-`--reproduce-pr33933 guarded` mode remains available for testing PR #33933's
-allocator guard. `--reproduce-pr33933 valid` is the positive control that keeps
-the configured output mapping and must reach serial DMA with a non-null handle.
-See [`h743_port.md`](h743_port.md) for the root cause, symbolized stack, fix,
-and test results.
-
 ## Next
 
 - Turn the all-board generation audit into CI and add representative automated

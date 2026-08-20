@@ -251,76 +251,7 @@ Arm: Battery 1 unhealthy
 Arm: Waiting for RC
 ```
 
-This is far enough for the GCS receive/BLHeli reproduction path. A
-future GPS model can move EKF3 past its fixed-wing bootstrap gate, but
-is not required for the Shared_DMA fault.
-
-## Stage 3.5 status: causal issue #33926 reproduction complete
-
-The reporter's stable-4.7.0 dump exposes the complete failure state. AP_BLHeli
-was processing motor index 2 with `SERVO_BLH_MASK=0`, a boot-time
-`motor_map={4,5,6}`, and `motor_mask=0x70`. The live Motor3 servo-function
-lookup failed. `blheli_chan_to_output_chan()` ignored that failure and returned
-its initialized fallback value, channel 0.
-
-That mismatch explains the apparently corrupt DMA state without a DMA lifetime
-bug. `serial_setup_output(channel=0, mask=0x70)` selects PWM group 0 as
-`serial_group`, but its setup loop configures only groups intersecting mask
-0x70. Groups 1 and 2 receive DMA handles while group 0 remains in PWM mode with
-a null handle. The function nevertheless returns success. The first
-`serial_write_bytes()` then calls `group0.dma_handle->lock()` and reaches
-`Shared_DMA::lock_core()` through the null handle's `allocate` functor.
-
-The Renode regression creates this inconsistency causally rather than writing a
-DMA field. It configures output 5 as DShot300, waits until AP_BLHeli has cached
-that output, changes the live BLHeli mask so Motor1 has no dynamic servo
-assignment, and starts the normal firmware connection test. This is a compact
-same-boot surrogate for the reporter's repeated mask and servo-function edits:
-it exercises the same unchecked lookup and naturally creates the same null
-PWM-group handle.
-
-Build and run the vulnerable case with:
-
-```sh
-./waf configure --board BlitzWingH743 --enable-APJ_TOOL_PARAMETERS \
-    --default-parameters=Tools/renode/params/pr33933.parm
-./waf plane
-Tools/renode/run.py BlitzWingH743 --vehicle arduplane \
-    --reproduce-pr33933 vulnerable
-```
-
-The launcher reads symbol and parameter metadata from the selected ELF, so
-addresses and object offsets are not tied to one build. It arms all hooks before
-starting the MCU, waits for BLHeli initialization, applies the mapping change in
-RAM, and pauses after the expected result. It only observes the selected PWM
-group's DMA handle; it never changes it.
-
-Observed vulnerable result:
-
-```text
-PR33933: changed SERVO_BLH_MASK from 16 to 0 after BLHeli init
-PR33933: selected pwm_group DMA handle=0x0
-PR33933: vulnerable build entered CrashCatcher
-PR33933: CrashCatcher finished writing the dump
-```
-
-The vulnerable run naturally produced a CrashCatcher dump. CrashDebug
-symbolized the relevant stack as:
-
-```text
-Functor<void, Shared_DMA*>::operator()       (null method pointer, r3=0)
-Shared_DMA::lock_core
-RCOutput::serial_write_bytes
-AP_BLHeli::BL_SendBuf
-AP_BLHeli::BL_ConnectEx
-AP_BLHeli::run_connection_test
-Plane::one_second_loop
-```
-
-That is the same core `Shared_DMA -> RCOutput -> AP_BLHeli` failure path as the
-reporter's dump, although this run enters it through the built-in connection
-test rather than MAVLink passthrough and Renode records the faulting call-site
-PC rather than PC=0.
+A future GPS model can move EKF3 past its fixed-wing bootstrap gate.
 
 ## Stage 4 status: timer update DMA complete
 
@@ -335,44 +266,6 @@ that a timer update now advances NDTR, completes the transfer, and raises the
 real firmware DMA-completion path. The stock timer still logs the DMAR write at
 offset 0x4c as unhandled; modeling the individual pulse values is unnecessary
 for transfer completion and will matter only when an ESC line model is added.
-
-## Stage 4.5 status: root fix tested
-
-`AP_BLHeli::get_output_channel()` now returns failure when the requested motor
-does not exist, its servo-function lookup fails, or the resolved output is not
-in the mask configured during initialization. All BLHeli serial, MSP motor, and
-ESC-voltage consumers handle that failure instead of operating on output 1.
-The mask check also prevents a live servo-function move from driving an output
-that was never initialized for BLHeli; the existing BLHeli mask and output-type
-parameters already require a reboot.
-
-The same Renode stimulus against the fixed firmware stops before RCOutput:
-
-```sh
-Tools/renode/run.py BlitzWingH743 --vehicle arduplane \
-    --reproduce-pr33933 fixed
-```
-
-```text
-PR33933: changed SERVO_BLH_MASK from 16 to 0 after BLHeli init
-PR33933: fixed build rejected stale motor mapping
-```
-
-A control mode leaves the mask and mapping valid:
-
-```sh
-Tools/renode/run.py BlitzWingH743 --vehicle arduplane \
-    --reproduce-pr33933 valid
-```
-
-It reached the normal BLHeli serial path with `DMA handle=0x3002BA38`, proving
-the fix does not block a configured DShot output. The fixed BlitzWingH743
-ArduPlane image also completes its normal waf build.
-
-The hwdef-generated harness was retested with a fresh image on 2026-08-07. The
-fixed case again rejected the stale mapping before RCOutput, and the valid case
-reached serial DMA with a non-null handle (`0x3002C9C8`). A fresh generated
-KakuteF4 platform also reached `Copter::init_ardupilot()`.
 
 ## CubeOrange boot and MAVLink
 

@@ -21,7 +21,6 @@ a build of renode v1.16.1 with them applied (see the README).
 import argparse
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -52,239 +51,6 @@ exec "$GDB" \
     -ex "target remote 127.0.0.1:$PORT" \
     "$ELF"
 '''
-
-
-def cpp_symbols(elf):
-    '''Demangled ELF (address, size) pairs, keyed by complete names.'''
-    nm = shutil.which('arm-none-eabi-nm') or shutil.which('nm')
-    if nm is None:
-        return {}
-    try:
-        out = subprocess.check_output(
-            [nm, '-C', '-S', str(elf)], stderr=subprocess.DEVNULL
-        ).decode()
-    except (OSError, subprocess.CalledProcessError):
-        return {}
-    symbols = {}
-    for line in out.splitlines():
-        parts = line.split(None, 3)
-        if len(parts) != 4:
-            continue
-        try:
-            symbols[parts[3]] = (int(parts[0], 16), int(parts[1], 16))
-        except ValueError:
-            pass
-    return symbols
-
-
-def elf_data(elf, address, size):
-    '''Read bytes from a loadable ELF address using objdump.'''
-    objdump = shutil.which('arm-none-eabi-objdump') or shutil.which('objdump')
-    if objdump is None:
-        sys.exit('objdump is required for the PR 33933 reproduction')
-    try:
-        out = subprocess.check_output(
-            [objdump, '-s', '--start-address=0x%X' % address,
-             '--stop-address=0x%X' % (address + size), str(elf)],
-            stderr=subprocess.STDOUT,
-        ).decode()
-    except (OSError, subprocess.CalledProcessError) as error:
-        sys.exit('failed to read data from %s: %s' % (elf, error))
-    data = bytearray()
-    for line in out.splitlines():
-        fields = line.split()
-        if not fields or not re.fullmatch(r'[0-9a-fA-F]+', fields[0]):
-            continue
-        for field in fields[1:]:
-            if not re.fullmatch(r'[0-9a-fA-F]{8}', field):
-                break
-            data.extend(bytes.fromhex(field))
-    if len(data) != size:
-        sys.exit('expected %u bytes at 0x%X in %s, found %u' %
-                 (size, address, elf, len(data)))
-    return data
-
-
-def group_member_offset(elf, address, size, index):
-    '''Find an AP_Param GroupInfo member offset by its parameter index.'''
-    data = elf_data(elf, address, size)
-    group_info_size = 16
-    for entry in range(0, len(data), group_info_size):
-        if entry + group_info_size > len(data):
-            break
-        if data[entry + 14] == index:
-            return int.from_bytes(data[entry + 4:entry + 8], 'little')
-    sys.exit('PR 33933 reproduction: parameter index %u not found' % index)
-
-
-def serial_dma_offsets(elf):
-    '''Derive RCOutput serial_group and pwm_group dma_handle offsets.'''
-    objdump = shutil.which('arm-none-eabi-objdump') or shutil.which('objdump')
-    if objdump is None:
-        sys.exit('objdump is required for the PR 33933 reproduction')
-    try:
-        out = subprocess.check_output(
-            [objdump, '-d', '-C', str(elf)], stderr=subprocess.STDOUT
-        ).decode()
-    except (OSError, subprocess.CalledProcessError) as error:
-        sys.exit('failed to disassemble %s: %s' % (elf, error))
-    marker = ('<ChibiOS::RCOutput::serial_write_bytes(unsigned char const*, '
-              'unsigned short)>:')
-    start = out.find(marker)
-    if start < 0:
-        sys.exit('PR 33933 reproduction: RCOutput::serial_write_bytes not found')
-    body = out[start:out.find('\n\n', start)]
-    serial_group = re.search(r'ldr(?:\.w)?\s+r4, \[r0, #(\d+)\]', body)
-    dma_handle = re.search(r'ldr(?:\.w)?\s+r0, \[r4, #(\d+)\]', body)
-    if serial_group is None or dma_handle is None:
-        sys.exit('PR 33933 reproduction: could not derive RCOutput layout')
-    return int(serial_group.group(1)), int(dma_handle.group(1))
-
-
-def blheli_initialized_offset(elf):
-    '''Derive the AP_BLHeli::initialised member offset from init().'''
-    objdump = shutil.which('arm-none-eabi-objdump') or shutil.which('objdump')
-    if objdump is None:
-        sys.exit('objdump is required for the PR 33933 reproduction')
-    try:
-        out = subprocess.check_output(
-            [objdump, '-d', '-C', str(elf)], stderr=subprocess.STDOUT
-        ).decode()
-    except (OSError, subprocess.CalledProcessError) as error:
-        sys.exit('failed to disassemble %s: %s' % (elf, error))
-    marker = '<AP_BLHeli::init(unsigned long, AP_HAL::RCOutput::output_mode)>:'
-    start = out.find(marker)
-    if start < 0:
-        sys.exit('PR 33933 reproduction: AP_BLHeli::init not found')
-    body = out[start:out.find('\n\n', start)]
-    initialised = re.search(r'strb(?:\.w)?\s+r3, \[r0, #(\d+)\]', body)
-    if initialised is None:
-        sys.exit('PR 33933 reproduction: could not derive AP_BLHeli layout')
-    return int(initialised.group(1))
-
-
-def pr33933_commands(elf, expected):
-    '''Hooks for a deterministic test of the stale BLHeli motor mapping.
-
-       The firmware must use params/pr33933.parm. For the failure cases,
-       the hook changes SERVO_BLH_MASK from 16 to zero after
-       AP_BLHeli::init(). The cached motor mask still names output 5, while
-       the missing dynamic Motor1 assignment falls back to output 1. The
-       valid control leaves the mask unchanged.
-    '''
-    symbols = cpp_symbols(elf)
-
-    def monitor_script(script):
-        return script.replace('\\', '\\\\').replace('"', '\\"')
-
-    def required(name):
-        info = symbols.get(name)
-        if info is None:
-            sys.exit("PR 33933 reproduction: symbol not found: %s" % name)
-        return info
-
-    singleton, _ = required('AP_BLHeli::_singleton')
-    update, _ = required('AP_BLHeli::update()')
-    var_info, var_info_size = required('AP_BLHeli::var_info')
-    serial_write, _ = required(
-        'ChibiOS::RCOutput::serial_write_bytes(unsigned char const*, unsigned short)'
-    )
-    channel_mask = group_member_offset(elf, var_info, var_info_size, 1)
-    run_test = group_member_offset(elf, var_info, var_info_size, 3)
-    serial_group_offset, dma_handle_offset = serial_dma_offsets(elf)
-    initialised_offset = blheli_initialized_offset(elf)
-
-    if expected == 'valid':
-        trigger = (
-            'obj=machine.SystemBus.ReadDoubleWord(0x%X); '
-            'ready=obj != 0 and machine.SystemBus.ReadByte(obj+%u) != 0; '
-            'machine.SystemBus.WriteByte(obj+%u, 1) if ready else None; '
-            'self.InfoLog("PR33933: retained valid output 5 mapping") if ready else None'
-            % (singleton, initialised_offset, run_test)
-        )
-    else:
-        trigger = (
-            'obj=machine.SystemBus.ReadDoubleWord(0x%X); '
-            'ready=obj != 0 and machine.SystemBus.ReadByte(obj+%u) != 0; '
-            'machine.SystemBus.WriteDoubleWord(obj+%u, 0) if ready else None; '
-            'machine.SystemBus.WriteByte(obj+%u, 1) if ready else None; '
-            'self.InfoLog("PR33933: changed SERVO_BLH_MASK from 16 to 0 after BLHeli init") if ready else None'
-            % (singleton, initialised_offset, channel_mask, run_test)
-        )
-    observe = (
-        'rcout=self.GetRegisterUlong(0); '
-        'group=machine.SystemBus.ReadDoubleWord(rcout+%u); '
-        'handle=machine.SystemBus.ReadDoubleWord(group+%u); '
-        'self.InfoLog("PR33933: selected pwm_group DMA handle=0x{0:X}", handle); '
-        'self.RemoveHooksAt(0x%X); self.RemoveHooksAt(0x%X)'
-        % (serial_group_offset, dma_handle_offset, serial_write, update)
-    )
-    if expected == 'fixed':
-        observe += (
-            '; self.ErrorLog("PR33933: fixed build unexpectedly reached serial output")'
-            '; machine.PauseAndRequestEmulationPause()'
-        )
-    elif expected == 'valid':
-        observe += (
-            '; self.InfoLog("PR33933: valid mapping reached serial DMA") if handle != 0 else '
-            'self.ErrorLog("PR33933: valid mapping has a null DMA handle")'
-            '; machine.PauseAndRequestEmulationPause()'
-        )
-    commands = [
-        'logLevel 3 nvic',
-        'logLevel 3 flashController',
-        'logLevel 3 bdma',
-        'logLevel 3 adcM1S2',
-        'logLevel 3 adc3',
-        'logLevel 3 usart1',
-        'logLevel 3 usart2',
-        'logLevel 3 usart3',
-        'logLevel 3 uart4',
-        'logLevel 3 uart8',
-        'logLevel 3 timer1',
-        'logLevel 3 timer3',
-        'logLevel 3 timer4',
-        'logLevel 3 timer5',
-        'cpu AddHook 0x%X "%s"' % (update, monitor_script(trigger)),
-        'cpu AddHook 0x%X "%s"' % (serial_write, monitor_script(observe)),
-    ]
-
-    if expected == 'vulnerable':
-        crash_start, _ = required('CrashCatcher_DumpStart')
-        crash_end, _ = required('CrashCatcher_DumpEnd')
-        crash = 'self.ErrorLog("PR33933: vulnerable build entered CrashCatcher")'
-        dumped = (
-            'self.ErrorLog("PR33933: CrashCatcher finished writing the dump"); '
-            'machine.PauseAndRequestEmulationPause()'
-        )
-        commands.append('cpu AddHook 0x%X "%s"' % (crash_start, monitor_script(crash)))
-        commands.append('cpu AddHook 0x%X "%s"' % (crash_end, monitor_script(dumped)))
-    elif expected == 'guarded':
-        internal_error, _ = required(
-            'AP_InternalError::error(AP_InternalError::error_t, unsigned short)'
-        )
-        check = (
-            'code=self.GetRegisterUlong(1); '
-            'self.InfoLog("PR33933: AP_InternalError code=0x{0:X}", code); '
-            'machine.PauseAndRequestEmulationPause() if code == 0x00100000 else None'
-        )
-        commands.append(
-            'cpu AddHook 0x%X "%s"' % (internal_error, monitor_script(check))
-        )
-    elif expected == 'fixed':
-        serial_end, _ = required('AP_BLHeli::serial_end()')
-        success = (
-            'obj=machine.SystemBus.ReadDoubleWord(0x%X); '
-            'mask=machine.SystemBus.ReadDoubleWord(obj+%u) if obj != 0 else 16; '
-            'self.InfoLog("PR33933: fixed build rejected stale motor mapping") if mask == 0 else None; '
-            'self.RemoveHooksAt(0x%X) if mask == 0 else None; '
-            'machine.PauseAndRequestEmulationPause() if mask == 0 else None'
-            % (singleton, channel_mask, update)
-        )
-        commands.append(
-            'cpu AddHook 0x%X "%s"' % (serial_end, monitor_script(success))
-        )
-    return commands
 
 
 def hwdef_value(hwdef_h, name):
@@ -690,10 +456,6 @@ def main():
     parser.add_argument('--no-xterm', action='store_true',
                         help='with --gdb, print the attach command instead of '
                              'opening a terminal')
-    parser.add_argument('--reproduce-pr33933',
-                        choices=('vulnerable', 'guarded', 'fixed', 'valid'),
-                        help='reproduce the stale BLHeli motor mapping and '
-                             'observe the expected firmware behavior')
     args = parser.parse_args()
 
     if args.cpusel is not None:
@@ -769,7 +531,7 @@ def main():
     # ensures hwdef.dat/hwdef-bl.dat, not checked-in Renode board copies, are
     # authoritative for pins, buses, DMA, flash layout, and devices.
     outdir = state_dir
-    serial_index = 3 if args.reproduce_pr33933 and args.serial is None else args.serial
+    serial_index = args.serial
     try:
         generated = gen_board.generate(
             root, args.board, outdir / 'generated', serial_index, args.uart_port,
@@ -898,12 +660,6 @@ def main():
         commands.append('machine LoadPlatformDescription @%s' % persistence_repl)
     if args.unthrottled:
         commands.append('emulation SetGlobalAdvanceImmediately true')
-    if args.reproduce_pr33933:
-        if args.board != 'BlitzWingH743' or args.vehicle != 'arduplane':
-            sys.exit('--reproduce-pr33933 requires BlitzWingH743 --vehicle arduplane')
-        if args.gdb:
-            sys.exit('--reproduce-pr33933 cannot be combined with --gdb')
-        commands += pr33933_commands(elf, args.reproduce_pr33933)
     post_start_commands = []
     if args.watchdog:
         # Scheduler::_monitor_thread deliberately branches to 0xE000FFFF to
@@ -1049,8 +805,6 @@ def main():
         print('signals: %s' % ', '.join(generated['sigrok_signals']))
         print('PulseView device: renode-la:conn=tcp/127.0.0.1/%u' %
               args.sigrok_port)
-    if args.reproduce_pr33933:
-        print('PR33933: expecting %s behavior' % args.reproduce_pr33933)
     cmd = [renode, '--disable-xwt'] + monitor + ['-e', '; '.join(commands)]
     try:
         try:
