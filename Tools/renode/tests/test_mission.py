@@ -101,6 +101,20 @@ def connect_mavlink(port, process, log_path, deadline):
     raise RuntimeError('timed out connecting to MAVLink: %s' % last_error)
 
 
+def check_power_status(connection, process, log_path, deadline):
+    status = recv_match(
+        connection, process, log_path, 'POWER_STATUS', deadline)
+    expected_flags = mavutil.mavlink.MAV_POWER_STATUS_USB_CONNECTED
+    if not 4900 <= status.Vcc <= 5100:
+        raise RuntimeError('POWER_STATUS Vcc is not 5 V: %u mV' % status.Vcc)
+    if status.flags != expected_flags:
+        raise RuntimeError(
+            'unexpected POWER_STATUS flags: %u (expected %u)' %
+            (status.flags, expected_flags))
+    print('POWER_STATUS Vcc=%u Vservo=%u flags=%u' %
+          (status.Vcc, status.Vservo, status.flags), flush=True)
+
+
 def set_parameter(connection, process, log_path, name, value, timeout=20):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -461,6 +475,7 @@ def run_test(args, root, output_dir):
             10,
             1,
         )
+        check_power_status(connection, process, process_log, deadline)
         set_parameter(connection, process, process_log, 'AUTO_OPTIONS', 3)
         position = wait_for_global_position(
             connection, process, process_log, deadline)

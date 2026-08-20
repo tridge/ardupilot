@@ -22,6 +22,7 @@ namespace Antmicro.Renode.Peripherals.Analog
         {
             registers.Clear();
             sequenceIndex = 0;
+            dmaSequenceReady = true;
             DMARequest.Unset();
             IRQ.Unset();
         }
@@ -104,6 +105,12 @@ namespace Antmicro.Renode.Peripherals.Analog
             samples[channel] = value & 0xFFFF;
         }
 
+        public void ResetSequence()
+        {
+            sequenceIndex = 0;
+            dmaSequenceReady = false;
+        }
+
         public GPIO DMARequest { get; } = new GPIO();
         public GPIO IRQ { get; } = new GPIO();
         public long Size => 0x400;
@@ -112,6 +119,12 @@ namespace Antmicro.Renode.Peripherals.Analog
         {
             if((Register(Control) & Start) == 0)
             {
+                return;
+            }
+
+            if(!dmaSequenceReady)
+            {
+                dmaSequenceReady = true;
                 return;
             }
 
@@ -166,6 +179,7 @@ namespace Antmicro.Renode.Peripherals.Analog
         private readonly Dictionary<long, uint> registers = new Dictionary<long, uint>();
         private readonly Dictionary<uint, uint> samples = new Dictionary<uint, uint>();
         private int sequenceIndex;
+        private bool dmaSequenceReady = true;
 
         private const uint Ready = 1U;
         private const uint EndOfConversion = 1U << 2;

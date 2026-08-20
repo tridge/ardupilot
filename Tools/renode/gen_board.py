@@ -941,6 +941,37 @@ def _hwdef_gpios(app):
     return sorted(gpios.items())
 
 
+def _power_status_inputs(app):
+    '''Return hwdef power-status input pins and their simulated levels.'''
+    labels = (
+        'VDD_BRICK_VALID', 'VDD_BRICK_nVALID',
+        'VDD_BRICK2_VALID', 'VDD_BRICK2_nVALID',
+        'VBUS', 'VBUS_VALID', 'VBUS_nVALID',
+        'VDD_5V_HIPOWER_OC', 'VDD_5V_HIPOWER_nOC',
+        'VDD_5V_PERIPH_OC', 'VDD_5V_PERIPH_nOC',
+    )
+    inputs = []
+    for label in labels:
+        pin = app.bylabel.get(label)
+        if pin is None or pin.get_MODER_value() != 'INPUT':
+            continue
+        pull = pin.get_PUPDR_value()
+        if pull == 'PULLUP':
+            level = True
+        elif pull == 'PULLDOWN':
+            level = False
+        else:
+            continue
+        # The emulated board's 5 V supply represents USB power. Override the
+        # passive pull on its VBUS status input with the active level.
+        if label in ('VBUS', 'VBUS_VALID'):
+            level = True
+        elif label == 'VBUS_nVALID':
+            level = False
+        inputs.append((pin, level))
+    return inputs
+
+
 def _gpio_routes(family_name, chip_selects, sigrok_pins=None,
                  hwdef_gpios=None):
     sigrok_pins = sigrok_pins or {}
@@ -985,6 +1016,7 @@ def _f405_dma_wiring(defines, family, alloc, warnings):
                 'sysbus 0x%08X' % (model, alloc()),
                 '    dma: dma%d' % dma,
                 '    stream: %d' % channel,
+                '    adc: %s' % model,
                 '',
             ]
 
@@ -1183,6 +1215,7 @@ def _h743_dma_wiring(root, defines, family, alloc, warnings):
                 'sysbus 0x%08X' % (model, alloc()),
                 '    dma: dma%d' % dma,
                 '    stream: %d' % dma_stream,
+                '    adc: %s' % model,
                 '',
             ]
 
@@ -1615,6 +1648,7 @@ def _platform(root, board, app, outdir, fram_path, is_periph, warnings,
                 '',
             ]
 
+    adcs = family.get('adcs', {})
     battery_samples = []
     if is_periph and _define_enabled(defines, 'AP_PERIPH_BATTERY_ENABLED'):
         analog_pins = _analog_pins(hwdef_h)
@@ -1662,7 +1696,6 @@ def _platform(root, board, app, outdir, fram_path, is_periph, warnings,
                     battery_inputs.append((
                         kind + instance, pin_value, scale_value, desired, offset))
 
-        adcs = family.get('adcs', {})
         if battery_inputs and 'ADC1' not in adcs:
             warnings.append('battery ADC is not modelled for %s' % app.mcu_type)
         elif battery_inputs:
@@ -1688,10 +1721,26 @@ def _platform(root, board, app, outdir, fram_path, is_periph, warnings,
                 raw <<= family.get('adc_sample_shift', 0)
                 battery_samples.append((name, adcs['ADC1'], channel, raw))
 
+    board_voltage_pin = defines.get('ANALOG_VCC_5V_PIN')
+    if board_voltage_pin is not None and 'ADC1' in adcs:
+        logical_pin = _constant_integer(board_voltage_pin)
+        analog = _analog_pins(hwdef_h).get(logical_pin)
+        if analog is None:
+            warnings.append('board voltage selects unmapped analog pin %d' %
+                            logical_pin)
+        else:
+            channel, volts_per_count = analog
+            raw = round(5.0 / volts_per_count)
+            if not 0 <= raw <= 4095:
+                warnings.append('simulated board voltage is outside ADC range')
+                raw = min(4095, max(0, raw))
+            raw <<= family.get('adc_sample_shift', 0)
+            battery_samples.append(
+                ('board voltage', adcs['ADC1'], channel, raw))
+
     # ChibiOS can initialize ADC1 for board-specific analog consumers even
     # when none of the generic battery parameters select an input.  Keep the
     # converter present so ADC startup and DMA cannot spin on an SVD stub.
-    adcs = family.get('adcs', {})
     if 'ADC1' in adcs and not family.get('adc_existing'):
         lines += [
             '%s: Analog.AP_STM32_ADC @ sysbus 0x%08X' %
@@ -1898,7 +1947,7 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
     lines += ['include @%s' % common, '']
     for name, adc, channel, raw in battery_samples:
         lines += [
-            '# simulated battery %s input' % name,
+            '# simulated %s input' % name,
             'sysbus.%s FeedSample %u %u -1' % (adc, raw, channel),
             '',
         ]
@@ -1999,6 +2048,20 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
             'sysbus.ethernet ActivePhy RMII',
             '',
         ]
+    power_inputs = _power_status_inputs(app)
+    for port in sorted({pin.port for pin, _ in power_inputs}):
+        port_inputs = [(pin, level) for pin, level in power_inputs
+                       if pin.port == port]
+        mask = sum(1 << pin.pin for pin, _ in port_inputs)
+        high = sum(1 << pin.pin for pin, level in port_inputs if level)
+        lines += [
+            '# hwdef power-status input defaults',
+            ('sysbus SetHookAfterPeripheralRead sysbus.gpioPort%s '
+             '"if offset == 0x10: value = (value & 0x%08X) | 0x%08X"') %
+            (port, (~mask) & 0xFFFFFFFF, high),
+            '',
+        ]
+
     for index in range(1, 5):
         label = 'GPIO_CAN_I2C%d_SEL' % index
         pin = app.bylabel.get(label)
@@ -2072,6 +2135,7 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
         'airspeed_bus': airspeed_bus,
         'battery_channels': {
             name: channel for name, _, channel, _ in battery_samples
+            if name.startswith(('voltage', 'current'))
         },
         'rangefinder_uart': rangefinder_uart,
         'rangefinder_type': rangefinder_type,

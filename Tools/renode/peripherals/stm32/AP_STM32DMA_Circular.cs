@@ -16,7 +16,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 {
     public class AP_STM32DMA_Circular : IDoubleWordPeripheral, IKnownSize
     {
-        public AP_STM32DMA_Circular(IMachine machine, STM32DMA dma, int stream)
+        public AP_STM32DMA_Circular(IMachine machine, STM32DMA dma, int stream, IPeripheral adc)
         {
             var streamsField = typeof(STM32DMA).GetField(
                 "streams", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -27,6 +27,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             }
             var streams = (Array)streamsField.GetValue(dma);
             dmaStream = streams.GetValue(stream);
+            this.adc = adc;
             ResolveFields();
 
             // SxCR = 0x10 + 0x18 * stream.  Use a before-write hook so this
@@ -53,6 +54,12 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             // Keep this sticky because the stock tagged bit reads back as 0.
             circular |= (value & CircularMode) != 0;
+            // ADC conversion can start before DMA. Align the scan when the
+            // stream is enabled so buffer slot zero receives sequence zero.
+            if((value & Enable) != 0)
+            {
+                resetSequence?.Invoke(adc, null);
+            }
             return null;
         }
 
@@ -85,17 +92,24 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                     "STM32DMA stream no longer has an nrOfData field - revisit this fix");
             }
             numberOfData = (IValueRegisterField)field.GetValue(dmaStream);
+            resetSequence = adc.GetType().GetMethod(
+                "ResetSequence",
+                BindingFlags.Public | BindingFlags.Instance);
         }
 
         private readonly object dmaStream;
+        private readonly IPeripheral adc;
         private readonly IManagedThread poller;
         private bool circular;
         private ulong reloadCount;
 
         [Transient]
         private IValueRegisterField numberOfData;
+        [Transient]
+        private MethodInfo resetSequence;
 
         private const uint CircularMode = 1U << 8;
+        private const uint Enable = 1U;
         private const uint PollFrequency = 100000;
     }
 }
