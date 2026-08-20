@@ -33,11 +33,12 @@ sysbus ApplySVD $repo/Tools/renode/data/STM32G474.svd.gz
 sysbus LoadELF $elf
 
 $app_base?=0x08009000
-cpu VectorTableOffset $app_base
+$vector_base?=$app_base
+cpu VectorTableOffset $vector_base
 
 macro reset
 """
-    cpu VectorTableOffset $app_base
+    cpu VectorTableOffset $vector_base
 """
 
 cpu PerformanceInMips 120

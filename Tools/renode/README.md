@@ -13,9 +13,8 @@ generates the board REPL and RESC below `build/<board>/renode/generated/` in
 under a second. There are no checked-in KakuteF4 or BlitzWingH743 Renode board
 descriptions. The application and bootloader hwdefs remain authoritative for
 the MCU, flash offset, serial order, buses, sensors, chip selects, DMA, system
-timer, and SDMMC presence. The bootloader is not emulated yet; compiling its
-hwdef makes its MCU and load offset available now rather than introducing a
-second copy of that information.
+timer, and SDMMC presence. `run.py --bootloader` loads an ArduPilot bootloader
+before the application and starts from its vector table.
 
 `Tools/renode/run.py --list` shows the hwdef targets accepted by the generator.
 Support is MCU-family driven rather than maintained as a board allowlist. The
@@ -370,6 +369,18 @@ the firmware, and renode itself is found from `--renode`, `$RENODE` or PATH.
 The selected firmware UART must still have the desired ArduPilot serial
 protocol configured; exposing a UART does not alter firmware parameters.
 
+Use `--bootloader` to execute a bootloader before the selected application:
+
+```sh
+Tools/renode/run.py CubeOrange \
+    --bootloader Tools/bootloaders/CubeOrange_bl.bin
+```
+
+The bootloader can be an ELF, a raw BIN based at `0x08000000`, or an Intel HEX
+whose embedded addresses select its flash location. The application still
+comes from the normal build output or `--elf`. Both images are overlaid into
+`flash.img` on every launch, and resets return to the bootloader vector table.
+
 State survives both firmware resets and separate `run.py` invocations. By
 default it is stored in `renode/<board>/`; use `--state-dir DIR` to select an
 exact alternative directory. Depending on the hwdef, this contains:
@@ -703,7 +714,5 @@ and test results.
   heartbeat checks for each MCU/sensor group.
 - Replace the remaining generic stationary sensor identities with richer data
   paths where a firmware test needs live samples.
-- Add bootloader-in-the-loop execution, using the already compiled
-  `hwdef-bl.dat` output.
 - Add an AM32-style result-producing CI runner for boot and firmware regression
   scenarios.

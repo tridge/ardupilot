@@ -49,18 +49,19 @@ machine LoadPlatformDescription $platform
 sysbus LoadELF $elf
 
 # The generated board script gets the app base from FLASH_RESERVE_START_KB. It
-# also compiles hwdef-bl.dat and retains its load offset for future bootloader
-# execution. The bootloader is not loaded yet; the CPU is pointed straight at
-# the app vector table. The app's stm32_clock_init rebuilds the clock tree and
-# enables the RAM regions itself.
+# also compiles hwdef-bl.dat. run.py selects the bootloader vector table when
+# one is loaded, otherwise execution starts directly in the application. The
+# app's stm32_clock_init rebuilds the clock tree and enables the RAM regions
+# itself.
 $app_base?=0x08060000
-cpu VectorTableOffset $app_base
+$vector_base?=$app_base
+cpu VectorTableOffset $vector_base
 
 # ... and again after every reset: ArduPilot reboots itself via
 # NVIC_SystemReset and Renode restores the default vector table at 0.
 macro reset
 """
-    cpu VectorTableOffset $app_base
+    cpu VectorTableOffset $vector_base
 """
 
 # 480MHz Cortex-M7, derated for flash wait states and bus contention.

@@ -484,6 +484,42 @@ def make_firmware_binary(source, destination):
     return destination
 
 
+def make_bootloader_binary(source, destination):
+    '''Convert an ELF, raw BIN, or Intel HEX bootloader to a flash overlay.'''
+    try:
+        with source.open('rb') as source_file:
+            magic = source_file.read(4)
+    except OSError as error:
+        sys.exit('failed to read bootloader %s: %s' % (source, error))
+
+    suffix = source.suffix.lower()
+    if magic == b'\x7fELF' or suffix == '.elf':
+        return make_firmware_binary(source, destination), 0x08000000
+    if suffix == '.bin':
+        try:
+            shutil.copyfile(source, destination)
+        except OSError as error:
+            sys.exit('failed to copy bootloader %s: %s' % (source, error))
+        return destination, 0x08000000
+    if suffix in ('.hex', '.ihex'):
+        try:
+            from intelhex import IntelHex, IntelHexError
+        except ImportError:
+            sys.exit('the intelhex Python module is required for %s' % source)
+        try:
+            image = IntelHex(str(source))
+            if len(image) == 0:
+                sys.exit('bootloader contains no data: %s' % source)
+            start = image.minaddr()
+            image.padding = 0xff
+            image.tobinfile(str(destination), start=start, end=image.maxaddr())
+        except (OSError, IntelHexError) as error:
+            sys.exit('failed to convert bootloader %s: %s' % (source, error))
+        return destination, start
+    sys.exit('unsupported bootloader format for %s (expected ELF, BIN, or HEX)' %
+             source)
+
+
 def find_terminal():
     for term in ('xterm', 'x-terminal-emulator', 'konsole', 'gnome-terminal'):
         path = shutil.which(term)
@@ -598,6 +634,8 @@ def main():
                         help='firmware to run (default: AP_Periph for peripheral '
                              'targets, arducopter otherwise)')
     parser.add_argument('--elf', help='firmware ELF (default: build/<board>/bin/<vehicle>)')
+    parser.add_argument('--bootloader',
+                        help='bootloader ELF, BIN, or HEX to execute before the firmware')
     parser.add_argument('--renode', help='renode executable to use')
     parser.add_argument('--cpusel', type=int, metavar='N',
                         help='pin only Renode\'s emulated MCU CPU thread to '
@@ -718,6 +756,9 @@ def main():
                   'ardusub': 'sub', 'antennatracker': 'antennatracker'}.get(args.vehicle, args.vehicle)
         sys.exit("no firmware at %s - build it first:\n"
                  "  ./waf configure --board %s && ./waf %s" % (elf, args.board, target))
+    bootloader = Path(args.bootloader).expanduser() if args.bootloader else None
+    if bootloader is not None and not bootloader.is_file():
+        sys.exit('no bootloader at %s' % bootloader)
 
     state_dir = (Path(args.state_dir).expanduser() if args.state_dir else
                  root / 'renode' / args.board).resolve()
@@ -779,6 +820,22 @@ def main():
     flash_img = make_flash_image(
         state_dir / 'flash.img', flash_size, legacy_regions)
     overlay_flash_image(flash_img, firmware_bin, firmware_offset)
+    bootloader_address = None
+    if bootloader is not None:
+        bootloader_bin, bootloader_address = make_bootloader_binary(
+            bootloader, outdir / 'current-bootloader.bin')
+        bootloader_size = bootloader_bin.stat().st_size
+        if bootloader_size == 0:
+            sys.exit('bootloader contains no data: %s' % bootloader)
+        bootloader_offset = bootloader_address - 0x08000000
+        bootloader_end = bootloader_address + bootloader_size
+        if (bootloader_offset < 0 or bootloader_end > generated['app_base'] or
+                bootloader_end > 0x08000000 + flash_size):
+            sys.exit('%s occupies 0x%08X..0x%08X and does not fit below the '
+                     'application at 0x%08X' %
+                     (bootloader, bootloader_address, bootloader_end - 1,
+                      generated['app_base']))
+        overlay_flash_image(flash_img, bootloader_bin, bootloader_offset)
     initial_loads = [
         'sysbus LoadBinary @%s 0x08000000' % flash_img,
     ]
@@ -814,8 +871,11 @@ def main():
         runtime_elf = make_runtime_elf(elf, outdir / 'gdb-runtime.elf')
 
     monitor = ['-P', str(args.port)] if args.port else ['--console']
+    vector_base = (bootloader_address if bootloader_address is not None else
+                   generated['app_base'])
     commands = ['$repo=@%s' % root,
-                '$elf=@%s' % runtime_elf] + pre_vars + [
+                '$elf=@%s' % runtime_elf,
+                '$vector_base=0x%08X' % vector_base] + pre_vars + [
                 'include @%s' % generated['resc']] + initial_loads
     if args.sigrok:
         commands += [
@@ -958,6 +1018,8 @@ def main():
         env['PATH'] = '%s:%s' % (dotnet, env.get('PATH', ''))
 
     print('ELF:     %s' % elf)
+    if bootloader is not None:
+        print('bootloader: %s at 0x%08X' % (bootloader, bootloader_address))
     print('renode:  %s' % renode)
     print('state:   %s' % state_dir)
     if generated['serial'] is None:

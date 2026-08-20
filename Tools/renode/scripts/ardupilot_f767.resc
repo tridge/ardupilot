@@ -40,11 +40,12 @@ machine LoadPlatformDescription $platform
 sysbus LoadELF $elf
 
 $app_base?=0x08008000
-cpu VectorTableOffset $app_base
+$vector_base?=$app_base
+cpu VectorTableOffset $vector_base
 
 macro reset
 """
-    cpu VectorTableOffset $app_base
+    cpu VectorTableOffset $vector_base
 """
 
 cpu PerformanceInMips 150

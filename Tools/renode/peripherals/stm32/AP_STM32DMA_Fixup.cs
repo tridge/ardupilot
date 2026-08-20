@@ -8,6 +8,11 @@
 // scribbles the next fill further into memory. The same pattern hits
 // aborted SPI transfers (20ms timeout path).
 //
+// The stock model also completes memory-to-memory transfers immediately
+// but leaves SxCR.EN set. Hardware clears EN when the transfer finishes;
+// bootloader flash ECC checks wait for that transition before continuing.
+// Clear it after the model has performed the transfer.
+//
 // Real hardware reloads its internal pointers whenever NDTR is written
 // (writes are only legal with the stream disabled), so an after-write
 // hook on every SxNDTR register that zeroes the stream's dataOffset is
@@ -42,9 +47,21 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
             for(var i = 0; i < streams.Length; i++)
             {
+                // SxCR = 0x10 + 0x18 * stream
+                var configurationOffset = 0x10 + 0x18 * i;
                 var resetter = new OffsetResetter(streams.GetValue(i));
                 // SxNDTR = 0x14 + 0x18 * stream
                 dma.RegistersCollection.AddAfterWriteHook(0x14 + 0x18 * i, resetter.Reset);
+                dma.RegistersCollection.AddAfterWriteHook(configurationOffset, (offset, value) =>
+                {
+                    const uint enable = 1U << 0;
+                    const uint directionMask = 3U << 6;
+                    const uint memoryToMemory = 2U << 6;
+                    if((value & enable) != 0 && (value & directionMask) == memoryToMemory)
+                    {
+                        dma.WriteDoubleWord(offset, value & ~enable);
+                    }
+                });
             }
         }
 

@@ -51,11 +51,12 @@ sysbus ApplySVD $repo/Tools/renode/data/STM32F405.svd.gz
 
 sysbus LoadELF $elf
 
-# The generated board script gets this from FLASH_RESERVE_START_KB. It also
-# compiles hwdef-bl.dat and retains its load offset for future bootloader
-# execution. The bootloader itself is not loaded yet.
+# The generated board script gets the application base from the application
+# and bootloader hwdefs. run.py selects the bootloader vector table when one
+# is loaded, otherwise execution starts directly in the application.
 $app_base?=0x08010000
-cpu VectorTableOffset $app_base
+$vector_base?=$app_base
+cpu VectorTableOffset $vector_base
 
 # ... and again after every reset: ArduPilot reboots itself via
 # NVIC_SystemReset (MAV_CMD_PREFLIGHT_REBOOT, watchdog paths), and
@@ -64,7 +65,7 @@ cpu VectorTableOffset $app_base
 # looks healthy.
 macro reset
 """
-    cpu VectorTableOffset $app_base
+    cpu VectorTableOffset $vector_base
 """
 
 # NOT one instruction per 168MHz cycle: 5-wait-state flash and AHB
