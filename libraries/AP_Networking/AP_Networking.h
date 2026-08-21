@@ -176,6 +176,7 @@ public:
 #if AP_NETWORKING_CAPTURE_ENABLED
         CAPTURE_PACKETS=(1U<<7),
 #endif
+        PPP_SOFTWARE_FLOW_CONTROL=(1U<<8),
     };
     bool option_is_set(OPTION option) const {
         return (param.options.get() & int32_t(option)) != 0;
