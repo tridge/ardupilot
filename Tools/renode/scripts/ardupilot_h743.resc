@@ -27,6 +27,7 @@ include $repo/Tools/renode/peripherals/stm32/AP_STM32DMA_Fixup.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32F7_USART_Idle.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32_Timer_UpdateDMA.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32H7_SDMMC.cs
+include $repo/Tools/renode/peripherals/stm32/AP_STM32_OTG.cs
 include $repo/Tools/renode/peripherals/sensors/AP_ADIS.cs
 include $repo/Tools/renode/peripherals/sensors/AP_AdditionalBarometers.cs
 include $repo/Tools/renode/peripherals/sensors/AP_BMP280.cs

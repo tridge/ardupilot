@@ -381,6 +381,11 @@ whose embedded addresses select its flash location. The application still
 comes from the normal build output or `--elf`. Both images are overlaid into
 `flash.img` on every launch, and resets return to the bootloader vector table.
 
+By default the bootloader follows its normal timeout and starts the
+application. Pass `--hold-bootloader` to request the same one-shot bootloader
+hold used by an application-requested reboot, keeping the upload interface
+available until the uploader commands a reboot.
+
 State survives both firmware resets and separate `run.py` invocations. By
 default it is stored in `renode/<board>/`; use `--state-dir DIR` to select an
 exact alternative directory. Depending on the hwdef, this contains:
@@ -394,6 +399,10 @@ exact alternative directory. Depending on the hwdef, this contains:
 - `fram.img`: the SPI RAMTRON/FRAM contents on boards with
   `HAL_WITH_RAMTRON` and a `SPIDEV ramtron` entry. Writes are committed on the
   real chip-select deassertion forwarded by the generated SPI multiplexer.
+- `mcu_id.txt`: the persistent random 96-bit STM32 unique-device ID, encoded
+  as 24 hexadecimal characters. It is created on the first launch and used by
+  firmware logs, bootloader identification, and USB serial-number descriptors,
+  so separate state directories appear as separate physical boards.
 
 When creating `flash.img` for the first time, `run.py` imports existing
 `storage.img` and `crashlog.img` state at their flash addresses and leaves the
@@ -472,9 +481,9 @@ for reducing the peripheral workload on boards with several redundant IMUs:
 Tools/renode/run.py CubeOrange --num-imus 1
 ```
 
-Works against a stock Renode 1.16.1, but the performance patches in
-`patches/` are worth ~4x - see the performance notes for the build
-recipe.
+Basic emulation works against stock Renode 1.16.1. The recommended
+`tests/build_renode.sh` build adds the performance patch stack (worth roughly
+4x) and the USB/IP device-state patch used for firmware re-enumeration.
 
 For AP_Periph targets, `run.py` selects the AP_Periph ELF, opens each CAN
 multicast bus, and attaches supported hwdef-selected sensors automatically.
@@ -485,6 +494,46 @@ For example:
 ./waf AP_Periph
 Tools/renode/run.py HolybroG4_GPS
 ```
+
+### USB/IP
+
+On Linux, `--usb` exports the firmware-driven H7 USB controller through
+Renode's USB/IP server. Install the distribution's `usbip` userspace tools,
+then start Renode and the vhci helper in separate terminals:
+
+```sh
+Tools/renode/run.py CubeOrange --usb \
+    --bootloader Tools/bootloaders/CubeOrange_bl.bin \
+    --hold-bootloader
+sudo Tools/renode/usbip_attach.py
+```
+
+The helper loads `vhci_hcd`, attaches export `1-0`, and monitors it for
+firmware USB disconnects. It automatically reattaches after bootloader,
+application, or runtime USB re-enumeration so Linux obtains the new
+descriptors. On exit it detaches any vhci connection it created. Pass the same
+`--port N` to the helper when using `run.py --usbip-port N`.
+
+The virtual controller then appears in `dmesg`, as `/dev/ttyACM*`, and
+under `/dev/serial/by-id/`. Both bootloader and application descriptors use
+the persistent ID from `mcu_id.txt`. Firmware can therefore be uploaded
+through the same host path used for hardware, for example:
+
+```sh
+Tools/scripts/uploader.py \
+    --port /dev/serial/by-id/usb-Hex_ProfiCNC_CubeOrange-BL_*-if00 \
+    build/CubeOrange/bin/arducopter.apj
+```
+
+Use paced execution for uploading. With `--unthrottled`, guest time can pass
+the bootloader's receive timeout while the host is between separate USB
+writes. The Renode build script applies
+`patches/usbip-device-state.patch`, which reports full-speed USB and makes a
+firmware soft-disconnect close the current USB/IP client while keeping the
+export listener available.
+
+Renode's USB/IP server listens on all host interfaces. Keep its TCP port
+firewalled from untrusted networks.
 
 ### Sigrok/PulseView
 

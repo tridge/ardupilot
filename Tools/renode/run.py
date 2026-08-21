@@ -21,6 +21,7 @@ a build of renode v1.16.1 with them applied (see the README).
 import argparse
 import json
 import os
+import secrets
 import shutil
 import subprocess
 import sys
@@ -113,6 +114,31 @@ def make_erased(path, size):
     with open(path, 'wb') as f:
         f.write(b'\xff' * size)
     return path
+
+
+def make_mcu_id(path):
+    '''Return a persistent, randomly generated 96-bit STM32 unique ID.'''
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        pass
+    except OSError as error:
+        sys.exit('failed to create MCU ID %s: %s' % (path, error))
+    else:
+        try:
+            with os.fdopen(fd, 'w') as mcu_id_file:
+                mcu_id_file.write(secrets.token_hex(12) + '\n')
+        except OSError as error:
+            sys.exit('failed to write MCU ID %s: %s' % (path, error))
+
+    try:
+        text = path.read_text().strip()
+        mcu_id = bytes.fromhex(text)
+    except (OSError, ValueError) as error:
+        sys.exit('invalid MCU ID in %s: %s' % (path, error))
+    if len(mcu_id) != 12 or len(text) != 24:
+        sys.exit('%s must contain exactly 24 hexadecimal characters' % path)
+    return mcu_id
 
 
 def make_flash_image(path, size, legacy_regions):
@@ -402,6 +428,9 @@ def main():
     parser.add_argument('--elf', help='firmware ELF (default: build/<board>/bin/<vehicle>)')
     parser.add_argument('--bootloader',
                         help='bootloader ELF, BIN, or HEX to execute before the firmware')
+    parser.add_argument('--hold-bootloader', action='store_true',
+                        help='keep an H7 bootloader running until an upload or '
+                             'reboot command')
     parser.add_argument('--renode', help='renode executable to use')
     parser.add_argument('--cpusel', type=int, metavar='N',
                         help='pin only Renode\'s emulated MCU CPU thread to '
@@ -437,6 +466,10 @@ def main():
                         help='first CAN multicast bus number (default: 0)')
     parser.add_argument('--ethernet-tap', metavar='INTERFACE',
                         help='connect the emulated Ethernet MAC to this host TAP')
+    parser.add_argument('--usb', action='store_true',
+                        help='export firmware USB through a Renode USB/IP server')
+    parser.add_argument('--usbip-port', type=int, default=3240,
+                        help='USB/IP server port (default: 3240)')
     parser.add_argument('--port', type=int,
                         help='telnet monitor on this port instead of the interactive console')
     parser.add_argument('--exec', dest='extra', action='append', default=[],
@@ -458,6 +491,8 @@ def main():
                              'opening a terminal')
     args = parser.parse_args()
 
+    if args.hold_bootloader and not args.bootloader:
+        parser.error('--hold-bootloader requires --bootloader')
     if args.cpusel is not None:
         if args.cpusel < 0:
             parser.error('--cpusel must be a non-negative host CPU number')
@@ -478,6 +513,22 @@ def main():
         parser.error('--reverse-gdb-limit cannot be negative')
     if args.can_base < 0:
         parser.error('--can-base cannot be negative')
+    if not 1 <= args.usbip_port <= 65535:
+        parser.error('--usbip-port must be between 1 and 65535')
+    if args.usb:
+        conflicting_ports = [args.uart_port]
+        if args.port is not None:
+            conflicting_ports.append(args.port)
+        if args.sigrok:
+            conflicting_ports.append(args.sigrok_port)
+        if args.gdb:
+            conflicting_ports += [
+                args.gdb_port,
+                (args.renode_gdb_port if args.renode_gdb_port is not None else
+                 args.gdb_port + 1),
+            ]
+        if args.usbip_port in conflicting_ports:
+            parser.error('--usbip-port conflicts with another Renode TCP port')
     if args.sigrok_channels is not None and not args.sigrok:
         parser.error('--sigrok-channels requires --sigrok')
     sigrok_channels = None
@@ -500,6 +551,8 @@ def main():
                 (args.renode_gdb_port if args.renode_gdb_port is not None else
                  args.gdb_port + 1),
             ]
+        if args.usb:
+            conflicting_ports.append(args.usbip_port)
         if args.sigrok_port in conflicting_ports:
             parser.error('--sigrok-port conflicts with another Renode TCP port')
 
@@ -540,8 +593,14 @@ def main():
             num_imus=args.num_imus)
     except (OSError, ValueError) as error:
         sys.exit('failed to generate Renode board: %s' % error)
+    if args.hold_bootloader and generated['family'] not in ('h743', 'h757'):
+        parser.error('--hold-bootloader is only supported on STM32H7 boards')
+
     for warning in generated['warnings']:
         print('warning: %s' % warning, file=sys.stderr)
+    mcu_id = make_mcu_id(state_dir / 'mcu_id.txt')
+    mcu_id_bin = outdir / 'current-mcu-id.bin'
+    mcu_id_bin.write_bytes(mcu_id)
     enable_can = args.can or generated['is_periph']
     if enable_can and not generated['can_buses']:
         sys.exit('%s has no generated CAN peripherals' % args.board)
@@ -551,6 +610,9 @@ def main():
                   args.can_base + len(generated['can_buses']) - 1))
     if args.ethernet_tap and not generated['has_ethernet']:
         sys.exit('%s has no generated Ethernet peripheral' % args.board)
+    if args.usb and generated['family'] not in ('h743', 'h757'):
+        sys.exit('%s does not have a supported Renode USB controller' %
+                 args.board)
 
     # Persist the complete physical internal flash. Its size does not move as
     # linker regions change between builds, unlike the old crashlog.img. The
@@ -600,6 +662,7 @@ def main():
         overlay_flash_image(flash_img, bootloader_bin, bootloader_offset)
     initial_loads = [
         'sysbus LoadBinary @%s 0x08000000' % flash_img,
+        'sysbus LoadBinary @%s 0x%08X' % (mcu_id_bin, generated['uid_address']),
     ]
     persistent_regions = [
         ('persistentFlash', flash_img, 0x08000000, flash_size),
@@ -639,6 +702,9 @@ def main():
                 '$elf=@%s' % runtime_elf,
                 '$vector_base=0x%08X' % vector_base] + pre_vars + [
                 'include @%s' % generated['resc']] + initial_loads
+    if args.hold_bootloader:
+        # Match an application-requested reboot into the bootloader.
+        commands.append('sysbus WriteDoubleWord 0x58004050 0xB0070001')
     if args.sigrok:
         commands += [
             'sysbus.sigrok SampleRate %u' % args.sigrok_sample_rate,
@@ -655,6 +721,11 @@ def main():
             'emulation CreateTap %s "ethernetTap" false' %
             json.dumps(args.ethernet_tap),
             'connector Connect host.ethernetTap ethernetSwitch',
+        ]
+    if args.usb:
+        commands += [
+            'emulation CreateUSBIPServer %u "usb"' % args.usbip_port,
+            'host.usb Register sysbus.usbOtg',
         ]
     if persistence_repl is not None:
         commands.append('machine LoadPlatformDescription @%s' % persistence_repl)
@@ -805,6 +876,10 @@ def main():
         print('signals: %s' % ', '.join(generated['sigrok_signals']))
         print('PulseView device: renode-la:conn=tcp/127.0.0.1/%u' %
               args.sigrok_port)
+    if args.usb:
+        print('USB/IP:  tcp:localhost:%u' % args.usbip_port)
+        print('attach:  sudo Tools/renode/usbip_attach.py --port %u' %
+              args.usbip_port)
     cmd = [renode, '--disable-xwt'] + monitor + ['-e', '; '.join(commands)]
     try:
         try:

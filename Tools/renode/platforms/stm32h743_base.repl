@@ -455,24 +455,8 @@ sdmmc: SD.AP_STM32H7_SDMMC @ sysbus 0x52007000
 sdmmc2: SD.AP_STM32H7_SDMMC @ sysbus 0x48022400
     IRQ -> nvic@124
 
-usb2Otg: Python.PythonPeripheral @ sysbus 0x40080000
-    size: 0x40000
-    initable: true
-    script: '''
-if request.IsInit:
-    registers = {}
-
-if request.IsWrite:
-    value = request.Value
-    if request.Offset == 0x10:
-        value &= ~1
-    registers[request.Offset] = value
-elif request.IsRead:
-    value = registers.get(request.Offset, 0)
-    if request.Offset == 0x10:
-        value |= 1 << 31
-    request.Value = value
-'''
+usbOtg: USB.AP_STM32_OTG @ sysbus 0x40080000
+    IRQ -> nvic@101
 
 sysbus:
     init:
