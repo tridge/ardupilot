@@ -910,17 +910,18 @@ def _sensor_devices(config, family, defines, fram_path, warnings,
     return declarations, chip_selects, has_fram, emulated_imus, spi_sdcard
 
 
-def _iomcu_device(root, app, family, defines, address, warnings):
+def _iomcu_device(root, app, family, defines, address, warnings,
+                  synthetic_iomcu=True):
     uart = app.get_config('IOMCU_UART', required=False, default=None)
     if uart is None:
-        return [], None
+        return [], None, None
     if uart not in family['uarts']:
         warnings.append('%s IOMCU UART is not present in the current MCU base' % uart)
-        return [], None
+        return [], None, None
     firmware = app.romfs.get('io_firmware.bin')
     if firmware is None:
         warnings.append('IOMCU_UART is set without ROMFS io_firmware.bin')
-        return [], None
+        return [], None, None
     firmware_path = Path(firmware)
     if not firmware_path.is_absolute():
         firmware_path = root / firmware_path
@@ -931,12 +932,13 @@ def _iomcu_device(root, app, family, defines, address, warnings):
         firmware_crc = _crc32_small(data, flash_size)
     except (OSError, SyntaxError, ValueError, ZeroDivisionError) as error:
         warnings.append('cannot configure IOMCU firmware CRC: %s' % error)
-        return [], None
-    return [
+        return [], None, None
+    lines = [
         'iomcu: Miscellaneous.AP_IOMCU @ sysbus 0x%08X' % address,
         '    firmwareCrc: 0x%08X' % firmware_crc,
         '',
-    ], uart
+    ] if synthetic_iomcu else []
+    return lines, uart, firmware_path
 
 
 def _hwdef_gpios(app):
@@ -1508,7 +1510,7 @@ def _sigrok_spi_capture(app, family):
 
 
 def _platform(root, board, app, outdir, fram_path, is_periph, warnings,
-              sigrok=False, num_imus=None):
+              sigrok=False, num_imus=None, synthetic_iomcu=True):
     family = FAMILIES[app.mcu_type]
     base = root / 'Tools' / 'renode' / 'platforms' / family['base']
     lines = [
@@ -1556,8 +1558,8 @@ def _platform(root, board, app, outdir, fram_path, is_periph, warnings,
         app, family, defines, fram_path, warnings,
         sigrok_capture['bus'] if sigrok_capture else None, num_imus)
     lines += sensor_lines
-    iomcu_lines, iomcu_uart = _iomcu_device(
-        root, app, family, defines, address, warnings)
+    iomcu_lines, iomcu_uart, iomcu_firmware = _iomcu_device(
+        root, app, family, defines, address, warnings, synthetic_iomcu)
     lines += iomcu_lines
     if iomcu_uart is not None:
         address += 4
@@ -1874,6 +1876,7 @@ def _platform(root, board, app, outdir, fram_path, is_periph, warnings,
     lines += _gpio_routes(
         family['name'], chip_selects, sigrok_pins, gpio_pins)
     return ('\n'.join(lines).rstrip() + '\n', has_fram, iomcu_uart,
+            iomcu_firmware,
             can_buses, has_ethernet, gps_uart, airspeed_bus, battery_samples,
             rangefinder_uart, rangefinder_type, gpio_pins, sigrok_capture,
             emulated_imus, spi_sdcard)
@@ -1905,7 +1908,7 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
             iomcu_uart, can_buses, has_ethernet, gps_uart, airspeed_bus,
             battery_samples, rangefinder_uart, rangefinder_type, warnings,
             gpio_pins, sigrok_capture=None, quiet_peripherals=True,
-            sigrok_channels=None, spi_sdcard=None):
+            sigrok_channels=None, spi_sdcard=None, real_iomcu=False):
     family = FAMILIES[app.mcu_type]
     reserve_kb = app.get_config('FLASH_RESERVE_START_KB', default=0, type=int)
     boot_kb = bootloader.get_config(
@@ -2019,10 +2022,18 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
     elif sigrok_capture is not None:
         raise ValueError('sigrok capture needs a selected hardware UART')
     if iomcu_uart is not None:
+        iomcu_target = iomcu_uart.lower()
+        if real_iomcu:
+            iomcu_target += 'Host'
         lines += [
             'emulation CreateUARTHub "iomcuHub"',
-            'connector Connect sysbus.%s iomcuHub' % iomcu_uart.lower(),
-            'connector Connect sysbus.iomcu iomcuHub',
+            'connector Connect sysbus.%s iomcuHub' % iomcu_target,
+        ]
+        if not real_iomcu:
+            lines += [
+                'connector Connect sysbus.iomcu iomcuHub',
+            ]
+        lines += [
             '',
         ]
     if gps_uart is not None:
@@ -2160,7 +2171,7 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
 
 def generate(root, board, outdir, serial_index=None, uart_port=5762,
              state_dir=None, quiet_peripherals=True, sigrok=False,
-             sigrok_channels=None, num_imus=None):
+             sigrok_channels=None, num_imus=None, real_iomcu=False):
     '''Generate the board REPL/RESC and return paths plus run metadata.'''
     root = root.resolve()
     outdir = outdir.resolve()
@@ -2185,19 +2196,19 @@ def generate(root, board, outdir, serial_index=None, uart_port=5762,
     warnings = []
     repl = outdir / ('%s.repl' % board)
     resc = outdir / ('%s.resc' % board)
-    (platform, has_fram, iomcu_uart, can_buses, has_ethernet, gps_uart,
+    (platform, has_fram, iomcu_uart, iomcu_firmware, can_buses, has_ethernet, gps_uart,
      airspeed_bus, battery_samples, rangefinder_uart,
      rangefinder_type, gpio_pins, sigrok_capture, emulated_imus,
      spi_sdcard) = _platform(
         root, board, app, outdir, state_dir / 'fram.img', is_periph, warnings,
-        sigrok, num_imus)
+        sigrok, num_imus, synthetic_iomcu=not real_iomcu)
     repl.write_text(platform)
     script, metadata = _script(
         root, board, app, bootloader, repl, serial_index, uart_port,
         iomcu_uart, can_buses, has_ethernet, gps_uart, airspeed_bus,
         battery_samples, rangefinder_uart, rangefinder_type, warnings,
         gpio_pins, sigrok_capture, quiet_peripherals, sigrok_channels,
-        spi_sdcard)
+        spi_sdcard, real_iomcu)
     resc.write_text(script)
     metadata.update({
         'repl': repl,
@@ -2207,6 +2218,7 @@ def generate(root, board, outdir, serial_index=None, uart_port=5762,
         'has_fram': has_fram,
         'fram_size': 32 * 1024 if has_fram else 0,
         'gps_uart': gps_uart,
+        'iomcu_firmware': iomcu_firmware,
         'num_imus': emulated_imus,
         'gpio_pins': {
             gpio: pin.portpin for gpio, pin in gpio_pins

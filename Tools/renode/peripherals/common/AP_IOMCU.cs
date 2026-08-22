@@ -6,16 +6,19 @@
 using System;
 using System.Collections.Generic;
 using Antmicro.Migrant;
+using Antmicro.Renode.Core;
 using Antmicro.Renode.Peripherals;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.UART;
+using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Miscellaneous
 {
     public class AP_IOMCU : IUART, IDoubleWordPeripheral, IKnownSize
     {
-        public AP_IOMCU(uint firmwareCrc)
+        public AP_IOMCU(IMachine machine, uint firmwareCrc)
         {
+            this.machine = machine;
             this.firmwareCrc = firmwareCrc;
             request = new List<byte>();
             setup = new ushort[SetupRegisterCount];
@@ -25,8 +28,8 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
         public void Reset()
         {
+            generation++;
             request.Clear();
-            compactReads = false;
             Array.Clear(setup, 0, setup.Length);
             Array.Clear(servos, 0, servos.Length);
             setup[DefaultRateRegister] = 50;
@@ -45,8 +48,14 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
             var code = (byte)(request[0] >> CodeShift);
             var count = request[0] & CountMask;
-            var expected = code == CodeRead && compactReads
-                ? HeaderSize : HeaderSize + 2 * count;
+            // ChibiOS peers use a four-byte read request after discovering
+            // the protocol version; older peers pad reads to the expected
+            // reply size. Determine the form from this packet's header CRC
+            // instead of remembering a previous config read. The FMU can
+            // retry that config read in legacy form after a timeout.
+            var compactRead = code == CodeRead && request.Count == HeaderSize &&
+                ValidCrc(request);
+            var expected = compactRead ? HeaderSize : HeaderSize + 2 * count;
             if(request.Count < expected)
             {
                 return;
@@ -89,10 +98,6 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             {
                 var values = ReadRegisters(page, offset, count);
                 SendReply(CodeSuccess, page, offset, values);
-                if(page == PageConfig)
-                {
-                    compactReads = true;
-                }
                 return;
             }
 
@@ -182,9 +187,23 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 reply[HeaderSize + 2 * i + 1] = (byte)(registers[i] >> 8);
             }
             reply[1] = Crc8(reply);
-            foreach(var value in reply)
+            // A real IO MCU cannot start its reply until the request has left
+            // the FMU UART, and then shifts the reply one frame at a time.
+            // Injecting the whole reply synchronously from the final request
+            // byte overruns the STM32 receive path before DMA can consume it.
+            var scheduledGeneration = generation;
+            for(var i = 0; i < reply.Length; i++)
             {
-                CharReceived?.Invoke(value);
+                var value = reply[i];
+                machine.ScheduleAction(TimeInterval.FromMicroseconds(
+                    ReplyDelayUs + (uint)i * FrameDelayUs),
+                    _ =>
+                    {
+                        if(scheduledGeneration == generation)
+                        {
+                            CharReceived?.Invoke(value);
+                        }
+                    }, name: "AP IOMCU reply");
             }
         }
 
@@ -211,12 +230,12 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             return crc;
         }
 
+        private readonly IMachine machine;
         private readonly uint firmwareCrc;
         private readonly List<byte> request;
         private readonly ushort[] setup;
         private readonly ushort[] servos;
-        private bool compactReads;
-
+        private uint generation;
         private const int HeaderSize = 4;
         private const int MaxChannels = 16;
         private const int SetupRegisterCount = 28;
@@ -239,5 +258,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private const int FirmwareCrcRegister = 11;
         private const ushort ProtocolVersion = 4;
         private const ushort ProtocolVersion2 = 10;
+        private const uint ReplyDelayUs = 7;
+        private const uint FrameDelayUs = 7;
     }
 }

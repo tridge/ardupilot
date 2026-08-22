@@ -137,6 +137,9 @@ every pause-at-a-breakpoint into a reboot).
 
 ## Files
 
+- `launch.py` — graphical board/firmware chooser, lifecycle manager and live
+  Renode speed, PC and MIPS status panel. It delegates board construction and
+  execution to `run.py`.
 - `gen_board.py` — runs the same `ChibiOSHWDef` compiler used by
   `./waf configure`, then translates its expanded configuration and generated
   `hwdef.h` DMA assignments into a board overlay and launch script.
@@ -368,6 +371,44 @@ commands, `--serial N` selects another `SERIAL_ORDER` entry, `--elf` overrides
 the firmware, and renode itself is found from `--renode`, `$RENODE` or PATH.
 The selected firmware UART must still have the desired ArduPilot serial
 protocol configured; exposing a UART does not alter firmware parameters.
+
+### Graphical launcher
+
+`launch.py` provides a board and firmware chooser around `run.py`:
+
+```sh
+Tools/renode/launch.py --renode ~/project/UAV/renode/renode
+```
+
+It discovers supported boards and their built ELF images, selects a matching
+bootloader when one is available, and exposes CPU pinning, real IOMCU, USB,
+CAN bus and Ethernet TAP options. Start and Stop own the complete Renode and
+USB-helper process groups, and Quit performs the same cleanup before closing.
+The runtime panel obtains status directly from Renode's monitor and shows the
+current PC, configured MIPS, actually executed MIPS, and virtual-time speedup.
+The target for paced execution is `1.00x realtime`; a lower value means the
+host is not keeping up with the selected model and workload.
+
+The **Download Renode** button checks
+`https://firmware.ardupilot.org/Tools/Renode/latest.json` on every use and
+selects the portable package matching the host architecture. Downloads are
+size and SHA-256 checked, extracted atomically, and cached under
+`~/.cache/ardupilot/renode/`. A cached executable is reused only when its
+recorded source revision and package hash still match the current server
+manifest. Use `--renode-cache DIR` to select another cache directory. The
+launcher also checks for an update in the background when it opens and changes
+the button to **Update Renode** when the managed cache is stale.
+
+When USB is selected, the launcher starts `usbip_attach.py` as the current
+user. Perform its one-time udev setup before the first launch:
+
+```sh
+sudo Tools/renode/usbip_attach.py --install-rules
+```
+
+For automated UI tests, `--control-port N` enables a localhost command socket.
+Run `Tools/renode/launch.py --help` for its board, firmware, option, lifecycle,
+and JSON status commands.
 
 Use `--bootloader` to execute a bootloader before the selected application:
 

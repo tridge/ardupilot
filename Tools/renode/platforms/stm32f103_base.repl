@@ -61,23 +61,23 @@ afio: GPIOPort.STM32F1AFIO @ sysbus 0x40010000
     gpioPorts: [gpioPortA, gpioPortB, gpioPortC, gpioPortD, gpioPortE, gpioPortF, gpioPortG]
     [0-15] -> exti@[0-15]
 
-usart1: UART.STM32_UART @ sysbus <0x40013800, +0x100>
+usart1: UART.AP_STM32F1_UART @ sysbus <0x40013800, +0x100>
     frequency: 72000000
     -> nvic@37
 
-usart2: UART.STM32_UART @ sysbus <0x40004400, +0x100>
+usart2: UART.AP_STM32F1_UART @ sysbus <0x40004400, +0x100>
     frequency: 36000000
     -> nvic@38
 
-usart3: UART.STM32_UART @ sysbus <0x40004800, +0x100>
+usart3: UART.AP_STM32F1_UART @ sysbus <0x40004800, +0x100>
     frequency: 36000000
     -> nvic@39
 
-uart4: UART.STM32_UART @ sysbus <0x40004C00, +0x100>
+uart4: UART.AP_STM32F1_UART @ sysbus <0x40004C00, +0x100>
     frequency: 36000000
     -> nvic@52
 
-uart5: UART.STM32_UART @ sysbus <0x40005000, +0x100>
+uart5: UART.AP_STM32F1_UART @ sysbus <0x40005000, +0x100>
     frequency: 36000000
     -> nvic@53
 
@@ -168,23 +168,8 @@ rcc: Miscellaneous.AP_STM32F1F3_RCC @ sysbus 0x40021000
     timer3: timer3
     timer4: timer4
 
-// FLASH_SR error flags are write-one-to-clear. AP_FlashStorage writes 0xF3
-// while formatting, which must not leave the controller permanently busy.
-flashController: Python.PythonPeripheral @ sysbus 0x40022000
-    size: 0x400
-    initable: true
-    script: '''
-if request.IsInit:
-    registers = {}
-
-if request.IsWrite:
-    if request.Offset == 0xC:
-        registers[request.Offset] = 0
-    else:
-        registers[request.Offset] = request.Value
-elif request.IsRead:
-    request.Value = registers.get(request.Offset, 0)
-'''
+flashController: MTD.AP_STM32F1_FlashController @ sysbus 0x40022000
+    flash: flash
 
 backupRegisters: Memory.MappedMemory @ sysbus 0x40006C00
     size: 0x400
