@@ -33,6 +33,8 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             request.Clear();
             Array.Clear(setup, 0, setup.Length);
             Array.Clear(servos, 0, servos.Length);
+            safetyOff = false;
+            totalPackets = 0;
             setup[DefaultRateRegister] = 50;
             setup[AlternateRateRegister] = 200;
             setup[FirmwareCrcRegister] = (ushort)firmwareCrc;
@@ -88,6 +90,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 return;
             }
 
+            totalPackets++;
             if(code == CodeRead)
             {
                 var values = ReadRegisters(page, offset, count);
@@ -115,6 +118,9 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 {
                 case PageConfig:
                     result[i] = ReadConfig(register);
+                    break;
+                case PageStatus:
+                    result[i] = ReadStatus(register);
                     break;
                 case PageSetup:
                     result[i] = register < setup.Length ? setup[register] : (ushort)0;
@@ -151,6 +157,33 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             }
         }
 
+        private ushort ReadStatus(int register)
+        {
+            var elapsedUs = (ulong)machine.ElapsedVirtualTime.TimeElapsed.TotalMicroseconds;
+            var timestampMs = (uint)Math.Max(1UL, elapsedUs / 1000);
+            switch(register)
+            {
+            case 0:
+                return 1024; // Free memory
+            case 1:
+            case 2:
+                return 512; // Free thread stack
+            // page_reg_status has one alignment word before timestamp_ms.
+            case 4:
+                return (ushort)timestampMs;
+            case 5:
+                return (ushort)(timestampMs >> 16);
+            case 10:
+                return (ushort)totalPackets;
+            case 11:
+                return (ushort)(totalPackets >> 16);
+            case 16:
+                return safetyOff ? (ushort)1 : (ushort)0;
+            default:
+                return 0;
+            }
+        }
+
         private void WriteRegisters(byte page, byte offset, int count)
         {
             for(var i = 0; i < count; i++)
@@ -161,6 +194,14 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 if(page == PageSetup && register < setup.Length)
                 {
                     setup[register] = value;
+                    if(register == ForceSafetyOffRegister && value == ForceSafetyMagic)
+                    {
+                        safetyOff = true;
+                    }
+                    else if(register == ForceSafetyOnRegister && value == ForceSafetyMagic)
+                    {
+                        safetyOff = false;
+                    }
                 }
                 else if(page == PageDirectPwm && register < servos.Length)
                 {
@@ -230,6 +271,8 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private readonly List<byte> request;
         private readonly ushort[] setup;
         private readonly ushort[] servos;
+        private bool safetyOff;
+        private uint totalPackets;
         private uint generation;
         private const int HeaderSize = 4;
         private const int MaxChannels = 16;
@@ -244,6 +287,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private const byte CodeError = 2;
 
         private const byte PageConfig = 0;
+        private const byte PageStatus = 1;
         private const byte PageServos = 3;
         private const byte PageSetup = 50;
         private const byte PageDirectPwm = 54;
@@ -251,6 +295,9 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private const int DefaultRateRegister = 3;
         private const int AlternateRateRegister = 4;
         private const int FirmwareCrcRegister = 11;
+        private const int ForceSafetyOffRegister = 12;
+        private const int ForceSafetyOnRegister = 14;
+        private const ushort ForceSafetyMagic = 22027;
         private const ushort ProtocolVersion = 4;
         private const ushort ProtocolVersion2 = 10;
         private const uint ReplyDelayUs = 7;
