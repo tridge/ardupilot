@@ -4,13 +4,14 @@ Run the same CubeOrange SITL-on-hardware mission used by CI from the repository
 root:
 
 ```sh
-Tools/renode/tests/build_renode.sh
+Tools/renode/tests/fetch_renode.sh
 Tools/renode/tests/test_mission.py
 ```
 
-The build helper follows the `pr-arudpilot-am32-perf` branch of the ArduPilot
-Renode fork. It fetches the latest branch tip on every run so local testing and
-CI pick up ongoing Renode development.
+The fetch helper downloads the latest package for the host architecture from
+`https://firmware.ardupilot.org/Tools/Renode/`. It verifies the package size
+and SHA-256 against `latest.json` before extracting it. Set
+`RENODE_PACKAGE_BASE_URL` to use another package mirror.
 
 The test builds Copter with `Tools/scripts/sitl-on-hardware/sitl-on-hw.py`,
 uploads and flies a four-waypoint mission, lands, downloads the DataFlash log

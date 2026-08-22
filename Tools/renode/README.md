@@ -481,9 +481,9 @@ for reducing the peripheral workload on boards with several redundant IMUs:
 Tools/renode/run.py CubeOrange --num-imus 1
 ```
 
-Basic emulation works against stock Renode 1.16.1. The recommended
-`tests/build_renode.sh` build adds the performance patch stack (worth roughly
-4x) and the USB/IP device-state patch used for firmware re-enumeration.
+Basic emulation works against stock Renode 1.16.1. The recommended packages
+downloaded by `tests/fetch_renode.sh` include the performance patch stack
+(worth roughly 4x) and USB/IP support used for firmware re-enumeration.
 
 For AP_Periph targets, `run.py` selects the AP_Periph ELF, opens each CAN
 multicast bus, and attaches supported hwdef-selected sensors automatically.
