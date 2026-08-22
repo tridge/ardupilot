@@ -5,7 +5,6 @@
 //
 using System;
 using System.Collections.Generic;
-using Antmicro.Migrant;
 using Antmicro.Renode.Core;
 using Antmicro.Renode.Peripherals;
 using Antmicro.Renode.Peripherals.Bus;
@@ -14,15 +13,17 @@ using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Miscellaneous
 {
-    public class AP_IOMCU : IUART, IDoubleWordPeripheral, IKnownSize
+    public class AP_IOMCU : IDoubleWordPeripheral, IKnownSize
     {
-        public AP_IOMCU(IMachine machine, uint firmwareCrc)
+        public AP_IOMCU(IMachine machine, IUART uart, uint firmwareCrc)
         {
             this.machine = machine;
+            this.uart = uart;
             this.firmwareCrc = firmwareCrc;
             request = new List<byte>();
             setup = new ushort[SetupRegisterCount];
             servos = new ushort[MaxChannels];
+            uart.CharReceived += WriteChar;
             Reset();
         }
 
@@ -38,7 +39,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             setup[FirmwareCrcRegister + 1] = (ushort)(firmwareCrc >> 16);
         }
 
-        public void WriteChar(byte value)
+        private void WriteChar(byte value)
         {
             request.Add(value);
             if(request.Count < HeaderSize)
@@ -66,8 +67,8 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         }
 
         // AP_IOMCU is mapped in the synthetic Renode peripheral window only
-        // to give the UART connector a registered endpoint. The FMU exchanges
-        // data with it exclusively through IUART.
+        // so Renode instantiates it. The FMU exchanges data with it exclusively
+        // through the UART supplied to the constructor.
         public uint ReadDoubleWord(long offset)
         {
             return 0;
@@ -78,13 +79,6 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         }
 
         public long Size => 4;
-
-        public uint BaudRate => 1500000;
-        public Parity ParityBit => Parity.None;
-        public Bits StopBits => Bits.One;
-
-        [field: Transient]
-        public event Action<byte> CharReceived;
 
         private void ProcessRequest(byte code, int count, byte page, byte offset)
         {
@@ -201,7 +195,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                     {
                         if(scheduledGeneration == generation)
                         {
-                            CharReceived?.Invoke(value);
+                            uart.WriteChar(value);
                         }
                     }, name: "AP IOMCU reply");
             }
@@ -231,6 +225,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         }
 
         private readonly IMachine machine;
+        private readonly IUART uart;
         private readonly uint firmwareCrc;
         private readonly List<byte> request;
         private readonly ushort[] setup;

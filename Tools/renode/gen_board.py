@@ -935,6 +935,7 @@ def _iomcu_device(root, app, family, defines, address, warnings,
         return [], None, None
     lines = [
         'iomcu: Miscellaneous.AP_IOMCU @ sysbus 0x%08X' % address,
+        '    uart: %s' % uart.lower(),
         '    firmwareCrc: 0x%08X' % firmware_crc,
         '',
     ] if synthetic_iomcu else []
@@ -2021,18 +2022,13 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
         ]
     elif sigrok_capture is not None:
         raise ValueError('sigrok capture needs a selected hardware UART')
-    if iomcu_uart is not None:
+    if iomcu_uart is not None and real_iomcu:
         iomcu_target = iomcu_uart.lower()
-        if real_iomcu:
-            iomcu_target += 'Host'
+        iomcu_target += 'Host'
         lines += [
             'emulation CreateUARTHub "iomcuHub"',
             'connector Connect sysbus.%s iomcuHub' % iomcu_target,
         ]
-        if not real_iomcu:
-            lines += [
-                'connector Connect sysbus.iomcu iomcuHub',
-            ]
         lines += [
             '',
         ]
