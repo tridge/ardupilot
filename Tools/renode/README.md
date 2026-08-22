@@ -495,6 +495,44 @@ For example:
 Tools/renode/run.py HolybroG4_GPS
 ```
 
+### Real IOMCU
+
+H7 flight controllers with an `IOMCU_UART` can run the real STM32F100 IOMCU
+bootloader and firmware in a second Renode machine:
+
+```sh
+Tools/renode/run.py CubeOrangePlus --real-iomcu \
+    --bootloader Tools/bootloaders/CubeOrangePlus_bl.bin
+```
+
+The generated FMU UART and the F100 USART2 are connected through a paced UART
+hub. Renode runs the two CPUs with deterministic serial execution and a 20 us
+global quantum; this is slower than the synthetic IOMCU but prevents concurrent
+native CPU execution from racing exception entry. The F100 model supplies the
+24 MHz Cube oscillator, USART IDLE timing, DMA receive request, and flash page
+erase behavior needed by the unmodified bootloader and application.
+
+The default IOMCU bootloader is `Tools/bootloaders/iomcu_bl.bin`; override it
+with `--iomcu-bootloader`. The application comes from the FMU ELF's embedded
+`io_firmware.bin`. Its complete 64 KiB flash persists as `iomcu-flash.img` in
+the board state directory. `--iomcu-force-update` erases only the application
+region before startup, causing the FMU to upload its embedded image through
+the real IOMCU bootloader. Do not leave that option enabled on every run if the
+persisted result is what you want to test.
+
+Once MAVProxy is connected to the selected MAVLink UART, these commands use
+the normal FMU-to-IOMCU register path:
+
+```text
+arm safetyoff
+arm safetyon
+```
+
+The FMU's normal `IOMC` DataFlash message records the real IOMCU status once
+logging is active. Set `LOG_DISARMED=1` when collecting it without arming the
+vehicle. Real-IOMCU mode currently requires an STM32H7 FMU; the synthetic
+IOMCU remains the default for faster general board testing.
+
 ### USB/IP
 
 On Linux, `--usb` exports the firmware-driven H7 USB controller through
@@ -505,14 +543,26 @@ then start Renode and the vhci helper in separate terminals:
 Tools/renode/run.py CubeOrange --usb \
     --bootloader Tools/bootloaders/CubeOrange_bl.bin \
     --hold-bootloader
-sudo Tools/renode/usbip_attach.py
+Tools/renode/usbip_attach.py
 ```
 
-The helper loads `vhci_hcd`, attaches export `1-0`, and monitors it for
+The helper does the USB/IP import itself and hands the socket to
+`vhci_hcd` through sysfs, so the distribution's usbip tool is not
+needed. Root is only required for the kernel's attach/detach files;
+run once
+
+```sh
+sudo Tools/renode/usbip_attach.py --install-rules
+```
+
+to load `vhci_hcd` at boot and make them group-writable for `dialout`,
+after which the helper runs as a normal user. (Without the rules it
+still works run as root.) It attaches export `1-0` and monitors it for
 firmware USB disconnects. It automatically reattaches after bootloader,
 application, or runtime USB re-enumeration so Linux obtains the new
-descriptors. On exit it detaches any vhci connection it created. Pass the same
-`--port N` to the helper when using `run.py --usbip-port N`.
+descriptors. Control-C or SIGTERM exits cleanly and detaches the vhci
+port this helper attached. Pass the same `--port N` to the helper when
+using `run.py --usbip-port N`.
 
 The virtual controller then appears in `dmesg`, as `/dev/ttyACM*`, and
 under `/dev/serial/by-id/`. Both bootloader and application descriptors use
