@@ -547,9 +547,10 @@ Tools/renode/run.py CubeOrangePlus --real-iomcu \
 ```
 
 The generated FMU UART and the F100 USART2 are connected through a paced UART
-hub. Renode runs the two CPUs with deterministic serial execution and a 20 us
-global quantum; this is slower than the synthetic IOMCU but prevents concurrent
-native CPU execution from racing exception entry. The F100 model supplies the
+hub. Renode runs the two CPUs with deterministic serial execution and a 500 us
+global quantum; this prevents concurrent native CPU execution from racing
+exception entry without the excessive synchronization overhead of a UART-frame
+length quantum. The F100 model supplies the
 24 MHz Cube oscillator, USART IDLE timing, DMA receive request, and flash page
 erase behavior needed by the unmodified bootloader and application.
 

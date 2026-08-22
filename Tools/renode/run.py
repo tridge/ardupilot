@@ -832,7 +832,7 @@ def main():
             'connector Connect sysbus.iomcuUart iomcuHub',
             'machine LoadPlatformDescription @%s' % iomcu_persistence_repl,
             'emulation SetGlobalSerialExecution true',
-            'emulation SetGlobalQuantum "0.00002"',
+            'emulation SetGlobalQuantum "0.0005"',
             'mach set "ardupilot"',
         ]
     if args.unthrottled:
