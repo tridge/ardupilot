@@ -21,6 +21,7 @@ include $repo/Tools/renode/peripherals/common/AP_SPIMultiplexer.cs
 include $repo/Tools/renode/peripherals/common/AP_CANMcast.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32F4_I2C.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32_ADC.cs
+include $repo/Tools/renode/peripherals/stm32/AP_STM32_OTG.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32DMA_Fixup.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32DMA_Circular.cs
 include $repo/Tools/renode/peripherals/stm32/AP_STM32F_SDMMC_DmaPump.cs

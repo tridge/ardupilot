@@ -646,7 +646,8 @@ def main():
                   args.can_base + len(generated['can_buses']) - 1))
     if args.ethernet_tap and not generated['has_ethernet']:
         sys.exit('%s has no generated Ethernet peripheral' % args.board)
-    if args.usb and generated['family'] not in ('h743', 'h757'):
+    if args.usb and generated['family'] not in (
+            'f405', 'f407', 'f427', 'h743', 'h757'):
         sys.exit('%s does not have a supported Renode USB controller' %
                  args.board)
     if args.real_iomcu:

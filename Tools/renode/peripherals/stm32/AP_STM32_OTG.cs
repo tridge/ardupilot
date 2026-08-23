@@ -19,9 +19,11 @@ namespace Antmicro.Renode.Peripherals.USB
 {
     public class AP_STM32_OTG : IDoubleWordPeripheral, IKnownSize, IUSBDevice
     {
-        public AP_STM32_OTG(IMachine machine)
+        public AP_STM32_OTG(IMachine machine,
+                            bool connectOnVbusSensing = false)
         {
             this.machine = machine;
+            this.connectOnVbusSensing = connectOnVbusSensing;
             sofTimer = new LimitTimer(machine.ClockSource, 1000, this,
                 "USB start of frame", limit: 1,
                 direction: Antmicro.Renode.Time.Direction.Ascending, enabled: false,
@@ -180,6 +182,9 @@ namespace Antmicro.Renode.Peripherals.USB
                 }
                 switch(offset)
                 {
+                case AhbConfiguration:
+                    WriteAhbConfiguration(value);
+                    break;
                 case ResetControl:
                     // Core reset and FIFO flush request bits self-clear.
                     break;
@@ -193,6 +198,9 @@ namespace Antmicro.Renode.Peripherals.USB
                         enumerateAfterReset = false;
                         registers[offset] |= EnumerationDoneInterrupt;
                     }
+                    break;
+                case GlobalCoreConfiguration:
+                    WriteGlobalCoreConfiguration(value);
                     break;
                 case DeviceControl:
                     WriteDeviceControl(value);
@@ -662,28 +670,95 @@ namespace Antmicro.Renode.Peripherals.USB
             registers[DeviceControl] = value;
             if((value & SoftDisconnect) != 0)
             {
-                if(connected)
-                {
-                    SetUSBIPConnected(false);
-                }
-                connected = false;
-                sofTimer.Enabled = false;
+                Disconnect();
                 return;
             }
-            if(wasDisconnected)
+            if(wasDisconnected && !connectOnVbusSensing)
             {
-                connected = SetUSBIPConnected(true);
-                if(!connected)
-                {
-                    return;
-                }
-                sofTimer.Enabled = true;
-                USBCore.Address = 0;
-                USBCore.SelectedConfiguration = genericConfiguration;
-                registers[GlobalInterruptStatus] =
-                    GetRegister(GlobalInterruptStatus) | UsbResetInterrupt;
-                enumerateAfterReset = true;
+                Connect();
             }
+        }
+
+        private void WriteGlobalCoreConfiguration(uint value)
+        {
+            if(!connectOnVbusSensing)
+            {
+                registers[GlobalCoreConfiguration] = value;
+                return;
+            }
+            var wasConnected =
+                (GetRegister(GlobalCoreConfiguration) & VbusBSensingEnable) != 0;
+            registers[GlobalCoreConfiguration] = value;
+            var isConnected = (value & VbusBSensingEnable) != 0;
+            if(wasConnected == isConnected)
+            {
+                return;
+            }
+            if(!isConnected)
+            {
+                Disconnect();
+                return;
+            }
+            // STM32F4 usbStart() enables VBUS sensing before clearing pending
+            // interrupts. Connect only once it has completed initialization
+            // by enabling the controller's global interrupt below.
+            if((GetRegister(AhbConfiguration) & GlobalInterruptEnable) != 0)
+            {
+                Connect();
+            }
+        }
+
+        private void WriteAhbConfiguration(uint value)
+        {
+            var wasEnabled =
+                (GetRegister(AhbConfiguration) & GlobalInterruptEnable) != 0;
+            registers[AhbConfiguration] = value;
+            if(!connectOnVbusSensing)
+            {
+                return;
+            }
+            if((value & GlobalInterruptEnable) == 0)
+            {
+                if(wasEnabled)
+                {
+                    Disconnect();
+                }
+                return;
+            }
+            if((GetRegister(GlobalCoreConfiguration) &
+                VbusBSensingEnable) != 0)
+            {
+                Connect();
+            }
+        }
+
+        private void Connect()
+        {
+            if(connected)
+            {
+                return;
+            }
+            connected = SetUSBIPConnected(true);
+            if(!connected)
+            {
+                return;
+            }
+            sofTimer.Enabled = true;
+            USBCore.Address = 0;
+            USBCore.SelectedConfiguration = genericConfiguration;
+            registers[GlobalInterruptStatus] =
+                GetRegister(GlobalInterruptStatus) | UsbResetInterrupt;
+            enumerateAfterReset = true;
+        }
+
+        private void Disconnect()
+        {
+            if(connected)
+            {
+                SetUSBIPConnected(false);
+            }
+            connected = false;
+            sofTimer.Enabled = false;
         }
 
         private bool SetUSBIPConnected(bool deviceConnected)
@@ -870,6 +945,7 @@ namespace Antmicro.Renode.Peripherals.USB
         }
 
         private readonly IMachine machine;
+        private readonly bool connectOnVbusSensing;
         private readonly LimitTimer sofTimer;
         private readonly object sync = new object();
         private readonly Dictionary<long, uint> registers =
@@ -911,6 +987,7 @@ namespace Antmicro.Renode.Peripherals.USB
         private const int EndpointAddressMask = 0x0F;
         private const int EndpointDirectionIn = 0x80;
         private const long AhbConfiguration = 0x008;
+        private const long GlobalCoreConfiguration = 0x038;
         private const long ResetControl = 0x010;
         private const long GlobalInterruptStatus = 0x014;
         private const long GlobalInterruptMask = 0x018;
@@ -936,6 +1013,7 @@ namespace Antmicro.Renode.Peripherals.USB
         private const long FifoStride = 0x1000;
         private const uint AhbIdle = 1u << 31;
         private const uint GlobalInterruptEnable = 1u << 0;
+        private const uint VbusBSensingEnable = 1u << 19;
         private const uint OutEndpointInterrupt = 1u << 19;
         private const uint InEndpointInterrupt = 1u << 18;
         private const uint EnumerationDoneInterrupt = 1u << 13;

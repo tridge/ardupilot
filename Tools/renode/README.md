@@ -577,9 +577,10 @@ IOMCU remains the default for faster general board testing.
 
 ### USB/IP
 
-On Linux, `--usb` exports the firmware-driven H7 USB controller through
-Renode's USB/IP server. Install the distribution's `usbip` userspace tools,
-then start Renode and the vhci helper in separate terminals:
+On Linux, `--usb` exports the firmware-driven STM32F4 or H7 USB controller
+through Renode's USB/IP server. This includes F4 boards such as CubeBlack.
+Install the distribution's `usbip` userspace tools, then start Renode and the
+vhci helper in separate terminals:
 
 ```sh
 Tools/renode/run.py CubeOrange --usb \

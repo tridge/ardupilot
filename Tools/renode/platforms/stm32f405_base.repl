@@ -22,8 +22,7 @@
 //  - ethernet, fsmcBank1, gpio J/K dropped (not on the F405)
 //  - network ApplySVD removed; the resc applies a vendored SVD instead
 //  - SYSCFG and DBGMCU tagged so accesses log instead of faulting
-//  - OTG_FS region tagged with AHBIDL set so the ChibiOS USB driver's
-//    GRSTCTL polls fall through
+//  - OTG_FS uses the firmware-driven ArduPilot USB device model
 
 sram: Memory.MappedMemory @ sysbus 0x20000000
     size: 0x20000
@@ -271,14 +270,11 @@ bitbandPeripherals: Miscellaneous.BitBanding @ sysbus <0x42000000, +0x2000000>
 bitbandSram: Miscellaneous.BitBanding @ sysbus <0x22000000, +0x200000>
     peripheralBase: 0x20000000
 
+usbOtg: USB.AP_STM32_OTG @ sysbus 0x50000000
+    connectOnVbusSensing: true
+    IRQ -> nvic@67
+
 sysbus:
     init:
         Tag <0x40013800, 0x40013BFF> "SYSCFG"
         Tag <0xE0042000, 0xE00420FF> "DBGMCU"
-        // OTG_FS: only GRSTCTL reads AHBIDL (bit 31) set so the ChibiOS
-        // core-reset polls in usb_lld fall through (CSRST reads clear).
-        // Everything else - GINTSTS in particular - must read zero: a
-        // set bit there is a pending interrupt and the OTG ISR storms.
-        Tag <0x50000000, 0x5000000F> "OTG_FS"
-        Tag <0x50000010, 0x50000013> "OTG_FS_GRSTCTL" 0x80000000
-        Tag <0x50000014, 0x5003FFFF> "OTG_FS"

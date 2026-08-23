@@ -25,12 +25,14 @@ using Antmicro.Renode.Peripherals;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.DMA;
 using Antmicro.Renode.Peripherals.UART;
+using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Miscellaneous
 {
     public class AP_UartRxDmaPump : IDoubleWordPeripheral, IKnownSize
     {
-        public AP_UartRxDmaPump(STM32DMA dma, int stream, STM32_UART uart)
+        public AP_UartRxDmaPump(IMachine machine, STM32DMA dma, int stream,
+                               STM32_UART uart)
         {
             var fifoField = typeof(STM32_UART).GetField("receiveFifo", BindingFlags.NonPublic | BindingFlags.Instance);
             if(fifoField == null)
@@ -39,19 +41,26 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             }
             var fifo = (Queue<byte>)fifoField.GetValue(uart);
 
-            dma.RegistersCollection.AddAfterWriteHook(0x10 + 0x18 * stream, (long offset, uint value) =>
+            dma.RegistersCollection.AddBeforeWriteHook(0x10 + 0x18 * stream, (long offset, uint value) =>
             {
                 if((value & 1) == 0)
                 {
-                    return;
+                    return null;
                 }
-                // stream just enabled: service every request that went
-                // missing while it was down
-                var pending = fifo.Count;
-                for(var i = 0; i < pending; i++)
+                // Run after this register write has enabled the stream. A
+                // before-write hook can coexist with AP_STM32DMA_Fixup's
+                // after-write hook on the same register.
+                machine.ScheduleAction(TimeInterval.FromMicroseconds(1), _ =>
                 {
-                    uart.DMARequest.Blink();
-                }
+                    // Service every request that went missing while the
+                    // stream was down.
+                    var pending = fifo.Count;
+                    for(var i = 0; i < pending; i++)
+                    {
+                        uart.DMARequest.Blink();
+                    }
+                }, name: "AP UART RX DMA replay");
+                return null;
             });
         }
 

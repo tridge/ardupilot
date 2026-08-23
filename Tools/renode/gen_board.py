@@ -968,19 +968,21 @@ def _power_status_inputs(app):
         pin = app.bylabel.get(label)
         if pin is None or pin.get_MODER_value() != 'INPUT':
             continue
-        pull = pin.get_PUPDR_value()
-        if pull == 'PULLUP':
-            level = True
-        elif pull == 'PULLDOWN':
-            level = False
-        else:
-            continue
         # The emulated board's 5 V supply represents USB power. Override the
-        # passive pull on its VBUS status input with the active level.
+        # passive pull (or an unpulled/open-drain input) on its VBUS status
+        # input with the active level.
         if label in ('VBUS', 'VBUS_VALID'):
             level = True
         elif label == 'VBUS_nVALID':
             level = False
+        else:
+            pull = pin.get_PUPDR_value()
+            if pull == 'PULLUP':
+                level = True
+            elif pull == 'PULLDOWN':
+                level = False
+            else:
+                continue
         inputs.append((pin, level))
     return inputs
 
