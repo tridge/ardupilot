@@ -10,7 +10,6 @@ import importlib.util
 from pathlib import Path
 from unittest import mock
 
-
 MODULE_PATH = Path(__file__).resolve().parents[1] / 'usbip_attach.py'
 SPEC = importlib.util.spec_from_file_location('usbip_attach', MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None

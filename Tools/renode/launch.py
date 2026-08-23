@@ -21,7 +21,6 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import queue
 import re
@@ -39,6 +38,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -744,12 +744,22 @@ def main():
                         help='localhost TCP port for scripted UI control')
     args = parser.parse_args()
 
-    from PySide6.QtCore import Qt, QTimer
-    from PySide6.QtWidgets import (
-        QApplication, QCheckBox, QComboBox, QFileDialog, QGridLayout,
-        QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
-        QPushButton, QSpinBox, QVBoxLayout, QWidget,
-    )
+    from PySide6.QtCore import Qt
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QCheckBox
+    from PySide6.QtWidgets import QComboBox
+    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtWidgets import QGridLayout
+    from PySide6.QtWidgets import QGroupBox
+    from PySide6.QtWidgets import QHBoxLayout
+    from PySide6.QtWidgets import QLabel
+    from PySide6.QtWidgets import QLineEdit
+    from PySide6.QtWidgets import QPlainTextEdit
+    from PySide6.QtWidgets import QPushButton
+    from PySide6.QtWidgets import QSpinBox
+    from PySide6.QtWidgets import QVBoxLayout
+    from PySide6.QtWidgets import QWidget
 
     sys.path.insert(0, str(HERE))
     import gen_board

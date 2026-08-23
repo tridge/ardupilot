@@ -12,7 +12,6 @@ dialout, after which this helper never needs root again.
 import argparse
 import grp
 import os
-from pathlib import Path
 import signal
 import socket
 import struct
@@ -20,6 +19,7 @@ import subprocess
 import sys
 import time
 
+from pathlib import Path
 
 VHCI = Path("/sys/devices/platform/vhci_hcd.0")
 VDEV_ST_USED = "006"

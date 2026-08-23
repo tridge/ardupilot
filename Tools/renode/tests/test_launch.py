@@ -5,16 +5,16 @@
 """Tests for the ArduPilot Renode launcher."""
 
 import hashlib
-import io
 import importlib.util
+import io
 import os
-from pathlib import Path
 import socket
 import tarfile
+
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / 'launch.py'
 SPEC = importlib.util.spec_from_file_location('renode_launch', MODULE_PATH)

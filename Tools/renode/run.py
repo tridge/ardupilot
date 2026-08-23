@@ -323,7 +323,8 @@ def make_bootloader_binary(source, destination):
         return destination, 0x08000000
     if suffix in ('.hex', '.ihex'):
         try:
-            from intelhex import IntelHex, IntelHexError
+            from intelhex import IntelHex
+            from intelhex import IntelHexError
         except ImportError:
             sys.exit('the intelhex Python module is required for %s' % source)
         try:
