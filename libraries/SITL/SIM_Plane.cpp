@@ -31,8 +31,9 @@ Plane::Plane(const char *frame_str) :
 
     const char *colon = strchr(frame_str, ':');
     size_t slen = strlen(frame_str);
+    const bool json_model = colon != nullptr && slen > 5 && strcmp(&frame_str[slen-5], ".json") == 0;
     // The last 5 letters are ".json"
-    if (colon != nullptr && slen > 5 && strcmp(&frame_str[slen-5], ".json") == 0) {
+    if (json_model) {
         load_coeffs(colon+1);
     } else {
         coefficient = default_coefficients;
@@ -75,7 +76,9 @@ Plane::Plane(const char *frame_str) :
           The Phoenix carries a Starlink Mini on top, which is why even 8.4 is
           low for an airframe of this size.
          */
-        coefficient.c_drag_p = 0.076;
+        if (!json_model) {
+            coefficient.c_drag_p = 0.076;
+        }
 
         /*
           Forward thrust, using the propeller model rather than a throttle
