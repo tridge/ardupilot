@@ -22,7 +22,7 @@ jobs:
       - name: Install Renode runtime dependencies
         run: |
           apt-get update
-          apt-get install --no-install-recommends -y curl dosfstools
+          apt-get install --no-install-recommends -y curl dosfstools python3-pytest
       - uses: actions/checkout@v7
         with:
           submodules: recursive
@@ -30,7 +30,11 @@ jobs:
         with:
           key-suffix: renode-cubeorange
       - name: Fetch Renode
+        env:
+          RENODE_SOURCE_REVISION: 2a060779f4e2b87d1ae7238a041d858369818805
         run: Tools/renode/tests/fetch_renode.sh
+      - name: Run Renode unit tests
+        run: python3 -m pytest -q Tools/renode/tests/test_launch.py Tools/renode/tests/test_usbip_attach.py
       - name: Fly CubeOrange mission
         env:
           PYTHONPATH: ${{ github.workspace }}/modules/mavlink
