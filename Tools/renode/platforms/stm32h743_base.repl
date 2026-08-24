@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Antmicro <www.antmicro.com>
+// SPDX-License-Identifier: MIT
+//
 // STM32H743 base platform for running ArduPilot under Renode.
 //
 // Vendored from the shared renode performance branch's

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Antmicro <www.antmicro.com>
+// SPDX-License-Identifier: MIT
+//
 // Vendored from Renode 1.16.1 platforms/cpus/stm32f746.repl (MIT).
 // The stock RCC stub is replaced with ArduPilot's register-driven model.
 fsmcBank1: Memory.MappedMemory @ sysbus 0xC0000000

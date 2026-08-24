@@ -1921,9 +1921,6 @@ def _script(root, board, app, bootloader, platform, serial_index, uart_port,
     # base, as it is in the generated ChibiOS build configuration.
     effective_reserve_kb = boot_kb if reserve_kb == 0 else reserve_kb
     app_base = 0x08000000 + effective_reserve_kb * 1024
-    if boot_kb != reserve_kb and reserve_kb != 0:
-        warnings.append('application starts at %uK, bootloader loads at %uK' %
-                        (reserve_kb, boot_kb))
     serial_index, serial = _serial_device(
         app, family, serial_index,
         excluded=(gps_uart, rangefinder_uart, iomcu_uart))

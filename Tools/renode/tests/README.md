@@ -11,7 +11,9 @@ Tools/renode/tests/test_mission.py
 The fetch helper downloads the latest package for the host architecture from
 `https://firmware.ardupilot.org/Tools/Renode/`. It verifies the package size
 and SHA-256 against `latest.json` before extracting it. Set
-`RENODE_PACKAGE_BASE_URL` to use another package mirror.
+`RENODE_PACKAGE_BASE_URL` to use another package mirror, or set
+`RENODE_SOURCE_REVISION` to require a specific 40-character source revision as
+CI does.
 
 The test builds Copter with `Tools/scripts/sitl-on-hardware/sitl-on-hw.py`,
 uploads and flies a four-waypoint mission, lands, downloads the DataFlash log

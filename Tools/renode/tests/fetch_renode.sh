@@ -39,7 +39,8 @@ package_data="${temporary}/package-data"
 curl --fail --location --retry 5 --retry-all-errors \
     --output "${manifest}" "${base_url}/latest.json"
 
-python3 - "${manifest}" "${artifact}" "${architecture}" > "${package_data}" <<'PY'
+python3 - "${manifest}" "${artifact}" "${architecture}" \
+    "${RENODE_SOURCE_REVISION:-}" > "${package_data}" <<'PY'
 import json
 import pathlib
 import re
@@ -48,6 +49,7 @@ import sys
 manifest_path = pathlib.Path(sys.argv[1])
 artifact_name = sys.argv[2]
 architecture = sys.argv[3]
+expected_revision = sys.argv[4]
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
 if manifest.get("schema_version") != 1:
@@ -83,6 +85,10 @@ if not isinstance(size, int) or size <= 0:
     raise SystemExit("invalid Renode package size")
 if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
     raise SystemExit("invalid Renode source revision")
+if expected_revision and revision != expected_revision:
+    raise SystemExit(
+        f"Renode source revision is {revision}, expected {expected_revision}"
+    )
 
 print(filename)
 print(checksum)

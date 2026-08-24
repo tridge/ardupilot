@@ -35,7 +35,8 @@ IOMCU_FLASH_BASE = 0x08000000
 IOMCU_FLASH_SIZE = 64 * 1024
 IOMCU_APP_OFFSET = 4 * 1024
 IOMCU_FIRMWARE_SIZE = IOMCU_FLASH_SIZE - IOMCU_APP_OFFSET
-# A 2 ms quantum makes the 1.5 Mbaud FMU/IOMCU link unreliable.
+# 1.5 ms is the longest tested reliable quantum for the 1.5 Mbaud FMU/IOMCU
+# link; 2 ms loses bytes, while shorter quanta add synchronization overhead.
 IOMCU_GLOBAL_QUANTUM = '0.0015'
 
 GDB_LAUNCH = r'''#!/bin/bash

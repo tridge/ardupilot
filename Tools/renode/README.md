@@ -18,7 +18,7 @@ before the application and starts from its vector table.
 
 `Tools/renode/run.py --list` shows the hwdef targets accepted by the generator.
 Support is MCU-family driven rather than maintained as a board allowlist. The
-current generation audit covers 397 targets, including all 109 STM32
+current generation audit covers 401 targets, including all 109 STM32
 AP_Periph hwdefs. AP_Periph can run without a separate bootloader hwdef because
 Renode loads its application ELF directly. The AP_Periph targets by exact MCU
 class are:
@@ -153,6 +153,8 @@ every pause-at-a-breakpoint into a reboot).
   loads persistent internal flash (fresh STM32 flash must read 0xFF),
   `PerformanceInMips 125`, 1ms global quantum.
 - `data/STM32F405.svd.gz` — vendored so headless CI never touches the network.
+- `THIRD_PARTY_NOTICES.md` — copyright and licence terms for the vendored
+  Renode platform/model sources and STMicroelectronics SVD files.
 - `platforms/stm32f427_base.repl` — extends the F405 platform with the second
   flash MiB, the upper SRAM bank, UART7/8, SPI4/5/6, and timer12.
 - `platforms/stm32f767_base.repl` and `scripts/ardupilot_f767.resc` — F767
@@ -600,7 +602,9 @@ sudo Tools/renode/usbip_attach.py --install-rules
 
 to load `vhci_hcd` at boot and make them group-writable for `dialout`,
 after which the helper runs as a normal user. (Without the rules it
-still works run as root.) It attaches export `1-0` and monitors it for
+still works run as root.) To undo the setup, remove
+`/etc/udev/rules.d/99-vhci-user.rules` and
+`/etc/modules-load.d/vhci-hcd.conf`. It attaches export `1-0` and monitors it for
 firmware USB disconnects. It automatically reattaches after bootloader,
 application, or runtime USB re-enumeration so Linux obtains the new
 descriptors. Control-C or SIGTERM exits cleanly and detaches the vhci

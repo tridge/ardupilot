@@ -198,7 +198,14 @@ def extract_renode(archive, destination, package):
     destination.mkdir()
     if package['filename'].endswith('.tar.gz'):
         with tarfile.open(archive, 'r:gz') as bundle:
-            bundle.extractall(destination, filter='data')
+            destination_resolved = destination.resolve()
+            members = bundle.getmembers()
+            for member in members:
+                target = (destination / member.name).resolve()
+                if (not target.is_relative_to(destination_resolved) or
+                        member.issym() or member.islnk() or member.isdev()):
+                    raise RuntimeError('unsafe path in Renode tar package')
+            bundle.extractall(destination, members=members)
         executable_name = 'renode'
     elif package['filename'].endswith('.zip'):
         with zipfile.ZipFile(archive) as bundle:

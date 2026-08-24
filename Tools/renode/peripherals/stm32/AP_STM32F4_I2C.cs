@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: Antmicro <www.antmicro.com>
+// SPDX-License-Identifier: MIT
 //
 // STM32 F4 I2C (I2Cv1) master model for ChibiOS, forked from Renode's
 // STM32F4_I2C (MIT). The stock model cannot run ChibiOS's driver:

@@ -61,16 +61,23 @@ def parse_args():
 def install_rules():
     if os.geteuid() != 0:
         sys.exit("--install-rules must run as root (once)")
+    try:
+        gid = grp.getgrnam("dialout").gr_gid
+    except KeyError:
+        sys.exit("--install-rules requires a dialout group")
     UDEV_RULE_PATH.write_text(UDEV_RULE, encoding="ascii")
     MODULES_LOAD_PATH.write_text("vhci_hcd\n", encoding="ascii")
-    subprocess.run(["modprobe", "vhci_hcd"], check=False)
-    gid = grp.getgrnam("dialout").gr_gid
+    try:
+        subprocess.run(["udevadm", "control", "--reload"], check=True)
+        subprocess.run(["modprobe", "vhci_hcd"], check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        sys.exit("failed to load vhci_hcd rules: %s" % error)
     for name in ("attach", "detach"):
         path = VHCI / name
-        if path.exists():
-            os.chown(path, 0, gid)
-            os.chmod(path, 0o220)
-    subprocess.run(["udevadm", "control", "--reload"], check=False)
+        if not path.exists():
+            sys.exit("vhci_hcd did not create %s" % path)
+        os.chown(path, 0, gid)
+        os.chmod(path, 0o220)
     print(f"installed {UDEV_RULE_PATH} and {MODULES_LOAD_PATH}; "
           "vhci attach now needs no root")
 

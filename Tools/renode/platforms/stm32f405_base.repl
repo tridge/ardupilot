@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Antmicro <www.antmicro.com>
+// SPDX-License-Identifier: MIT
+//
 // STM32F405 base platform for running ArduPilot under Renode.
 //
 // Vendored from Renode 1.16.1 platforms/cpus/stm32f4.repl (MIT), then

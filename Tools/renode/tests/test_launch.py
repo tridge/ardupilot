@@ -60,7 +60,7 @@ def test_parse_metrics():
     }
 
 
-def test_build_command_contains_selected_options():
+def test_build_command_contains_selected_options(tmp_path):
     args = SimpleNamespace(
         monitor_port=12390,
         uart_port=5762,
@@ -70,8 +70,8 @@ def test_build_command_contains_selected_options():
     )
     launcher = launch.Launcher(args)
     launcher.board = 'CubeOrangePlus'
-    launcher.firmware = str(
-        launch.ROOT / 'build' / 'CubeOrangePlus' / 'bin' / 'arducopter')
+    launcher.firmware = str(tmp_path / 'arducopter')
+    Path(launcher.firmware).touch()
     launcher.bootloader = 'none'
     launcher.cpu = min(os.sched_getaffinity(0))
     launcher.real_iomcu = True
@@ -188,3 +188,18 @@ def test_download_cache_is_reused_only_for_current_version(tmp_path):
     selected = launch.select_renode_package(
         newer, system='linux', machine='x86_64')
     assert launch.cached_renode(tmp_path, newer, selected) is None
+
+
+def test_tar_extraction_rejects_unsafe_members(tmp_path):
+    archive = tmp_path / 'renode.tar.gz'
+    with tarfile.open(archive, mode='w:gz') as bundle:
+        info = tarfile.TarInfo('../outside')
+        info.size = 1
+        bundle.addfile(info, io.BytesIO(b'x'))
+    package = {
+        'filename': 'renode-test.linux-portable-dotnet.tar.gz',
+        'platform': 'linux',
+    }
+
+    with pytest.raises(RuntimeError, match='unsafe path'):
+        launch.extract_renode(archive, tmp_path / 'payload', package)

@@ -73,7 +73,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 registers[CR] = MSION;
                 registers[CSR] = 6u << 8;
             }
-            registers[CSR] = Register(CSR) | PORRSTF | PINRSTF | BORRSTF;
+            registers[CSR] = Register(CSR) | BORRSTF | PINRSTF;
             appliedFrequencies.Clear();
             UpdateClocks();
         }
@@ -512,9 +512,8 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private const uint SWS_MASK = 0xC;
         private const uint CR_READ_ONLY_MASK = MSIRDY | HSIRDY | HSERDY | PLLRDY |
             PLLSAI1RDY | PLLSAI2RDY;
-        private const uint PORRSTF = 1u << 27;
+        private const uint BORRSTF = 1u << 27;
         private const uint PINRSTF = 1u << 26;
-        private const uint BORRSTF = 1u << 25;
         private const uint RESET_FLAGS = 0xFF000000;
         private const ulong HsiFrequency = 16000000;
         private const ulong Hsi48Frequency = 48000000;
