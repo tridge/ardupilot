@@ -582,9 +582,7 @@ bool AP_Camera::send_mavlink_message(GCS_MAVLINK &link, const enum ap_message ms
 #endif
 #if AP_MAVLINK_MSG_VIDEO_STREAM_INFORMATION_ENABLED
     case MSG_VIDEO_STREAM_INFORMATION:
-        CHECK_PAYLOAD_SIZE2(VIDEO_STREAM_INFORMATION);
-        send_video_stream_information(chan);
-        break;
+        return send_video_stream_information(chan);
 #endif // AP_MAVLINK_MSG_VIDEO_STREAM_INFORMATION_ENABLED
 
     default:
@@ -713,16 +711,23 @@ void AP_Camera::send_camera_information(uint8_t instance, mavlink_channel_t chan
 
 #if AP_MAVLINK_MSG_VIDEO_STREAM_INFORMATION_ENABLED
 // send video stream information message to GCS
-void AP_Camera::send_video_stream_information(mavlink_channel_t chan)
+bool AP_Camera::send_video_stream_information(mavlink_channel_t chan)
 {
     WITH_SEMAPHORE(_rsem);
 
-    // call each instance
-    for (uint8_t instance = 0; instance < AP_CAMERA_MAX_INSTANCES; instance++) {
-        if (_backends[instance] != nullptr) {
-            _backends[instance]->send_video_stream_information(chan);
+    // Resume at the unsent stream on this link when the scheduler retries.
+    auto &pending = _video_stream_send[chan];
+    for (; pending.instance < AP_CAMERA_MAX_INSTANCES; pending.instance++) {
+        if (_backends[pending.instance] == nullptr) {
+            continue;
         }
+        if (!_backends[pending.instance]->send_video_stream_information(chan, pending.stream)) {
+            return false;
+        }
+        pending.stream = 0;
     }
+    pending.instance = 0;
+    return true;
 }
 #endif // AP_MAVLINK_MSG_VIDEO_STREAM_INFORMATION_ENABLED
 
@@ -1109,18 +1114,15 @@ void AP_Camera::convert_params()
     }
 
     // table parameters to convert without scaling
-    static const AP_Param::ConversionInfo camera_param_conversion_info[] {
-        { k_param_camera_key, 2, AP_PARAM_INT16, "CAM1_SERVO_ON" },
-        { k_param_camera_key, 3, AP_PARAM_INT16, "CAM1_SERVO_OFF" },
-        { k_param_camera_key, 4, AP_PARAM_FLOAT, "CAM1_TRIGG_DIST" },
-        { k_param_camera_key, 5, AP_PARAM_INT8, "CAM1_RELAY_ON" },
-        { k_param_camera_key, 8, AP_PARAM_INT8, "CAM1_FEEDBAK_PIN" },
-        { k_param_camera_key, 9, AP_PARAM_INT8, "CAM1_FEEDBAK_POL" },
+    static const AP_Param::ConversionInfoNoKey camera_param_conversion_info[] {
+        { 2, AP_PARAM_INT16, "CAM1_SERVO_ON" },
+        { 3, AP_PARAM_INT16, "CAM1_SERVO_OFF" },
+        { 4, AP_PARAM_FLOAT, "CAM1_TRIGG_DIST" },
+        { 5, AP_PARAM_INT8, "CAM1_RELAY_ON" },
+        { 8, AP_PARAM_INT8, "CAM1_FEEDBAK_PIN" },
+        { 9, AP_PARAM_INT8, "CAM1_FEEDBAK_POL" },
     };
-    uint8_t table_size = ARRAY_SIZE(camera_param_conversion_info);
-    for (uint8_t i=0; i<table_size; i++) {
-        AP_Param::convert_old_parameter(&camera_param_conversion_info[i], 1.0f);
-    }
+    AP_Param::convert_old_parameters(k_param_camera_key, camera_param_conversion_info, ARRAY_SIZE(camera_param_conversion_info));
 }
 
 #if AP_RELAY_ENABLED
