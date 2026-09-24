@@ -9118,6 +9118,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
     def MAVLinkUnicast(self):
         '''unicast links forward addressed traffic but isolate broadcasts'''
         self.set_parameters({
+            "ADSB_TYPE": 1,
             "SERIAL1_PROTOCOL": 2,
             "SERIAL2_PROTOCOL": 2,
             "SERIAL5_PROTOCOL": 2,
@@ -10424,6 +10425,26 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
                 gimbal.close()
             vehicle.close()
             mavutil.mavfile_global = saved_mavfile_global
+
+    def MT11MAVFTP32bit(self):
+        """Camera discovery, telemetry and FTP with wide vehicle and GCS IDs."""
+        old_source = self.mav.source_system
+        old_sysid = self.sysid_thismav()
+        self.send_set_parameter_direct("MAV_SYSID", 100000)
+        self.mav.target_system = 100000
+        self.sysid_thismav = lambda: 100000
+        try:
+            self.wait_heartbeat(timeout=60)
+            self.mav.source_system = 70000
+            self.mav.mav.srcSystem = 70000
+            self.MT11MAVFTP()
+        finally:
+            self.mav.source_system = old_source
+            self.mav.mav.srcSystem = old_source
+            self.send_set_parameter_direct("MAV_SYSID", old_sysid)
+            del self.sysid_thismav
+            self.mav.target_system = old_sysid
+            self.wait_heartbeat(timeout=60)
 
     def MT11MAVFTP(self):
         '''list and download the simulated camera definition through a unicast link'''
@@ -22468,6 +22489,7 @@ RTL_ALT_M 111
 
         self.context_push()
 
+        self.install_mavlink_module_context("MAVLink")
         self.install_applet_script_context("param-lockdown.lua")
         self.reboot_sitl()
 
@@ -22508,6 +22530,26 @@ RTL_ALT_M 111
         }, check_context=True, very_verbose=True)
         self.assert_parameter_value('DISARM_DELAY', old_disarm_delay_value)
         self.context_pop()
+
+        original_source = self.mav.mav.srcSystem
+        try:
+            for source in (256, 70000, 0x80000000, 0xFFFFFFFF):
+                self.start_subtest("PARAM_ERROR reply to source %u" % source)
+                self.context_push()
+                self.context_collect('PARAM_ERROR')
+                self.mav.mav.srcSystem = source
+                self.send_set_parameter_direct('DISARM_DELAY', 78)
+                self.assert_received_message_field_values('PARAM_ERROR', {
+                    "target_system": 0,
+                    "target_component": 250,
+                    "param_id": 'DISARM_DELAY',
+                    "param_index": -1,
+                    "error": mavutil.mavlink.MAV_PARAM_ERROR_PERMISSION_DENIED,
+                }, check_context=True)
+                self.assert_parameter_value('DISARM_DELAY', old_disarm_delay_value)
+                self.context_pop()
+        finally:
+            self.mav.mav.srcSystem = original_source
 
         self.start_subtest("Disabling applet via parameter should allow freely setting DISARM_DELAY")
         self.set_parameter("PARAM_LOCK_ENAB", 0)
@@ -22705,6 +22747,7 @@ RTL_ALT_M 111
             [],
             **self.callisto_sitl_kwargs()
         )
+        self.install_mavlink_module_context("MAVLink")
         self.install_example_script_context("config_profiles.lua")
         self.set_parameters({
             'SCR_ENABLE': 1,
@@ -23107,6 +23150,7 @@ return update, 1000
             self.MAVLinkCameraMixed,
             self.MAVLinkCameraStreams,
             self.MT11MAVFTP,
+            self.MT11MAVFTP32bit,
             self.MountMT11,
             self.MountMT11Telemetry,
             self.MountAVTCM62Dual,
