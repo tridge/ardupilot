@@ -52,6 +52,11 @@ function update()
                 ack.progress = 0
                 ack.result_param2 = 0
                 ack.target_system = parsed_msg.sysid
+                -- Lua may represent upper-half IDs as negative integers.
+                -- Use broadcast until scripting supports extended target headers.
+                if ack.target_system < 0 or ack.target_system > 255 then
+                    ack.target_system = 0
+                end
                 ack.target_component = parsed_msg.compid
 
                 mavlink:send_chan(chan, mavlink_msgs.encode("COMMAND_ACK", ack))
