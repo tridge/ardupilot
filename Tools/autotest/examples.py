@@ -31,6 +31,7 @@ def run_example(name, filepath, valgrind=False, gdb=False):
     if name in [
             'RCProtocolTest',
             'Scheduler_test',
+            'StorageRace',
             'TransferFunctionCheck',
             'XPlane',
     ]:
