@@ -4,6 +4,16 @@
 package.path = 'libraries/AP_Scripting/modules/?.lua;' .. package.path
 
 local mav = require('MAVLink/mavlink_msgs')
+local decode_header = mav.decode_header
+mav.decode_header = function(...)
+    local header, payload_ofs = decode_header(...)
+    -- Desktop Lua has 64-bit integers. Present the signed 32-bit sysid
+    -- returned by firmware so CI exercises the negative-ID reply guards.
+    if header and header.sysid > 0x7fffffff then
+        header.sysid = -(0xffffffff - header.sysid) - 1
+    end
+    return header, payload_ofs
+end
 local pending, reply
 local component = 190
 local function noop() end
@@ -65,4 +75,5 @@ for _, source in ipairs({42, 255, 256, 70000, 0x7fffffff, 0x80000000, 0xffffffff
         assert(target == expected_target and target_component == component, script)
     end
 end
+mav.decode_header = decode_header
 print('MAVLink script reply tests passed')
