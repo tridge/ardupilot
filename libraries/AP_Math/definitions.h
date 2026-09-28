@@ -124,3 +124,6 @@ static const double WGS84_E = (sqrt(2 * WGS84_F - WGS84_F * WGS84_F));
 
 // kg/m^3 to g/cm^3
 #define KG_PER_M3_TO_G_PER_CM3(x) (0.001 * x)
+
+// maximum integer value that can be represented as a float32
+#define AP_FLOAT_INT_MAX float((1U<<24)-1)
