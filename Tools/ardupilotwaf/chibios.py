@@ -429,6 +429,16 @@ def chibios_firmware(self):
     # every step below writes its own files and never modifies its inputs,
     # so waf only reruns a step when what it reads has changed. waf orders
     # the steps from their input and output files.
+
+    # link inputs passed via LIB and LINKFLAGS that waf doesn't track
+    link_deps = ['modules/ChibiOS/libch.a', 'ldscript.ld', 'common.ld']
+    if 'DSP' in self.env.LIB:
+        link_deps.append('modules/ChibiOS/libDSP.a')
+    if self.env.ENABLE_CRASHDUMP:
+        link_deps.append('modules/ChibiOS/obj/CrashCatcher_armv7m_asm.o')
+    for d in link_deps:
+        self.link_task.dep_nodes.append(self.bld.bldnode.find_or_declare(d))
+
     link_output = self.link_task.outputs[0]
     # bootloader builds don't get an app descriptor patched in at all
     do_patch = not self.bld.env.BOOTLOADER
