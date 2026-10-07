@@ -941,6 +941,7 @@ class SITLBoard(Board):
             env.LINKFLAGS += ['-Wl,--wrap,malloc']
             # use AP_Common's strtod, as ChibiOS does
             env.LINKFLAGS += ['-Wl,--wrap,%s' % f for f in ('strtod', 'strtof', 'atof')]
+        # Darwin has no --wrap; malloc is replaced in libraries/AP_Common/c++.cpp
         
         if cfg.options.enable_sfml:
             if not cfg.check_SFML(env):
