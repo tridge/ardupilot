@@ -312,7 +312,7 @@ class upload_fw_blueos(Task.Task):
 
 class check_elf_symbols(Task.Task):
     # Recheck an unchanged binary when the symbol policy or inspection tool changes.
-    vars = ['SYMBOLS_BLACKLIST', 'CHECK_MALLOC_WRAPPING', 'CHECK_SYMBOLS',
+    vars = ['SYMBOLS_BLACKLIST', 'DISALLOWED_SYMBOLS', 'CHECK_MALLOC_WRAPPING', 'CHECK_SYMBOLS',
             'vehicle_binary', 'SIM_ENABLED', 'LINKFLAGS', 'DEST_OS', 'NM']
     color='CYAN'
     def keyword(self):
@@ -323,6 +323,14 @@ class check_elf_symbols(Task.Task):
         check allocator wrapping and disallowed symbols in the linked binary
         '''
         elfpath = self.inputs[0].abspath()
+
+        if self.env.DISALLOWED_SYMBOLS and self.env.vehicle_binary:
+            # symbols that must not be in firmware, checked by exact name.
+            # Examples may still use them, as they may use exceptions
+            for line in subprocess.check_output(self.env.NM + [elfpath], text=True).splitlines():
+                fields = line.split()
+                if fields and fields[-1] in self.env.DISALLOWED_SYMBOLS:
+                    raise Errors.WafError("Disallowed symbol in %s: %s" % (elfpath, fields[-1]))
 
         # Allocator/wrapper checks also apply to simulator builds and must not
         # depend on the optional C++ exception/new checking.

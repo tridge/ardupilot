@@ -944,6 +944,8 @@ class SITLBoard(Board):
             pass # handled at runtime in libraries/AP_Common/c++.cpp
         elif platform.system() != 'Darwin':
             env.LINKFLAGS += ['-Wl,--wrap,malloc']
+            # use AP_Common's strtod, as ChibiOS does
+            env.LINKFLAGS += ['-Wl,--wrap,%s' % f for f in ('strtod', 'strtof', 'atof')]
         # Darwin has no --wrap; malloc is replaced in libraries/AP_Common/c++.cpp
         
         if cfg.options.enable_sfml:
@@ -1667,6 +1669,10 @@ class WASMBoard(SITLBoard):
         # probes do not link AP_Common's __wrap_malloc implementation.
         if '-Wl,--wrap,malloc' in env.LINKFLAGS:
             env.LINKFLAGS.remove('-Wl,--wrap,malloc')
+        # WASM uses the C library strtod
+        for f in ('strtod', 'strtof', 'atof'):
+            if '-Wl,--wrap,%s' % f in env.LINKFLAGS:
+                env.LINKFLAGS.remove('-Wl,--wrap,%s' % f)
 
         # Emscripten does not support trapping floating-point math.
         env.CFLAGS.remove('-ftrapping-math')
