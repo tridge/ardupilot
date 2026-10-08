@@ -311,7 +311,9 @@ class upload_fw_blueos(Task.Task):
           return "Uploading to BlueOS"
 
 class check_elf_symbols(Task.Task):
-    vars = ['DISALLOWED_SYMBOLS', 'CHECK_SYMBOLS', 'SIM_ENABLED', 'vehicle_binary', 'NM']
+    # Recheck an unchanged binary when the symbol policy or inspection tool changes.
+    vars = ['DISALLOWED_SYMBOLS', 'SYMBOLS_BLACKLIST', 'CHECK_MALLOC_WRAPPING', 'CHECK_SYMBOLS',
+            'vehicle_binary', 'SIM_ENABLED', 'LINKFLAGS', 'DEST_OS', 'NM']
     color='CYAN'
     def keyword(self):
         return "checking symbols"
