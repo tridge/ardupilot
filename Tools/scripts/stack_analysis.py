@@ -7,7 +7,8 @@ Combines:
  - GCC's IPA call graph dumps (-fdump-ipa-cgraph), which give the static
    type and vtable slot of each virtual call
  - DWARF debug info, which gives the class hierarchy and the method in each
-   vtable slot, so virtual calls resolve to the possible overrides
+   vtable slot, so virtual calls resolve to the possible overrides; for LTO
+   builds its inline call chains restore the source caller of final ELF calls
  - disassembly of the ELF, for functions with no call graph info (ChibiOS
    kernel, newlib, assembly) and to find Functor callbacks given to the
    scheduler and device buses
@@ -63,6 +64,7 @@ AP_FLAKE8_CLEAN
 '''
 
 import argparse
+import bisect
 import glob
 import json
 import os
@@ -182,7 +184,13 @@ def tu_of(fname):
     if '.ltrans' in base or '.wpa.' in base:
         return 'LTO'
     m = re.match(r'(.*\.(?:cpp|c|cc|S))(?:\.\d+)?\.(?:ci|\d+i\.cgraph)$', fname)
-    return m.group(1) if m else fname
+    return normalise_path(m.group(1)) if m else fname
+
+
+def source_tu(loc):
+    '''translation unit containing a source call site'''
+    m = re.match(r'(.*\.(?:cpp|c|cc|S)):\d+:\d+$', loc)
+    return normalise_path(m.group(1)) if m else None
 
 
 def demangle_list(cxxfilt, names):
@@ -251,6 +259,7 @@ class Program:
         self.by_symbol = {}
         self.demangled = {}
         self.poly_by_func = {}
+        self.poly_by_symbol = {}
         self.poly_by_tu = {}
         self.elf_addr = {}
         self.elf_names_at = {}
@@ -264,6 +273,9 @@ class Program:
         self.data_syms = []
         self.sections = []
         self.sym_values = {}
+        self.lto = False
+        self.elf_call_sites = []
+        self.inline_sites = {}
 
     def load_ci(self, files):
         '''call graph and frame sizes from -fcallgraph-info=su'''
@@ -319,6 +331,7 @@ class Program:
                     if m and cur is not None:
                         key = (type_name(m.group(1)), int(m.group(2)))
                         self.poly_by_func.setdefault((tu, cur), set()).add(key)
+                        self.poly_by_symbol.setdefault(cur, set()).add(key)
                         self.poly_by_tu.setdefault(tu, set()).add(key)
 
     def load_elf(self, elf_file):
@@ -337,6 +350,8 @@ class Program:
                 if sec['sh_addr'] and sec['sh_type'] == 'SHT_PROGBITS':
                     self.sections.append((sec['sh_addr'], sec.data()))
         self.disassemble(elf_file)
+        if self.lto:
+            self.load_inline_sites(elf_file)
 
     def read_data(self, addr, size):
         for base, data in self.sections:
@@ -349,6 +364,7 @@ class Program:
         out = subprocess.run(['arm-none-eabi-objdump', '-d', '--no-show-raw-insn', elf_file],
                              capture_output=True, text=True).stdout
         func = None
+        func_addr = None
         regs = {}
         insns = []
 
@@ -357,24 +373,30 @@ class Program:
             if func is not None and len(insns) == 2 and re.fullmatch(r'bx\s+lr', insns[1]):
                 m = re.fullmatch(r'movs?(?:\.w)?\s+r0,\s*#(\d+)', insns[0])
                 if m:
-                    self.elf_returns[func] = int(m.group(1))
+                    for name in self.elf_names_at.get(func_addr, (func,)):
+                        self.elf_returns[name] = int(m.group(1))
 
         for line in out.splitlines():
             m = re.match(r'^([0-9a-f]+) <(.+)>:$', line)
             if m:
                 constant_return()
                 func = m.group(2)
+                func_addr = int(m.group(1), 16)
                 insns = []
-                self.elf_func_addr[func] = int(m.group(1), 16)
+                self.elf_func_addr[func] = func_addr
                 self.elf_frames[func] = 0
                 self.elf_indirect[func] = 0
                 self.elf_calls[func] = set()
                 self.consts[func] = set()
                 regs = {}
                 continue
-            if func is None or '\t' not in line:
+            if func is None:
                 continue
-            insn = line.split('\t', 1)[1]
+            am = re.match(r'^\s*([0-9a-f]+):\s*\t(.*)$', line)
+            if am is None:
+                continue
+            addr = int(am.group(1), 16)
+            insn = am.group(2)
             if len(insns) < 3:
                 insns.append(insn.split(';', 1)[0].strip())
             m = re.match(r'(push|stmdb)(?:\.w)?\s+(?:sp!,\s*)?\{([^}]*)\}', insn)
@@ -409,6 +431,7 @@ class Program:
             if re.match(r'(?:blx|bx)\s+(?:r\d+|ip)\b', insn) or re.match(r'(?:ldr|mov)\S*\s+pc,', insn):
                 # call or tail call through a register
                 self.elf_indirect[func] += 1
+                self.elf_call_sites.append((addr, func, INDIRECT))
                 continue
             m = re.match(r'(bl|blx|b(?:eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al)?(?:\.w|\.n)?'
                          r'|cbn?z\s+\S+,)\s+[0-9a-f]+ <([^>+]+)(?:\+0x[0-9a-f]+)?>', insn)
@@ -416,6 +439,7 @@ class Program:
                 if m.group(1) in ('bl', 'blx') or m.group(2) != func:
                     # calls, and branches into other functions
                     self.elf_calls[func].add(m.group(2))
+                    self.elf_call_sites.append((addr, func, m.group(2)))
                 continue
             m = re.match(r'\.word\s+0x([0-9a-f]+)', insn)
             if m:
@@ -429,6 +453,65 @@ class Program:
             if m and m.group(1) in regs:
                 self.consts[func].add(regs.pop(m.group(1)) | (int(m.group(2)) << 16))
         constant_return()
+
+    def load_inline_sites(self, elf_file):
+        '''DWARF inline call chains for final LTO call instructions'''
+        from elftools.elf.elffile import ELFFile
+
+        addrs = sorted({addr for addr, _, _ in self.elf_call_sites})
+        locations = {}
+        with open(elf_file, 'rb') as f:
+            dwarf = ELFFile(f).get_dwarf_info()
+            for cu in dwarf.iter_CUs():
+                lines = dwarf.line_program_for_CU(cu)
+                if lines is None:
+                    continue
+                previous = None
+                for entry in lines.get_entries():
+                    state = entry.state
+                    if state is None:
+                        continue
+                    if previous is not None and not previous.end_sequence and state.address > previous.address:
+                        first = bisect.bisect_left(addrs, previous.address)
+                        last = bisect.bisect_left(addrs, state.address)
+                        if first != last:
+                            file_entry = lines['file_entry'][previous.file - 1]
+                            dirname = ''
+                            if file_entry.dir_index:
+                                dirname = lines['include_directory'][file_entry.dir_index - 1].decode(errors='replace')
+                            path = normalise_path(os.path.join(dirname,
+                                                               file_entry.name.decode(errors='replace')))
+                            loc = '%s:%u:%u' % (path, previous.line, previous.column)
+                            for addr in addrs[first:last]:
+                                locations.setdefault(addr, loc)
+                    previous = state
+
+        addr2line = re.sub(r'c\+\+filt$', 'addr2line', self.cxxfilt)
+        output = subprocess.run([addr2line, '-a', '-f', '-i', '-e', elf_file],
+                                input=''.join('0x%x\n' % addr for addr in addrs),
+                                capture_output=True, text=True, check=True).stdout
+        chains = {}
+        addr = None
+        function = True
+        for line in output.splitlines():
+            if re.fullmatch(r'0x[0-9a-fA-F]+', line):
+                addr = int(line, 16)
+                chains[addr] = []
+                function = True
+            elif addr is not None:
+                if function and line != '??':
+                    chains[addr].append(line)
+                function = not function
+
+        for addr, outer, _ in self.elf_call_sites:
+            loc = locations.get(addr)
+            chain = tuple(chains.get(addr, ()))
+            if loc is not None and chain:
+                key = (base_symbol(outer), loc)
+                self.inline_sites.setdefault(key, set()).add(chain)
+
+    def inline_contexts(self, f, loc):
+        return self.inline_sites.get((base_symbol(f.title), loc), ())
 
     def remove_unlinked(self):
         '''drop functions with call graph info that the linker discarded'''
@@ -475,7 +558,10 @@ class Program:
             self.by_symbol.setdefault(base_symbol(name), []).append(f)
 
     def demangle_all(self):
-        self.demangled = demangle_list(self.cxxfilt, sorted(self.by_symbol.keys()))
+        names = set(self.by_symbol.keys())
+        names.update(self.elf_returns.keys())
+        names.update(sym for chains in self.inline_sites.values() for chain in chains for sym in chain)
+        self.demangled = demangle_list(self.cxxfilt, sorted(names))
         # unqualified function names, for matching against call sites. A
         # function can have several names when symbols are aliases
         for f in self.all_funcs():
@@ -711,9 +797,16 @@ class Analyser:
         return True
 
     def owner(self, f):
-        name = self.p.demangle(f).split('(', 1)[0]
+        return self.owner_name(self.p.demangle(f))
+
+    def owner_name(self, name):
+        name = name.split('(', 1)[0]
         cls = name.rsplit('::', 1)[0] if '::' in name else None
         return cls if cls in self.classes.bases else None
+
+    def inline_owners(self, f, loc):
+        return {owner for chain in self.p.inline_contexts(f, loc) if chain
+                for owner in (self.owner_name(self.p.demangled.get(chain[0], chain[0])),) if owner is not None}
 
     def contextual(self, f, suffix, context):
         g = Func(f.title + suffix, f.name, f.loc, f.size, f.dynamic, f.tu, f.origin)
@@ -790,12 +883,15 @@ class Analyser:
             out = {}
             for dst, loc in f.edges:
                 ts, why = self.targets(f, dst, loc)
-                own = self.own_receiver(loc, owners[f.title])
+                site_owners = self.inline_owners(f, loc) or {owners[f.title]}
+                site_owners.discard(None)
+                own = bool(site_owners) and all(self.own_receiver(loc, owner) for owner in site_owners)
+                shared_caller = bool(site_owners) and all(owner in RECEIVER_BASES for owner in site_owners)
                 for t in ts:
                     if t.title in cut:
                         continue
                     owner = owners.get(t.title)
-                    if own and why == 'virtual' and f.title in shared and owner is not None:
+                    if own and why == 'virtual' and shared_caller and owner is not None:
                         if not (self.classes.is_base(cls, owner) or self.classes.is_base(owner, cls)):
                             continue
                     if own and t.title in shared and self.classes.is_base(cls, owner):
@@ -815,8 +911,12 @@ class Analyser:
     def remove_initialised_statustext(self):
         '''send_textv only services startup text if vehicle_initialised is
         false. Keep the branch unless every linked implementation returns true'''
-        predicates = [f for f in self.funcs if f.name == 'vehicle_initialised']
-        if not predicates or not all(self.p.elf_returns.get(strip_partition(f.title)) == 1 for f in predicates):
+        predicates = {strip_partition(f.title) for f in self.funcs
+                      if f.name == 'vehicle_initialised' or
+                      re.search(r'::vehicle_initialised\(', self.p.demangle(f))}
+        predicates.update(name for name in self.p.elf_returns
+                          if re.search(r'::vehicle_initialised\(', self.p.demangled.get(name, name)))
+        if not predicates or not all(self.p.elf_returns.get(name) == 1 for name in predicates):
             return
 
         def guarded(loc):
@@ -904,8 +1004,20 @@ class Analyser:
             if self.functors == 'all':
                 return [x for x in self.p.all_funcs() if 'method_wrapper' in x.title], 'functor-all'
             return [], 'functor'
-        keys = self.p.poly_by_func.get((f.tu, base_symbol(f.title)), set())
-        for scope in (keys, self.p.poly_by_tu.get(f.tu, set())):
+        if f.tu == 'LTO':
+            tu = source_tu(loc)
+            keys = set()
+            symbol_keys = set()
+            for chain in self.p.inline_contexts(f, loc):
+                if chain:
+                    symbol = base_symbol(chain[0])
+                    keys.update(self.p.poly_by_func.get((tu, symbol), ()))
+                    symbol_keys.update(self.p.poly_by_symbol.get(symbol, ()))
+            scopes = (keys, symbol_keys, self.p.poly_by_tu.get(tu, set()))
+        else:
+            keys = self.p.poly_by_func.get((f.tu, base_symbol(f.title)), set())
+            scopes = (keys, self.p.poly_by_tu.get(f.tu, set()))
+        for scope in scopes:
             found = []
             for key in scope:
                 found.extend(x for x in self.poly_funcs(key) if name in x.names)
@@ -943,6 +1055,7 @@ class Analyser:
         self.funcs = funcs
         cut = set(f.title for f in funcs if any(r.search(self.p.demangle(f)) for r in self.cut))
         self.raw_succ = {}
+        self.raw_edge_callers = {}
         self.unresolved = {}
         self.callback_succ = {}
         for f in funcs:
@@ -958,6 +1071,11 @@ class Analyser:
                 for t in ts:
                     if t.title not in cut:
                         out[t.title] = t
+                        callers = {self.p.demangled.get(chain[0], chain[0])
+                                   for chain in self.p.inline_contexts(f, loc) if chain}
+                        if not callers:
+                            callers = {self.p.demangle(f)}
+                        self.raw_edge_callers.setdefault((f.title, t.title), []).append(callers)
             self.raw_succ[f.title] = list(out.values())
             self.unresolved[f.title] = unres
             self.callback_succ[f.title] = callbacks
@@ -967,11 +1085,11 @@ class Analyser:
         self.supp_edges = []
         dem = {f.title: self.p.demangle(f) for f in funcs}
         for scope, a, b, leaf, via, through in self.suppressions:
-            callers = [f for f in funcs if a.search(dem[f.title])]
             edges = set()
-            for f in callers:
+            for f in funcs:
                 for t in self.raw_succ[f.title]:
-                    if b.search(dem[t.title]):
+                    sites = self.raw_edge_callers.get((f.title, t.title), ({dem[f.title]},))
+                    if b.search(dem[t.title]) and all(any(a.search(name) for name in names) for names in sites):
                         edges.add((f.title, t.title))
             self.supp_edges.append(edges)
         self.variants = {}
@@ -1511,6 +1629,7 @@ def main():
     dump_files = glob.glob(os.path.join(args.builddir, '**', '*i.cgraph'), recursive=True)
 
     prog = Program(args.cxxfilt)
+    prog.lto = any(tu_of(f) == 'LTO' for f in ci_files)
     classes = ClassModel()
     if args.elf:
         classes.load(args.elf, args.elf + '.classes.json')

@@ -198,6 +198,17 @@ class StackAnalysisTests(unittest.TestCase):
                 a = g.analyser()
                 self.assertEqual(a.variant('rcin', 'rcin').worst(send)[0], expected)
 
+    def test_statustext_guard_recognises_elf_only_predicate(self):
+        g = self.g
+        send = g.func('GCS::send_textv()', 8)
+        service = g.func('GCS::service_statustext()', 100)
+        predicate = '_ZNK3GCS19vehicle_initialisedEv'
+        g.p.elf_returns[predicate] = 1
+        g.p.demangled[predicate] = 'GCS::vehicle_initialised() const'
+        g.lines.append('if (!vehicle_initialised()) {')
+        g.edge(send, service, 'service_statustext();')
+        self.assertEqual(g.analyser().variant('rcin', 'rcin').worst(send)[0], 8)
+
     def test_unguarded_statustext_call_and_unknown_source_remain_counted(self):
         for source in ('service_statustext();', None):
             with self.subTest(source=source):
@@ -234,6 +245,17 @@ class StackAnalysisTests(unittest.TestCase):
             self.g.p.disassemble('unused')
         self.assertEqual(self.g.p.elf_returns, {'true': 1, 'last': 0})
 
+    def test_constant_return_applies_to_all_symbol_aliases(self):
+        disassembly = '''00000010 <first>:
+  10:\tmovs\tr0, #1
+  12:\tbx\tlr
+'''
+        self.g.p.elf_names_at[0x10] = ['first', 'second']
+        with patch.object(sa.subprocess, 'run') as run:
+            run.return_value.stdout = disassembly
+            self.g.p.disassemble('unused')
+        self.assertEqual(self.g.p.elf_returns, {'first': 1, 'second': 1})
+
     def test_suppression_parser_preserves_original_and_contextual_rules(self):
         path = os.path.join(self.temp.name, 'rules.txt')
         with open(path, 'w') as f:
@@ -241,6 +263,80 @@ class StackAnalysisTests(unittest.TestCase):
         self.assertEqual(sa.load_suppressions(path),
                          [(None, 'A', 'B', False, None, None),
                           ((True, {'main'}), 'C', 'D', True, 'E', 'F')])
+
+    def test_lto_virtual_call_uses_inlined_source_function(self):
+        g = self.g
+        caller = g.func('outer()', 10)
+        caller.tu = 'LTO'
+        baro = g.func('AP_Baro_BMP::update()', 20)
+        mode = g.func('ModeTakeoff::update()', 100)
+        g.classes.bases = {'AP_Baro_Backend': [], 'AP_Baro_BMP': ['AP_Baro_Backend'],
+                           'Mode': [], 'ModeTakeoff': ['Mode']}
+        g.classes.slots = {'AP_Baro_Backend': {0: baro.title}, 'AP_Baro_BMP': {0: baro.title},
+                           'Mode': {0: mode.title}, 'ModeTakeoff': {0: mode.title}}
+        source = os.path.join(self.temp.name, 'libraries', 'AP_Baro')
+        os.makedirs(source)
+        with open(os.path.join(source, 'AP_Baro_Backend.cpp'), 'w') as f:
+            f.write('update();\n')
+        loc = 'libraries/AP_Baro/AP_Baro_Backend.cpp:1:7'
+        inlined = 'AP_Baro_Backend::backend_update()'
+        g.p.inline_sites[(caller.title, loc)] = {(inlined, caller.title)}
+        g.p.poly_by_func[('libraries/AP_Baro/AP_Baro_Backend.cpp', inlined)] = {('AP_Baro_Backend', 0)}
+        g.p.poly_by_tu['LTO'] = {('AP_Baro_Backend', 0), ('Mode', 0)}
+        caller.edges.append((sa.INDIRECT, loc))
+        self.assertEqual(g.analyser().variant('rcin', 'rcin').worst(caller)[0], 30)
+
+    def test_lto_virtual_call_in_header_uses_inlined_function(self):
+        g = self.g
+        caller = g.func('outer()', 10)
+        caller.tu = 'LTO'
+        backend = g.func('Backend::queue_message()', 20)
+        unrelated = g.func('Other::queue_message()', 100)
+        g.classes.bases = {'Base': [], 'Backend': ['Base'], 'OtherBase': [], 'Other': ['OtherBase']}
+        g.classes.slots = {'Base': {0: backend.title}, 'Backend': {0: backend.title},
+                           'OtherBase': {0: unrelated.title}, 'Other': {0: unrelated.title}}
+        source = os.path.join(self.temp.name, 'libraries', 'Frontend.h')
+        os.makedirs(os.path.dirname(source))
+        with open(source, 'w') as f:
+            f.write('queue_message();\n')
+        loc = 'libraries/Frontend.h:1:14'
+        inlined = 'Frontend::queue_message()'
+        g.p.inline_sites[(caller.title, loc)] = {(inlined, caller.title)}
+        g.p.poly_by_symbol[inlined] = {('Base', 0)}
+        caller.edges.append((sa.INDIRECT, loc))
+        self.assertEqual(g.analyser().variant('rcin', 'rcin').worst(caller)[0], 30)
+
+    def test_lto_suppression_matches_inlined_caller(self):
+        g = self.g
+        caller = g.func('outer()', 10)
+        target = g.func('AP_MSP_Telem_Backend::process_packet()', 100)
+        g.edge(caller, target, 'process_packet()')
+        loc = 'fixture.cpp:1:15'
+        g.p.inline_sites[(caller.title, loc)] = {('AP_RCTelemetry::run_wfq_scheduler()', caller.title)}
+        rules = [(None, r'^AP_RCTelemetry::', r'^AP_MSP_Telem_Backend::', False, None, None)]
+        self.assertEqual(g.analyser(rules).variant('rcin', 'rcin').worst(caller)[0], 10)
+
+    def test_lto_inlined_shared_method_keeps_receiver(self):
+        g = self.g
+        frsky = g.func('AP_Frsky_SPort_Passthrough::get_telem_data()', 50)
+        frsky.tu = 'LTO'
+        cr_packet = g.func('AP_CRSF_Telem::process_packet()', 100)
+        fr_packet = g.func('AP_Frsky_SPort_Passthrough::process_packet()', 40)
+        g.classes.bases = {'AP_RCTelemetry': [], 'AP_CRSF_Telem': ['AP_RCTelemetry'],
+                           'AP_Frsky_SPort_Passthrough': ['AP_RCTelemetry']}
+        g.classes.slots = {'AP_RCTelemetry': {0: cr_packet.title},
+                           'AP_CRSF_Telem': {0: cr_packet.title},
+                           'AP_Frsky_SPort_Passthrough': {0: fr_packet.title}}
+        loc = 'fixture.cpp:1:15'
+        scheduler = 'AP_RCTelemetry::run_wfq_scheduler(bool)'
+        g.p.inline_sites[(frsky.title, loc)] = {(scheduler, frsky.title)}
+        g.p.poly_by_func[('fixture.cpp', scheduler)] = {('AP_RCTelemetry', 0)}
+        g.lines.append('process_packet();')
+        frsky.edges.append((sa.INDIRECT, loc))
+        depth, path = g.analyser().variant('rcin', 'rcin').worst(frsky)
+        self.assertEqual(depth, 90)
+        self.assertEqual([f.name for f in path if isinstance(f, sa.Func)],
+                         ['get_telem_data', 'process_packet'])
 
     def project_suppressions(self):
         return sa.load_suppressions(os.path.join(os.path.dirname(sa.__file__), 'stack_analysis_suppressions.txt'))
