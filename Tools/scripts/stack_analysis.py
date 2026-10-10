@@ -14,9 +14,7 @@ Combines:
 
 Build with:
 
-  SU="-fstack-usage -fcallgraph-info=su"
-  CFLAGS="$SU" CXXFLAGS="$SU -fdump-ipa-cgraph" LINKFLAGS="$SU -fdump-ipa-cgraph -save-temps" \\
-      ./waf configure --board X -g
+  ./waf configure --board X --stack-analysis
   ./waf plane
 
 then:
