@@ -9,6 +9,7 @@ from waflib.TaskGen import before_method, after_method, feature
 import os.path, os
 from pathlib import Path
 from collections import OrderedDict
+import re
 import subprocess
 
 SOURCE_EXTS = [
@@ -357,7 +358,13 @@ class check_elf_symbols(Task.Task):
             # checking global symbols, code and undefined/weak references.
             if symbol_type in ('b', 'd', 'g', 'r', 's'):
                 continue
-            name = symbol.split('@', 1)[0].split('.', 1)[0]
+            unversioned = symbol.split('@', 1)[0]
+            # GCC LTO emits weak hidden markers such as time.cpp.2bc20fba
+            # when link-time temporary files are retained. They identify the
+            # source unit rather than a callable libc symbol.
+            if symbol_type == 'W' and re.search(r'\.(?:c|cc|cpp|cxx)\.[0-9a-f]+$', unversioned):
+                continue
+            name = unversioned.split('.', 1)[0]
             if name in self.env.SYMBOLS_BLACKLIST:
                 raise Errors.WafError("Disallowed unwrapped symbol in %s: %s" % (elfpath, symbol))
 

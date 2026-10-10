@@ -94,6 +94,15 @@ def test_local_data_is_not_a_libc_function(checker, monkeypatch, kind):
     task.run()
 
 
+@pytest.mark.parametrize("symbol", ["time.cpp.2bc20fba", "printf.c.deadbeef"])
+def test_lto_source_marker_is_not_a_libc_function(checker, monkeypatch, symbol):
+    waf, task = checker
+    task.env.CHECK_MALLOC_WRAPPING = False
+    task.env.SYMBOLS_BLACKLIST = ["time", "printf"]
+    monkeypatch.setattr(waf.subprocess, "check_output", lambda *a, **kw: "00001000 W %s\n" % symbol)
+    task.run()
+
+
 @pytest.mark.parametrize("entry", ["00001000 t time", "00001000 W time", " U time", " w time",
                                    "00001000 i time", "00001000 D time"])
 @pytest.mark.parametrize("data_first", [False, True])
