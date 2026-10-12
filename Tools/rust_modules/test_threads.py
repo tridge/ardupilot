@@ -25,10 +25,13 @@ import run  # noqa: E402
                      'owned_thread_test_memory_before', 'owned_thread_test_memory_after')),
     ('ExecutableMemory', ('executable_memory_test_result', 'executable_memory_test_address',
                           'executable_memory_test_before', 'executable_memory_test_after')),
+    ('RustHeap', ('rust_heap_test_result', 'rust_heap_test_cycles',
+                  'rust_heap_test_before', 'rust_heap_test_after')),
 ])
 def test_chibios_runtime_primitives(tmp_path, renode, example, names):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
-    executable = ROOT / 'build' / board / 'examples' / example
+    build_root = Path(os.environ.get('AP_RUST_BUILD_ROOT', ROOT / 'build'))
+    executable = build_root / board / 'examples' / example
     if not executable.is_file():
         pytest.skip(f'Build examples/{example} with the native runtime HAL options enabled')
     with executable.open('rb') as stream:
@@ -53,8 +56,10 @@ sysbus ReadDoubleWord 0x%X
     values = re.findall(r'^0x[0-9A-Fa-f]{8}$', output, re.M)
     values = [int(value, 16) for value in values]
     assert len(values) == 4 and values[0] == 0x600DF00D, output
-    if example == 'OwnedThread':
+    if example in ('OwnedThread', 'RustHeap'):
         assert values[1] == 100, output
+        if example == 'RustHeap':
+            assert values[3] == values[2], output
     else:
         # The allocator must not select ITCM/DTCM/CCM or an unrelated SRAM bank.
         expected = {'STM32H743xx': (0x24000000, 0x24080000), 'STM32F405xx': (0x20000000, 0x20020000)}
