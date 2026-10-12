@@ -7,6 +7,9 @@
 #include <sys/time.h>
 #include <fenv.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#if HAL_OWNED_THREADS_ENABLED
+#include <AP_HAL/utility/OwnedThread_posix.h>
+#endif
 #if defined (__clang__) || (defined (__APPLE__) && defined (__MACH__)) || defined (__OpenBSD__)
 #include <stdlib.h>
 #else
@@ -335,6 +338,15 @@ void *Scheduler::thread_create_trampoline(void *ctx)
 
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN 16384U
+#endif
+
+#if HAL_OWNED_THREADS_ENABLED
+AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
+                                                             uint32_t stack_size, priority_base base, int8_t priority)
+{
+    // Like other SITL workers, modules use the ordinary host scheduler.
+    return OwnedThreadPosix::create(proc, name, stack_size, SCHED_OTHER, 0);
+}
 #endif
 
 /*

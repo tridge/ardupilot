@@ -25,6 +25,11 @@ public:
         return 512*1024;
     }
 
+#if HAL_EXECUTABLE_MEMORY_ENABLED
+    AP_HAL::ExecutableMemory::Target executable_memory_target() const override;
+    AP_HAL::ExecutableMemory *allocate_executable(uint32_t size) override;
+#endif
+
     // get path to custom defaults file for AP_Param
     const char* get_custom_defaults_file() const override {
         return sitlState->defaults_path;
