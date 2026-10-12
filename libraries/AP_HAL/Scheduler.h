@@ -126,6 +126,43 @@ public:
         return false;
     }
 
+#if HAL_OWNED_THREADS_ENABLED
+    // Single-owner handle. Only thread_reap may destroy it; never cancel a
+    // running thread or release its callback's context before successful reap.
+    class OwnedThread {
+    public:
+        CLASS_NO_COPY(OwnedThread);
+        // Reserved stack bytes, including platform minimum/alignment rounding.
+        // On POSIX this includes in-stack libc/TLS bookkeeping, not just the
+        // bytes available to the callback. Callers must leave adequate margin.
+        virtual uint32_t stack_size() const = 0;
+        // Known reservation including stack, handle and guard/working-area bytes.
+        // Excludes allocator headers and opaque OS/libc thread bookkeeping.
+        virtual uint32_t allocation_size() const = 0;
+
+    protected:
+        OwnedThread() = default;
+        virtual ~OwnedThread() = default;
+        // Return false while the callback runs. Once it returns, join the OS
+        // thread before allowing destruction (may wait for its exit epilogue).
+        virtual bool join_if_finished() = 0;
+        friend class Scheduler;
+    };
+
+    // name must remain alive until reap. The returned handle has one owner;
+    // creation and reaping must not be called from interrupts.
+    // Stacks need not be DMA-capable. Device bindings must copy stack buffers
+    // to suitable host storage when their driver requires DMA-safe memory.
+    virtual OwnedThread *thread_create_owned(AP_HAL::MemberProc proc, const char *name,
+                                            uint32_t stack_size, priority_base base, int8_t priority) {
+        return nullptr;
+    }
+
+    // Call from a low-priority owner, not from the vehicle main loop. On true,
+    // the thread can no longer access its context, code or stack; clears handle.
+    static bool thread_reap(OwnedThread *&thread);
+#endif
+
 private:
 
     AP_HAL::Proc _delay_cb;
