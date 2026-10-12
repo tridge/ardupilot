@@ -30,7 +30,7 @@ bool MultiHeap::create(uint32_t total_size, uint8_t max_heaps, bool _allow_expan
         // don't allow double allocation
         return false;
     }
-    heaps = NEW_NOTHROW Heap[max_heaps];
+    heaps = NEW_NOTHROW Heap[max_heaps] {};
     if (heaps == nullptr) {
         return false;
     }
@@ -64,7 +64,7 @@ bool MultiHeap::create(uint32_t total_size, uint8_t max_heaps, bool _allow_expan
 // destroy heap
 void MultiHeap::destroy(void)
 {
-    if (!available()) {
+    if (heaps == nullptr) {
         return;
     }
     for (uint8_t i=0; i<num_heaps; i++) {

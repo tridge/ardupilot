@@ -17,7 +17,7 @@ TEST(MultiHeap, Tests)
         void *ptr;
         uint32_t size;
     };
-    auto *allocs = new alloc[max_allocs];
+    auto *allocs = new alloc[max_allocs] {};
     allocs[0].size = 640;
     allocs[0].ptr = h.allocate(allocs[0].size);
     for (uint32_t i=1; i<2; i++) {
@@ -52,6 +52,33 @@ TEST(MultiHeap, Tests)
     }
     h.destroy();
     delete[] allocs;
+}
+
+TEST(MultiHeap, DestroyUnavailableHeap)
+{
+    MultiHeap heap{};
+    // This has the same unavailable state as failing to allocate the first
+    // backing heap: the descriptor array exists, but heaps[0].hp is null.
+    ASSERT_TRUE(heap.create(0, 1, false, 0));
+    EXPECT_FALSE(heap.available());
+    heap.destroy();
+    ASSERT_TRUE(heap.create(1024, 1, false, 0));
+    EXPECT_TRUE(heap.available());
+    heap.destroy();
+}
+
+TEST(MultiHeap, DestroyUnusedDescriptors)
+{
+    MultiHeap heap{};
+    for (uint8_t i = 0; i < 100; i++) {
+        // One backing heap satisfies this request. Remaining descriptors must
+        // be initialized before destroy() inspects every possible heap.
+        ASSERT_TRUE(heap.create(1024, 8, false, 0));
+        void *allocation = heap.allocate(16);
+        ASSERT_NE(allocation, nullptr);
+        heap.deallocate(allocation);
+        heap.destroy();
+    }
 }
 
 AP_GTEST_MAIN()
