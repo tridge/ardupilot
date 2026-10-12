@@ -11021,6 +11021,7 @@ return update()
             self.MAVFTPVirtualWriteBounds,
             self.MAVFTPParamUploadBounds,
             self.MAVFTPListROMFS,
+            self.MAVFTPThreads,
             self.MAVFTPListROMFSLongNames,
             self.MAVFTPListROMFSMissingDirectory,
             self.MAVFTPListROMFSFile,

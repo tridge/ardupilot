@@ -16724,6 +16724,19 @@ switch value'''
 
         return tmpfile.read()
 
+    def MAVFTPThreads(self):
+        '''read the SITL HAL thread listing through MAVProxy FTP'''
+        listing = self.fetch_file_via_ftp('@SYS/threads.txt')
+        self.progress(listing)
+        if not listing.startswith('ThreadsV2\n'):
+            raise NotAchievedException('Missing thread listing header')
+        names = [line.split()[0] for line in listing.splitlines()[1:]]
+        if 'main' not in names or 'FTP' not in names:
+            raise NotAchievedException('Missing main or FTP worker in thread listing')
+        for line in listing.splitlines()[1:]:
+            if re.search(r'PRI=\s*[?\d]+ sp=\S+ STACK=[?\d]+/[?\d]+', line) is None:
+                raise NotAchievedException('Malformed thread entry: %s' % line)
+
     def MAVFTP(self):
         '''ensure MAVProxy can do MAVFTP to ardupilot'''
         mavproxy = self.start_mavproxy()
