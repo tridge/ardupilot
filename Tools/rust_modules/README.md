@@ -76,8 +76,9 @@ UINT32_MAX placeholder each. The packer validates their RW placement; only live
 sections survive linker GC. No exported static symbols or ARM GOT are needed.
 Resolution patches slots before publishing the image. Unknown hashes reject it.
 CRC covers the whole file with
-the CRC field zeroed. Stack requirements must be 8-byte multiples from 256
-bytes through 16 MiB. Version 1 remains a test-only probe format; experimental
+the CRC field zeroed. Stack requirements are byte counts from 256 bytes through
+16 MiB; the HAL rounds the configured worker stack up as needed.
+Version 1 remains a test-only probe format; experimental
 version-2 runtime modules must be rebuilt for version 3.
 
 ## Vehicle autotests

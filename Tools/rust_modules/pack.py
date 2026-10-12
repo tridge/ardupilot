@@ -44,7 +44,7 @@ def require(condition, message):
 def validate_contract(machine, abi, profile, stack, fingerprint):
     require(type(abi) is int and 0 < abi <= 0xFFFFFFFF, 'invalid ABI version')
     require(type(profile) is int and (machine, profile) in ((40, 1), (62, 2)), 'invalid CPU profile')
-    require(type(stack) is int and 256 <= stack <= MAX_IMAGE and stack % 8 == 0, 'invalid stack requirement')
+    require(type(stack) is int and 256 <= stack <= MAX_IMAGE, 'invalid stack requirement')
     require(len(fingerprint) == 16 and fingerprint != bytes(16), 'invalid API fingerprint')
 
 

@@ -226,6 +226,27 @@ def checksum(data):
     return zlib.crc32(data) & CHECKSUM_MASK
 
 
+@pytest.mark.parametrize('stack_size', [24576, 24577, 65537])
+def test_byte_granular_stack_size(tmp_path, launch, monkeypatch, stack_size):
+    monkeypatch.setenv('AP_RUST_LIFECYCLE', 'cooperative')
+    module = build.build(ROOT / 'libraries/AP_Rust/tests/modules/lifecycle.rs',
+                         tmp_path / 'odd.apmod', 'x86_64-unknown-linux-gnu', 8193)
+    vehicle = launch({'odd.apmod': module.read_bytes()}, SCR_ENABLE=0, RUST_STACK_SIZE=stack_size)
+    if stack_size < 8193 + 16384:
+        # Keep the callback margin even when the HAL could round the stack up.
+        vehicle.text('odd.apmod load failed (3)')
+        vehicle.arm(accepted=False)
+        return
+    vehicle.text('ready')
+    page = os.sysconf('SC_PAGESIZE')
+    reserved = ((stack_size + page - 1) // page) * page
+    vehicle.text(f'stack {reserved} heap initial')
+    vehicle.arm()
+    vehicle.arm(False)
+    vehicle.restart(1)
+    vehicle.text('Rust: exited odd.apmod')
+
+
 def test_normal_exit_checksums_and_arming_bypasses(launch, images):
     vehicle = launch()
     assert vehicle.checksums() == (0, 0)

@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 from elftools.elf.elffile import ELFFile
@@ -17,14 +18,15 @@ from test_threads import ROOT, gen_board, renode, renode_data, run  # noqa: F401
 @pytest.mark.parametrize('ending', ['never', 'panic'])
 def test_chibios_runtime_manager(tmp_path, renode, monkeypatch, ending):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
-    executable = ROOT / 'build' / board / 'examples/RustRuntime'
+    build_root = Path(os.environ.get('AP_RUST_BUILD_ROOT', ROOT / 'build'))
+    executable = build_root / board / 'examples/RustRuntime'
     if not executable.is_file():
         pytest.skip('Build examples/RustRuntime with --enable-rust-scripting')
     if not shutil.which('mcopy') or not shutil.which('mmd'):
         pytest.skip('Requires mtools')
     names = ['result', 'cycles', 'before', 'after', 'stack_free', 'stack_total',
              'manager_priority', 'worker_priority', 'manager_stack', 'worker_stack', 'timeouts', 'panics',
-             'timeout_elapsed']
+             'timeout_elapsed', 'worker_stack_total']
     with executable.open('rb') as stream:
         symbols = ELFFile(stream).get_section_by_name('.symtab')
         addresses = [symbols.get_symbol_by_name(f'rust_runtime_test_{name}')[0]['st_value'] for name in names]
@@ -42,7 +44,7 @@ def test_chibios_runtime_manager(tmp_path, renode, monkeypatch, ending):  # noqa
         output = tmp_path / f'{name}.apmod'
         source = 'parameters.rs' if mode == 'parameters' else 'lifecycle.rs'
         build.build(ROOT / 'libraries/AP_Rust/tests/modules' / source, output,
-                    'thumbv7em-none-eabihf', 8192)
+                    'thumbv7em-none-eabihf', 8193)
         subprocess.run(['mcopy', '-i', str(sdcard), str(output), f'::/fixtures/{name}.apmod'], check=True)
     output = renode('''
 $elf=@%s
@@ -67,6 +69,8 @@ emulation RunFor "40"
     assert result['result'] == 0x600DF00D, (result, output)
     assert result['cycles'] == 20 and result['before'] == result['after'], result
     assert result['stack_free'] > 4096 and result['stack_total'] >= 16384, result
+    # The registry includes port context overhead, but not a 4 KiB rounding gap.
+    assert 16385 <= result['worker_stack_total'] < 16385 + 1024, result
     assert result['manager_priority'] > result['worker_priority'], result
     fast_regions = {'STM32F405xx': (0x10000000, 0x10010000), 'STM32H743xx': (0x20000000, 0x20020000)}
     low, high = fast_regions[generated['mcu_type']]

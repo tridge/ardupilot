@@ -78,7 +78,11 @@ def test_runtime_contract(tmp_path, target):
     assert pack.unpack(data)['contract'] == manifest
     # Tagging changes the compatibility envelope, not the image or relocation.
     assert pack.relocate(data, 0x24000000) == pack.relocate(pack.pack_elf(elf), 0x24000000)
-    for offset, value in ((8, 1), (44, 0), (48, 3 - manifest['cpu_profile']), (52, 0), (52, 4097)):
+    for size in (256, 257, 4095, 4097, pack.MAX_IMAGE):
+        contract = {**manifest, 'stack_size': size}
+        assert pack.unpack(pack.pack_elf(elf, contract))['contract'] == contract
+    for offset, value in ((8, 1), (44, 0), (48, 3 - manifest['cpu_profile']),
+                          (52, 0), (52, 255), (52, pack.MAX_IMAGE + 1), (52, 0xffffffff)):
         damaged = bytearray(data)
         damaged[offset:offset + 4] = value.to_bytes(4, 'little')
         with pytest.raises(ValueError):
@@ -90,7 +94,8 @@ def test_runtime_contract(tmp_path, target):
     for length in (0, 55, 56, 75, len(data) - 1):
         with pytest.raises(ValueError):
             pack.unpack(data[:length])
-    for key, value in (('abi_version', True), ('cpu_profile', 3), ('stack_size', 0), ('fingerprint', '00' * 16)):
+    for key, value in (('abi_version', True), ('cpu_profile', 3), ('stack_size', 0), ('stack_size', True),
+                       ('stack_size', 255), ('stack_size', pack.MAX_IMAGE + 1), ('fingerprint', '00' * 16)):
         with pytest.raises(ValueError):
             pack.pack_elf(elf, {**manifest, key: value})
 
