@@ -89,6 +89,10 @@ class Board:
         self.disable_buggy_compiler_warnings(cfg, env)
 
         # Setup scripting:
+        if cfg.options.enable_scripting and cfg.options.disable_scripting:
+            cfg.fatal('Cannot both enable and disable Lua scripting')
+        if cfg.options.enable_rust_scripting and cfg.options.disable_rust_scripting:
+            cfg.fatal('Cannot both enable and disable Rust scripting')
         env.DEFINES.update(
             LUA_32BITS = 1,
         )
@@ -100,12 +104,17 @@ class Board:
 
         if cfg.options.enable_scripting:
             env.DEFINES.update(
-                AP_SCRIPTING_ENABLED = 1,
+                AP_SCRIPTING_LUA_ENABLED = 1,
             )
         elif cfg.options.disable_scripting:
             env.DEFINES.update(
-                AP_SCRIPTING_ENABLED = 0,
+                AP_SCRIPTING_LUA_ENABLED = 0,
             )
+
+        if cfg.options.enable_rust_scripting:
+            env.DEFINES.update(AP_SCRIPTING_RUST_ENABLED=1)
+        elif cfg.options.disable_rust_scripting:
+            env.DEFINES.update(AP_SCRIPTING_RUST_ENABLED=0)
 
         # embed any scripts from ROMFS/scripts
         if os.path.exists('ROMFS/scripts'):
@@ -410,6 +419,7 @@ class Board:
         if cfg.options.bootloader:
             # don't let bootloaders try and pull scripting in
             cfg.options.disable_scripting = True
+            cfg.options.disable_rust_scripting = True
 
         if cfg.options.enable_math_check_indexes:
             env.CXXFLAGS += ['-DMATH_CHECK_INDEXES']
