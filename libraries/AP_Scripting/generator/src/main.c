@@ -2885,11 +2885,212 @@ void emit_docs(struct userdata *node, int is_userdata, int emit_creation) {
 char * output_path = NULL;
 char * docs_path = NULL;
 
+// Export parsed method contracts for other binding backends. This is a
+// versioned subset of the parser state, not another description-file grammar.
+static void ir_string(FILE *out, const char *value) {
+  if (value == NULL) {
+    fputs("null", out);
+    return;
+  }
+  fputc('"', out);
+  for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+    if (*p == '"' || *p == '\\') {
+      fputc('\\', out);
+      fputc(*p, out);
+    } else if (*p < 0x20) {
+      fprintf(out, "\\u%04x", *p);
+    } else {
+      fputc(*p, out);
+    }
+  }
+  fputc('"', out);
+}
+
+static void ir_member(FILE *out, const char *key, const char *value) {
+  ir_string(out, key);
+  fputc(':', out);
+  ir_string(out, value);
+}
+
+static void ir_type(FILE *out, const struct type *type) {
+  // Do not use type_labels: this schema must name every field_type, including
+  // uint32_t and literals, independently of the human diagnostic labels.
+  const char *kind = NULL;
+  const char *name = NULL;
+  switch (type->type) {
+    case TYPE_BOOLEAN: kind = "boolean"; break;
+    case TYPE_FLOAT: kind = "float"; break;
+    case TYPE_INT8_T: kind = "int8_t"; break;
+    case TYPE_INT16_T: kind = "int16_t"; break;
+    case TYPE_INT32_T: kind = "int32_t"; break;
+    case TYPE_UINT8_T: kind = "uint8_t"; break;
+    case TYPE_UINT16_T: kind = "uint16_t"; break;
+    case TYPE_UINT32_T: kind = "uint32_t"; break;
+    case TYPE_NONE: kind = "void"; break;
+    case TYPE_STRING: kind = "string"; break;
+    case TYPE_ENUM: kind = "enum"; name = type->data.enum_name; break;
+    case TYPE_LITERAL: kind = "literal"; name = type->data.literal; break;
+    case TYPE_USERDATA: kind = "userdata"; name = type->data.ud.name; break;
+    case TYPE_AP_OBJECT: kind = "ap_object"; name = type->data.ud.name; break;
+  }
+  if (kind == NULL) {
+    error(ERROR_INTERNAL, "Unexported binding type");
+  }
+  fputc('{', out);
+  ir_member(out, "kind", kind);
+  fputc(',', out);
+  ir_member(out, "name", name);
+  fprintf(out, ",\"nullable\":%s,\"reference\":%s,\"pointer\":%s,\"skip_check\":%s,\"range\":",
+          (type->flags & TYPE_FLAGS_NULLABLE) ? "true" : "false",
+          (type->flags & TYPE_FLAGS_REFERENCE) ? "true" : "false",
+          type->access == ACCESS_REFERENCE ? "true" : "false",
+          (type->flags & TYPE_FLAGS_NO_RANGE_CHECK) ? "true" : "false");
+  if (type->range == NULL) {
+    fputs("null", out);
+  } else {
+    fputc('[', out);
+    ir_string(out, type->range->low);
+    fputc(',', out);
+    ir_string(out, type->range->high);
+    fputc(']', out);
+  }
+  fputc('}', out);
+}
+
+static void ir_owners(FILE *out, const struct userdata *owners, int userdata) {
+  fputc('[', out);
+  for (const struct userdata *owner = owners; owner != NULL; owner = owner->next) {
+    if (owner != owners) { fputc(',', out); }
+    fputc('{', out);
+    ir_member(out, "name", owner->name);
+    fputc(',', out);
+    ir_member(out, "rename", owner->rename);
+    fputc(',', out);
+    ir_member(out, "depends", owner->dependency);
+    fputc(',', out);
+    ir_member(out, "get", owner->get_string);
+    if (userdata) {
+      // A named creation function is custom, with -1 args disabling it.
+      // Null creation leaves Lua's implicit-constructor rules in effect.
+      // operations is only a presence marker here, not a stable bit layout.
+      fputc(',', out);
+      ir_member(out, "creation", owner->creation);
+      fprintf(out, ",\"creation_manual\":%s,\"creation_args\":%d,\"has_fields\":%s,\"has_enums\":%s,\"operations\":%u,",
+              owner->creation ? "true" : "false", owner->creation_args, owner->fields ? "true" : "false",
+              owner->enums ? "true" : "false", (unsigned int)owner->operations);
+      ir_member(out, "operator_getter", owner->operator_getter);
+      fprintf(out, ",\"operators_manual\":%s,\"operator_names\":[",
+              (owner->operations & OP_MANUAL) ? "true" : "false");
+      int first = TRUE;
+      for (enum operator_type op = OP_ADD; op < OP_MANUAL; op <<= 1) {
+        if (owner->operations & op) {
+          const char *symbol = get_sym_for_operation(op);
+          if (symbol == NULL) {
+            error(ERROR_INTERNAL, "No symbol for %s operation %u", owner->name, (unsigned int)op);
+          }
+          if (!first) { fputc(',', out); }
+          ir_string(out, symbol);
+          first = FALSE;
+        }
+      }
+      fputs("],\"fields\":[", out);
+      for (const struct userdata_field *field = owner->fields; field != NULL; field = field->next) {
+        if (field != owner->fields) { fputc(',', out); }
+        fputc('{', out);
+        ir_member(out, "name", field->name);
+        fputc(',', out);
+        ir_member(out, "rename", field->rename);
+        fputc(',', out);
+        ir_member(out, "depends", field->dependency);
+        fputc(',', out);
+        ir_member(out, "array_len", field->array_len);
+        fputc(',', out);
+        ir_member(out, "valid_mask_name", field->type.valid_mask.name);
+        fputc(',', out);
+        ir_member(out, "valid_mask_value", field->type.valid_mask.value);
+        fprintf(out, ",\"line\":%d,\"read\":%s,\"write\":%s,\"type\":", field->line,
+                (field->access_flags & ACCESS_FLAG_READ) ? "true" : "false",
+                (field->access_flags & ACCESS_FLAG_WRITE) ? "true" : "false");
+        ir_type(out, &field->type);
+        fputc('}', out);
+      }
+      fputc(']', out);
+    }
+    fprintf(out, ",\"literal\":%s,\"reference\":%s,\"semaphore\":%s,\"scheduler_semaphore\":%s,"
+                 "\"semaphore_pointer\":%s,\"methods\":[",
+            (owner->flags & UD_FLAG_LITERAL) ? "true" : "false",
+            (owner->flags & UD_FLAG_REFERENCE) ? "true" : "false",
+            (owner->flags & UD_FLAG_SEMAPHORE) ? "true" : "false",
+            (owner->flags & UD_FLAG_SCHEDULER_SEMAPHORE) ? "true" : "false",
+            (owner->flags & UD_FLAG_SEMAPHORE_POINTER) ? "true" : "false");
+    for (const struct method *method = owner->methods; method != NULL; method = method->next) {
+      if (method != owner->methods) { fputc(',', out); }
+      fputc('{', out);
+      ir_member(out, "name", method->name);
+      fputc(',', out);
+      ir_member(out, "rename", method->rename);
+      fputc(',', out);
+      ir_member(out, "depends", method->dependency);
+      fputc(',', out);
+      ir_member(out, "deprecate", method->deprecate);
+      fprintf(out, ",\"line\":%d,\"return\":", method->line);
+      ir_type(out, &method->return_type);
+      fputs(",\"arguments\":[", out);
+      for (const struct argument *arg = method->arguments; arg != NULL; arg = arg->next) {
+        if (arg != method->arguments) { fputc(',', out); }
+        ir_type(out, &arg->type);
+      }
+      fputs("]}", out);
+    }
+    fputs("],\"aliases\":[", out);
+    for (const struct method_alias *alias = owner->method_aliases; alias != NULL; alias = alias->next) {
+      if (alias != owner->method_aliases) { fputc(',', out); }
+      fputc('{', out);
+      ir_member(out, "name", alias->name);
+      fputc(',', out);
+      ir_member(out, "alias", alias->alias);
+      fputc(',', out);
+      ir_member(out, "depends", alias->dependency);
+      fprintf(out, ",\"manual\":%s}", alias->type == ALIAS_TYPE_NONE ? "false" : "true");
+    }
+    fputs("]}", out);
+  }
+  fputc(']', out);
+}
+
+static void emit_ir(FILE *out) {
+  fputs("{\"schema\":1,\"includes\":[", out);
+  for (const struct header *h = headers; h != NULL; h = h->next) {
+    if (h != headers) { fputc(',', out); }
+    fputc('{', out);
+    ir_member(out, "name", h->name);
+    fputc(',', out);
+    ir_member(out, "depends", h->dependency);
+    fputc('}', out);
+  }
+  fputs("],\"singletons\":", out);
+  ir_owners(out, parsed_singletons, 0);
+  // Additive schema-1 subset: userdata fields and operator tokens are exported,
+  // but enum values and manual bodies still require a separate audit.
+  fputs(",\"userdata\":", out);
+  ir_owners(out, parsed_userdata, 1);
+  // Export object signatures too; consumers must supply ownership/lifetime
+  // policies rather than treating all AP objects as owning userdata.
+  fputs(",\"ap_objects\":", out);
+  ir_owners(out, parsed_ap_objects, 1);
+  fputs("}\n", out);
+}
+
 int main(int argc, char **argv) {
   state.line_num = -1;
 
+  const char *ir_path = NULL;
+  static const struct option options[] = {
+    {"dump-ir", required_argument, NULL, 'j'},
+    {NULL, 0, NULL, 0}
+  };
   int c;
-  while ((c = getopt(argc, argv, "i:o:d:")) != -1) {
+  while ((c = getopt_long(argc, argv, "i:o:d:j:", options, NULL)) != -1) {
     switch (c) {
       case 'i':
         if (description != NULL) {
@@ -2915,10 +3116,21 @@ int main(int argc, char **argv) {
         docs_path = optarg;
         trace(TRACE_GENERAL, "Loading an docs path of %s", docs_path);
         break;
+      case 'j':
+        if (ir_path != NULL) {
+          error(ERROR_GENERAL, "An IR path was already selected");
+        }
+        ir_path = optarg;
+        break;
+      default:
+        error(ERROR_GENERAL, "Unknown generator option");
     }
   }
 
-  if (output_path == NULL) {
+  if (description == NULL) {
+    error(ERROR_GENERAL, "A description file must be provided");
+  }
+  if (output_path == NULL && ir_path == NULL) {
     error(ERROR_GENERAL, "An output path must be provided for the generated bindings");
   }
 
@@ -2953,6 +3165,22 @@ int main(int argc, char **argv) {
   }
 
   state.line_num = -1;
+
+  if (ir_path != NULL) {
+    sanity_check_userdata();
+    FILE *ir = fopen(ir_path, "w");
+    if (ir == NULL) {
+      error(ERROR_GENERAL, "Unable to open IR output: %s", ir_path);
+    }
+    emit_ir(ir);
+    const int failed = ferror(ir);
+    if (fclose(ir) != 0 || failed) {
+      error(ERROR_GENERAL, "Unable to write IR output: %s", ir_path);
+    }
+    if (output_path == NULL) {
+      return 0;
+    }
+  }
 
   char *file_name = (char *)allocate(strlen(output_path) + 5);
   sprintf(file_name, "%s.cpp", output_path);
