@@ -594,6 +594,9 @@ initial heap size, any expanded capacity, individual reservations and
 heap usage, not a complete physical-memory total: backing-allocator overhead,
 manager storage and temporary file buffers are additional. These defaults
 are experimental, not a recommendation for every board.
+Stack sizes need not be aligned: the HAL rounds requests up to its minimum and
+alignment, and RAM messages report the actual reserved stack size. Module stack
+requirements plus the host callback margin must still fit the requested size.
 ChibiOS owned stacks prefer fast RAM, competing with other fast-memory users;
 they can fall back to other heaps. Stacks need not be DMA-capable.
 

@@ -51,10 +51,9 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
 
     // @Param: STACK_SIZE
     // @DisplayName: Rust module stack limit
-    // @Description: Reserved stack per module in multiples of 4096 bytes, including host callback margin. OS and guard overhead are additional.
+    // @Description: Requested stack per module in bytes, including host callback margin. Rounded up to the platform minimum and alignment. OS and guard overhead are additional.
     // @Units: B
     // @Range: 8192 16777216
-    // @Increment: 4096
     // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("STACK_SIZE", 4, Runtime, _stack_size, 32768),
@@ -133,7 +132,7 @@ void Runtime::init()
     constexpr int32_t maximum = 16 * 1024 * 1024;
     if (_heap_size < 256 || _heap_size > maximum || _code_size < 4096 || _code_size > maximum ||
         _code_size.get() % 4096 != 0 || _stack_size < 8192 || _stack_size > maximum ||
-        _stack_size.get() % 4096 != 0 || _max_modules < 1 || _max_modules > MAX_MODULES) {
+        _max_modules < 1 || _max_modules > MAX_MODULES) {
         fail("invalid memory limits; reboot required");
         return;
     }

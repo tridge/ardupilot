@@ -239,6 +239,24 @@ TEST(RustImage, RequireRuntimeCompatibility)
     EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
 }
 
+TEST(RustImage, AcceptByteGranularStackRequirements)
+{
+    auto expected = RuntimeContainer::compatibility();
+    for (const uint32_t size : {
+             256U, 257U, 4095U, 4097U, 16U * 1024 * 1024
+         }) {
+        RuntimeContainer container;
+        container.put(52, size);
+        container.checksum();
+        AP_Rust::Image image;
+        expected.stack_limit = size;
+        ASSERT_TRUE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+        EXPECT_EQ(image.required_stack_size(), size);
+        expected.stack_limit = size - 1;
+        EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+    }
+}
+
 TEST(RustImage, RejectRuntimeMetadataErrors)
 {
     const auto expected = RuntimeContainer::compatibility();
@@ -247,7 +265,7 @@ TEST(RustImage, RejectRuntimeMetadataErrors)
         uint32_t value;
     } mutations[] = {
         {8, 1}, {44, 0}, {44, 2}, {48, 0}, {48, 3U - expected.cpu_profile},
-        {52, 0}, {52, 248}, {52, 4097}, {52, 8200}, {52, UINT32_MAX}, {56, 1},
+        {52, 0}, {52, 255}, {52, 8193}, {52, UINT32_MAX}, {56, 1},
         {60, 0}, {80 + 4104, 4103}, {80 + 4104 + 4, 4121}, {56, UINT32_MAX},
     };
     AP_Rust::Image image;

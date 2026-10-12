@@ -53,7 +53,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         if (word(source + 44) == 0 || word(source + 44) != compatibility->abi_version ||
             !((machine == 40 && profile == 1) || (machine == 62 && profile == 2)) ||
             profile != compatibility->cpu_profile ||
-            stack_size < 256 || stack_size > MAX_IMAGE || stack_size % 8 != 0 ||
+            stack_size < 256 || stack_size > MAX_IMAGE ||
             stack_size > compatibility->stack_limit ||
             memcmp(source + 60, empty_fingerprint, sizeof(empty_fingerprint)) == 0 ||
             memcmp(source + 60, compatibility->fingerprint, sizeof(compatibility->fingerprint)) != 0) {

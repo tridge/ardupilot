@@ -23,7 +23,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     error = Error::Limits;
     if (name == nullptr || name[0] == '\0' || limits.heap < 256 || limits.heap > maximum ||
         limits.code < 4096 || limits.code > maximum || limits.code % 4096 != 0 ||
-        limits.stack < 4096 || limits.stack > maximum || limits.stack % 4096 != 0) {
+        limits.stack < 4096 || limits.stack > maximum) {
         return nullptr;
     }
     Image::Compatibility expected{0, AP_RUST_ABI_VERSION, 0, 0, AP_RUST_API_FINGERPRINT};

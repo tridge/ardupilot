@@ -24,6 +24,7 @@ volatile uint32_t rust_runtime_test_manager_priority;
 volatile uint32_t rust_runtime_test_worker_priority;
 volatile uint32_t rust_runtime_test_manager_stack;
 volatile uint32_t rust_runtime_test_worker_stack;
+volatile uint32_t rust_runtime_test_worker_stack_total;
 volatile uint32_t rust_runtime_test_timeouts;
 volatile uint32_t rust_runtime_test_timeout_elapsed;
 volatile uint32_t rust_runtime_test_panics;
@@ -168,7 +169,8 @@ bool RuntimeHarness::exercise()
         hal.scheduler->delay(100);
     }
     rust_runtime_test_result = 2;
-    if (!set("ENABLE", 1) || !set("HEAP_SIZE", 4096) || !set("CODE_SIZE", 65536) || !set("STACK_SIZE", 16384)) {
+    // An odd byte count exercises HAL stack rounding, not loader alignment.
+    if (!set("ENABLE", 1) || !set("HEAP_SIZE", 4096) || !set("CODE_SIZE", 65536) || !set("STACK_SIZE", 16385)) {
         return false;
     }
     runtime.init();
@@ -256,6 +258,7 @@ bool RuntimeHarness::exercise()
     rust_runtime_test_worker_priority = worker_priority;
     rust_runtime_test_manager_stack = manager_address;
     rust_runtime_test_worker_stack = worker_address;
+    rust_runtime_test_worker_stack_total = worker_total;
     return manager_priority > worker_priority && free_stack > 4096;
 }
 
