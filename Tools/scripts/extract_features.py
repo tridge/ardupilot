@@ -237,7 +237,8 @@ class ExtractFeatures(BuildScriptBase):
             ('AP_AHRS_EKF_RESET_ENABLED', r'AP_AHRS::reset_configured_backend'),
 
             ('AP_RC_CHANNEL_AUX_FUNCTION_STRINGS_ENABLED', r'RC_Channel::lookuptable',),
-            ('AP_SCRIPTING_ENABLED', r'AP_Scripting::init',),
+            ('AP_SCRIPTING_LUA_ENABLED', r'AP_Scripting::init',),
+            ('AP_SCRIPTING_RUST_ENABLED', r'AP_Rust::Runtime::init',),
             ('AP_SCRIPTING_SERIALDEVICE_ENABLED', r'AP_Scripting_SerialDevice::init',),
 
             ('AP_NOTIFY_TONEALARM_ENABLED', r'AP_ToneAlarm::init'),
