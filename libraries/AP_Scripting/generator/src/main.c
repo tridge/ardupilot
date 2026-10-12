@@ -2965,7 +2965,7 @@ int main(int argc, char **argv) {
 
   fprintf(source, "#include <AP_Scripting/AP_Scripting_config.h>\n\n");
 
-  fprintf(source, "#if AP_SCRIPTING_ENABLED\n\n");
+  fprintf(source, "#if AP_SCRIPTING_LUA_ENABLED\n\n");
 
   trace(TRACE_GENERAL, "Sanity checking parsed input");
 
@@ -3019,7 +3019,7 @@ int main(int argc, char **argv) {
   // after everything is defined
   fprintf(source, "#include <AP_Scripting/generator/gen/generated_cpp_loader.h>\n\n");
 
-  fprintf(source, "#endif  // AP_SCRIPTING_ENABLED\n");
+  fprintf(source, "#endif  // AP_SCRIPTING_LUA_ENABLED\n");
 
   fclose(source);
   source = NULL;
@@ -3033,7 +3033,7 @@ int main(int argc, char **argv) {
   fprintf(header, "#pragma once\n");
   fprintf(header, "// auto generated bindings, don't manually edit.  See README.md for details.\n");
   fprintf(header, "#include <AP_Scripting/AP_Scripting_config.h>\n\n");
-  fprintf(header, "#if AP_SCRIPTING_ENABLED\n\n");
+  fprintf(header, "#if AP_SCRIPTING_LUA_ENABLED\n\n");
   fprintf(header, "#include <AP_Vehicle/AP_Vehicle_Type.h> // needed for APM_BUILD_TYPE #if\n");
   emit_headers(header);
   fprintf(header, "\n#include <AP_Scripting/lua/src/lua.hpp>\n");
@@ -3053,7 +3053,7 @@ int main(int argc, char **argv) {
     node = node->next;
   }
 
-  fprintf(header, "#endif  // AP_SCRIPTING_ENABLED\n");
+  fprintf(header, "#endif  // AP_SCRIPTING_LUA_ENABLED\n");
 
   fclose(header);
   header = NULL;
