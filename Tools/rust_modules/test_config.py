@@ -32,9 +32,30 @@ def test_independent_runtimes(lua, rust, rust_first):
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize('size,lua', [(1024, 0), (2048, 1)])
-def test_unchanged_default_lua_selection(size, lua):
-    result = compile_config({'HAL_PROGRAM_SIZE_LIMIT_KB': size}, lua, 0, lua)
+@pytest.mark.parametrize('size,lua,rust', [(1024, 0, 0), (2048, 1, 0), (2049, 1, 1), (4096, 1, 1)])
+@pytest.mark.parametrize('rust_first', [False, True])
+def test_default_runtime_selection(size, lua, rust, rust_first):
+    result = compile_config({'HAL_PROGRAM_SIZE_LIMIT_KB': size}, lua, rust, lua or rust, rust_first)
+    assert result.returncode == 0, result.stderr
+
+
+def test_large_board_can_disable_rust():
+    result = compile_config({'HAL_PROGRAM_SIZE_LIMIT_KB': 4096, 'AP_SCRIPTING_RUST_ENABLED': 0}, 1, 0, 1)
+    assert result.returncode == 0, result.stderr
+
+
+def test_large_board_legacy_disable():
+    result = compile_config({'HAL_PROGRAM_SIZE_LIMIT_KB': 4096, 'AP_SCRIPTING_ENABLED': 0}, 0, 0, 0)
+    assert result.returncode == 0, result.stderr
+
+
+def test_hal_only_default_selection():
+    result = subprocess.run(['g++', '-x', 'c++', '-std=c++17', '-fsyntax-only',
+                             '-I', str(ROOT / 'libraries'), '-DCONFIG_HAL_BOARD=99',
+                             '-DHAL_PROGRAM_SIZE_LIMIT_KB=4096', '-'], text=True, capture_output=True,
+                            input='#include <AP_HAL/AP_HAL_Boards.h>\n'
+                            'static_assert(AP_SCRIPTING_RUST_ENABLED && HAL_OWNED_THREADS_ENABLED && '
+                            'HAL_EXECUTABLE_MEMORY_ENABLED, "HAL-only inclusion");\n')
     assert result.returncode == 0, result.stderr
 
 

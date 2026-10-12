@@ -12,6 +12,7 @@ from pathlib import Path
 import pack
 
 HERE = Path(__file__).resolve().parent
+RUST_VERSION = (HERE / 'rust-toolchain-version').read_text().strip()
 SDK_ROOT = HERE.parents[1] / 'libraries/AP_Rust'
 TARGETS = {
     'thumbv7em-none-eabihf': (1, 'cortex-m4'),
@@ -22,8 +23,8 @@ TARGETS = {
 def build(source, output, target, stack_size, base=0x10000, cfg=()):
     compiler = os.environ.get('RUSTC', 'rustc')
     version = subprocess.check_output([compiler, '--version'], text=True)
-    if not version.startswith('rustc 1.90.0 '):
-        raise ValueError(f'expected Rust 1.90.0, got {version.strip()}')
+    if not version.startswith(f'rustc {RUST_VERSION} '):
+        raise ValueError(f'expected Rust {RUST_VERSION}, got {version.strip()}')
     profile, cpu = TARGETS[target]
     subprocess.run([os.environ.get('PYTHON', 'python3'), str(SDK_ROOT / 'generator/generate.py'), '--check'], check=True)
     contract = json.loads((SDK_ROOT / 'sdk/abi.json').read_text())

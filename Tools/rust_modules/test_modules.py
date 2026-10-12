@@ -17,6 +17,7 @@ import pytest
 from elftools.elf.elffile import ELFFile
 
 import pack
+from build import RUST_VERSION
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -27,7 +28,7 @@ from test_peripherals import renode  # noqa: E402,F401
 def build(tmp_path, target, base=0x10000, relocation='pic'):
     compiler = os.environ.get('RUSTC', 'rustc')
     version = subprocess.check_output([compiler, '--version'], text=True)
-    assert version.startswith('rustc 1.90.0 '), version
+    assert version.startswith(f'rustc {RUST_VERSION} '), version
     output = tmp_path / f'{target}-{base:x}-{relocation}.elf'
     command = [compiler, str(HERE / 'probe.rs'), '--edition=2021', '--target', target,
                '-C', 'opt-level=s', '-C', 'panic=abort', '-C', 'lto=fat',

@@ -80,6 +80,48 @@ the CRC field zeroed. Stack requirements must be 8-byte multiples from 256
 bytes through 16 MiB. Version 1 remains a test-only probe format; experimental
 version-2 runtime modules must be rebuilt for version 3.
 
+## Vehicle autotests
+
+SITL enables native Rust scripting by default (`HAL_PROGRAM_SIZE_LIMIT_KB > 2048`).
+The Plane suite builds and flies the numeric AirShow using Rust 1.90.0 with the
+`x86_64-unknown-linux-gnu` target installed. Select that compiler through `RUSTC`
+if it is not your default `rustc`:
+
+```sh
+RUSTC=/path/to/rustc-1.90.0 Tools/autotest/autotest.py \
+    build.Plane test.Plane.AerobaticsScripting_rust
+```
+
+The Plane `tests1a` CI job installs that pinned compiler. Local test runs do not
+download toolchains automatically. Use `--uds` if the normal SITL TCP ports are
+already in use.
+The builder, autotest precondition and CI share `rust-toolchain-version`.
+Do not rebuild or replace the running SITL binary during a test: SITL reboots by
+executing that binary again. Use a separate build/worktree for concurrent builds.
+
+Reusable `TestSuite` helpers:
+
+- `install_rust_applet_context('aerobatics/main.rs', install_name='airshow.apmod')`
+  builds a source under `libraries/AP_Rust/applets/` and installs it in `rust/`.
+- `install_rust_test_module_context('math.rs')` builds a native test fixture;
+  `install_rust_module_context(source)` accepts another source path.
+- `build_rust_module(source, output, stack_size=16384, target='x86_64-unknown-linux-gnu')`
+  exposes the build step for tests needing explicit artifacts or another target.
+- `install_rust_file_context(source, install_name='trick72.txt', directory='scripts')`
+  installs ancillary data (the default directory is `rust/`).
+- `rust_scripting_restart()` requests cooperative reload and waits for the
+  manager's new-generation message. Wait separately for applet-specific readiness.
+
+Context installers refuse to overwrite existing files and remove their own files
+on context cleanup, including failure cleanup. Intermediate build files are kept
+in a temporary directory and removed. Tests must enable `RUST_ENABLE` and reboot
+after installing, and configure image/heap/stack budgets; the module stack
+requirement excludes the loader's host-callback margin. Removing a file does not
+stop an already loaded worker: reboot after cleanup before running another test.
+If a killed run leaves a file behind, installation raises `FileExistsError` with
+its path. Check that file belongs to the interrupted test and move it aside or
+remove it before retrying; the helper never deletes an unowned file.
+
 ## SDK modules
 
 `build.py` builds a standalone source file against the generated core SDK,

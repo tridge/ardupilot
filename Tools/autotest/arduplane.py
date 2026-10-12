@@ -7044,6 +7044,73 @@ return update()
             else:
                 raise NotAchievedException("Missing trick %s" % t)
 
+    def AerobaticsScripting_rust(self):
+        '''Fly the native Rust RC AirShow'''
+        self.context_push()
+        self.install_rust_applet_context('aerobatics/main.rs', install_name='airshow.apmod')
+        self.install_rust_file_context(self.rust_applet_source_path('aerobatics/AirShow.txt'),
+                                       install_name='trick72.txt', directory='scripts')
+        self.customise_SITL_commandline([], model='plane-3d', wipe=True)
+        self.set_parameters({
+            'RUST_ENABLE': 1,
+            'RUST_HEAP_SIZE': 32768,
+            'RUST_CODE_SIZE': 131072,
+            'RUST_STACK_SIZE': 32768,
+            'SCR_ENABLE': 0,
+            'RC7_OPTION': 300,
+            'RC9_OPTION': 301,
+        })
+        self.context_set_speedup(5)
+        self.context_collect('STATUSTEXT')
+        self.install_message_hook_context(self.FailFastStatusText(
+            self, ['Rust panic:', 'Aerobatics error', 'Too low altitude, aborting', 'Invalid path - aborting']))
+        self.reboot_sitl()
+        self.set_rc(7, 1000)
+        self.set_rc(9, 1000)
+        self.wait_text('Rust: loaded 1 modules', check_context=True)
+        self.set_parameter('TRIK_ENABLE', 1)
+        self.rust_scripting_restart()
+        self.wait_text('Enabled 3 tricks', check_context=True)
+        self.set_parameter('TRIK1_ID', 72)
+
+        self.wait_ready_to_arm()
+        self.change_mode('TAKEOFF')
+        self.arm_vehicle()
+        self.wait_altitude(30, 40, timeout=30, relative=True)
+        self.change_mode('CRUISE')
+        self.delay_sim_time(1, reason='trick selection to register')
+        self.set_rc(7, 1500)
+        self.wait_text('Trick 1 selected (SuperAirShow)', check_context=True)
+        self.context_clear_collection('STATUSTEXT')
+        self.set_rc(7, 2000)
+        self.wait_text('Trick 1 started (SuperAirShow)', check_context=True)
+
+        highest_error = 0
+        samples = 0
+        start = self.get_sim_time()
+        while not any(m.text == 'Finishing SuperAirShow!' for m in self.context_collection('STATUSTEXT')):
+            if self.get_sim_time_cached() - start > 300:
+                raise AutoTestTimeoutException('Rust AirShow did not finish')
+            m = self.mav.recv_match(type='NAMED_VALUE_FLOAT', timeout=1, blocking=True)
+            if m is None or m.name != 'PERR':
+                continue
+            if not math.isfinite(m.value) or not 0 <= m.value <= 15:
+                raise NotAchievedException('Rust AirShow path error %s' % m.value)
+            highest_error = max(highest_error, m.value)
+            samples += 1
+        if samples < 20 or highest_error == 0:
+            raise NotAchievedException('Insufficient Rust path error telemetry (%u samples)' % samples)
+        tricks = ['Loop', 'HalfReverseCubanEight', 'ScaleFigureEight', 'Immelmann', 'Roll',
+                  'Split-S', 'RollingCircle', 'HumptyBump', 'HalfCubanEight', 'BarrelRoll',
+                  'CrossBoxTopHat', 'TriangularLoop', 'Finishing SuperAirShow!']
+        observed = [m.text for m in self.context_collection('STATUSTEXT') if m.text in tricks]
+        if observed != tricks:
+            raise NotAchievedException('Rust AirShow maneuver order: %s' % observed)
+        self.progress('Rust AirShow completed: %u PERR samples, peak %.2fm' % (samples, highest_error))
+        self.disarm_vehicle(force=True)
+        self.context_pop()
+        self.reboot_sitl()
+
     def UniversalAutoLandScript(self):
         '''Test UniversalAutoLandScript'''
         applet_script = "UniversalAutoLand.lua"
@@ -10469,6 +10536,7 @@ return update()
             self.AutotuneFiltering,
             self.MidAirDisarmDisallowed,
             self.AerobaticsScripting,
+            self.AerobaticsScripting_rust,
             self.MANUAL_CONTROL,
             self.SDCardWPTest,
             self.SagetechMXS,
