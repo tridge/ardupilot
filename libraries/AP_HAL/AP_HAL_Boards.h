@@ -420,6 +420,16 @@
 #define AP_USB_DEBUG_STARTUP_WAIT_ENABLED 0
 #endif
 
+// The native runtime and its HAL services must agree even when HAL headers
+// are included before AP_Rust_config.h. Explicit build overrides win.
+#ifndef AP_SCRIPTING_RUST_ENABLED
+#if defined(AP_SCRIPTING_ENABLED) && !AP_SCRIPTING_ENABLED
+#define AP_SCRIPTING_RUST_ENABLED 0
+#else
+#define AP_SCRIPTING_RUST_ENABLED (HAL_PROGRAM_SIZE_LIMIT_KB > 2048)
+#endif
+#endif
+
 #ifndef HAL_OWNED_THREADS_ENABLED
 #if defined(AP_SCRIPTING_RUST_ENABLED) && AP_SCRIPTING_RUST_ENABLED
 #define HAL_OWNED_THREADS_ENABLED 1
