@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Boot the real AirShow runner on H743; stationary observations are not a flight test."""
 
+import os
 import shutil
 import subprocess
 
+import pytest
 from pymavlink import DFReader
 from pymavlink.dialects.v20 import ardupilotmega
 
@@ -15,11 +17,12 @@ from test_threads import gen_board, renode, renode_data, run  # noqa: F401
 from test_driver_probe import ControlledPhysics
 
 
-def test_h743_runner(tmp_path, renode):  # noqa: F811
+@pytest.mark.parametrize('mission', [False, True], ids=['rc', 'mission'])
+def test_h743_runner(tmp_path, renode, mission):  # noqa: F811
     # Patch a private copy of the embedded-defaults test ELF, never the build
     # artifact used by the target-local Lua controller oracle.
     executable = tmp_path / 'arduplane'
-    shutil.copyfile(ROOT / 'build/MatekH743/bin/arduplane', executable)
+    shutil.copyfile(os.environ.get('AP_RUST_H743_BINARY', ROOT / 'build/MatekH743/bin/arduplane'), executable)
     defaults = tmp_path / 'runner.parm'
     defaults.write_text((ROOT / 'Tools/rust_modules/aerobatics-oracle.parm').read_text()
                         .replace('RUST_ENABLE 0', 'RUST_ENABLE 1')
@@ -61,7 +64,7 @@ INS_ACCSCAL_Z 1.001
     subprocess.run(['mcopy', '-i', str(sdcard), str(module), '::/APM/rust/airshow.apmod'], check=True)
     subprocess.run(['mcopy', '-i', str(sdcard), str(APPLET / 'AirShow.txt'), '::/APM/scripts/trick72.txt'], check=True)
     driver = tmp_path / 'driver.lua'
-    driver.write_text('''
+    driver_source = '''
 local stage = 0
 local function update()
  if stage == 0 then
@@ -93,7 +96,47 @@ local function update()
  return update,stage==4 and 20000 or 5000
 end
 return update,20000
-''')
+'''
+    if mission:
+        assert driver_source.count('param:set_and_save("TRIK_ENABLE",1)') == 1
+        driver_source = driver_source.replace('param:set_and_save("TRIK_ENABLE",1)',
+                                              'param:set_and_save("TRIK_ENABLE",0)')
+        start = driver_source.index('  if param:get("TRIK1_ID")')
+        end = driver_source.index(' elseif stage == 4 then', start)
+        driver_source = driver_source[:start] + '''
+  assert(param:set("AEROM_ALT_ABORT",1000))
+  assert(param:set("AEROM_MIS_ANGLE",90))
+  assert(mission:clear())
+  local m = mavlink_mission_item_int_t()
+  m:command(16)
+  m:x(-353632610)
+  m:y(1491652300)
+  m:z(40)
+  m:frame(3)
+  assert(mission:set_item(0,m))
+  m:command(42702)
+  m:param1(7)
+  m:param3(10000)
+  m:param4(1)
+  m:x(0)
+  m:y(0)
+  assert(mission:set_item(1,m))
+  m:command(16)
+  m:x(-353632610)
+  m:y(1491652300)
+  assert(mission:set_item(2,m))
+ elseif stage == 2 then
+  assert(vehicle:set_mode(10))
+ elseif stage == 3 then
+  assert(mission:set_current_cmd(1))
+''' + driver_source[end:]
+        assert driver_source.count('assert(rc:run_aux_function(300,0))') == 1
+        driver_source = driver_source.replace('assert(rc:run_aux_function(300,0))',
+                                              'assert(vehicle:set_mode(7))')
+        assert driver_source.count('assert(param:get("TRIK1_ID") == 72)') == 1
+        driver_source = driver_source.replace('assert(param:get("TRIK1_ID") == 72)',
+                                              'assert(param:get("TRIK_ENABLE") == 0)')
+    driver.write_text(driver_source)
     subprocess.run(['mcopy', '-i', str(sdcard), str(driver), '::/APM/scripts/driver.lua'], check=True)
     physics = ControlledPhysics()
     physics.start()
@@ -138,8 +181,12 @@ emulation RunFor "90"
     assert 'H743 runner driver done' in texts
     assert texts.count('Rust: loaded 1 modules') == 3
     assert texts.count('Loaded plane_aerobatics Rust') == 3
-    assert 'Trick 1 started (SuperAirShow)' in texts
-    assert 'Trick aborted' in texts
+    if mission:
+        assert 'Starting Axial Roll!' in texts
+        assert not any('NavScript time out' in text for text in texts)
+    else:
+        assert 'Trick 1 started (SuperAirShow)' in texts
+        assert 'Trick aborted' in texts
     assert len(updates) > 100
     assert dropped and all(row['Dp'] == 0 for row in dropped)
     assert stacks and min(free for total, free in stacks) > 4096

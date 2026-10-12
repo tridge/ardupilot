@@ -21,6 +21,18 @@ APPLET = ROOT / 'libraries/AP_Rust/applets/aerobatics'
 LUA_DIR = ROOT / 'libraries/AP_Scripting/applets/Aerobatics/FixedWing'
 
 
+def test_builtin_ids_match_lua():
+    lua = (LUA_DIR / 'plane_aerobatics.lua').read_text()
+    rust = (APPLET / 'maneuvers.rs').read_text()
+    commands = dict((int(i), (function, name)) for i, function, name in re.findall(
+        r'command_table\[(\d+)\]\s*=\s*PathFunction\((\w+), "([^"]+)"\)', lua))
+    native = dict((int(i), (variant, name)) for i, variant, name in re.findall(
+        r'(\d+) => \(Self::(\w+), "([^"]+)"\)', rust))
+    named = dict(re.findall(r'"([^"]+)" => Self::(\w+)', rust))
+    assert len(native) == 10
+    assert all((named[commands[i][0]], commands[i][1]) == binding for i, binding in native.items())
+
+
 def test_parser_units(tmp_path):
     rustc = os.environ.get('RUSTC', 'rustc')
     sdk = tmp_path / 'libap_rust_sdk.rlib'
@@ -29,7 +41,7 @@ def test_parser_units(tmp_path):
     source = tmp_path / 'test.rs'
     source.write_text('extern crate alloc;\n' + '\n'.join(
         f'#[path="{APPLET / (name + ".rs")}"] mod {name};'
-        for name in ('math', 'primitives', 'path', 'maneuvers', 'schedule')))
+        for name in ('math', 'primitives', 'path', 'maneuvers', 'schedule', 'support', 'mission')))
     executable = tmp_path / 'tests'
     subprocess.run([rustc, '--edition=2021', '--test', '-A', 'dead_code', str(source),
                     '--extern', f'ap_rust_sdk={sdk}', '-o', str(executable)], check=True)

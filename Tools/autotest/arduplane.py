@@ -7044,8 +7044,8 @@ return update()
             else:
                 raise NotAchievedException("Missing trick %s" % t)
 
-    def AerobaticsScripting_rust(self):
-        '''Fly the native Rust RC AirShow'''
+    def setup_rust_aerobatics(self, allow_mission_timeout=False):
+        '''Install and start the native aerobatics applet in a test context'''
         self.context_push()
         self.install_rust_applet_context('aerobatics/main.rs', install_name='airshow.apmod')
         self.install_rust_file_context(self.rust_applet_source_path('aerobatics/AirShow.txt'),
@@ -7062,12 +7062,19 @@ return update()
         })
         self.context_set_speedup(5)
         self.context_collect('STATUSTEXT')
-        self.install_message_hook_context(self.FailFastStatusText(
-            self, ['Rust panic:', 'Aerobatics error', 'Too low altitude, aborting', 'Invalid path - aborting']))
+        errors = ['Rust panic:', 'Aerobatics error', 'Too low altitude, aborting', 'Invalid path - aborting',
+                  'NavScript time out']
+        if not allow_mission_timeout:
+            errors.append('NavScriptTime timed out')
+        self.install_message_hook_context(self.FailFastStatusText(self, errors))
         self.reboot_sitl()
         self.set_rc(7, 1000)
         self.set_rc(9, 1000)
         self.wait_text('Rust: loaded 1 modules', check_context=True)
+
+    def AerobaticsScripting_rust(self):
+        '''Fly the native Rust RC AirShow'''
+        self.setup_rust_aerobatics()
         self.set_parameter('TRIK_ENABLE', 1)
         self.rust_scripting_restart()
         self.wait_text('Enabled 3 tricks', check_context=True)
@@ -7085,6 +7092,33 @@ return update()
         self.set_rc(7, 2000)
         self.wait_text('Trick 1 started (SuperAirShow)', check_context=True)
 
+        self.wait_rust_airshow_complete()
+        self.disarm_vehicle(force=True)
+        self.context_pop()
+        self.reboot_sitl()
+
+    def AerobaticsScripting_rust_mission(self):
+        '''Fly native AirShow from NAV_SCRIPT_TIME with RC tricks disabled'''
+        self.setup_rust_aerobatics()
+        self.assert_parameter_value('TRIK_ENABLE', 0)
+        self.set_parameter('RTL_AUTOLAND', 2)
+        self.load_mission('rust-aerobatics.txt')
+        self.wait_ready_to_arm()
+        self.context_clear_collection('STATUSTEXT')
+        self.change_mode('AUTO')
+        self.arm_vehicle()
+        self.wait_text('Starting SuperAirShow!', check_context=True, timeout=120)
+        self.assert_current_waypoint(4)
+        self.wait_rust_airshow_complete()
+        # Timeout is zero: only the applet's matching completion acknowledgement
+        # should advance the mission, not the NavScript watchdog.
+        self.wait_current_waypoint(5, timeout=10)
+        self.disarm_vehicle(force=True)
+        self.context_pop()
+        self.reboot_sitl()
+
+    def wait_rust_airshow_complete(self):
+        '''Check the complete schedule, not just a successful script start'''
         highest_error = 0
         samples = 0
         start = self.get_sim_time()
@@ -7107,6 +7141,64 @@ return update()
         if observed != tricks:
             raise NotAchievedException('Rust AirShow maneuver order: %s' % observed)
         self.progress('Rust AirShow completed: %u PERR samples, peak %.2fm' % (samples, highest_error))
+
+    def AerobaticsScripting_rust_mission_control(self):
+        '''Exercise mission arguments, command replacement, timeout and mode exit'''
+        self.setup_rust_aerobatics(allow_mission_timeout=True)
+        self.assert_parameter_value('TRIK_ENABLE', 0)
+        self.wait_ready_to_arm()
+        self.change_mode('TAKEOFF')
+        self.arm_vehicle()
+        self.wait_altitude(30, 40, timeout=30, relative=True)
+        self.change_mode('CRUISE')
+        self.set_parameter('AEROM_MIS_ANGLE', self.get_heading() or 360)
+        items = [
+            self.mission_item_home(),
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_NAV_SCRIPT_TIME, p1=7, p2=3, p3=20000, p4=1),
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_NAV_SCRIPT_TIME, p1=7, p3=80, p4=1),
+            self.mission_item_waypoint(-35.364290, 149.164936, 40),
+        ]
+        self.renumber_mission_items(items)
+        self.check_mission_upload_download(items)
+        self.set_current_waypoint(1, check_afterwards=False)
+        self.context_clear_collection('STATUSTEXT')
+        self.change_mode('AUTO')
+        self.wait_text('Starting Axial Roll!', check_context=True)
+        self.wait_text('NavScriptTime timed out', check_context=True)
+        self.wait_current_waypoint(2)
+        start = self.get_sim_time()
+        self.wait_text('Finishing Axial Roll!', check_context=True, timeout=15)
+        if self.get_sim_time() - start < 1:
+            raise NotAchievedException('Second mission maneuver finished prematurely')
+        self.wait_current_waypoint(3)
+        texts = [m.text for m in self.context_collection('STATUSTEXT')]
+        if texts.count('Starting Axial Roll!') != 2 or texts.count('Finishing Axial Roll!') != 1:
+            raise NotAchievedException('Mission task replacement/completion mismatch: %s' % texts)
+
+        self.change_mode('CRUISE')
+        self.set_parameter('AEROM_MIS_ANGLE', self.get_heading() or 360)
+        items[1].param2 = 0
+        self.check_mission_upload_download(items)
+        for exit_mode in (True, False):
+            self.context_clear_collection('STATUSTEXT')
+            self.set_current_waypoint(1, check_afterwards=False)
+            self.change_mode('AUTO')
+            self.wait_text('Starting Axial Roll!', check_context=True)
+            self.delay_sim_time(1, reason='allow mission controller updates')
+            self.drain_mav()
+            self.assert_receive_named_value_float('PERR', timeout=3)
+            if exit_mode:
+                self.change_mode('CRUISE')
+            else:
+                self.set_current_waypoint(3)
+            # Drain in-flight telemetry before checking that the old task stops.
+            self.delay_sim_time(1, reason='drain pre-exit telemetry')
+            self.context_push()
+            self.context_collect('NAMED_VALUE_FLOAT')
+            self.delay_sim_time(2, reason='check old mission controller stopped')
+            if any(m.name == 'PERR' for m in self.context_collection('NAMED_VALUE_FLOAT')):
+                raise NotAchievedException('Old mission controller continued after exit')
+            self.context_pop()
         self.disarm_vehicle(force=True)
         self.context_pop()
         self.reboot_sitl()
@@ -10537,6 +10629,8 @@ return update()
             self.MidAirDisarmDisallowed,
             self.AerobaticsScripting,
             self.AerobaticsScripting_rust,
+            self.AerobaticsScripting_rust_mission,
+            self.AerobaticsScripting_rust_mission_control,
             self.MANUAL_CONTROL,
             self.SDCardWPTest,
             self.SagetechMXS,
