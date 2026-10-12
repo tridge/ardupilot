@@ -19,6 +19,10 @@
 #include "UARTDriver.h"
 #include "Util.h"
 
+#if HAL_OWNED_THREADS_ENABLED
+#include <AP_HAL/utility/OwnedThread_posix.h>
+#endif
+
 using namespace Linux;
 
 extern const AP_HAL::HAL& hal;
@@ -424,3 +428,15 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
 
     return true;
 }
+
+#if HAL_OWNED_THREADS_ENABLED
+AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
+                                                             uint32_t stack_size, priority_base base, int8_t priority)
+{
+    // Match the existing unprivileged debugging policy, without inheriting
+    // the main thread's realtime priority when running with privileges.
+    const bool realtime = geteuid() == 0;
+    return OwnedThreadPosix::create(proc, name, stack_size, realtime ? SCHED_FIFO : SCHED_OTHER,
+                                    realtime ? calculate_thread_priority(base, priority) : 0);
+}
+#endif
