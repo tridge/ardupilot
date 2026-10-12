@@ -253,6 +253,16 @@ jobs:
       - uses: ./.github/actions/setup-ccache
         with:
           key-suffix: base
+      - name: Install native module compiler
+        if: matrix.config == 'sitltest-plane-tests1a'
+        shell: bash
+        run: |
+          export RUSTUP_HOME="${RUNNER_TEMP}/ap-rust-rustup"
+          export CARGO_HOME="${RUNNER_TEMP}/ap-rust-cargo"
+          rust_version="$(< Tools/rust_modules/rust-toolchain-version)"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "${RUNNER_TEMP}/ap-rustup-init.sh"
+          sh "${RUNNER_TEMP}/ap-rustup-init.sh" -y --no-modify-path --profile minimal --default-toolchain "$rust_version"
+          echo "RUSTC=$("${CARGO_HOME}/bin/rustup" which --toolchain "$rust_version" rustc)" >> "$GITHUB_ENV"
       - name: test ${{matrix.config}}
         env:
           CI_BUILD_TARGET: ${{matrix.config}}
