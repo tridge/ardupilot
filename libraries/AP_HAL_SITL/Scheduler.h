@@ -75,6 +75,8 @@ public:
     // get the name of the current thread, or nullptr if not known
     const char *get_current_thread_name(void) const;
 
+    void thread_info(ExpandingString &str);
+
 private:
     SITL_State *_sitlState;
     uint8_t _nested_atomic_ctr;

@@ -47,6 +47,7 @@ public:
     bool get_system_id(char buf[50]) override;
     bool get_system_id_unformatted(uint8_t buf[], uint8_t &len) override;
     void dump_stack_trace();
+    void thread_info(ExpandingString &str) override;
 
 #ifdef WITH_SITL_TONEALARM
     bool toneAlarm_init(uint8_t types) override { return _toneAlarm.init(); }

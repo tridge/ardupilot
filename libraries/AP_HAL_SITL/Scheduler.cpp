@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <fenv.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <AP_Common/ExpandingString.h>
 #if HAL_OWNED_THREADS_ENABLED
 #include <AP_HAL/utility/OwnedThread_posix.h>
 #endif
@@ -316,7 +317,6 @@ void Scheduler::stop_clock(uint64_t time_usec)
 void *Scheduler::thread_create_trampoline(void *ctx)
 {
     struct thread_attr *a = (struct thread_attr *)ctx;
-    a->thread = pthread_self();
     a->f[0]();
     
     WITH_SEMAPHORE(_thread_sem);
@@ -363,7 +363,7 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
     pthread_t thread {};
     const uint32_t alloc_stack = MAX(size_t(PTHREAD_STACK_MIN),stack_size);
 
-    struct thread_attr *a = NEW_NOTHROW struct thread_attr;
+    auto *a = NEW_NOTHROW thread_attr {};
     if (!a) {
         return false;
     }
@@ -401,6 +401,7 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
     pthread_setname_np(thread, name);
 #endif
 
+    a->thread = thread;
     a->next = threads;
     threads = a;
     return true;
@@ -442,4 +443,68 @@ const char *Scheduler::get_current_thread_name(void) const
         }
     }
     return nullptr;
+}
+
+// Ordinary SITL threads normally use libc stacks, not the painted allocation
+// used by the optional stack checker. Do not report that unused buffer as free.
+static void thread_info_line(ExpandingString &str, pthread_t thread, const char *name,
+                             const uint8_t *painted = nullptr, uint32_t painted_size = 0)
+{
+    int policy;
+    sched_param param{};
+    const bool have_priority = pthread_getschedparam(thread, &policy, &param) == 0;
+    str.printf("%-13.13s PRI=", name == nullptr ? "unnamed" : name);
+    if (have_priority) {
+        str.printf("%3d", param.sched_priority);
+    } else {
+        str.printf("  ?");
+    }
+    void *stack = nullptr;
+    size_t size = 0;
+#if defined(__linux__)
+    pthread_attr_t attr;
+    if (pthread_getattr_np(thread, &attr) == 0) {
+        if (pthread_attr_getstack(&attr, &stack, &size) != 0) {
+            stack = nullptr;
+            size = 0;
+        }
+        pthread_attr_destroy(&attr);
+    }
+#elif defined(__APPLE__)
+    size = pthread_get_stacksize_np(thread);
+    stack = static_cast<uint8_t *>(pthread_get_stackaddr_np(thread)) - size;
+#endif
+    if (painted != nullptr) {
+        uint32_t free = 0;
+        const volatile uint8_t *bytes = painted;
+        while (free < painted_size && bytes[free] == 0xEB) {
+            free++;
+        }
+        str.printf(" sp=0x%llx STACK=%u/%u\n", (unsigned long long)uintptr_t(painted),
+                   unsigned(free), unsigned(painted_size));
+    } else if (size != 0) {
+        // The HAL formatter does not support %zu and %p is only 32 bits.
+        str.printf(" sp=0x%llx STACK=?/%llu\n", (unsigned long long)uintptr_t(stack), (unsigned long long)size);
+    } else {
+        str.printf(" sp=? STACK=?/?\n");
+    }
+}
+
+void Scheduler::thread_info(ExpandingString &str)
+{
+    str.printf("ThreadsV2\n");
+    {
+        WITH_SEMAPHORE(_thread_sem);
+        thread_info_line(str, _main_ctx, "main");
+        for (const thread_attr *p = threads; p != nullptr; p = p->next) {
+#if SITL_STACK_CHECKING_ENABLED
+            thread_info_line(str, p->thread, p->name, p->stack_min, p->stack_size);
+#else
+            thread_info_line(str, p->thread, p->name);
+#endif
+        }
+    }
+#if HAL_OWNED_THREADS_ENABLED
+    OwnedThreadPosix::thread_info(str);
+#endif
 }
