@@ -6,9 +6,10 @@ Andrew Tridgell, with controller assistance from Paul Riseborough and testing by
 Henry Wurzburg. This native port is AI-assisted (Codex, with independent Claude
 reviews). It is experimental and not established as safe for hardware flight.
 
-The RC-triggered twelve-maneuver AirShow now completes in Plane SITL, including
-repeat execution, RC abort and module restart while controlling. The controller
-also runs from SD on H743/ChibiOS under Renode and matches Lua running on H743.
+The twelve-maneuver AirShow runs from RC or `NAV_SCRIPT_TIME` in Plane SITL.
+RC tests include repeat execution, abort and module restart while controlling.
+The controller also runs from SD on H743/ChibiOS under Renode and matches Lua
+running on H743.
 This is a single-aircraft, numeric-schedule demonstration, not a complete
 replacement for every feature of the Lua applet.
 
@@ -42,6 +43,24 @@ trick 1; channel 7 low aborts, middle selects and high executes. Execute only
 after a fresh switch transition in a supported Plane scripting mode. A held
 execute switch must not launch a maneuver after reload.
 
+For AUTO missions, add `NAV_SCRIPT_TIME` with command 72 and timeout 0 (no
+mission-item time limit). `TRIK_ENABLE` and RC scripting options are not needed.
+The applet acknowledges completion with the mission command ID. As in Lua,
+`AEROM_MIS_ANGLE=0` selects the bearing between the surrounding waypoints,
+reversed when appropriate for the entry course; a nonzero value fixes the heading.
+Waypoint searches skip non-location commands and are limited to 256 items,
+including forward `DO_JUMP` traversal, to reject malformed/cyclic missions.
+The next script item is preloaded while approaching it. A jump directly to an
+uncached schedule may require loading inside Plane's one-second watchdog;
+slow storage can cause that item to be skipped, with a diagnostic.
+
+The ported built-in command IDs also accept Lua's four mission/RC arguments:
+2 (Loop), 7 (Axial Roll), 8 (Rolling Circle), 9 (Half Cuban Eight),
+10 (Half Reverse Cuban Eight), 12 (Humpty Bump), 14 (Scale Figure Eight),
+15 (Immelmann Turn), 16 (Split-S), and 26 (Barrel Roll).
+Loaded numeric schedules use their file's arguments, as Lua does; the mission
+arguments do not scale or select a subsection of a loaded schedule.
+
 Do **not** run the original Lua aerobatics applet concurrently: both own the
 same parameter names and vehicle-control interface. Other Lua scripts may run
 alongside Rust. Parameters use the same AP_Param tables, keys, defaults, live
@@ -59,11 +78,14 @@ MAVLINK20=1 RUSTC=/path/to/rustc-1.90.0 \
 ```
 
 The test flies both engines separately with the same model. It is not a
-hardware-flight procedure. Mission/AUTO execution, dual-aircraft time sync,
-stall-turn/rate overrides and arbitrary Lua maneuver functions are unsupported.
-The runner declines AUTO and the dual-aircraft option; custom geometry requires
-rebuilding the Rust module. `TRIK*_ARG*` are registered for parameter compatibility
-but this numeric file has fixed arguments.
+hardware-flight procedure. Dual-aircraft time sync, unlisted built-in maneuvers,
+stall-turn/rate overrides and arbitrary Lua maneuver functions remain unsupported.
+The runner declines the dual-aircraft option; custom geometry requires rebuilding
+the Rust module. The standard Plane tests `AerobaticsScripting_rust_mission` and
+`AerobaticsScripting_rust_mission_control` cover AUTO AirShow completion, built-in
+arguments, timeout, command replacement and mode exit with RC tricks disabled.
+The built-in mission test flies Axial Roll; the AirShow tests exercise the other
+ported geometries with fixed schedule arguments, not every built-in argument combination.
 
 These are trusted native modules, not a sandbox. Compile-time Rust checks do not
 provide instruction budgets, MPU isolation or flight-safety certification.
@@ -73,9 +95,9 @@ resuming after prolonged starvation. Ordinary failures release scripting
 control. On module stop, host bindings reject further calls, so Plane's existing
 one-second NavScript watchdog releases control, as with Lua restart. Invalid
 finite/configuration checks are intentionally stronger than Lua's NaN checks.
-As in the Lua applet, a mode change can leave the script progressing after the
-host has revoked NavScript control; it cannot regain control without a fresh
-enable request. This demonstration does not add new disarm/failsafe policy.
+Unlike Lua's retained task, the native runner discards its controller on mode
+change or mission-item expiry/replacement, so stale commands cannot continue
+into a new task. This demonstration does not add new disarm/failsafe policy.
 
 `test_aerobatics_parameters.py` checks the live tables, storage indices, all
 29 AEROM defaults, expansion to eleven tricks, the legacy acceleration/time

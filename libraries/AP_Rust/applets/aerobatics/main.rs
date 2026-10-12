@@ -10,6 +10,7 @@ mod faults;
 mod logging;
 mod maneuvers;
 mod math;
+mod mission;
 mod parameters;
 mod path;
 mod primitives;
@@ -29,6 +30,7 @@ ap_rust_sdk::module!(run);
 
 struct Loaded {
     id: i32,
+    args: [f32; 4],
     name: String,
     path: Path,
 }
@@ -54,9 +56,33 @@ fn observation(c: &Context<'_>) -> Result<Input> {
     Ok(input)
 }
 
-fn load(c: &Context<'_>, id: i32, p: Configuration, input: Input, width: f32) -> Result<Loaded> {
+fn load(
+    c: &Context<'_>,
+    id: i32,
+    args: [f32; 4],
+    p: Configuration,
+    input: Input,
+    width: f32,
+) -> Result<Loaded> {
     if !(1..=255).contains(&id) {
         return Err(Error::Invalid);
+    }
+    let eval = Evaluation {
+        speed: controller::target_speed(c, input, p)?,
+        entry_rate: p.entry_rate,
+        announce: true,
+    };
+    if let Some((command, name)) = maneuvers::Command::builtin(id) {
+        let mut text = String::new();
+        text.try_reserve_exact(name.len())
+            .map_err(|_| Error::NoMemory)?;
+        text.push_str(name);
+        return Ok(Loaded {
+            id,
+            args,
+            name: text,
+            path: maneuvers::build(c, command, args, width, eval)?,
+        });
     }
     let mut found = None;
     for directory in ["APM/scripts/", "scripts/", ""] {
@@ -67,24 +93,32 @@ fn load(c: &Context<'_>, id: i32, p: Configuration, input: Input, width: f32) ->
         }
     }
     let schedule = found.ok_or(Error::Unavailable)?;
-    let path = schedule.build(
-        c,
-        width,
-        Evaluation {
-            speed: controller::target_speed(c, input, p)?,
-            entry_rate: p.entry_rate,
-            announce: true,
-        },
-    )?;
+    // As in Lua's PathTask, file schedules already contain their arguments.
+    let path = schedule.build(c, width, eval)?;
     Ok(Loaded {
         id,
+        args,
         name: schedule.name,
         path,
     })
 }
 
-fn release(c: &Context<'_>) -> Result {
-    c.vehicle_nav_scripting_enable(255)?;
+#[derive(Clone, Copy)]
+enum Owner {
+    Rc(u8),
+    Mission(u16),
+}
+
+fn release(c: &Context<'_>, owner: Owner) -> Result {
+    match owner {
+        Owner::Mission(id) => c.vehicle_nav_script_time_done(id)?,
+        // A mode transition has already revoked RC control. Do not disable a
+        // newly started AUTO item while cleaning up the old RC controller.
+        Owner::Rc(mode) if c.vehicle_get_mode()? == mode => {
+            c.vehicle_nav_scripting_enable(255)?;
+        }
+        Owner::Rc(_) => (),
+    }
     Ok(())
 }
 
@@ -112,7 +146,9 @@ fn run(c: &Context<'_>) -> Result {
     } else {
         None
     };
-    let mut owned = false;
+    let mut owner: Option<Owner> = None;
+    let mut last_mission_id = None;
+    let mut last_preload = None;
     // Lua's path_var.count is global, not reset when a new trick starts.
     let mut count = 0;
     let mut last_named_float = 0.0;
@@ -124,6 +160,9 @@ fn run(c: &Context<'_>) -> Result {
         let previous_selection = last_selection;
         let previous_action = last_action;
         let mut starting = false;
+        let mut starting_mission = false;
+        let mut preloading = false;
+        let mut attempted_trick = None;
         let mut stepped = false;
         let mut delivering = false;
         let result = (|| -> Result {
@@ -133,110 +172,207 @@ fn run(c: &Context<'_>) -> Result {
                 message(c, 3, format_args!("Aerobatics: control timeout"))?;
                 return Err(Error::Invalid);
             }
-            if owned && active.is_none() {
-                release(c)?;
-                owned = false;
-            }
-            if params.trick_count == 0 {
-                return Ok(());
-            }
-            let action = retry(c, || {
-                c.rc_get_aux_cached(RcChannelAuxFunc(params.t(3)? as i32))
-            })?;
-            if last_action.is_none() && action.is_some() {
-                // No RC sample at boot/reload: adopt the first valid switch
-                // position, never interpret reception itself as execute.
-                last_action = action;
-            }
-            if action == Some(0) && active.is_some() {
-                count = active.take().unwrap().count;
-                last_selection = None;
-                release(c)?;
-                owned = false;
-                message(c, 1, format_args!("Trick aborted"))?;
-                return Ok(());
+            if let Some(o) = owner {
+                if active.is_none() {
+                    release(c, o)?;
+                    owner = None;
+                }
             }
             let mode = retry(c, || c.vehicle_get_mode())?;
-            // Mission and dual-aircraft support are not silently approximated.
-            if mode == 10 || params.a(34)? as u32 & 4 != 0 {
-                if active.take().is_some() {
-                    release(c)?;
-                    owned = false;
+            let mission_command = if mode == mission::AUTO {
+                retry(c, || c.vehicle_nav_script_time())?
+            } else {
+                None
+            };
+            // Never deliver an old task's rates into a different mission item
+            // or after a timeout/mode change has revoked its control.
+            let stale = match owner {
+                Some(Owner::Mission(id)) => mission_command.map(|m| m.0) != Some(id),
+                Some(Owner::Rc(old_mode)) => old_mode != mode,
+                None => false,
+            };
+            if stale {
+                if let Some(controller) = active.take() {
+                    count = controller.count;
                 }
+                if let Some(o) = owner {
+                    release(c, o)?;
+                    owner = None;
+                }
+            }
+            // Dual-aircraft time synchronization is not implemented.
+            if params.a(34)? as u32 & 4 != 0 {
+                if let Some(o) = owner {
+                    release(c, o)?;
+                    owner = None;
+                }
+                active = None;
                 return Ok(());
             }
-            if channel.is_none() {
-                channel = retry(c, || {
-                    c.rc_find_channel_for_option(RcChannelAuxFunc(params.t(2)? as i32))
-                })?;
-            }
-            let selection = match channel.as_ref() {
-                Some(ch) => {
-                    let norm = retry(c, || ch.norm_input_ignore_trim(c))?;
-                    let n = c.libm_floorf(
-                        params.t(4)? * math::constrain(0.5 * (norm + 1.0), 0.0, 0.999) + 1.0,
-                    )? as usize;
-                    if n > 0 && n <= params.trick_count {
-                        n
-                    } else {
-                        0
-                    }
-                }
-                None => 0,
-            };
-            if active.is_none()
-                && selection > 0
-                && ((action == Some(1) && last_selection != Some(selection))
-                    || action != last_action)
-            {
-                starting = true;
-                last_selection = Some(selection);
-                last_action = action;
-                let id = params.t(5 * selection)? as i32;
-                let p = retry(c, || params.configuration())?;
-                p.validate()?;
-                if loaded.as_ref().map(|l| l.id) != Some(id) {
-                    // Keep only one composed schedule within the module heap.
-                    loaded = None;
-                    match load(c, id, p, observation(c)?, params.a(22)?) {
-                        Ok(l) => loaded = Some(l),
-                        Err(Error::Stopped) => return Err(Error::Stopped),
-                        Err(Error::Busy) => return Err(Error::Busy),
-                        Err(error) => {
-                            message(c, 3, format_args!("Trick {id} load: {:?}", error))?;
+            if mode == mission::AUTO {
+                if let Some((id, command, arg1, arg2, arg3, arg4)) = mission_command {
+                    if last_mission_id != Some(id) {
+                        let args = [arg1, arg2, arg3 as f32, arg4 as f32];
+                        let p = retry(c, || params.configuration())?;
+                        p.validate()?;
+                        let input = observation(c)?;
+                        // As in Lua, attempt each item once. Only contention
+                        // retries below undo this marker, not missing files.
+                        last_mission_id = Some(id);
+                        starting_mission = true;
+                        attempted_trick = Some(command as i32);
+                        if loaded.as_ref().map(|l| (l.id, l.args)) != Some((command as i32, args)) {
+                            loaded = None;
+                            loaded = Some(load(c, command as i32, args, p, input, params.a(22)?)?);
+                        }
+                        let course = math::deg(c.libm_atan2f(input.velocity.y, input.velocity.x)?);
+                        let yaw = mission::heading(c, params.a(33)?, course)?;
+                        let task = loaded.as_mut().unwrap();
+                        let controller =
+                            Controller::start(c, &mut task.path, observation(c)?, p, yaw, count)?;
+                        // Loading/heading lookup may outlast a mission timeout.
+                        if retry(c, || c.vehicle_get_mode())? != mission::AUTO
+                            || retry(c, || c.vehicle_nav_script_time())?.map(|m| m.0) != Some(id)
+                        {
+                            message(c, 4, format_args!("Trick {command} skipped: item expired"))?;
                             return Ok(());
                         }
+                        owner = Some(Owner::Mission(id));
+                        last_command = c.time_us();
+                        active = Some(controller);
+                        message(c, 6, format_args!("Starting {}!", task.name))?;
                     }
+                } else {
+                    // Lua preloads the immediately following script item. This
+                    // keeps SD reads/path construction outside the 1s watchdog.
+                    let index = retry(c, || c.mission_get_current_nav_index())?;
+                    if last_preload != Some(index) {
+                        last_preload = Some(index);
+                        preloading = true;
+                        if let Some(next) = index.checked_add(1) {
+                            if let Some(item) = retry(c, || c.mission_get_item(next))? {
+                                if item.command == mission::NAV_SCRIPT_TIME {
+                                    attempted_trick = Some(item.param1 as i32);
+                                    let p = retry(c, || params.configuration())?;
+                                    let args =
+                                        [item.param3, item.param4, item.x as f32, item.y as f32];
+                                    loaded = None;
+                                    loaded = Some(load(
+                                        c,
+                                        item.param1 as i32,
+                                        args,
+                                        p,
+                                        observation(c)?,
+                                        params.a(22)?,
+                                    )?);
+                                }
+                            }
+                        }
+                    }
+                    return Ok(());
                 }
-                let task = loaded.as_mut().unwrap();
-                if action == Some(1) {
-                    message(
-                        c,
-                        6,
-                        format_args!("Trick {selection} selected ({})", task.name),
-                    )?;
-                } else if action == Some(2) {
-                    let input = observation(c)?;
-                    let yaw = math::wrap_180(
-                        c,
-                        math::deg(c.libm_atan2f(input.velocity.y, input.velocity.x)?),
-                    )?;
-                    // Construct/validate before enabling control of the vehicle.
-                    let controller = Controller::start(c, &mut task.path, input, p, yaw, count)?;
-                    if !retry(c, || c.vehicle_nav_scripting_enable(mode))? {
-                        message(c, 1, format_args!("Tricks not available in mode"))?;
+            } else {
+                if params.trick_count == 0 {
+                    return Ok(());
+                }
+                let action = retry(c, || {
+                    c.rc_get_aux_cached(RcChannelAuxFunc(params.t(3)? as i32))
+                })?;
+                if last_action.is_none() && action.is_some() {
+                    // No RC sample at boot/reload: adopt the first valid switch
+                    // position, never interpret reception itself as execute.
+                    last_action = action;
+                }
+                if action == Some(0) && active.is_some() {
+                    count = active.take().unwrap().count;
+                    last_selection = None;
+                    if let Some(o) = owner {
+                        release(c, o)?;
+                        owner = None;
+                    }
+                    message(c, 1, format_args!("Trick aborted"))?;
+                    return Ok(());
+                }
+                if channel.is_none() {
+                    channel = retry(c, || {
+                        c.rc_find_channel_for_option(RcChannelAuxFunc(params.t(2)? as i32))
+                    })?;
+                }
+                let selection = match channel.as_ref() {
+                    Some(ch) => {
+                        let norm = retry(c, || ch.norm_input_ignore_trim(c))?;
+                        let n = c.libm_floorf(
+                            params.t(4)? * math::constrain(0.5 * (norm + 1.0), 0.0, 0.999) + 1.0,
+                        )? as usize;
+                        if n > 0 && n <= params.trick_count {
+                            n
+                        } else {
+                            0
+                        }
+                    }
+                    None => 0,
+                };
+                if active.is_none()
+                    && selection > 0
+                    && ((action == Some(1) && last_selection != Some(selection))
+                        || action != last_action)
+                {
+                    starting = true;
+                    last_selection = Some(selection);
+                    last_action = action;
+                    let id = params.t(5 * selection)? as i32;
+                    let args = [
+                        params.t(5 * selection + 1)?,
+                        params.t(5 * selection + 2)?,
+                        params.t(5 * selection + 3)?,
+                        params.t(5 * selection + 4)?,
+                    ];
+                    let p = retry(c, || params.configuration())?;
+                    p.validate()?;
+                    if loaded.as_ref().map(|l| (l.id, l.args)) != Some((id, args)) {
+                        // Keep only one composed schedule within the module heap.
+                        loaded = None;
+                        match load(c, id, args, p, observation(c)?, params.a(22)?) {
+                            Ok(l) => loaded = Some(l),
+                            Err(Error::Stopped) => return Err(Error::Stopped),
+                            Err(Error::Busy) => return Err(Error::Busy),
+                            Err(error) => {
+                                message(c, 3, format_args!("Trick {id} load: {:?}", error))?;
+                                return Ok(());
+                            }
+                        }
+                    }
+                    let task = loaded.as_mut().unwrap();
+                    if action == Some(1) {
+                        message(
+                            c,
+                            6,
+                            format_args!("Trick {selection} selected ({})", task.name),
+                        )?;
+                    } else if action == Some(2) {
+                        let input = observation(c)?;
+                        let yaw = math::wrap_180(
+                            c,
+                            math::deg(c.libm_atan2f(input.velocity.y, input.velocity.x)?),
+                        )?;
+                        // Construct/validate before enabling control of the vehicle.
+                        let controller =
+                            Controller::start(c, &mut task.path, input, p, yaw, count)?;
+                        if !retry(c, || c.vehicle_nav_scripting_enable(mode))? {
+                            message(c, 1, format_args!("Tricks not available in mode"))?;
+                            return Ok(());
+                        }
+                        owner = Some(Owner::Rc(mode));
+                        last_command = c.time_us();
+                        message(
+                            c,
+                            6,
+                            format_args!("Trick {selection} started ({})", task.name),
+                        )?;
+                        last_selection = None;
+                        active = Some(controller);
                         return Ok(());
                     }
-                    owned = true;
-                    last_command = c.time_us();
-                    message(
-                        c,
-                        6,
-                        format_args!("Trick {selection} started ({})", task.name),
-                    )?;
-                    last_selection = None;
-                    active = Some(controller);
-                    return Ok(());
                 }
             }
             if let Some(controller) = active.as_mut() {
@@ -273,6 +409,22 @@ fn run(c: &Context<'_>) -> Result {
                     delivering = !finish;
                     #[cfg(ap_rust_aerobatics_faults)]
                     faults.check(c, params.t(9)? as u8, true, finish)?;
+                    // Recheck after the controller and its observation reads.
+                    // An expired item must not receive another task's command.
+                    let valid = match owner {
+                        Some(Owner::Mission(id)) => {
+                            retry(c, || c.vehicle_get_mode())? == mission::AUTO
+                                && retry(c, || c.vehicle_nav_script_time())?.map(|m| m.0)
+                                    == Some(id)
+                        }
+                        Some(Owner::Rc(mode)) => retry(c, || c.vehicle_get_mode())? == mode,
+                        None => false,
+                    };
+                    if !valid {
+                        active = None;
+                        owner = None;
+                        return Ok(());
+                    }
                     retry(c, || {
                         c.vehicle_set_target_throttle_rate_rpy(
                             o.throttle, o.rates.x, o.rates.y, o.rates.z,
@@ -316,8 +468,10 @@ fn run(c: &Context<'_>) -> Result {
                     );
                 }
                 if finish {
-                    release(c)?;
-                    owned = false;
+                    if let Some(o) = owner {
+                        release(c, o)?;
+                        owner = None;
+                    }
                     message(c, 6, format_args!("Finishing {}!", task.name))?;
                     active = None;
                 }
@@ -325,7 +479,15 @@ fn run(c: &Context<'_>) -> Result {
             Ok(())
         })();
         if let Err(error) = result {
-            if starting && matches!(error, Error::Busy | Error::Unavailable) && !owned {
+            if error == Error::Busy {
+                if starting_mission && owner.is_none() {
+                    last_mission_id = None;
+                }
+                if preloading {
+                    last_preload = None;
+                }
+            }
+            if starting && matches!(error, Error::Busy | Error::Unavailable) && owner.is_none() {
                 last_selection = previous_selection;
                 last_action = previous_action;
             }
@@ -338,8 +500,10 @@ fn run(c: &Context<'_>) -> Result {
             if let Some(controller) = active.take() {
                 count = controller.count;
             }
-            if owned && release(c).is_ok() {
-                owned = false;
+            if let Some(o) = owner {
+                if release(c, o).is_ok() {
+                    owner = None;
+                }
             }
             if error == Error::Stopped {
                 // The host rejects bindings after stop. Plane's existing
@@ -347,7 +511,13 @@ fn run(c: &Context<'_>) -> Result {
                 return Err(error);
             }
             let now = c.time_us();
-            if now.saturating_sub(last_error) > 1000000 {
+            if let Some(id) = attempted_trick {
+                message(
+                    c,
+                    3,
+                    format_args!("Aerobatics error: trick {id}: {:?}", error),
+                )?;
+            } else if now.saturating_sub(last_error) > 1000000 {
                 last_error = now;
                 message(c, 3, format_args!("Aerobatics error {:?}", error))?;
             }

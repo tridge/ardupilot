@@ -28,6 +28,24 @@ pub enum Command {
 }
 
 impl Command {
+    // IDs and display names from Lua's command_table. Other built-ins are
+    // not yet ported; loadable numeric schedules continue to use file IDs.
+    pub fn builtin(id: i32) -> Option<(Self, &'static str)> {
+        Some(match id {
+            2 => (Self::Loop, "Loop"),
+            7 => (Self::StraightRoll, "Axial Roll"),
+            8 => (Self::RollingCircle, "Rolling Circle"),
+            9 => (Self::HalfCuban, "Half Cuban Eight"),
+            10 => (Self::HalfReverseCuban, "Half Reverse Cuban Eight"),
+            12 => (Self::HumptyBump, "Humpty Bump"),
+            14 => (Self::ScaleFigureEight, "Scale Figure Eight"),
+            15 => (Self::Immelmann, "Immelmann Turn"),
+            16 => (Self::SplitS, "Split-S"),
+            26 => (Self::BarrelRoll, "Barrel Roll"),
+            _ => return None,
+        })
+    }
+
     pub fn named(name: &str) -> Option<Self> {
         Some(match name {
             "loop" => Self::Loop,
