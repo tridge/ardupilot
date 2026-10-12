@@ -29,8 +29,8 @@ experimental SITL/Renode target until reviewed and tested on real hardware.
 ## Evidence from this tree
 
 - `AP_Scripting` starts one HAL thread and gives Lua a `MultiHeap` arena.
-  Heap expansion can exceed `SCR_HEAP_SIZE`; the Rust limit should default to
-  a strict bound by passing `allow_expansion=false` to MultiHeap::create.
+  Heap expansion can exceed `SCR_HEAP_SIZE`; Rust follows the same armed-only
+  expansion policy, with a 20 KiB system reserve and a debug option to disable it.
 - `MultiHeap` has ChibiOS and malloc-backed implementations. It does not
   supply Rust's arbitrary alignment contract or a shared-thread lock. Its
   host backend requires all allocations freed before destroying a heap.
@@ -248,8 +248,10 @@ metadata. Enable explicitly for SITL, Linux and H743 tests first, then F4/F7;
 all production boards default off. SDK and generated bindings follow the
 repository's GPLv3-or-later licensing.
 
-All module dynamic allocation uses MultiHeap with expansion disabled. Serialize
-heap operations and use value initialization. Executable memory needs a HAL
+All module dynamic allocation uses MultiHeap with Lua-style expansion. Retry a
+failed allocation once to bypass the first-failure GC opportunity, which Rust
+does not use. Serialize heap operations and use value initialization.
+Executable memory needs a HAL
 allocation/publication API: executable-capable RAM on STM32; dedicated pages
 with write-then-execute permissions on Linux/SITL. Do not mprotect arbitrary
 malloc pages shared with unrelated allocations. Prefer an allocator-aware

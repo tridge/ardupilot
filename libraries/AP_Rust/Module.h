@@ -19,9 +19,13 @@ class Module
 public:
     CLASS_NO_COPY(Module);
     struct Limits {
+        Limits(uint32_t heap_size = 0, uint32_t code_size = 0, uint32_t stack_size = 0,
+               bool allow_expansion = true) :
+            heap(heap_size), code(code_size), stack(stack_size), allow_heap_expansion(allow_expansion) {}
         uint32_t heap;
         uint32_t code;
         uint32_t stack;
+        bool allow_heap_expansion;
     };
     enum class Error : uint8_t {
         None, Limits, Target, Image, Memory, Publication, Imports,
@@ -47,7 +51,7 @@ public:
     };
     struct Stats {
         Heap::Stats heap;
-        uint32_t heap_limit;
+        uint32_t heap_initial;
         uint32_t image_reserved;
         uint32_t stack_reserved;
         uint32_t thread_reserved;

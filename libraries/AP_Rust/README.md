@@ -59,7 +59,10 @@ manifest uses ABI 1, profile 2, stack 4096 and fingerprint
 
 Heap usage includes allocation headers and alignment slack, but excludes
 MultiHeap's backing-heap overhead. Heap creation is limited to 256 bytes
-through 16 MiB with expansion disabled. Deallocation validates ownership
+through 16 MiB initially. Like Lua, heaps may expand while armed, retaining
+20 KiB of free system memory; `RUST_DEBUG_OPTS` bit 6 disables expansion.
+The allocator retries a failed allocation once because MultiHeap's first-failure
+GC opportunity is not applicable to Rust. Deallocation validates ownership
 by walking a list, so its cost is linear in the live allocation count.
 The module owner joins the worker before destroying its heap. Allocation and
 deallocation stay available during cooperative stop, including from destructors.
@@ -585,8 +588,9 @@ SD-card targets, or `./rust` on SITL/Linux. Loading is filename-sorted and
 validates all images before starting any workers. `RUST_MAX_MOD` bounds the
 file count; extra files cause an error instead of being ignored.
 
-`RUST_HEAP_SIZE`, `RUST_CODE_SIZE` and `RUST_STACK_SIZE` set separate
-per-module limits at boot. RAM messages report individual reservations and
+`RUST_HEAP_SIZE` sets the initial per-module heap size at boot; `RUST_CODE_SIZE`
+and `RUST_STACK_SIZE` set separate per-module limits. RAM messages report the
+initial heap size, any expanded capacity, individual reservations and
 heap usage, not a complete physical-memory total: backing-allocator overhead,
 manager storage and temporary file buffers are additional. These defaults
 are experimental, not a recommendation for every board.
@@ -604,8 +608,20 @@ Pre-arm checks use the same SYSTEM-check and bypass paths as Lua. Normal
 return and an empty directory are not failures. Optional `RUST_LD_CSUM` and
 `RUST_RUN_CSUM` are masked XORs of loaded/running file CRC32 values, with -1
 disabling each requirement. `RUST_DEBUG_OPTS` bit 4 bypasses Rust pre-arm
-checks; bit 5 saves both checksums and clears itself in storage. Errors do not
-automatically disarm an already armed vehicle.
+checks; bit 5 saves both checksums and clears itself in storage. Bit 6 disables
+heap expansion for modules loaded on the next restart. Expansion uses the same
+MultiHeap armed-only policy and 20 KiB system reserve as Lua (including the
+build-time always-expand override). It emits a warning with the module name
+and required heap size and fails subsequent pre-arm checks until module reload
+or reboot, without stopping the running module or disarming the vehicle.
+Expanded capacity remains usable after disarm; reload reclaims it.
+The reported size includes rounded backing-heap capacity, not an exact minimum
+requirement. Reload clears the warning but keeps the boot-time initial size;
+after increasing `RUST_HEAP_SIZE`, reboot to apply the larger initial heap.
+`Tools/rust_modules/test_heap_expansion.py` covers armed/disarmed allocation,
+the disable option, expansion warnings, pre-arm checks, worker exit and reload.
+The `RustHeap` example, exercised by `Tools/rust_modules/test_threads.py`, checks
+the ChibiOS allocator and memory reclamation over 100 cycles on H743 in Renode.
 
 `Tools/rust_modules/test_runtime.py` exercises the manager in a real SITL
 Plane process. Its restart-memory test checks anonymous mapping reservations;
@@ -642,7 +658,7 @@ cover backend overhead and margin. These declarations are not stack proofs.
 
 `Module::load` validates compatibility and limits, relocates and publishes the
 image, and releases its reference to the caller's input bytes before returning.
-`start` creates the bounded heap and one scripting-priority worker. Prepare
+`start` creates the initial heap and one scripting-priority worker. Prepare
 all images before starting workers so ordinary heaps/stacks do not consume
 scarce executable SRAM first. `request_stop` interrupts SDK
 sleeps. `release` refuses to delete a live worker. A normal return can be joined
@@ -650,8 +666,9 @@ and freed; panic retains the image, heap, context and stack until reboot.
 All manager-side methods must have one owner. The firmware text sink runs on
 the worker, must be thread-safe, and must outlive the module.
 
-Limits apply separately to the heap capacity, page-rounded image and reserved
-stack. Known thread/guard and image-handle overhead, object metadata and heap
+Limits apply separately to the page-rounded image and reserved stack; the heap
+can grow beyond its initial capacity unless expansion is disabled. Known
+thread/guard and image-handle overhead, object metadata and heap
 used/peak are reported separately. These are not complete physical RAM totals:
 Unused backing-heap capacity, MultiHeap descriptors, backing-heap bookkeeping
 and opaque OS overhead still need separate accounting. ChibiOS's default-heap

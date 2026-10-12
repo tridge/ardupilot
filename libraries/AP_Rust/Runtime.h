@@ -37,6 +37,7 @@ private:
         Module *module;
         bool running;
         bool panic_reported;
+        uint32_t heap_expansion_reported;
     };
     struct Message {
         uint8_t severity;
@@ -81,6 +82,7 @@ private:
     bool _restart_pending{};
     uint32_t _loaded_checksum{};
     uint32_t _running_checksum{};
+    uint32_t _heap_required{};
     char _error[80] {};
     Message _messages[8] {};
     uint8_t _message_head{};

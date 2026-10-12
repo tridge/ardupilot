@@ -31,8 +31,8 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
     AP_GROUPINFO_FLAGS("ENABLE", 1, Runtime, _enable, 0, AP_PARAM_FLAG_ENABLE),
 
     // @Param: HEAP_SIZE
-    // @DisplayName: Rust module heap limit
-    // @Description: Maximum allocation arena size per module, without heap expansion. Excludes code, stack and allocator metadata.
+    // @DisplayName: Rust module initial heap size
+    // @Description: Initial allocation arena size per module. May expand while armed unless DEBUG_OPTS bit 6 is set, retaining 20 KiB of system memory. Excludes code, stack and allocator metadata.
     // @Units: B
     // @Range: 256 16777216
     // @RebootRequired: True
@@ -90,8 +90,8 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
 
     // @Param: DEBUG_OPTS
     // @DisplayName: Rust module debug options
-    // @Description: Disable Rust pre-arm checks or save current loaded and running checksums. The save bit clears after storing both values.
-    // @Bitmask: 4:Disable pre-arm checks,5:Save checksums
+    // @Description: Disable Rust pre-arm checks, save current loaded and running checksums, or disable heap expansion. The save bit clears after storing both values. Changes to the heap expansion option take effect on module restart.
+    // @Bitmask: 4:Disable pre-arm checks,5:Save checksums,6:Disable heap expansion
     // @User: Advanced
     AP_GROUPINFO("DEBUG_OPTS", 9, Runtime, _debug_options, 0),
     AP_GROUPEND
@@ -217,6 +217,10 @@ bool Runtime::arming_checks(size_t length, char *message) const
         hal.util->snprintf(message, length, "Rust: %s", _error);
         return false;
     }
+    if (_heap_required != 0) {
+        hal.util->snprintf(message, length, "Rust: Required RUST_HEAP_SIZE over %u", unsigned(_heap_required));
+        return false;
+    }
     if (_loaded_required != -1 && (uint32_t(_loaded_required.get()) & CHECKSUM_MASK) != (_loaded_checksum & CHECKSUM_MASK)) {
         hal.util->snprintf(message, length, "Rust: loaded checksum mismatch");
         return false;
@@ -293,8 +297,10 @@ bool Runtime::load_generation()
         WITH_SEMAPHORE(_sem);
         _phase = Phase::Loading;
         _error[0] = '\0';
+        _heap_required = 0;
         _loaded_checksum = _running_checksum = 0;
     }
+    _limits.allow_heap_expansion = (uint8_t(_debug_options.get()) & (1U << 6)) == 0;
     char names[MAX_MODULES][64] {};
     uint8_t count = 0;
     auto &fs = AP::FS();
@@ -338,6 +344,7 @@ bool Runtime::load_generation()
     for (uint8_t i = 0; i < count; i++) {
         auto &slot = _slots[i];
         slot.panic_reported = slot.running = false;
+        slot.heap_expansion_reported = 0;
         slot.module = load_file(names[i], slot);
         if (slot.module == nullptr) {
             return false;
@@ -368,10 +375,13 @@ void Runtime::report_memory(Module &module)
     // Separate reservations/counters, not total RAM: backend heap overhead,
     // manager storage and temporary input buffers are not included here.
     const auto stats = module.stats();
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: image %u stack %u heap limit %u",
-                  unsigned(stats.image_reserved), unsigned(stats.stack_reserved), unsigned(stats.heap_limit));
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: image %u stack %u heap initial %u",
+                  unsigned(stats.image_reserved), unsigned(stats.stack_reserved), unsigned(stats.heap_initial));
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: heap used %u peak %u thread %u",
                   unsigned(stats.heap.used), unsigned(stats.heap.peak), unsigned(stats.thread_reserved));
+    if (stats.heap.expanded_to != 0) {
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: heap expanded to %u", unsigned(stats.heap.expanded_to));
+    }
 }
 
 void Runtime::poll_modules()
@@ -391,6 +401,18 @@ void Runtime::poll_modules()
             report_memory(*module);
         }
         const bool joined = module->poll_join();
+        // Sample after joining too: a worker can expand and return between
+        // manager polls. Its final requirement must survive heap destruction.
+        const uint32_t expanded_to = module->stats().heap.expanded_to;
+        if (expanded_to > slot.heap_expansion_reported) {
+            slot.heap_expansion_reported = expanded_to;
+            {
+                WITH_SEMAPHORE(_sem);
+                _heap_required = MAX(_heap_required, expanded_to);
+            }
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Rust: %.31s required RUST_HEAP_SIZE over %u",
+                          module->name(), unsigned(expanded_to));
+        }
         if (slot.running && (joined || state == Module::State::Returned || state == Module::State::Panicked)) {
             slot.running = false;
             WITH_SEMAPHORE(_sem);

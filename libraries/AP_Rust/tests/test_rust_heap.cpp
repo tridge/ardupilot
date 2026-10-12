@@ -2,10 +2,26 @@
 #include <AP_gtest.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Rust/Heap.h>
+#include <AP_Scripting/AP_Scripting_config.h>
 
 const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 
 #if AP_SCRIPTING_RUST_ENABLED
+class ArmedState
+{
+public:
+    explicit ArmedState(bool armed) : _previous(hal.util->get_soft_armed())
+    {
+        hal.util->set_soft_armed(armed);
+    }
+    ~ArmedState()
+    {
+        hal.util->set_soft_armed(_previous);
+    }
+private:
+    bool _previous;
+};
+
 TEST(RustHeap, AlignmentBoundsAndCleanup)
 {
     AP_Rust::Heap heap;
@@ -32,8 +48,9 @@ TEST(RustHeap, AlignmentBoundsAndCleanup)
 
 TEST(RustHeap, ExhaustionDoesNotExpand)
 {
+    ArmedState armed(true);
     AP_Rust::Heap heap;
-    ASSERT_TRUE(heap.create(4096));
+    ASSERT_TRUE(heap.create(4096, false));
     void *pointers[64] {};
     uint8_t count = 0;
     while (count < ARRAY_SIZE(pointers)) {
@@ -59,6 +76,46 @@ TEST(RustHeap, ExhaustionDoesNotExpand)
     void *pointer = heap.allocate(100, 16);
     ASSERT_NE(pointer, nullptr);
     // Destruction must reclaim an outstanding allocation on the host backend.
+}
+
+TEST(RustHeap, ExpandsOnFirstRustRequestOnlyWhenArmed)
+{
+#if AP_SCRIPTING_HEAP_EXPANSION_ALWAYS_ENABLED
+    GTEST_SKIP() << "Build explicitly permits expansion while disarmed";
+#endif
+    ArmedState armed(false);
+    AP_Rust::Heap heap;
+    ASSERT_TRUE(heap.create(4096));
+    EXPECT_EQ(heap.allocate(8192, 64), nullptr);
+    EXPECT_EQ(heap.stats().expanded_to, 0U);
+    // A successful allocation resets MultiHeap's first-failure/GC state.
+    auto *small = heap.allocate(16, 8);
+    ASSERT_NE(small, nullptr);
+    hal.util->set_soft_armed(true);
+    auto *large = heap.allocate(8192, 64);
+    ASSERT_NE(large, nullptr);
+    EXPECT_EQ(reinterpret_cast<uintptr_t>(large) % 64, 0U);
+    EXPECT_GT(heap.stats().expanded_to, 4096U);
+    EXPECT_EQ(heap.stats().allocations, 2U);
+    // Expanded capacity stays usable after disarming, but cannot grow further.
+    hal.util->set_soft_armed(false);
+    EXPECT_EQ(heap.allocate(65536, 8), nullptr);
+    ASSERT_TRUE(heap.deallocate(large));
+    ASSERT_NE(heap.allocate(8192, 64), nullptr);
+    heap.clear();
+    EXPECT_EQ(heap.stats().used, 0U);
+    EXPECT_GT(heap.stats().expanded_to, 4096U);
+}
+
+TEST(RustHeap, ExpansionPreservesSystemReserve)
+{
+    ArmedState armed(true);
+    AP_Rust::Heap heap;
+    ASSERT_TRUE(heap.create(4096));
+    // Available memory itself is too large a request once the reserve and
+    // backing allocator overhead are considered, even after the retry.
+    EXPECT_EQ(heap.allocate(hal.util->available_memory(), 8), nullptr);
+    EXPECT_EQ(heap.stats().expanded_to, 0U);
 }
 #else
 TEST(RustHeap, RequiresEnabledBuild)

@@ -99,7 +99,7 @@ bool Module::start()
     // ordinary heaps until here keeps them out of scarce executable SRAM while
     // those images are being reserved. A failed thread start can reuse its heap.
     if (!_heap_ready) {
-        if (!_heap.create(_limits.heap)) {
+        if (!_heap.create(_limits.heap, _limits.allow_heap_expansion)) {
             return false;
         }
         _heap_ready = true;

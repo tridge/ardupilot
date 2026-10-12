@@ -35,7 +35,9 @@ Set `RUST_ENABLE=1`, `RUST_HEAP_SIZE=32768`, `RUST_CODE_SIZE=131072` and
 `RUST_STACK_SIZE=32768` for the supplied H743 schedule, then reboot. Prefer a
 48 KiB heap (`49152`) for x86-64 experiments or edited schedules: the measured
 x86-64 peak leaves only about 1.5 KiB in a 32 KiB arena. The tests deliberately
-retain the smaller cap to check this specific schedule, not arbitrary edits.
+retain the smaller initial heap to check this specific schedule, not arbitrary edits.
+`RUST_DEBUG_OPTS` bit 6 disables Lua-style emergency expansion while armed;
+without it, an undersized heap can expand and produce a warning/pre-arm error.
 After the module registers its parameters,
 set `TRIK_ENABLE=1` and change `RUST_RESTART` to reload. Set `TRIK1_ID=72`,
 `RC7_OPTION=300` (action) and `RC9_OPTION=301` (selection). Channel 9 low selects
