@@ -24,10 +24,13 @@ executable allocation. The code is AI-assisted and reviewed with Claude.
 
 `AP_SCRIPTING_ENABLED` enables shared scripting facilities when either
 `AP_SCRIPTING_LUA_ENABLED` or `AP_SCRIPTING_RUST_ENABLED` is enabled. Lua
-keeps its existing board defaults; Rust defaults off. Select the runtimes
+keeps its existing board defaults; Rust defaults on when
+`HAL_PROGRAM_SIZE_LIMIT_KB > 2048` (including SITL). Exactly-2 MiB boards
+still require explicit enablement. Select the runtimes
 independently with `--enable-lua-scripting` / `--disable-lua-scripting` and
 `--enable-rust-scripting` / `--disable-rust-scripting`. The older
 `--enable-scripting` / `--disable-scripting` options remain Lua aliases.
+To disable both runtimes, use `--disable-lua-scripting --disable-rust-scripting`.
 For a Rust-only SITL vehicle build:
 
 ```sh
@@ -46,8 +49,8 @@ build/sitl/tests/test_rust_heap
 AP_RUST_TEST_MODULE=/path/to/packed/x86-64/probe.apmod build/sitl/tests/test_rust_image
 ```
 
-Without the extra hwdef the tests explicitly skip, because AP_SCRIPTING_RUST_ENABLED
-defaults to zero. Without AP_RUST_TEST_MODULE, only the test executing a
+The extra hwdef enables Rust on smaller targets and enables the legacy-format
+loader probes. Without AP_RUST_TEST_MODULE, only the test executing a
 compiler-built module skips; the synthetic image tests still run.
 Set `AP_RUST_TEST_RUNTIME_MODULE` to a version-2 copy of the same probe to
 also test execution through the strict compatibility parser. Its test-only
