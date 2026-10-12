@@ -1,0 +1,40 @@
+# Numeric counterpart of AP_Scripting/applets/Aerobatics/FixedWing/Schedules/AirShow.txt
+# triangular_loop and crossbox_tophat are compiled into the module.
+# Changing custom function code requires a rebuild; numeric commands remain editable.
+name: SuperAirShow
+
+message: Loop
+loop 25 0 1
+align_box 1
+message: HalfReverseCubanEight
+half_reverse_cuban_eight 25
+align_center
+message: ScaleFigureEight
+scale_figure_eight -40 -45
+align_box 1
+message: Immelmann
+immelmann_turn 30
+align_center
+message: Roll
+straight_roll 80 2
+align_box 1
+message: Split-S
+split_s 30
+align_center
+message: RollingCircle
+rolling_circle -75 1
+align_box 1
+message: HumptyBump
+humpty_bump 20 60
+align_box 1
+message: HalfCubanEight
+half_cuban_eight 25
+align_center
+message: BarrelRoll
+barrel_roll 30 100 2
+align_box 1
+message: CrossBoxTopHat
+crossbox_tophat 20 60 60
+align_center
+message: TriangularLoop
+triangular_loop 20 60
