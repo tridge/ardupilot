@@ -5732,6 +5732,9 @@ class TestSuite(abc.ABC):
         '''
         if wp.get_type() == 'MISSION_ITEM_INT':
             return wp
+        # NAV_SCRIPT_TIME carries integer script arguments, not lat/lon, in
+        # these fields. Scaling them truncates the arguments on the vehicle.
+        coordinate_scale = 1 if wp.command == mavutil.mavlink.MAV_CMD_NAV_SCRIPT_TIME else 1.0e7
         wp_int = mavutil.mavlink.MAVLink_mission_item_int_message(
             wp.target_system,
             wp.target_component,
@@ -5744,8 +5747,8 @@ class TestSuite(abc.ABC):
             wp.param2,
             wp.param3,
             wp.param4,
-            int(wp.x*1.0e7),
-            int(wp.y*1.0e7),
+            int(wp.x*coordinate_scale),
+            int(wp.y*coordinate_scale),
             wp.z,
             mission_type,
         )
