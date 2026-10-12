@@ -42,6 +42,9 @@
 #include <AP_Terrain/AP_Terrain.h>
 #include <AP_ADSB/AP_ADSB.h>
 #include <AP_Scripting/AP_Scripting.h>
+#if AP_SCRIPTING_RUST_ENABLED
+#include <AP_Rust/Runtime.h>
+#endif
 #include <AP_Camera/AP_RunCam.h>
 #include <AP_GyroFFT/AP_GyroFFT.h>
 #include <AP_VisualOdom/AP_VisualOdom.h>
@@ -1190,9 +1193,16 @@ bool AP_Arming::system_checks(bool report)
             return false;
         }
 #endif
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_LUA_ENABLED
         const AP_Scripting *scripting = AP_Scripting::get_singleton();
         if ((scripting != nullptr) && !scripting->arming_checks(sizeof(buffer), buffer)) {
+            check_failed(Check::SYSTEM, report, "%s", buffer);
+            return false;
+        }
+#endif
+#if AP_SCRIPTING_RUST_ENABLED
+        const auto *rust = AP_Rust::Runtime::get_singleton();
+        if (rust != nullptr && !rust->arming_checks(sizeof(buffer), buffer)) {
             check_failed(Check::SYSTEM, report, "%s", buffer);
             return false;
         }
