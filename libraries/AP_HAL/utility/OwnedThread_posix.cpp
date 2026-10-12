@@ -4,9 +4,26 @@
 #if HAL_OWNED_THREADS_ENABLED && (CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_LINUX)
 #include <sys/mman.h>
 #include <unistd.h>
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#include <AP_Common/ExpandingString.h>
+#include <AP_HAL/Semaphores.h>
+static HAL_Semaphore thread_info_sem;
+OwnedThreadPosix *OwnedThreadPosix::_info_threads;
+#endif
 
 OwnedThreadPosix::~OwnedThreadPosix()
 {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    // Exclude snapshots before unmapping a joined worker's stack. Failed
+    // creations were never registered and simply fall through this search.
+    WITH_SEMAPHORE(thread_info_sem);
+    for (OwnedThreadPosix **p = &_info_threads; *p != nullptr; p = &(*p)->_info_next) {
+        if (*p == this) {
+            *p = _info_next;
+            break;
+        }
+    }
+#endif
     if (_mapping != nullptr) {
         munmap(_mapping, _mapping_size);
     }
@@ -41,6 +58,13 @@ AP_HAL::Scheduler::OwnedThread *OwnedThreadPosix::create(AP_HAL::MemberProc proc
         delete thread;
         return nullptr;
     }
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    thread->_stack = stack;
+    // SITL diagnostics need a high-water mark; painting commits these pages.
+    memset(stack, stackfill, stack_size);
+    strncpy(thread->_name, name == nullptr ? "unnamed" : name, sizeof(thread->_name) - 1);
+    thread->_priority = priority;
+#endif
     pthread_attr_t attr;
     if (pthread_attr_init(&attr) != 0) {
         delete thread;
@@ -64,8 +88,32 @@ AP_HAL::Scheduler::OwnedThread *OwnedThreadPosix::create(AP_HAL::MemberProc proc
         pthread_setname_np(thread->_thread, name);
     }
 #endif
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    {
+        WITH_SEMAPHORE(thread_info_sem);
+        thread->_info_next = _info_threads;
+        _info_threads = thread;
+    }
+#endif
     return thread;
 }
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+void OwnedThreadPosix::thread_info(ExpandingString &str)
+{
+    WITH_SEMAPHORE(thread_info_sem);
+    for (auto *p = _info_threads; p != nullptr; p = p->_info_next) {
+        const volatile uint8_t *stack = static_cast<const uint8_t *>(p->_stack);
+        uint32_t free = 0;
+        while (free < p->_stack_size && stack[free] == stackfill) {
+            free++;
+        }
+        str.printf("%-13.13s PRI=%3d sp=0x%llx STACK=%u/%u%s\n", p->_name, p->_priority,
+                   (unsigned long long)uintptr_t(p->_stack), unsigned(free), unsigned(p->_stack_size),
+                   p->_finished.load(std::memory_order_acquire) ? " EXITED" : "");
+    }
+}
+#endif
 
 void *OwnedThreadPosix::trampoline(void *context)
 {

@@ -8,6 +8,10 @@ const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 #include <AP_HAL/utility/OwnedThread_posix.h>
 #include <atomic>
 #include <unistd.h>
+#include <AP_Common/ExpandingString.h>
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#include <thread>
+#endif
 
 class OwnedThreadTask
 {
@@ -49,6 +53,7 @@ public:
         if (pthread_getattr_np(pthread_self(), &attr) == 0) {
             if (pthread_attr_getstack(&attr, &stack, &size) == 0) {
                 actual_stack_size = size;
+                actual_stack_address = uintptr_t(stack);
             }
             pthread_attr_destroy(&attr);
         }
@@ -63,6 +68,7 @@ public:
     std::atomic<bool> release{false};
     std::atomic<bool> entered{false};
     uint32_t actual_stack_size = 0;
+    uintptr_t actual_stack_address = 0;
     uint32_t result = 0;
 };
 
@@ -122,6 +128,64 @@ TEST(OwnedThread, RejectInvalidRequests)
     task.release.store(true);
     EXPECT_TRUE(task.reap());
 }
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+TEST(OwnedThread, SnapshotTracksOwnedThreadLifetime)
+{
+    OwnedThreadTask task;
+    ASSERT_TRUE(task.start(65537));
+    for (unsigned i = 0; i < 1000 && !task.entered.load(); i++) {
+        usleep(1000);
+    }
+    ASSERT_TRUE(task.entered.load());
+    ExpandingString running;
+    OwnedThreadPosix::thread_info(running);
+    ASSERT_NE(running.get_string(), nullptr);
+    const char *line = strstr(running.get_string(), "owned-test");
+    ASSERT_NE(line, nullptr);
+    uint32_t free, total;
+    unsigned long long address;
+    ASSERT_EQ(sscanf(line, "%*s PRI=%*d sp=%llx STACK=%u/%u", &address, &free, &total), 3);
+    EXPECT_EQ(address, task.actual_stack_address);
+    EXPECT_EQ(total, task.thread->stack_size());
+    EXPECT_GT(free, 0U);
+    EXPECT_LT(free, total);
+    task.release.store(true);
+    ASSERT_TRUE(task.reap());
+    ExpandingString reaped;
+    OwnedThreadPosix::thread_info(reaped);
+    EXPECT_TRUE(reaped.get_string() == nullptr || strstr(reaped.get_string(), "owned-test") == nullptr);
+}
+
+TEST(OwnedThread, SnapshotsDuringCreationAndReaping)
+{
+    std::atomic<bool> stop{false};
+    std::atomic<uint32_t> snapshots{0};
+    std::thread reader([&]() {
+        while (!stop.load()) {
+            ExpandingString snapshot;
+            OwnedThreadPosix::thread_info(snapshot);
+            snapshots.fetch_add(1);
+            usleep(100);
+        }
+    });
+    for (unsigned i = 0; i < 1000 && snapshots.load() == 0; i++) {
+        usleep(1000);
+    }
+    // Join the reader before any fatal test assertion can return.
+    for (unsigned i = 0; i < 100; i++) {
+        OwnedThreadTask task;
+        if (!task.start()) {
+            ADD_FAILURE() << "Could not create worker";
+            break;
+        }
+        task.release.store(true);
+        EXPECT_TRUE(task.reap());
+    }
+    stop.store(true);
+    reader.join();
+    EXPECT_GT(snapshots.load(), 0U);
+}
+#endif
 #else
 TEST(OwnedThread, RequiresEnabledPosixBuild)
 {

@@ -7,6 +7,8 @@
 #include <atomic>
 #include <pthread.h>
 
+class ExpandingString;
+
 // Shared POSIX backend for the Linux and SITL schedulers.
 class OwnedThreadPosix final : public AP_HAL::Scheduler::OwnedThread
 {
@@ -21,6 +23,9 @@ public:
     {
         return _mapping_size + sizeof(*this);
     }
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    static void thread_info(ExpandingString &str);
+#endif
 
 private:
     explicit OwnedThreadPosix(AP_HAL::MemberProc proc) : _proc(proc) {}
@@ -34,5 +39,13 @@ private:
     void *_mapping = nullptr;
     uint32_t _mapping_size = 0;
     uint32_t _stack_size = 0;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    OwnedThreadPosix *_info_next = nullptr;
+    static OwnedThreadPosix *_info_threads;
+    void *_stack = nullptr;
+    char _name[32] {};
+    int _priority = 0;
+    static constexpr uint8_t stackfill = 0xEB;
+#endif
 };
 #endif
