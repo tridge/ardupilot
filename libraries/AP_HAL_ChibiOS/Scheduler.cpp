@@ -750,6 +750,78 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
     return true;
 }
 
+#if HAL_OWNED_THREADS_ENABLED
+namespace {
+class OwnedThreadChibiOS final : public AP_HAL::Scheduler::OwnedThread {
+public:
+    explicit OwnedThreadChibiOS(AP_HAL::MemberProc proc, uint32_t size) : _proc(proc), _stack_size(size) {}
+    ~OwnedThreadChibiOS() override = default;
+
+    bool start(const char *name, tprio_t priority)
+    {
+        // Owned stacks need no instruction fetches. Prefer fast RAM (including
+        // F405 CCM) before consuming SRAM needed for loadable native images.
+        // The existing allocator can already place stacks in these heaps as a
+        // fallback, so this does not add a DMA-capability guarantee for stacks.
+        memory_heap_t *heaps;
+        const memory_region *regions;
+        const uint8_t count = malloc_get_heaps(&heaps, &regions);
+        for (uint8_t i = 1; i < count; i++) {
+            if ((regions[i].flags & MEM_REGION_FLAG_FAST) == 0) {
+                continue;
+            }
+            _thread = chThdCreateFromHeap(&heaps[i], THD_WORKING_AREA_SIZE(_stack_size), name, priority, trampoline, this);
+            if (_thread != nullptr) {
+                return true;
+            }
+        }
+        _thread = thread_create_alloc(THD_WORKING_AREA_SIZE(_stack_size), name, priority, trampoline, this);
+        return _thread != nullptr;
+    }
+    uint32_t stack_size() const override { return _stack_size; }
+    uint32_t allocation_size() const override { return THD_WORKING_AREA_SIZE(_stack_size) + sizeof(*this); }
+
+private:
+    static void trampoline(void *context)
+    {
+        static_cast<OwnedThreadChibiOS *>(context)->_proc();
+    }
+    bool join_if_finished() override
+    {
+        chSysLock();
+        const bool finished = chThdTerminatedX(_thread);
+        chSysUnlock();
+        if (!finished) {
+            return false;
+        }
+        // chThdWait releases our dynamic thread reference and working area.
+        // Never chThdRelease again after this call.
+        chThdWait(_thread);
+        _thread = nullptr;
+        return true;
+    }
+    AP_HAL::MemberProc _proc;
+    uint32_t _stack_size;
+    thread_t *_thread = nullptr;
+};
+}
+
+AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
+                                                             uint32_t stack_size, priority_base base, int8_t priority)
+{
+    if (!proc || stack_size == 0 || stack_size > 16U * 1024 * 1024) {
+        return nullptr;
+    }
+    stack_size = MEM_ALIGN_NEXT(stack_size, PORT_WORKING_AREA_ALIGN);
+    auto *thread = NEW_NOTHROW OwnedThreadChibiOS(proc, stack_size);
+    if (thread != nullptr && !thread->start(name, calculate_thread_priority(base, priority))) {
+        delete thread;
+        return nullptr;
+    }
+    return thread;
+}
+#endif
+
 /*
   inform the scheduler that we are calling an operation from the
   main thread that may take an extended amount of time. This can

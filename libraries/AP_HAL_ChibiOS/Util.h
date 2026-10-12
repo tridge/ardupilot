@@ -49,6 +49,11 @@ public:
     void *malloc_type(size_t size, AP_HAL::Util::Memory_Type mem_type) override;
     void free_type(void *ptr, size_t size, AP_HAL::Util::Memory_Type mem_type) override;
 
+#if HAL_EXECUTABLE_MEMORY_ENABLED
+    AP_HAL::ExecutableMemory::Target executable_memory_target() const override;
+    AP_HAL::ExecutableMemory *allocate_executable(uint32_t size) override;
+#endif
+
     /*
       return state of safety switch, if applicable
      */
