@@ -72,8 +72,12 @@
 #include <Filter/AP_Filter.h>
 #include <AP_Stats/AP_Stats.h>              // statistics library
 #include <AP_DDS/AP_DDS_config.h>
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_LUA_ENABLED
 #include <AP_Scripting/AP_Scripting.h>
+#endif
+#include <AP_Rust/AP_Rust_config.h>
+#if AP_SCRIPTING_RUST_ENABLED
+#include <AP_Rust/Runtime.h>
 #endif
 
 #include <AP_Gripper/AP_Gripper_config.h>
@@ -506,8 +510,12 @@ protected:
     AP_TemperatureSensor temperature_sensor;
 #endif
 
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_LUA_ENABLED
     AP_Scripting scripting;
+#endif
+
+#if AP_SCRIPTING_RUST_ENABLED
+    AP_Rust::Runtime rust_modules;
 #endif
 
 #if AP_RPM_ENABLED
