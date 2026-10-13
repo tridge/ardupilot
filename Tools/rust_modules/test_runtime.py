@@ -13,6 +13,7 @@ import pytest
 from pymavlink import mavutil
 
 import build
+import pack
 
 ROOT = Path(__file__).resolve().parents[2]
 SYSTEM_CHECK = 1 << 13
@@ -245,6 +246,35 @@ def test_byte_granular_stack_size(tmp_path, launch, monkeypatch, stack_size):
     vehicle.arm(False)
     vehicle.restart(1)
     vehicle.text('Rust: exited odd.apmod')
+
+
+@pytest.mark.parametrize('budget', ['negative', 'too_small', 'round_up', 'generous'])
+def test_rounded_code_size(launch, images, budget):
+    data = images['cooperative']
+    image_size = pack.unpack(data)['memory_size']
+    previous_page = ((image_size - 1) // 4096) * 4096
+    assert 4096 <= previous_page < image_size - 1
+    requested = {'negative': -1, 'too_small': previous_page,
+                 'round_up': previous_page + 1, 'generous': 131071}[budget]
+    vehicle = launch({'code.apmod': data}, SCR_ENABLE=0, RUST_CODE_SIZE=requested)
+    if budget in ('negative', 'too_small'):
+        vehicle.text('invalid memory limits' if budget == 'negative' else 'code.apmod load failed (3)')
+        vehicle.arm(accepted=False)
+        return
+    vehicle.text('ready')
+    # The parameter stays as entered; rounding affects the effective budget,
+    # not how much image memory is actually allocated.
+    assert vehicle.parameter('RUST_CODE_SIZE') == requested
+    page = os.sysconf('SC_PAGESIZE')
+    reserved = ((image_size + page - 1) // page) * page
+    vehicle.text('Rust RAM: image ')
+    report = next(t for t in vehicle.texts if t.startswith('Rust RAM: image '))
+    reported = int(report.split()[3])
+    # The RAM report includes the executable-memory handle as well as pages.
+    assert reserved <= reported < reserved + page, report
+    vehicle.arm()
+    vehicle.arm(False)
+    vehicle.restart(1)
 
 
 def test_normal_exit_checksums_and_arming_bypasses(launch, images):
