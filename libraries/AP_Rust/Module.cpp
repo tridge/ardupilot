@@ -16,13 +16,22 @@ const AP_RustHostApi Module::_api {
     allocate, deallocate, time_us, sleep_ms, stop_requested, text, panic, binding_call
 };
 
+uint32_t Module::rounded_code_size(uint32_t requested)
+{
+    if (requested < 4096 || requested > 16U * 1024 * 1024) {
+        return 0;
+    }
+    return (requested + 4095U) & ~4095U;
+}
+
 Module *Module::load(const uint8_t *source, size_t length, const char *name,
                      const Limits &limits, TextSink sink, Error &error, BindingSink bindings, uint64_t *missing_import)
 {
     constexpr uint32_t maximum = 16U * 1024 * 1024;
+    const uint32_t code_size = rounded_code_size(limits.code);
     error = Error::Limits;
     if (name == nullptr || name[0] == '\0' || limits.heap < 256 || limits.heap > maximum ||
-        limits.code < 4096 || limits.code > maximum || limits.code % 4096 != 0 ||
+        code_size == 0 ||
         limits.stack < 4096 || limits.stack > maximum) {
         return nullptr;
     }
@@ -53,7 +62,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     expected.stack_limit = limits.stack - margin;
     Image image;
     error = Error::Image;
-    if (!image.parse(source, length, limits.code, expected)) {
+    if (!image.parse(source, length, code_size, expected)) {
         return nullptr;
     }
     error = Error::Imports;

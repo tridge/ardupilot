@@ -169,8 +169,8 @@ bool RuntimeHarness::exercise()
         hal.scheduler->delay(100);
     }
     rust_runtime_test_result = 2;
-    // An odd byte count exercises HAL stack rounding, not loader alignment.
-    if (!set("ENABLE", 1) || !set("HEAP_SIZE", 4096) || !set("CODE_SIZE", 65536) || !set("STACK_SIZE", 16385)) {
+    // Odd byte counts exercise image-budget and HAL stack rounding.
+    if (!set("ENABLE", 1) || !set("HEAP_SIZE", 4096) || !set("CODE_SIZE", 65535) || !set("STACK_SIZE", 16385)) {
         return false;
     }
     runtime.init();

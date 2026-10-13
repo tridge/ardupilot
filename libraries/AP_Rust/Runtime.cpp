@@ -41,10 +41,9 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
 
     // @Param: CODE_SIZE
     // @DisplayName: Rust module image limit
-    // @Description: Per-module code and data image limit, in multiples of 4096 bytes. Alignment and allocator overhead are additional.
+    // @Description: Per-module code and data image limit in bytes, rounded up to a multiple of 4096. Only the loaded image is allocated, not this entire limit. Alignment and allocator overhead are additional.
     // @Units: B
     // @Range: 4096 16777216
-    // @Increment: 4096
     // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO("CODE_SIZE", 3, Runtime, _code_size, 131072),
@@ -130,8 +129,9 @@ void Runtime::init()
         return;
     }
     constexpr int32_t maximum = 16 * 1024 * 1024;
-    if (_heap_size < 256 || _heap_size > maximum || _code_size < 4096 || _code_size > maximum ||
-        _code_size.get() % 4096 != 0 || _stack_size < 8192 || _stack_size > maximum ||
+    const uint32_t code_size = Module::rounded_code_size(uint32_t(_code_size.get()));
+    if (_heap_size < 256 || _heap_size > maximum || code_size == 0 ||
+        _stack_size < 8192 || _stack_size > maximum ||
         _max_modules < 1 || _max_modules > MAX_MODULES) {
         fail("invalid memory limits; reboot required");
         return;
@@ -152,7 +152,7 @@ void Runtime::init()
         fail("unsupported native execution target");
         return;
     }
-    _limits = {uint32_t(_heap_size.get()), uint32_t(_code_size.get()), uint32_t(_stack_size.get())};
+    _limits = {uint32_t(_heap_size.get()), code_size, uint32_t(_stack_size.get())};
     _capacity = _max_modules.get();
     {
         WITH_SEMAPHORE(_sem);

@@ -58,6 +58,9 @@ public:
         uint32_t metadata;
     };
 
+    // Zero means outside the supported range; otherwise round up safely.
+    static uint32_t rounded_code_size(uint32_t requested);
+
     // Source may be released on return. Scratch is owned/accounted by caller.
     static Module *load(const uint8_t *source, size_t length, const char *name,
                         const Limits &limits, TextSink sink, Error &error, BindingSink bindings = {},

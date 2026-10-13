@@ -5,6 +5,21 @@
 
 const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 
+#if AP_SCRIPTING_RUST_ENABLED && HAL_OWNED_THREADS_ENABLED && HAL_EXECUTABLE_MEMORY_ENABLED
+TEST(RustModuleLimits, RoundCodeBudget)
+{
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(0), 0U);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(4095), 0U);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(4096), 4096U);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(4097), 8192U);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(131071), 131072U);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(16U * 1024 * 1024 - 1), 16U * 1024 * 1024);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(16U * 1024 * 1024), 16U * 1024 * 1024);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(16U * 1024 * 1024 + 1), 0U);
+    EXPECT_EQ(AP_Rust::Module::rounded_code_size(UINT32_MAX), 0U);
+}
+#endif
+
 // Native Linux uses the actual scheduler clock. SITL without a simulated
 // vehicle advances its synthetic clock instead of sleeping; use vehicle tests
 // there for sleep latency and panic parking rather than a misleading unit test.
@@ -160,7 +175,8 @@ TEST_F(RustModule, ValidateBeforeAllocation)
         EXPECT_TRUE(Module::release(module));
     };
     reject({0, 131072, 65536}, Module::Error::Limits);
-    reject({32768, 131071, 65536}, Module::Error::Limits);
+    reject({32768, 4095, 65536}, Module::Error::Limits);
+    reject({32768, UINT32_MAX, 65536}, Module::Error::Limits);
     reject({32768, 131072, 16384}, Module::Error::Limits);
     reject({32768, 131072, 20480}, Module::Error::Image); // declared 8192 plus host margin
     bytes.back() ^= 1;

@@ -594,6 +594,9 @@ initial heap size, any expanded capacity, individual reservations and
 heap usage, not a complete physical-memory total: backing-allocator overhead,
 manager storage and temporary file buffers are additional. These defaults
 are experimental, not a recommendation for every board.
+`RUST_CODE_SIZE` accepts byte counts within its existing range and rounds the
+budget up to a 4096-byte boundary. Only the actual image is allocated, not the
+whole budget; images larger than the rounded budget are still rejected.
 Stack sizes need not be aligned: the HAL rounds requests up to its minimum and
 alignment, and RAM messages report the actual reserved stack size. Module stack
 requirements plus the host callback margin must still fit the requested size.
