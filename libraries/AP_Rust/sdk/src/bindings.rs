@@ -801,7 +801,7 @@ impl Context<'_> {
         Ok(value0)
     }
 
-    /// `AP_AHRS::get_variances` from bindings.desc.
+    /// `AP_AHRS::get_variances_for_configured_backend` from bindings.desc.
     /// Lock contention returns Error::Busy; sleep before retrying.
     pub fn ahrs_get_variances(&self) -> Result<Option<(f32, f32, f32, Vector3f, f32)>> {
         let input = [0u8; 0];

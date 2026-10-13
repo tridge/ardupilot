@@ -31,6 +31,15 @@ The image is CPU-profile specific. Put `airshow.apmod` in `APM/rust/` on SD
 `APM/scripts/trick72.txt` (`scripts/trick72.txt` in SITL). Do not substitute the
 original executable-Lua schedule, which the numeric parser rejects.
 
+Schedule numbers are finite decimal tokens, at most 255 bytes each. Conversion
+uses the firmware's allocation-free `ap_strtof()` through a hashed binding,
+rather than embedding Rust's decimal parser and lookup tables in every module.
+Whole-token validation rejects trailing junk, hexadecimal and non-finite values.
+The firmware parser retains up to 19 significant decimal digits; rounding very
+near halfway values can differ from Rust's parser. With Rust 1.90.0 and the
+standard Thumb size-optimised build, this change reduced the AirShow module from
+91,820 to 75,228 bytes (stack and heap are separate runtime allocations).
+
 Set `RUST_ENABLE=1`, `RUST_HEAP_SIZE=32768`, `RUST_CODE_SIZE=131072` and
 `RUST_STACK_SIZE=32768` for the supplied H743 schedule, then reboot. Prefer a
 48 KiB heap (`49152`) for x86-64 experiments or edited schedules: the measured

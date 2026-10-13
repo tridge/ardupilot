@@ -1162,7 +1162,7 @@
     },
     {
       "owner": "AP_AHRS",
-      "method": "get_variances",
+      "method": "get_variances_for_configured_backend",
       "rust_name": "ahrs_get_variances",
       "api_name": "ahrs.get_variances",
       "api_aliases": [],
@@ -10479,5 +10479,20 @@
     ],
     "result": "void",
     "policy": "v1:lua-dynamic-logger,no-scheduler-lock,host-TimeUS-u64,all-f32-bits,firmware-owned-copied-metadata,persistent-until-reboot,shared-message-id-pool,checked-payload-and-labels-and-units,post-lookup-format-match,SITL-conflict-config-error,best-effort-record-no-durability-guarantee"
+  },
+  "strtof": {
+    "id": 432,
+    "name": "string.strtof",
+    "arguments": [
+      {
+        "type": "nul-free-bytes-max255-zero-pad256",
+        "direction": "in"
+      }
+    ],
+    "result": {
+      "value": "f32-le",
+      "consumed": "u16-le"
+    },
+    "policy": "v1:ap_strtof,no-allocation,no-scheduler-lock,ascii-c-number-prefix,no-conversion-is-zero-consumed,allow-nonfinite,ignore-errno,19-significant-decimal-digits,rounding-not-guaranteed-at-halfway"
   }
 }

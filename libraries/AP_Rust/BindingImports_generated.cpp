@@ -341,6 +341,7 @@ uint32_t binding_resolve(void *, uint64_t hash)
         {UINT64_C(0xc25a1743a0518b07), 108U},
         {UINT64_C(0xc28fc4ddddf876fb), 252U},
         {UINT64_C(0xc398d1dda49fbecd), 262U},
+        {UINT64_C(0xc418a70a43dab34e), 432U},
         {UINT64_C(0xc515027a078abed1), 298U},
         {UINT64_C(0xc53206a59c619490), 292U},
         {UINT64_C(0xc678694813c2db51), 301U},

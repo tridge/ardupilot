@@ -14392,5 +14392,25 @@
       "result": "void",
       "policy": "v1:lua-dynamic-logger,no-scheduler-lock,host-TimeUS-u64,all-f32-bits,firmware-owned-copied-metadata,persistent-until-reboot,shared-message-id-pool,checked-payload-and-labels-and-units,post-lookup-format-match,SITL-conflict-config-error,best-effort-record-no-durability-guarantee"
     }
+  },
+  {
+    "id": 432,
+    "hash": "c418a70a43dab34e",
+    "contract": {
+      "name": "string.strtof",
+      "revision": 1,
+      "encoding": "AP_Rust.bindings.v1:little-endian,IEEE754-f32,bool-u8,optional-presence-u8,exact-lengths",
+      "arguments": [
+        {
+          "type": "nul-free-bytes-max255-zero-pad256",
+          "direction": "in"
+        }
+      ],
+      "result": {
+        "value": "f32-le",
+        "consumed": "u16-le"
+      },
+      "policy": "v1:ap_strtof,no-allocation,no-scheduler-lock,ascii-c-number-prefix,no-conversion-is-zero-consumed,allow-nonfinite,ignore-errno,19-significant-decimal-digits,rounding-not-guaranteed-at-halfway"
+    }
   }
 ]

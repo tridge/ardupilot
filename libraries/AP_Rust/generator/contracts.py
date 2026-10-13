@@ -126,6 +126,8 @@ def describe(spec):
     add(method, method['name'], method['arguments'], method['result'], method['policy'])
     method = spec['log']
     add(method, method['name'], method['arguments'], method['result'], method['policy'])
+    method = spec['strtof']
+    add(method, method['name'], method['arguments'], method['result'], method['policy'])
     hashes = set()
     names = set()
     for entry in entries:

@@ -17,6 +17,7 @@ mod file;
 mod log;
 mod imports;
 mod libm;
+mod strtof;
 mod math;
 mod memory;
 mod parameter;
@@ -60,6 +61,8 @@ mod log_tests;
 mod math_tests;
 #[cfg(test)]
 mod libm_tests;
+#[cfg(test)]
+mod strtof_tests;
 #[cfg(test)]
 mod parameter_tests;
 #[cfg(test)]

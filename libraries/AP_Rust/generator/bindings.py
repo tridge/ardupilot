@@ -18,6 +18,7 @@ import math_binding
 import value_binding
 import parameter_binding
 import singleton_binding
+import strtof_binding
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -183,6 +184,7 @@ def select(ir, selection, only=None):
     libm = libm_binding.specification(max(m['id'] for o in math['types'] for m in o['methods']) + 1)
     file = file_binding.specification(max(m['id'] for m in libm) + 1)
     log = log_binding.specification(file['id'] + 1)
+    strtof = strtof_binding.specification(log['id'] + 1)
     for owner in sorted(ir['userdata'], key=lambda o: o['name']):
         if only is None and owner['name'] in value_binding.TYPES:
             continue
@@ -217,7 +219,7 @@ def select(ir, selection, only=None):
                             'resource registrations requiring ownership are explicitly excluded.',
                   summary=dict(Counter(c['kind'] + ':' + c['status'] for c in coverage)), entries=coverage)
     return dict(encoding=ENCODING, lock_timeout_ms=LOCK_TIMEOUT_MS, methods=methods, headers=headers,
-                parameter=parameter, math=math, libm=libm, file=file, log=log, coverage=report)
+                parameter=parameter, math=math, libm=libm, file=file, log=log, strtof=strtof, coverage=report)
 
 
 def specification():
@@ -230,7 +232,7 @@ def emit(contract):
            '#include "BindingSupport.h"', '#include "HostApi.h"', '#include "BindingParam.h"',
            '#include "BindingFile.h"', '#include "BindingLog.h"',
            '#include <AP_Scripting/AP_Scripting_config.h>', '#include <AP_Vehicle/AP_Vehicle_Type.h>',
-           '#include <AP_Scheduler/AP_Scheduler.h>']
+           '#include <AP_Scheduler/AP_Scheduler.h>', '#include <AP_Common/strtod.h>']
     header_lines = []
     for header in contract['headers']:
         if header['depends']:
@@ -263,6 +265,7 @@ def emit(contract):
         if not method.get('receiver') and not method.get('value_receiver'):
             rust += singleton_binding.rust(method)
     cpp += libm_binding.cpp(contract['libm'])
+    cpp += strtof_binding.cpp(contract['strtof'])
     cpp += ['int32_t binding_dispatch(void *context, uint32_t id, const uint8_t *input, uint32_t input_size,',
             '                         uint8_t *output, uint32_t output_size)', '{', '    switch (id) {']
     for method in contract['methods']:
@@ -276,6 +279,8 @@ def emit(contract):
             '        return binding_file_read_at(input, input_size, output, output_size);']
     cpp += [f'    case {contract["log"]["id"]}:',
             '        return binding_log_write(input, input_size, output, output_size);']
+    cpp += [f'    case {contract["strtof"]["id"]}:',
+            f'        return binding_strtof_{contract["strtof"]["id"]}(input, input_size, output, output_size);']
     cpp += ['    default:', '        return binding_math_dispatch(id, input, input_size, output, output_size);',
             '    }', '}', '}', '#endif', '']
     rust += ['}', '']
@@ -285,6 +290,7 @@ def emit(contract):
                 [m for m in contract['methods'] if m.get('receiver')], notice, singleton_binding.rust),
             'sdk/src/values.rs': value_binding.rust(contract['methods'], notice, singleton_binding.rust),
             'sdk/src/libm.rs': libm_binding.rust(contract['libm'], notice),
+            'sdk/src/strtof.rs': strtof_binding.rust(contract['strtof'], notice),
             'sdk/src/file.rs': file_binding.rust(contract['file'], notice),
             'sdk/src/log.rs': log_binding.rust(contract['log'], notice),
             'BindingLog_generated.h': log_binding.header(notice),

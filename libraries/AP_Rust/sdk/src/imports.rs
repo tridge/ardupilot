@@ -1295,3 +1295,6 @@ pub(crate) static BINDING_430: Import = Import::new();
 
 #[link_section = ".ap_rust_import_aa75172d84b8eaad"]
 pub(crate) static BINDING_431: Import = Import::new();
+
+#[link_section = ".ap_rust_import_c418a70a43dab34e"]
+pub(crate) static BINDING_432: Import = Import::new();

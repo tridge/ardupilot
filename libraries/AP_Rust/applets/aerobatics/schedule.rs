@@ -31,9 +31,19 @@ fn copy_text(value: &str) -> Result<String> {
     Ok(s)
 }
 
-fn number(value: &str) -> Result<f32> {
-    let n: f32 = value.parse().map_err(|_| Error::Invalid)?;
-    if n.is_finite() {
+fn number(value: &str, convert: &impl Fn(&str) -> Result<(f32, usize)>) -> Result<f32> {
+    // Keep decimal-only, whole-token, finite schedule numbers. The firmware
+    // parser also accepts hexadecimal, whitespace and partial conversions.
+    if value.is_empty()
+        || value.len() > 255
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || matches!(b, b'+' | b'-' | b'.' | b'e' | b'E'))
+    {
+        return Err(Error::Invalid);
+    }
+    let (n, consumed) = convert(value)?;
+    if consumed == value.len() && n.is_finite() {
         Ok(n)
     } else {
         Err(Error::Invalid)
@@ -49,7 +59,7 @@ fn boolean(value: &str) -> Result<bool> {
 }
 
 impl Schedule {
-    pub fn parse(text: &str) -> Result<Self> {
+    fn parse(text: &str, convert: impl Fn(&str) -> Result<(f32, usize)>) -> Result<Self> {
         if text.len() > MAX_BYTES || text.as_bytes().contains(&0) {
             return Err(Error::Invalid);
         }
@@ -90,10 +100,10 @@ impl Schedule {
                         }
                         message = Some(copy_text(value)?);
                     }
-                    "roll_ref" => attributes.roll_ref = Some(number(value)?),
+                    "roll_ref" => attributes.roll_ref = Some(number(value, &convert)?),
                     "thr_boost" => attributes.thr_boost = Some(boolean(value)?),
-                    "pos_corr" => attributes.pos_corr = Some(number(value)?),
-                    "pos_gain_mul" => attributes.pos_gain_mul = Some(number(value)?),
+                    "pos_corr" => attributes.pos_corr = Some(number(value, &convert)?),
+                    "pos_gain_mul" => attributes.pos_gain_mul = Some(number(value, &convert)?),
                     "shift_xy" => attributes.shift_xy = Some(boolean(value)?),
                     // Timestamp synchronization/rate overrides need their
                     // own controller support; do not silently ignore them.
@@ -110,7 +120,7 @@ impl Schedule {
                 if i >= args.len() {
                     return Err(Error::Invalid);
                 }
-                args[i] = number(word)?;
+                args[i] = number(word, &convert)?;
             }
             if commands.len() == MAX_COMMANDS {
                 return Err(Error::Invalid);
@@ -150,7 +160,7 @@ impl Schedule {
             bytes.extend_from_slice(&chunk[..n]);
         }
         let text = core::str::from_utf8(&bytes).map_err(|_| Error::Invalid)?;
-        Ok(Some(Self::parse(text)?))
+        Ok(Some(Self::parse(text, |value| c.strtof(value))?))
     }
 
     pub fn build(&self, c: &Context<'_>, box_width: f32, eval: Evaluation) -> Result<Path> {
@@ -172,12 +182,51 @@ impl Schedule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Exercise the same prefix/end-offset contract as the firmware. The binding
+    // tests cover ap_strtof itself; these tests cover schedule validation.
+    fn convert(value: &str) -> Result<(f32, usize)> {
+        use std::ffi::{c_char, CString};
+        extern "C" {
+            fn strtof(text: *const c_char, end: *mut *mut c_char) -> f32;
+        }
+        let text = CString::new(value).map_err(|_| Error::Invalid)?;
+        let mut end = core::ptr::null_mut();
+        let n = unsafe { strtof(text.as_ptr(), &mut end) };
+        Ok((n, unsafe { end.offset_from(text.as_ptr()) } as usize))
+    }
+    fn parse(text: &str) -> Result<Schedule> {
+        Schedule::parse(text, convert)
+    }
+    #[test]
+    fn decimal_numbers() {
+        for (text, expected) in [
+            ("25", 25.0f32),
+            ("-.5", -0.5),
+            ("+1.25e2", 125.0),
+            ("1.", 1.0),
+            ("-0", -0.0),
+            ("1e-999", 0.0),
+        ] {
+            assert_eq!(
+                number(text, &convert).unwrap().to_bits(),
+                expected.to_bits()
+            );
+        }
+        for text in [
+            "", "+", ".", "1e", "1e+", "1.2.3", "1-2", "1e999", "NaN", "inf", "0x1p2", " 1", "1 ",
+            "1\0", "1_0", "١",
+        ] {
+            assert_eq!(number(text, &convert), Err(Error::Invalid), "{text}");
+        }
+        let long = "0".repeat(256);
+        assert_eq!(number(&long[..255], &convert), Ok(0.0));
+        assert_eq!(number(&long, &convert), Err(Error::Invalid));
+        assert_eq!(number("1", &|_| Err(Error::Stopped)), Err(Error::Stopped));
+    }
     #[test]
     fn numeric_schedule() {
-        let s = Schedule::parse(
-            "# hello\nname: Test\nmessage: Loop\nloop 25 0 1\nalign_box 1\nloop -20\n",
-        )
-        .unwrap();
+        let s = parse("# hello\nname: Test\nmessage: Loop\nloop 25 0 1\nalign_box 1\nloop -20\n")
+            .unwrap();
         assert_eq!(s.name, "Test");
         assert_eq!(s.commands.len(), 3);
         assert_eq!(s.commands[0].args, [25.0, 0.0, 1.0, 0.0]);
@@ -203,13 +252,13 @@ mod tests {
             "message: Loop #1\nloop 25",
             "loop 25 # trailing comment",
         ] {
-            assert!(Schedule::parse(text).is_err(), "{text}");
+            assert!(parse(text).is_err(), "{text}");
         }
     }
     #[test]
     fn text_bounds_and_whitespace() {
         assert_eq!(
-            Schedule::parse("name: Test\r\n\tloop\t25\t0\t1\r\n")
+            parse("name: Test\r\n\tloop\t25\t0\t1\r\n")
                 .unwrap()
                 .commands
                 .len(),
@@ -219,21 +268,21 @@ mod tests {
         while exact.len() < MAX_BYTES {
             exact.push('x');
         }
-        assert!(Schedule::parse(&exact).is_ok());
+        assert!(parse(&exact).is_ok());
         exact.push('x');
-        assert!(Schedule::parse(&exact).is_err());
+        assert!(parse(&exact).is_err());
         let mut commands = String::new();
         for _ in 0..MAX_COMMANDS {
             commands.push_str("loop 25\n");
         }
-        assert!(Schedule::parse(&commands).is_ok());
+        assert!(parse(&commands).is_ok());
         commands.push_str("loop 25\n");
-        assert!(Schedule::parse(&commands).is_err());
+        assert!(parse(&commands).is_err());
         let mut long_name = copy_text("name: ").unwrap();
         for _ in 0..49 {
             long_name.push('x');
         }
         long_name.push_str("\nloop 25");
-        assert!(Schedule::parse(&long_name).is_err());
+        assert!(parse(&long_name).is_err());
     }
 }

@@ -13,6 +13,7 @@ extern const AP_HAL::HAL &hal;
 #include <AP_Scripting/AP_Scripting_config.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 #include <AP_Scheduler/AP_Scheduler.h>
+#include <AP_Common/strtod.h>
 // Match the Lua generated header/source dependency passes.
 #if defined(OSD_ENABLED) && OSD_ENABLED && !defined(HAL_BUILD_AP_PERIPH)
 #include <AP_OSD/AP_OSD_Backend.h>
@@ -1926,7 +1927,7 @@ static __attribute__((noinline)) int32_t binding_55(const uint8_t *input, uint32
 #endif
 }
 
-// AP_AHRS::get_variances
+// AP_AHRS::get_variances_for_configured_backend
 static __attribute__((noinline)) int32_t binding_56(const uint8_t *input, uint32_t input_size,
                                                        uint8_t *output, uint32_t output_size)
 {
@@ -1949,7 +1950,7 @@ static __attribute__((noinline)) int32_t binding_56(const uint8_t *input, uint32
     if (!lock.taken()) {
         return AP_RUST_STATUS_BUSY;
     }
-    const auto value = ud->get_variances(arg0, arg1, arg2, arg3, arg4);
+    const auto value = ud->get_variances_for_configured_backend(arg0, arg1, arg2, arg3, arg4);
     output[0] = value ? 1 : 0;
     if (value) {
         BindingWire::write_float(output + 1, arg0);
@@ -11751,6 +11752,22 @@ static int32_t binding_libm_429(const uint8_t *input, uint32_t input_size,
     return AP_RUST_STATUS_OK;
 }
 
+static int32_t binding_strtof_432(const uint8_t *input, uint32_t input_size,
+                                    uint8_t *output, uint32_t output_size)
+{
+    if (input_size != 256 || output_size != 6 || input == nullptr || output == nullptr) {
+        return AP_RUST_STATUS_INVALID;
+    }
+    const char *text = BindingWire::read_cstring(input);
+    if (text == nullptr) {
+        return AP_RUST_STATUS_INVALID;
+    }
+    char *end;
+    const float value = ap_strtof(text, &end);
+    BindingWire::write_float(output, value);
+    BindingWire::write(output + 4, uint16_t(end - text), 2);
+    return AP_RUST_STATUS_OK;
+}
 int32_t binding_dispatch(void *context, uint32_t id, const uint8_t *input, uint32_t input_size,
                          uint8_t *output, uint32_t output_size)
 {
@@ -12668,6 +12685,8 @@ int32_t binding_dispatch(void *context, uint32_t id, const uint8_t *input, uint3
         return binding_file_read_at(input, input_size, output, output_size);
     case 431:
         return binding_log_write(input, input_size, output, output_size);
+    case 432:
+        return binding_strtof_432(input, input_size, output, output_size);
     default:
         return binding_math_dispatch(id, input, input_size, output, output_size);
     }

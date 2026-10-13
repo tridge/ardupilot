@@ -18,7 +18,7 @@
     {
       "owner": "AC_AttitudeControl",
       "name": "get_att_error_angle_deg",
-      "line": 859,
+      "line": 860,
       "kind": "singleton-method",
       "status": "generated",
       "api": "AC_AttitudeControl.get_att_error_angle_deg"
@@ -26,7 +26,7 @@
     {
       "owner": "AC_AttitudeControl",
       "name": "get_rpy_srate",
-      "line": 858,
+      "line": 859,
       "kind": "singleton-method",
       "status": "generated",
       "api": "AC_AttitudeControl.get_rpy_srate"
@@ -34,7 +34,7 @@
     {
       "owner": "AC_AttitudeControl_Multi_6DoF",
       "name": "set_forward_enable",
-      "line": 645,
+      "line": 646,
       "kind": "singleton-method",
       "status": "generated",
       "api": "attitude_control.set_forward_enable"
@@ -42,7 +42,7 @@
     {
       "owner": "AC_AttitudeControl_Multi_6DoF",
       "name": "set_lateral_enable",
-      "line": 644,
+      "line": 645,
       "kind": "singleton-method",
       "status": "generated",
       "api": "attitude_control.set_lateral_enable"
@@ -50,7 +50,7 @@
     {
       "owner": "AC_AttitudeControl_Multi_6DoF",
       "name": "set_offset_roll_pitch",
-      "line": 646,
+      "line": 647,
       "kind": "singleton-method",
       "status": "generated",
       "api": "attitude_control.set_offset_roll_pitch"
@@ -58,7 +58,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_breach_direction_NED",
-      "line": 1087,
+      "line": 1088,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_breach_direction_NED"
@@ -66,7 +66,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_breach_distance",
-      "line": 1086,
+      "line": 1087,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_breach_distance"
@@ -74,7 +74,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_breach_time",
-      "line": 1083,
+      "line": 1084,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_breach_time"
@@ -82,7 +82,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_breaches",
-      "line": 1082,
+      "line": 1083,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_breaches"
@@ -90,7 +90,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_enabled_fences",
-      "line": 1093,
+      "line": 1094,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_enabled_fences"
@@ -98,7 +98,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_margin_breach_time",
-      "line": 1085,
+      "line": 1086,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_margin_breach_time"
@@ -106,7 +106,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_margin_breaches",
-      "line": 1084,
+      "line": 1085,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_margin_breaches"
@@ -114,7 +114,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_safe_alt_max_m_and_frame",
-      "line": 1090,
+      "line": 1091,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_safe_alt_max"
@@ -122,7 +122,7 @@
     {
       "owner": "AC_Fence",
       "name": "get_safe_alt_min_m_and_frame",
-      "line": 1088,
+      "line": 1089,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.get_safe_alt_min"
@@ -130,7 +130,7 @@
     {
       "owner": "AC_Fence",
       "name": "present",
-      "line": 1092,
+      "line": 1093,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fence.present"
@@ -138,7 +138,7 @@
     {
       "owner": "AC_PosControl",
       "name": "get_accel_target",
-      "line": 867,
+      "line": 868,
       "kind": "singleton-method",
       "status": "generated",
       "api": "poscontrol.get_accel_target"
@@ -146,7 +146,7 @@
     {
       "owner": "AC_PosControl",
       "name": "get_posvelaccel_offset",
-      "line": 865,
+      "line": 866,
       "kind": "singleton-method",
       "status": "generated",
       "api": "poscontrol.get_posvelaccel_offset"
@@ -154,7 +154,7 @@
     {
       "owner": "AC_PosControl",
       "name": "get_vel_target",
-      "line": 866,
+      "line": 867,
       "kind": "singleton-method",
       "status": "generated",
       "api": "poscontrol.get_vel_target"
@@ -162,7 +162,7 @@
     {
       "owner": "AC_PosControl",
       "name": "set_posvelaccel_offset",
-      "line": 864,
+      "line": 865,
       "kind": "singleton-method",
       "status": "generated",
       "api": "poscontrol.set_posvelaccel_offset"
@@ -170,7 +170,7 @@
     {
       "owner": "AC_PrecLand",
       "name": "get_last_valid_target_ms",
-      "line": 852,
+      "line": 853,
       "kind": "singleton-method",
       "status": "generated",
       "api": "precland.get_last_valid_target_ms"
@@ -178,7 +178,7 @@
     {
       "owner": "AC_PrecLand",
       "name": "get_target_location",
-      "line": 854,
+      "line": 855,
       "kind": "singleton-method",
       "status": "generated",
       "api": "precland.get_target_location"
@@ -186,7 +186,7 @@
     {
       "owner": "AC_PrecLand",
       "name": "get_target_velocity",
-      "line": 853,
+      "line": 854,
       "kind": "singleton-method",
       "status": "generated",
       "api": "precland.get_target_velocity"
@@ -194,7 +194,7 @@
     {
       "owner": "AC_PrecLand",
       "name": "healthy",
-      "line": 850,
+      "line": 851,
       "kind": "singleton-method",
       "status": "generated",
       "api": "precland.healthy"
@@ -202,7 +202,7 @@
     {
       "owner": "AC_PrecLand",
       "name": "target_acquired",
-      "line": 851,
+      "line": 852,
       "kind": "singleton-method",
       "status": "generated",
       "api": "precland.target_acquired"
@@ -210,7 +210,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_desired_spool_state",
-      "line": 808,
+      "line": 809,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_desired_spool_state"
@@ -218,7 +218,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_forward",
-      "line": 817,
+      "line": 818,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_forward"
@@ -226,7 +226,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_interlock",
-      "line": 807,
+      "line": 808,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_interlock"
@@ -234,7 +234,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_lateral",
-      "line": 818,
+      "line": 819,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_lateral"
@@ -242,7 +242,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_pitch",
-      "line": 811,
+      "line": 812,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_pitch"
@@ -250,7 +250,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_pitch_ff",
-      "line": 812,
+      "line": 813,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_pitch_ff"
@@ -258,7 +258,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_roll",
-      "line": 809,
+      "line": 810,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_roll"
@@ -266,7 +266,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_roll_ff",
-      "line": 810,
+      "line": 811,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_roll_ff"
@@ -274,7 +274,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_spool_state",
-      "line": 819,
+      "line": 820,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_spool_state"
@@ -282,7 +282,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_throttle",
-      "line": 815,
+      "line": 816,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_throttle"
@@ -290,7 +290,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_throttle_in",
-      "line": 816,
+      "line": 817,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_throttle_in"
@@ -298,7 +298,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_yaw",
-      "line": 813,
+      "line": 814,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_yaw"
@@ -306,7 +306,7 @@
     {
       "owner": "AP::motors()",
       "name": "get_yaw_ff",
-      "line": 814,
+      "line": 815,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.get_yaw_ff"
@@ -314,7 +314,7 @@
     {
       "owner": "AP::motors()",
       "name": "set_external_limits",
-      "line": 820,
+      "line": 821,
       "kind": "singleton-method",
       "status": "generated",
       "api": "motors.set_external_limits"
@@ -322,7 +322,7 @@
     {
       "owner": "AP::motors()",
       "name": "set_frame_string",
-      "line": 806,
+      "line": 807,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "persistent-frame-string-initialization"
@@ -402,7 +402,7 @@
     {
       "owner": "AP_AHRS",
       "name": "get_origin",
-      "line": 78,
+      "line": 79,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.get_origin"
@@ -426,7 +426,7 @@
     {
       "owner": "AP_AHRS",
       "name": "get_posvelyaw_source_set",
-      "line": 81,
+      "line": 82,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.get_posvelyaw_source_set"
@@ -434,7 +434,7 @@
     {
       "owner": "AP_AHRS",
       "name": "get_quaternion",
-      "line": 82,
+      "line": 83,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.get_quaternion"
@@ -481,7 +481,7 @@
     },
     {
       "owner": "AP_AHRS",
-      "name": "get_variances",
+      "name": "get_variances_for_configured_backend",
       "line": 74,
       "kind": "singleton-method",
       "status": "generated",
@@ -490,7 +490,7 @@
     {
       "owner": "AP_AHRS",
       "name": "get_vel_innovations_and_variances_for_source",
-      "line": 76,
+      "line": 77,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.get_vel_innovations_and_variances_for_source"
@@ -546,7 +546,7 @@
     {
       "owner": "AP_AHRS",
       "name": "handle_external_position_estimate",
-      "line": 83,
+      "line": 84,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.handle_external_position_estimate"
@@ -578,7 +578,7 @@
     {
       "owner": "AP_AHRS",
       "name": "initialised",
-      "line": 80,
+      "line": 81,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.initialised"
@@ -586,7 +586,7 @@
     {
       "owner": "AP_AHRS",
       "name": "set_home",
-      "line": 77,
+      "line": 78,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.set_home"
@@ -594,7 +594,7 @@
     {
       "owner": "AP_AHRS",
       "name": "set_origin",
-      "line": 79,
+      "line": 80,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.set_origin"
@@ -602,7 +602,7 @@
     {
       "owner": "AP_AHRS",
       "name": "set_posvelyaw_source_set",
-      "line": 75,
+      "line": 76,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ahrs.set_posvelyaw_source_set"
@@ -639,7 +639,7 @@
     {
       "owner": "AP_Airspeed",
       "name": "get_backend",
-      "line": 306,
+      "line": 307,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Airspeed_Backend"
@@ -647,7 +647,7 @@
     {
       "owner": "AP_Arming",
       "name": "arm",
-      "line": 93,
+      "line": 94,
       "kind": "singleton-method",
       "status": "generated",
       "api": "arming.arm"
@@ -655,7 +655,7 @@
     {
       "owner": "AP_Arming",
       "name": "arm_force",
-      "line": 94,
+      "line": 95,
       "kind": "singleton-method",
       "status": "generated",
       "api": "arming.arm_force"
@@ -663,7 +663,7 @@
     {
       "owner": "AP_Arming",
       "name": "disarm",
-      "line": 90,
+      "line": 91,
       "kind": "singleton-method",
       "status": "generated",
       "api": "arming.disarm"
@@ -671,7 +671,7 @@
     {
       "owner": "AP_Arming",
       "name": "get_aux_auth_id",
-      "line": 95,
+      "line": 96,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "auxiliary-authorization-ownership"
@@ -679,7 +679,7 @@
     {
       "owner": "AP_Arming",
       "name": "is_armed",
-      "line": 91,
+      "line": 92,
       "kind": "singleton-method",
       "status": "generated",
       "api": "arming.is_armed"
@@ -687,7 +687,7 @@
     {
       "owner": "AP_Arming",
       "name": "pre_arm_checks",
-      "line": 92,
+      "line": 93,
       "kind": "singleton-method",
       "status": "generated",
       "api": "arming.pre_arm_checks"
@@ -695,7 +695,7 @@
     {
       "owner": "AP_Arming",
       "name": "set_aux_auth_failed",
-      "line": 97,
+      "line": 98,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "auxiliary-authorization-ownership"
@@ -703,7 +703,7 @@
     {
       "owner": "AP_Arming",
       "name": "set_aux_auth_passed",
-      "line": 96,
+      "line": 97,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "auxiliary-authorization-ownership"
@@ -711,7 +711,7 @@
     {
       "owner": "AP_Baro",
       "name": "get_altitude",
-      "line": 485,
+      "line": 486,
       "kind": "singleton-method",
       "status": "generated",
       "api": "baro.get_altitude"
@@ -719,7 +719,7 @@
     {
       "owner": "AP_Baro",
       "name": "get_altitude_difference",
-      "line": 487,
+      "line": 488,
       "kind": "singleton-method",
       "status": "generated",
       "api": "baro.get_altitude_difference"
@@ -727,7 +727,7 @@
     {
       "owner": "AP_Baro",
       "name": "get_external_temperature",
-      "line": 484,
+      "line": 485,
       "kind": "singleton-method",
       "status": "generated",
       "api": "baro.get_external_temperature"
@@ -735,7 +735,7 @@
     {
       "owner": "AP_Baro",
       "name": "get_pressure",
-      "line": 482,
+      "line": 483,
       "kind": "singleton-method",
       "status": "generated",
       "api": "baro.get_pressure"
@@ -743,7 +743,7 @@
     {
       "owner": "AP_Baro",
       "name": "get_temperature",
-      "line": 483,
+      "line": 484,
       "kind": "singleton-method",
       "status": "generated",
       "api": "baro.get_temperature"
@@ -751,7 +751,7 @@
     {
       "owner": "AP_Baro",
       "name": "healthy",
-      "line": 486,
+      "line": 487,
       "kind": "singleton-method",
       "status": "generated",
       "api": "baro.healthy"
@@ -759,7 +759,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "capacity_remaining_pct",
-      "line": 125,
+      "line": 126,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.capacity_remaining_pct"
@@ -767,7 +767,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "consumed_mah",
-      "line": 123,
+      "line": 124,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.consumed_mah"
@@ -775,7 +775,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "consumed_wh",
-      "line": 124,
+      "line": 125,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.consumed_wh"
@@ -783,7 +783,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "current_amps",
-      "line": 122,
+      "line": 123,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.current_amps"
@@ -791,7 +791,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "get_cell_voltage",
-      "line": 132,
+      "line": 133,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.get_cell_voltage"
@@ -799,7 +799,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "get_cycle_count",
-      "line": 130,
+      "line": 131,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.get_cycle_count"
@@ -807,7 +807,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "get_resistance",
-      "line": 120,
+      "line": 121,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.get_resistance"
@@ -815,7 +815,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "get_temperature",
-      "line": 129,
+      "line": 130,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.get_temperature"
@@ -823,7 +823,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "handle_scripting",
-      "line": 133,
+      "line": 134,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:BattMonitorScript_State"
@@ -831,7 +831,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "has_failsafed",
-      "line": 127,
+      "line": 128,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.has_failsafed"
@@ -839,7 +839,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "healthy",
-      "line": 118,
+      "line": 119,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.healthy"
@@ -847,7 +847,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "num_instances",
-      "line": 117,
+      "line": 118,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.num_instances"
@@ -855,7 +855,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "overpower_detected",
-      "line": 128,
+      "line": 129,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.overpower_detected"
@@ -863,7 +863,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "pack_capacity_mah",
-      "line": 126,
+      "line": 127,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.pack_capacity_mah"
@@ -871,7 +871,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "reset_remaining",
-      "line": 131,
+      "line": 132,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.reset_remaining"
@@ -879,7 +879,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "voltage",
-      "line": 119,
+      "line": 120,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.voltage"
@@ -887,7 +887,7 @@
     {
       "owner": "AP_BattMonitor",
       "name": "voltage_resting_estimate",
-      "line": 121,
+      "line": 122,
       "kind": "singleton-method",
       "status": "generated",
       "api": "battery.voltage_resting_estimate"
@@ -895,7 +895,7 @@
     {
       "owner": "AP_Button",
       "name": "get_button_state",
-      "line": 598,
+      "line": 599,
       "kind": "singleton-method",
       "status": "generated",
       "api": "button.get_button_state"
@@ -903,7 +903,7 @@
     {
       "owner": "AP_CRSF_Telem",
       "name": "pop_menu_event",
-      "line": 785,
+      "line": 786,
       "kind": "singleton-method",
       "status": "generated",
       "api": "crsf.pop_menu_event"
@@ -911,7 +911,7 @@
     {
       "owner": "AP_CRSF_Telem",
       "name": "send_response",
-      "line": 786,
+      "line": 787,
       "kind": "singleton-method",
       "status": "generated",
       "api": "crsf.send_response"
@@ -947,7 +947,7 @@
     {
       "owner": "AP_Camera",
       "name": "change_setting",
-      "line": 938,
+      "line": 939,
       "kind": "singleton-method",
       "status": "generated",
       "api": "camera.change_setting"
@@ -955,7 +955,7 @@
     {
       "owner": "AP_Camera",
       "name": "get_state",
-      "line": 937,
+      "line": 938,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Camera::camera_state_t"
@@ -963,7 +963,7 @@
     {
       "owner": "AP_Camera",
       "name": "record_video",
-      "line": 925,
+      "line": 926,
       "kind": "singleton-method",
       "status": "generated",
       "api": "camera.record_video"
@@ -971,7 +971,7 @@
     {
       "owner": "AP_Camera",
       "name": "set_camera_information",
-      "line": 939,
+      "line": 940,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:mavlink_camera_information_t"
@@ -979,7 +979,7 @@
     {
       "owner": "AP_Camera",
       "name": "set_stream_information",
-      "line": 941,
+      "line": 942,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:mavlink_video_stream_information_t"
@@ -987,7 +987,7 @@
     {
       "owner": "AP_Camera",
       "name": "set_trigger_distance",
-      "line": 926,
+      "line": 927,
       "kind": "singleton-method",
       "status": "generated",
       "api": "camera.set_trigger_distance"
@@ -995,7 +995,7 @@
     {
       "owner": "AP_Camera",
       "name": "take_picture",
-      "line": 924,
+      "line": 925,
       "kind": "singleton-method",
       "status": "generated",
       "api": "camera.take_picture"
@@ -1003,7 +1003,7 @@
     {
       "owner": "AP_EFI",
       "name": "get_backend",
-      "line": 1005,
+      "line": 1006,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_EFI_Backend"
@@ -1011,7 +1011,7 @@
     {
       "owner": "AP_EFI",
       "name": "get_last_update_ms",
-      "line": 1007,
+      "line": 1008,
       "kind": "singleton-method",
       "status": "generated",
       "api": "efi.get_last_update_ms"
@@ -1019,7 +1019,7 @@
     {
       "owner": "AP_EFI",
       "name": "get_state",
-      "line": 1006,
+      "line": 1007,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:EFI_State"
@@ -1027,7 +1027,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_consumption_mah",
-      "line": 515,
+      "line": 516,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_consumption_mah"
@@ -1035,7 +1035,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_current",
-      "line": 513,
+      "line": 514,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_current"
@@ -1043,7 +1043,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_last_telem_data_ms",
-      "line": 520,
+      "line": 521,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_last_telem_data_ms"
@@ -1051,7 +1051,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_motor_temperature",
-      "line": 512,
+      "line": 513,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_motor_temperature"
@@ -1059,7 +1059,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_rpm",
-      "line": 510,
+      "line": 511,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_rpm"
@@ -1067,7 +1067,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_temperature",
-      "line": 511,
+      "line": 512,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_temperature"
@@ -1075,7 +1075,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_usage_seconds",
-      "line": 516,
+      "line": 517,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_usage_seconds"
@@ -1083,7 +1083,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "get_voltage",
-      "line": 514,
+      "line": 515,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.get_voltage"
@@ -1091,7 +1091,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "set_rpm_scale",
-      "line": 519,
+      "line": 520,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.set_rpm_scale"
@@ -1099,7 +1099,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "update_rpm",
-      "line": 517,
+      "line": 518,
       "kind": "singleton-method",
       "status": "generated",
       "api": "esc_telem.update_rpm"
@@ -1107,7 +1107,7 @@
     {
       "owner": "AP_ESC_Telem",
       "name": "update_telem_data",
-      "line": 518,
+      "line": 519,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_ESC_Telem_Backend::TelemetryData"
@@ -1115,7 +1115,7 @@
     {
       "owner": "AP_Filesystem",
       "name": "crc32",
-      "line": 1119,
+      "line": 1120,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fs.crc32"
@@ -1123,7 +1123,7 @@
     {
       "owner": "AP_Filesystem",
       "name": "format",
-      "line": 1115,
+      "line": 1116,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "filesystem-format-lifecycle"
@@ -1131,7 +1131,7 @@
     {
       "owner": "AP_Filesystem",
       "name": "get_format_status",
-      "line": 1117,
+      "line": 1118,
       "kind": "singleton-method",
       "status": "generated",
       "api": "fs.get_format_status"
@@ -1139,7 +1139,7 @@
     {
       "owner": "AP_Filesystem",
       "name": "stat",
-      "line": 1114,
+      "line": 1115,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Filesystem::stat_t"
@@ -1147,7 +1147,7 @@
     {
       "owner": "AP_Follow",
       "name": "get_last_update_ms",
-      "line": 841,
+      "line": 842,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.get_last_update_ms"
@@ -1155,7 +1155,7 @@
     {
       "owner": "AP_Follow",
       "name": "get_target_dist_and_vel_NED_m",
-      "line": 845,
+      "line": 846,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.get_target_dist_and_vel_NED_m"
@@ -1163,7 +1163,7 @@
     {
       "owner": "AP_Follow",
       "name": "get_target_heading_deg",
-      "line": 844,
+      "line": 845,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.get_target_heading_deg"
@@ -1171,7 +1171,7 @@
     {
       "owner": "AP_Follow",
       "name": "get_target_location_and_velocity",
-      "line": 842,
+      "line": 843,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.get_target_location_and_velocity"
@@ -1179,7 +1179,7 @@
     {
       "owner": "AP_Follow",
       "name": "get_target_location_and_velocity_ofs",
-      "line": 843,
+      "line": 844,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.get_target_location_and_velocity_ofs"
@@ -1187,7 +1187,7 @@
     {
       "owner": "AP_Follow",
       "name": "get_target_sysid",
-      "line": 840,
+      "line": 841,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.get_target_sysid"
@@ -1195,7 +1195,7 @@
     {
       "owner": "AP_Follow",
       "name": "have_target",
-      "line": 839,
+      "line": 840,
       "kind": "singleton-method",
       "status": "generated",
       "api": "follow.have_target"
@@ -1203,7 +1203,7 @@
     {
       "owner": "AP_Frsky_SPort",
       "name": "prep_number",
-      "line": 639,
+      "line": 640,
       "kind": "singleton-method",
       "status": "generated",
       "api": "frsky_sport.prep_number"
@@ -1211,7 +1211,7 @@
     {
       "owner": "AP_Frsky_SPort",
       "name": "sport_telemetry_push",
-      "line": 638,
+      "line": 639,
       "kind": "singleton-method",
       "status": "generated",
       "api": "frsky_sport.sport_telemetry_push"
@@ -1219,7 +1219,7 @@
     {
       "owner": "AP_GPS",
       "name": "first_unconfigured_gps",
-      "line": 160,
+      "line": 161,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.first_unconfigured_gps"
@@ -1227,7 +1227,7 @@
     {
       "owner": "AP_GPS",
       "name": "get_antenna_offset",
-      "line": 159,
+      "line": 160,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.get_antenna_offset"
@@ -1235,7 +1235,7 @@
     {
       "owner": "AP_GPS",
       "name": "get_hdop",
-      "line": 154,
+      "line": 155,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.get_hdop"
@@ -1243,7 +1243,7 @@
     {
       "owner": "AP_GPS",
       "name": "get_vdop",
-      "line": 155,
+      "line": 156,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.get_vdop"
@@ -1251,7 +1251,7 @@
     {
       "owner": "AP_GPS",
       "name": "gps_yaw_deg",
-      "line": 161,
+      "line": 162,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.gps_yaw_deg"
@@ -1259,7 +1259,7 @@
     {
       "owner": "AP_GPS",
       "name": "ground_course",
-      "line": 150,
+      "line": 151,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.ground_course"
@@ -1267,7 +1267,7 @@
     {
       "owner": "AP_GPS",
       "name": "ground_speed",
-      "line": 149,
+      "line": 150,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.ground_speed"
@@ -1275,7 +1275,7 @@
     {
       "owner": "AP_GPS",
       "name": "have_vertical_velocity",
-      "line": 158,
+      "line": 159,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.have_vertical_velocity"
@@ -1283,7 +1283,7 @@
     {
       "owner": "AP_GPS",
       "name": "horizontal_accuracy",
-      "line": 146,
+      "line": 147,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.horizontal_accuracy"
@@ -1291,7 +1291,7 @@
     {
       "owner": "AP_GPS",
       "name": "last_fix_time_ms",
-      "line": 156,
+      "line": 157,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.last_fix_time_ms"
@@ -1299,7 +1299,7 @@
     {
       "owner": "AP_GPS",
       "name": "last_message_time_ms",
-      "line": 157,
+      "line": 158,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.last_message_time_ms"
@@ -1307,7 +1307,7 @@
     {
       "owner": "AP_GPS",
       "name": "location",
-      "line": 144,
+      "line": 145,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.location"
@@ -1315,7 +1315,7 @@
     {
       "owner": "AP_GPS",
       "name": "num_sats",
-      "line": 151,
+      "line": 152,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.num_sats"
@@ -1323,7 +1323,7 @@
     {
       "owner": "AP_GPS",
       "name": "num_sensors",
-      "line": 141,
+      "line": 142,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.num_sensors"
@@ -1331,7 +1331,7 @@
     {
       "owner": "AP_GPS",
       "name": "primary_sensor",
-      "line": 142,
+      "line": 143,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.primary_sensor"
@@ -1339,7 +1339,7 @@
     {
       "owner": "AP_GPS",
       "name": "speed_accuracy",
-      "line": 145,
+      "line": 146,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.speed_accuracy"
@@ -1347,7 +1347,7 @@
     {
       "owner": "AP_GPS",
       "name": "status",
-      "line": 143,
+      "line": 144,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.status"
@@ -1355,7 +1355,7 @@
     {
       "owner": "AP_GPS",
       "name": "time_epoch_usec",
-      "line": 162,
+      "line": 163,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:uint64_t"
@@ -1363,7 +1363,7 @@
     {
       "owner": "AP_GPS",
       "name": "time_week",
-      "line": 152,
+      "line": 153,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.time_week"
@@ -1371,7 +1371,7 @@
     {
       "owner": "AP_GPS",
       "name": "time_week_ms",
-      "line": 153,
+      "line": 154,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.time_week_ms"
@@ -1379,7 +1379,7 @@
     {
       "owner": "AP_GPS",
       "name": "velocity",
-      "line": 148,
+      "line": 149,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.velocity"
@@ -1387,7 +1387,7 @@
     {
       "owner": "AP_GPS",
       "name": "vertical_accuracy",
-      "line": 147,
+      "line": 148,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gps.vertical_accuracy"
@@ -1402,7 +1402,7 @@
     {
       "owner": "AP_IOMCU",
       "name": "healthy",
-      "line": 956,
+      "line": 957,
       "kind": "singleton-method",
       "status": "generated",
       "api": "iomcu.healthy"
@@ -1410,7 +1410,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "accels_consistent",
-      "line": 736,
+      "line": 737,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.accels_consistent"
@@ -1418,7 +1418,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "calibrating",
-      "line": 738,
+      "line": 739,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.calibrating"
@@ -1426,7 +1426,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "get_accel",
-      "line": 740,
+      "line": 741,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.get_accel"
@@ -1434,7 +1434,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "get_accel_health",
-      "line": 737,
+      "line": 738,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.get_accel_health"
@@ -1442,7 +1442,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "get_gyro",
-      "line": 739,
+      "line": 740,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.get_gyro"
@@ -1450,7 +1450,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "get_gyro_health",
-      "line": 735,
+      "line": 736,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.get_gyro_health"
@@ -1458,7 +1458,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "get_temperature",
-      "line": 734,
+      "line": 735,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.get_temperature"
@@ -1466,7 +1466,7 @@
     {
       "owner": "AP_InertialSensor",
       "name": "gyros_consistent",
-      "line": 741,
+      "line": 742,
       "kind": "singleton-method",
       "status": "generated",
       "api": "ins.gyros_consistent"
@@ -1474,7 +1474,7 @@
     {
       "owner": "AP_Logger",
       "name": "log_file_content",
-      "line": 1015,
+      "line": 1016,
       "kind": "singleton-method",
       "status": "generated",
       "api": "logger.log_file_content"
@@ -1489,7 +1489,7 @@
     {
       "owner": "AP_Mission",
       "name": "clear",
-      "line": 564,
+      "line": 565,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.clear"
@@ -1497,7 +1497,7 @@
     {
       "owner": "AP_Mission",
       "name": "cmd_has_location",
-      "line": 565,
+      "line": 566,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.cmd_has_location"
@@ -1505,7 +1505,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_current_do_cmd_id",
-      "line": 560,
+      "line": 561,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_current_do_cmd_id"
@@ -1513,7 +1513,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_current_nav_id",
-      "line": 559,
+      "line": 560,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_current_nav_id"
@@ -1521,7 +1521,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_current_nav_index",
-      "line": 556,
+      "line": 557,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_current_nav_index"
@@ -1529,7 +1529,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_index_of_jump_tag",
-      "line": 567,
+      "line": 568,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_index_of_jump_tag"
@@ -1537,7 +1537,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_item",
-      "line": 562,
+      "line": 563,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_item"
@@ -1545,7 +1545,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_last_jump_tag",
-      "line": 568,
+      "line": 569,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_last_jump_tag"
@@ -1553,7 +1553,7 @@
     {
       "owner": "AP_Mission",
       "name": "get_prev_nav_cmd_id",
-      "line": 558,
+      "line": 559,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.get_prev_nav_cmd_id"
@@ -1561,7 +1561,7 @@
     {
       "owner": "AP_Mission",
       "name": "jump_to_abort_landing_sequence",
-      "line": 570,
+      "line": 571,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.jump_to_abort_landing_sequence"
@@ -1569,7 +1569,7 @@
     {
       "owner": "AP_Mission",
       "name": "jump_to_landing_sequence",
-      "line": 569,
+      "line": 570,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.jump_to_landing_sequence"
@@ -1577,7 +1577,7 @@
     {
       "owner": "AP_Mission",
       "name": "jump_to_tag",
-      "line": 566,
+      "line": 567,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.jump_to_tag"
@@ -1585,7 +1585,7 @@
     {
       "owner": "AP_Mission",
       "name": "num_commands",
-      "line": 561,
+      "line": 562,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.num_commands"
@@ -1593,7 +1593,7 @@
     {
       "owner": "AP_Mission",
       "name": "set_current_cmd",
-      "line": 557,
+      "line": 558,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.set_current_cmd"
@@ -1601,7 +1601,7 @@
     {
       "owner": "AP_Mission",
       "name": "set_item",
-      "line": 563,
+      "line": 564,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.set_item"
@@ -1609,7 +1609,7 @@
     {
       "owner": "AP_Mission",
       "name": "state",
-      "line": 555,
+      "line": 556,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mission.state"
@@ -1617,7 +1617,7 @@
     {
       "owner": "AP_MotorsMatrix",
       "name": "add_motor_raw",
-      "line": 630,
+      "line": 631,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "motor-configuration-lifecycle"
@@ -1625,7 +1625,7 @@
     {
       "owner": "AP_MotorsMatrix",
       "name": "get_lost_motor",
-      "line": 632,
+      "line": 633,
       "kind": "singleton-method",
       "status": "generated",
       "api": "MotorsMatrix.get_lost_motor"
@@ -1633,7 +1633,7 @@
     {
       "owner": "AP_MotorsMatrix",
       "name": "get_thrust_boost",
-      "line": 633,
+      "line": 634,
       "kind": "singleton-method",
       "status": "generated",
       "api": "MotorsMatrix.get_thrust_boost"
@@ -1641,7 +1641,7 @@
     {
       "owner": "AP_MotorsMatrix",
       "name": "init",
-      "line": 629,
+      "line": 630,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "motor-configuration-lifecycle"
@@ -1649,7 +1649,7 @@
     {
       "owner": "AP_MotorsMatrix",
       "name": "set_throttle_factor",
-      "line": 631,
+      "line": 632,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "motor-configuration-lifecycle"
@@ -1657,7 +1657,7 @@
     {
       "owner": "AP_MotorsMatrix_6DoF_Scripting",
       "name": "add_motor",
-      "line": 653,
+      "line": 654,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "motor-configuration-lifecycle"
@@ -1665,7 +1665,7 @@
     {
       "owner": "AP_MotorsMatrix_6DoF_Scripting",
       "name": "init",
-      "line": 652,
+      "line": 653,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "motor-configuration-lifecycle"
@@ -1673,6 +1673,14 @@
     {
       "owner": "AP_MotorsMatrix_Scripting_Dynamic",
       "name": "add_motor",
+      "line": 722,
+      "kind": "singleton-method",
+      "status": "unsupported",
+      "reason": "motor-configuration-lifecycle"
+    },
+    {
+      "owner": "AP_MotorsMatrix_Scripting_Dynamic",
+      "name": "init",
       "line": 721,
       "kind": "singleton-method",
       "status": "unsupported",
@@ -1680,16 +1688,8 @@
     },
     {
       "owner": "AP_MotorsMatrix_Scripting_Dynamic",
-      "name": "init",
-      "line": 720,
-      "kind": "singleton-method",
-      "status": "unsupported",
-      "reason": "motor-configuration-lifecycle"
-    },
-    {
-      "owner": "AP_MotorsMatrix_Scripting_Dynamic",
       "name": "load_factors",
-      "line": 722,
+      "line": 723,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_MotorsMatrix_Scripting_Dynamic::factor_table"
@@ -1697,7 +1697,7 @@
     {
       "owner": "AP_Mount",
       "name": "get_angle_target",
-      "line": 885,
+      "line": 886,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.get_angle_target"
@@ -1705,7 +1705,7 @@
     {
       "owner": "AP_Mount",
       "name": "get_attitude_euler",
-      "line": 882,
+      "line": 883,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.get_attitude_euler"
@@ -1713,7 +1713,7 @@
     {
       "owner": "AP_Mount",
       "name": "get_location_target",
-      "line": 886,
+      "line": 887,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.get_location_target"
@@ -1721,7 +1721,7 @@
     {
       "owner": "AP_Mount",
       "name": "get_mode",
-      "line": 877,
+      "line": 878,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.get_mode"
@@ -1729,7 +1729,7 @@
     {
       "owner": "AP_Mount",
       "name": "get_rate_target",
-      "line": 884,
+      "line": 885,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.get_rate_target"
@@ -1737,7 +1737,7 @@
     {
       "owner": "AP_Mount",
       "name": "set_angle_target",
-      "line": 879,
+      "line": 880,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.set_angle_target"
@@ -1745,7 +1745,7 @@
     {
       "owner": "AP_Mount",
       "name": "set_attitude_euler",
-      "line": 887,
+      "line": 888,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.set_attitude_euler"
@@ -1753,7 +1753,7 @@
     {
       "owner": "AP_Mount",
       "name": "set_mode",
-      "line": 878,
+      "line": 879,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.set_mode"
@@ -1761,7 +1761,7 @@
     {
       "owner": "AP_Mount",
       "name": "set_natively_supported_mount_target_types",
-      "line": 883,
+      "line": 884,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.set_natively_supported_mount_target_types"
@@ -1769,7 +1769,7 @@
     {
       "owner": "AP_Mount",
       "name": "set_rate_target",
-      "line": 880,
+      "line": 881,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.set_rate_target"
@@ -1777,7 +1777,7 @@
     {
       "owner": "AP_Mount",
       "name": "set_roi_target",
-      "line": 881,
+      "line": 882,
       "kind": "singleton-method",
       "status": "generated",
       "api": "mount.set_roi_target"
@@ -1785,7 +1785,7 @@
     {
       "owner": "AP_Networking",
       "name": "add_route",
-      "line": 1136,
+      "line": 1137,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "persistent-route-ownership"
@@ -1793,7 +1793,7 @@
     {
       "owner": "AP_Networking",
       "name": "address_to_str",
-      "line": 1135,
+      "line": 1136,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "string-output-ownership"
@@ -1801,7 +1801,7 @@
     {
       "owner": "AP_Networking",
       "name": "get_gateway_active",
-      "line": 1134,
+      "line": 1135,
       "kind": "singleton-method",
       "status": "generated",
       "api": "networking.get_gateway_active"
@@ -1809,7 +1809,7 @@
     {
       "owner": "AP_Networking",
       "name": "get_ip_active",
-      "line": 1132,
+      "line": 1133,
       "kind": "singleton-method",
       "status": "generated",
       "api": "networking.get_ip_active"
@@ -1817,7 +1817,7 @@
     {
       "owner": "AP_Networking",
       "name": "get_netmask_active",
-      "line": 1133,
+      "line": 1134,
       "kind": "singleton-method",
       "status": "generated",
       "api": "networking.get_netmask_active"
@@ -1825,7 +1825,7 @@
     {
       "owner": "AP_Notify",
       "name": "handle_rgb",
-      "line": 220,
+      "line": 221,
       "kind": "singleton-method",
       "status": "generated",
       "api": "notify.handle_rgb"
@@ -1833,7 +1833,7 @@
     {
       "owner": "AP_Notify",
       "name": "handle_rgb_id",
-      "line": 221,
+      "line": 222,
       "kind": "singleton-method",
       "status": "generated",
       "api": "notify.handle_rgb_id"
@@ -1841,7 +1841,7 @@
     {
       "owner": "AP_Notify",
       "name": "play_tune",
-      "line": 219,
+      "line": 220,
       "kind": "singleton-method",
       "status": "generated",
       "api": "notify.play_tune"
@@ -1849,7 +1849,7 @@
     {
       "owner": "AP_Notify",
       "name": "release_text_scripting",
-      "line": 224,
+      "line": 225,
       "kind": "singleton-method",
       "status": "generated",
       "api": "notify.release_text"
@@ -1857,7 +1857,7 @@
     {
       "owner": "AP_Notify",
       "name": "send_text_scripting",
-      "line": 222,
+      "line": 223,
       "kind": "singleton-method",
       "status": "generated",
       "api": "notify.send_text"
@@ -1865,7 +1865,7 @@
     {
       "owner": "AP_ONVIF",
       "name": "get_pan_tilt_limit_max",
-      "line": 360,
+      "line": 361,
       "kind": "singleton-method",
       "status": "generated",
       "api": "onvif.get_pan_tilt_limit_max"
@@ -1873,7 +1873,7 @@
     {
       "owner": "AP_ONVIF",
       "name": "get_pan_tilt_limit_min",
-      "line": 359,
+      "line": 360,
       "kind": "singleton-method",
       "status": "generated",
       "api": "onvif.get_pan_tilt_limit_min"
@@ -1881,7 +1881,7 @@
     {
       "owner": "AP_ONVIF",
       "name": "set_absolutemove",
-      "line": 358,
+      "line": 359,
       "kind": "singleton-method",
       "status": "generated",
       "api": "onvif.set_absolutemove"
@@ -1889,7 +1889,7 @@
     {
       "owner": "AP_ONVIF",
       "name": "start",
-      "line": 357,
+      "line": 358,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "persistent-client-initialization-and-concurrent-ownership"
@@ -1897,7 +1897,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "clear",
-      "line": 1192,
+      "line": 1193,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.clear"
@@ -1905,7 +1905,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "display_disabled",
-      "line": 1196,
+      "line": 1197,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.display_disabled"
@@ -1913,7 +1913,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "draw_screen",
-      "line": 1193,
+      "line": 1194,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.draw_screen"
@@ -1921,7 +1921,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "flush",
-      "line": 1191,
+      "line": 1192,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.flush"
@@ -1929,7 +1929,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "get_aspect_ratio_correction",
-      "line": 1194,
+      "line": 1195,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.get_aspect_ratio_correction"
@@ -1937,7 +1937,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "get_screen",
-      "line": 1195,
+      "line": 1196,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.get_screen"
@@ -1945,7 +1945,7 @@
     {
       "owner": "AP_OSD_Backend",
       "name": "write",
-      "line": 1190,
+      "line": 1191,
       "kind": "singleton-method",
       "status": "generated",
       "api": "osd.write"
@@ -1953,7 +1953,7 @@
     {
       "owner": "AP_OpticalFlow",
       "name": "enabled",
-      "line": 492,
+      "line": 493,
       "kind": "singleton-method",
       "status": "generated",
       "api": "optical_flow.enabled"
@@ -1961,7 +1961,7 @@
     {
       "owner": "AP_OpticalFlow",
       "name": "healthy",
-      "line": 493,
+      "line": 494,
       "kind": "singleton-method",
       "status": "generated",
       "api": "optical_flow.healthy"
@@ -1969,7 +1969,7 @@
     {
       "owner": "AP_OpticalFlow",
       "name": "quality",
-      "line": 494,
+      "line": 495,
       "kind": "singleton-method",
       "status": "generated",
       "api": "optical_flow.quality"
@@ -1977,7 +1977,7 @@
     {
       "owner": "AP_Param",
       "name": "add_param",
-      "line": 533,
+      "line": 534,
       "kind": "singleton-method",
       "status": "generated",
       "api": "param.add_param"
@@ -1985,7 +1985,7 @@
     {
       "owner": "AP_Param",
       "name": "add_table",
-      "line": 531,
+      "line": 532,
       "kind": "singleton-method",
       "status": "generated",
       "api": "param.add_table"
@@ -1993,7 +1993,7 @@
     {
       "owner": "AP_Param",
       "name": "get",
-      "line": 524,
+      "line": 525,
       "kind": "singleton-method",
       "status": "generated",
       "api": "param.get"
@@ -2001,7 +2001,7 @@
     {
       "owner": "AP_Param",
       "name": "set_and_save_by_name",
-      "line": 527,
+      "line": 528,
       "kind": "singleton-method",
       "status": "generated",
       "api": "param.set_and_save"
@@ -2009,7 +2009,7 @@
     {
       "owner": "AP_Param",
       "name": "set_by_name",
-      "line": 525,
+      "line": 526,
       "kind": "singleton-method",
       "status": "generated",
       "api": "param.set"
@@ -2017,7 +2017,7 @@
     {
       "owner": "AP_Param",
       "name": "set_default_by_name",
-      "line": 529,
+      "line": 530,
       "kind": "singleton-method",
       "status": "generated",
       "api": "param.set_default"
@@ -2025,7 +2025,7 @@
     {
       "owner": "AP_Periph_FW",
       "name": "can_printf",
-      "line": 799,
+      "line": 800,
       "kind": "singleton-method",
       "status": "generated",
       "api": "periph.can_printf"
@@ -2033,7 +2033,7 @@
     {
       "owner": "AP_Periph_FW",
       "name": "get_vehicle_state",
-      "line": 797,
+      "line": 798,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:uint64_t"
@@ -2041,7 +2041,7 @@
     {
       "owner": "AP_Periph_FW",
       "name": "get_yaw_earth",
-      "line": 795,
+      "line": 796,
       "kind": "singleton-method",
       "status": "generated",
       "api": "periph.get_yaw_earth"
@@ -2049,7 +2049,7 @@
     {
       "owner": "AP_Periph_FW",
       "name": "reboot",
-      "line": 800,
+      "line": 801,
       "kind": "singleton-method",
       "status": "generated",
       "api": "periph.reboot"
@@ -2057,7 +2057,7 @@
     {
       "owner": "AP_Proximity",
       "name": "get_backend",
-      "line": 244,
+      "line": 245,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Proximity_Backend"
@@ -2065,7 +2065,7 @@
     {
       "owner": "AP_Proximity",
       "name": "get_closest_object",
-      "line": 242,
+      "line": 243,
       "kind": "singleton-method",
       "status": "generated",
       "api": "proximity.get_closest_object"
@@ -2073,7 +2073,7 @@
     {
       "owner": "AP_Proximity",
       "name": "get_object_angle_and_distance",
-      "line": 243,
+      "line": 244,
       "kind": "singleton-method",
       "status": "generated",
       "api": "proximity.get_object_angle_and_distance"
@@ -2081,7 +2081,7 @@
     {
       "owner": "AP_Proximity",
       "name": "get_object_count",
-      "line": 241,
+      "line": 242,
       "kind": "singleton-method",
       "status": "generated",
       "api": "proximity.get_object_count"
@@ -2089,7 +2089,7 @@
     {
       "owner": "AP_Proximity",
       "name": "get_status",
-      "line": 239,
+      "line": 240,
       "kind": "singleton-method",
       "status": "generated",
       "api": "proximity.get_status"
@@ -2097,7 +2097,7 @@
     {
       "owner": "AP_Proximity",
       "name": "num_sensors",
-      "line": 240,
+      "line": 241,
       "kind": "singleton-method",
       "status": "generated",
       "api": "proximity.num_sensors"
@@ -2105,7 +2105,7 @@
     {
       "owner": "AP_RPM",
       "name": "get_rpm",
-      "line": 593,
+      "line": 594,
       "kind": "singleton-method",
       "status": "generated",
       "api": "RPM.get_rpm"
@@ -2113,7 +2113,7 @@
     {
       "owner": "AP_RTC",
       "name": "clock_s_to_date_fields",
-      "line": 1125,
+      "line": 1126,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rtc.clock_s_to_date_fields"
@@ -2121,7 +2121,7 @@
     {
       "owner": "AP_RTC",
       "name": "date_fields_to_clock_s",
-      "line": 1126,
+      "line": 1127,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rtc.date_fields_to_clock_s"
@@ -2129,7 +2129,7 @@
     {
       "owner": "AP_Rally",
       "name": "get_rally_location_with_index",
-      "line": 1099,
+      "line": 1100,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rally.get_rally_location"
@@ -2137,7 +2137,7 @@
     {
       "owner": "AP_Relay",
       "name": "enabled",
-      "line": 325,
+      "line": 326,
       "kind": "singleton-method",
       "status": "generated",
       "api": "relay.enabled"
@@ -2145,7 +2145,7 @@
     {
       "owner": "AP_Relay",
       "name": "get",
-      "line": 327,
+      "line": 328,
       "kind": "singleton-method",
       "status": "generated",
       "api": "relay.get"
@@ -2153,7 +2153,7 @@
     {
       "owner": "AP_Relay",
       "name": "off",
-      "line": 324,
+      "line": 325,
       "kind": "singleton-method",
       "status": "generated",
       "api": "relay.off"
@@ -2161,7 +2161,7 @@
     {
       "owner": "AP_Relay",
       "name": "on",
-      "line": 323,
+      "line": 324,
       "kind": "singleton-method",
       "status": "generated",
       "api": "relay.on"
@@ -2169,7 +2169,7 @@
     {
       "owner": "AP_Relay",
       "name": "toggle",
-      "line": 326,
+      "line": 327,
       "kind": "singleton-method",
       "status": "generated",
       "api": "relay.toggle"
@@ -2177,7 +2177,7 @@
     {
       "owner": "AP_Scripting",
       "name": "restart_all",
-      "line": 548,
+      "line": 549,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "lua-runtime-lifecycle"
@@ -2185,7 +2185,7 @@
     {
       "owner": "AP_SerialLED",
       "name": "send",
-      "line": 420,
+      "line": 421,
       "kind": "singleton-method",
       "status": "generated",
       "api": "serialLED.send"
@@ -2193,7 +2193,7 @@
     {
       "owner": "AP_SerialLED",
       "name": "set_RGB",
-      "line": 419,
+      "line": 420,
       "kind": "singleton-method",
       "status": "generated",
       "api": "serialLED.set_RGB"
@@ -2201,14 +2201,6 @@
     {
       "owner": "AP_SerialLED",
       "name": "set_num_neopixel",
-      "line": 416,
-      "kind": "singleton-method",
-      "status": "unsupported",
-      "reason": "persistent-driver-allocation"
-    },
-    {
-      "owner": "AP_SerialLED",
-      "name": "set_num_neopixel_rgb",
       "line": 417,
       "kind": "singleton-method",
       "status": "unsupported",
@@ -2216,8 +2208,16 @@
     },
     {
       "owner": "AP_SerialLED",
-      "name": "set_num_profiled",
+      "name": "set_num_neopixel_rgb",
       "line": 418,
+      "kind": "singleton-method",
+      "status": "unsupported",
+      "reason": "persistent-driver-allocation"
+    },
+    {
+      "owner": "AP_SerialLED",
+      "name": "set_num_profiled",
+      "line": 419,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "persistent-driver-allocation"
@@ -2225,7 +2225,7 @@
     {
       "owner": "AP_Servo_Telem",
       "name": "get_telem",
-      "line": 1154,
+      "line": 1155,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Servo_Telem::TelemetryData"
@@ -2233,7 +2233,7 @@
     {
       "owner": "AP_Servo_Telem",
       "name": "update_telem_data",
-      "line": 1155,
+      "line": 1156,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Servo_Telem::TelemetryData"
@@ -2241,7 +2241,7 @@
     {
       "owner": "AP_TemperatureSensor",
       "name": "get_temperature",
-      "line": 1148,
+      "line": 1149,
       "kind": "singleton-method",
       "status": "generated",
       "api": "temperature_sensor.get_temperature"
@@ -2249,7 +2249,7 @@
     {
       "owner": "AP_Terrain",
       "name": "enabled",
-      "line": 312,
+      "line": 313,
       "kind": "singleton-method",
       "status": "generated",
       "api": "terrain.enabled"
@@ -2257,7 +2257,7 @@
     {
       "owner": "AP_Terrain",
       "name": "height_above_terrain",
-      "line": 317,
+      "line": 318,
       "kind": "singleton-method",
       "status": "generated",
       "api": "terrain.height_above_terrain"
@@ -2265,7 +2265,7 @@
     {
       "owner": "AP_Terrain",
       "name": "height_amsl",
-      "line": 315,
+      "line": 316,
       "kind": "singleton-method",
       "status": "generated",
       "api": "terrain.height_amsl"
@@ -2273,7 +2273,7 @@
     {
       "owner": "AP_Terrain",
       "name": "height_terrain_difference_home",
-      "line": 316,
+      "line": 317,
       "kind": "singleton-method",
       "status": "generated",
       "api": "terrain.height_terrain_difference_home"
@@ -2281,7 +2281,7 @@
     {
       "owner": "AP_Terrain",
       "name": "status",
-      "line": 314,
+      "line": 315,
       "kind": "singleton-method",
       "status": "generated",
       "api": "terrain.status"
@@ -2289,7 +2289,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_circle_radius",
-      "line": 387,
+      "line": 388,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_circle_radius"
@@ -2297,7 +2297,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_control_mode_reason",
-      "line": 371,
+      "line": 372,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_control_mode_reason"
@@ -2305,7 +2305,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_control_output",
-      "line": 374,
+      "line": 375,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_control_output"
@@ -2313,7 +2313,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_likely_flying",
-      "line": 372,
+      "line": 373,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_likely_flying"
@@ -2321,7 +2321,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_mode",
-      "line": 370,
+      "line": 371,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_mode"
@@ -2329,7 +2329,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_pan_tilt_norm",
-      "line": 394,
+      "line": 395,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_pan_tilt_norm"
@@ -2337,7 +2337,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_steering_and_throttle",
-      "line": 390,
+      "line": 391,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_steering_and_throttle"
@@ -2345,7 +2345,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_target_location",
-      "line": 377,
+      "line": 378,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_target_location"
@@ -2353,7 +2353,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_time_flying_ms",
-      "line": 373,
+      "line": 374,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_time_flying_ms"
@@ -2361,7 +2361,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_wp_bearing_deg",
-      "line": 392,
+      "line": 393,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_wp_bearing_deg"
@@ -2369,7 +2369,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_wp_crosstrack_error_m",
-      "line": 393,
+      "line": 394,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_wp_crosstrack_error_m"
@@ -2377,7 +2377,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "get_wp_distance_m",
-      "line": 391,
+      "line": 392,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.get_wp_distance_m"
@@ -2385,7 +2385,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "has_ekf_failsafed",
-      "line": 404,
+      "line": 405,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.has_ekf_failsafed"
@@ -2393,7 +2393,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "is_crashed",
-      "line": 408,
+      "line": 409,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.is_crashed"
@@ -2401,7 +2401,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "is_landing",
-      "line": 406,
+      "line": 407,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.is_landing"
@@ -2409,7 +2409,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "is_taking_off",
-      "line": 407,
+      "line": 408,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.is_taking_off"
@@ -2417,7 +2417,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "nav_script_time",
-      "line": 395,
+      "line": 396,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.nav_script_time"
@@ -2425,7 +2425,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "nav_script_time_done",
-      "line": 396,
+      "line": 397,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.nav_script_time_done"
@@ -2433,7 +2433,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "nav_scripting_enable",
-      "line": 401,
+      "line": 402,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.nav_scripting_enable"
@@ -2441,7 +2441,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "reboot",
-      "line": 405,
+      "line": 406,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.reboot"
@@ -2449,7 +2449,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "register_custom_mode",
-      "line": 410,
+      "line": 411,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_Vehicle::custom_mode_state"
@@ -2457,7 +2457,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_circle_rate",
-      "line": 388,
+      "line": 389,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_circle_rate"
@@ -2465,7 +2465,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_crosstrack_start",
-      "line": 409,
+      "line": 410,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_crosstrack_start"
@@ -2473,7 +2473,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_desired_speed",
-      "line": 400,
+      "line": 401,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_desired_speed"
@@ -2481,7 +2481,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_desired_turn_rate_and_speed",
-      "line": 399,
+      "line": 400,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_desired_turn_rate_and_speed"
@@ -2489,7 +2489,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_land_descent_rate",
-      "line": 403,
+      "line": 404,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_land_descent_rate"
@@ -2497,7 +2497,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_mode",
-      "line": 369,
+      "line": 370,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_mode"
@@ -2505,7 +2505,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_rudder_offset",
-      "line": 398,
+      "line": 399,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_rudder_offset"
@@ -2513,7 +2513,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_steering_and_throttle",
-      "line": 389,
+      "line": 390,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_steering_and_throttle"
@@ -2521,7 +2521,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_angle_and_climbrate",
-      "line": 384,
+      "line": 385,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_angle_and_climbrate"
@@ -2529,7 +2529,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_angle_and_rate_and_throttle",
-      "line": 386,
+      "line": 387,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_angle_and_rate_and_throttle"
@@ -2537,7 +2537,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_location",
-      "line": 376,
+      "line": 377,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_location"
@@ -2545,7 +2545,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_pos_NED",
-      "line": 379,
+      "line": 380,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_pos_NED"
@@ -2553,7 +2553,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_posvel_NED",
-      "line": 380,
+      "line": 381,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_posvel_NED"
@@ -2561,7 +2561,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_posvelaccel_NED",
-      "line": 381,
+      "line": 382,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_posvelaccel_NED"
@@ -2569,7 +2569,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_rate_and_throttle",
-      "line": 385,
+      "line": 386,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_rate_and_throttle"
@@ -2577,7 +2577,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_throttle_rate_rpy",
-      "line": 397,
+      "line": 398,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_throttle_rate_rpy"
@@ -2585,7 +2585,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_target_velaccel_NED",
-      "line": 382,
+      "line": 383,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_target_velaccel_NED"
@@ -2593,7 +2593,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "set_velocity_match",
-      "line": 402,
+      "line": 403,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.set_velocity_match"
@@ -2601,7 +2601,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "start_takeoff",
-      "line": 375,
+      "line": 376,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.start_takeoff"
@@ -2609,7 +2609,7 @@
     {
       "owner": "AP_Vehicle",
       "name": "update_target_location",
-      "line": 378,
+      "line": 379,
       "kind": "singleton-method",
       "status": "generated",
       "api": "vehicle.update_target_location"
@@ -2624,7 +2624,7 @@
     {
       "owner": "AP_VisualOdom",
       "name": "healthy",
-      "line": 1141,
+      "line": 1142,
       "kind": "singleton-method",
       "status": "generated",
       "api": "visual_odom.healthy"
@@ -2632,7 +2632,7 @@
     {
       "owner": "AP_VisualOdom",
       "name": "quality",
-      "line": 1142,
+      "line": 1143,
       "kind": "singleton-method",
       "status": "generated",
       "api": "visual_odom.quality"
@@ -2640,7 +2640,7 @@
     {
       "owner": "AP_Winch",
       "name": "get_rate_max",
-      "line": 951,
+      "line": 952,
       "kind": "singleton-method",
       "status": "generated",
       "api": "winch.get_rate_max"
@@ -2648,7 +2648,7 @@
     {
       "owner": "AP_Winch",
       "name": "healthy",
-      "line": 947,
+      "line": 948,
       "kind": "singleton-method",
       "status": "generated",
       "api": "winch.healthy"
@@ -2656,7 +2656,7 @@
     {
       "owner": "AP_Winch",
       "name": "relax",
-      "line": 948,
+      "line": 949,
       "kind": "singleton-method",
       "status": "generated",
       "api": "winch.relax"
@@ -2664,7 +2664,7 @@
     {
       "owner": "AP_Winch",
       "name": "release_length",
-      "line": 949,
+      "line": 950,
       "kind": "singleton-method",
       "status": "generated",
       "api": "winch.release_length"
@@ -2672,7 +2672,7 @@
     {
       "owner": "AP_Winch",
       "name": "set_desired_rate",
-      "line": 950,
+      "line": 951,
       "kind": "singleton-method",
       "status": "generated",
       "api": "winch.set_desired_rate"
@@ -2680,7 +2680,7 @@
     {
       "owner": "AR_AttitudeControl",
       "name": "get_srate",
-      "line": 871,
+      "line": 872,
       "kind": "singleton-method",
       "status": "generated",
       "api": "AR_AttitudeControl.get_srate"
@@ -2702,7 +2702,7 @@
     {
       "owner": "Compass",
       "name": "healthy",
-      "line": 961,
+      "line": 962,
       "kind": "singleton-method",
       "status": "generated",
       "api": "compass.healthy"
@@ -2710,7 +2710,7 @@
     {
       "owner": "GCS",
       "name": "enable_high_latency_connections",
-      "line": 345,
+      "line": 346,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.enable_high_latency_connections"
@@ -2718,7 +2718,7 @@
     {
       "owner": "GCS",
       "name": "frame_type",
-      "line": 337,
+      "line": 338,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.frame_type"
@@ -2726,7 +2726,7 @@
     {
       "owner": "GCS",
       "name": "get_allow_param_set",
-      "line": 351,
+      "line": 352,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.get_allow_param_set"
@@ -2734,7 +2734,7 @@
     {
       "owner": "GCS",
       "name": "get_high_latency_status",
-      "line": 342,
+      "line": 343,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.get_high_latency_status"
@@ -2742,7 +2742,7 @@
     {
       "owner": "GCS",
       "name": "get_hud_throttle",
-      "line": 338,
+      "line": 339,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.get_hud_throttle"
@@ -2750,7 +2750,7 @@
     {
       "owner": "GCS",
       "name": "send_named_float",
-      "line": 334,
+      "line": 335,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.send_named_float"
@@ -2758,7 +2758,7 @@
     {
       "owner": "GCS",
       "name": "send_named_int",
-      "line": 335,
+      "line": 336,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.send_named_int"
@@ -2766,7 +2766,7 @@
     {
       "owner": "GCS",
       "name": "send_named_string",
-      "line": 336,
+      "line": 337,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.send_named_string"
@@ -2774,7 +2774,7 @@
     {
       "owner": "GCS",
       "name": "send_text",
-      "line": 332,
+      "line": 333,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.send_text"
@@ -2782,7 +2782,7 @@
     {
       "owner": "GCS",
       "name": "set_allow_param_set",
-      "line": 352,
+      "line": 353,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.set_allow_param_set"
@@ -2790,7 +2790,7 @@
     {
       "owner": "GCS",
       "name": "set_message_interval",
-      "line": 333,
+      "line": 334,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.set_message_interval"
@@ -2798,7 +2798,7 @@
     {
       "owner": "GCS",
       "name": "sysid_mygcs_last_seen_time_ms",
-      "line": 339,
+      "line": 340,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gcs.last_seen"
@@ -2813,7 +2813,7 @@
     {
       "owner": "QuadPlane",
       "name": "abort_landing",
-      "line": 611,
+      "line": 612,
       "kind": "singleton-method",
       "status": "generated",
       "api": "quadplane.abort_landing"
@@ -2821,7 +2821,7 @@
     {
       "owner": "QuadPlane",
       "name": "in_assisted_flight",
-      "line": 610,
+      "line": 611,
       "kind": "singleton-method",
       "status": "generated",
       "api": "quadplane.in_assisted_flight"
@@ -2829,7 +2829,7 @@
     {
       "owner": "QuadPlane",
       "name": "in_vtol_land_descent",
-      "line": 612,
+      "line": 613,
       "kind": "singleton-method",
       "status": "generated",
       "api": "quadplane.in_vtol_land_descent"
@@ -2837,7 +2837,7 @@
     {
       "owner": "QuadPlane",
       "name": "in_vtol_mode",
-      "line": 609,
+      "line": 610,
       "kind": "singleton-method",
       "status": "generated",
       "api": "quadplane.in_vtol_mode"
@@ -2845,7 +2845,7 @@
     {
       "owner": "RC_Channels",
       "name": "find_channel_for_option",
-      "line": 453,
+      "line": 454,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rc.find_channel_for_option"
@@ -2853,7 +2853,7 @@
     {
       "owner": "RC_Channels",
       "name": "get_aux_cached",
-      "line": 458,
+      "line": 459,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rc.get_aux_cached"
@@ -2861,7 +2861,7 @@
     {
       "owner": "RC_Channels",
       "name": "get_pwm",
-      "line": 452,
+      "line": 453,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rc.get_pwm"
@@ -2869,7 +2869,7 @@
     {
       "owner": "RC_Channels",
       "name": "has_valid_input",
-      "line": 455,
+      "line": 456,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rc.has_valid_input"
@@ -2877,7 +2877,7 @@
     {
       "owner": "RC_Channels",
       "name": "lua_rc_channel",
-      "line": 456,
+      "line": 457,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rc.get_channel"
@@ -2885,7 +2885,7 @@
     {
       "owner": "RC_Channels",
       "name": "run_aux_function",
-      "line": 454,
+      "line": 455,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rc.run_aux_function"
@@ -2893,7 +2893,7 @@
     {
       "owner": "RangeFinder",
       "name": "distance_cm_orient",
-      "line": 276,
+      "line": 277,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "deprecated"
@@ -2901,7 +2901,7 @@
     {
       "owner": "RangeFinder",
       "name": "distance_orient",
-      "line": 278,
+      "line": 279,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.distance_orient"
@@ -2909,7 +2909,7 @@
     {
       "owner": "RangeFinder",
       "name": "get_backend",
-      "line": 293,
+      "line": 294,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_RangeFinder_Backend"
@@ -2917,7 +2917,7 @@
     {
       "owner": "RangeFinder",
       "name": "get_pos_offset_orient",
-      "line": 291,
+      "line": 292,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.get_pos_offset_orient"
@@ -2925,7 +2925,7 @@
     {
       "owner": "RangeFinder",
       "name": "ground_clearance_cm_orient",
-      "line": 284,
+      "line": 285,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "deprecated"
@@ -2933,7 +2933,7 @@
     {
       "owner": "RangeFinder",
       "name": "ground_clearance_orient",
-      "line": 288,
+      "line": 289,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.ground_clearance_orient"
@@ -2941,7 +2941,7 @@
     {
       "owner": "RangeFinder",
       "name": "has_data_orient",
-      "line": 290,
+      "line": 291,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.has_data_orient"
@@ -2949,7 +2949,7 @@
     {
       "owner": "RangeFinder",
       "name": "has_orientation",
-      "line": 275,
+      "line": 276,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.has_orientation"
@@ -2957,7 +2957,7 @@
     {
       "owner": "RangeFinder",
       "name": "max_distance_cm_orient",
-      "line": 280,
+      "line": 281,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "deprecated"
@@ -2965,7 +2965,7 @@
     {
       "owner": "RangeFinder",
       "name": "max_distance_orient",
-      "line": 286,
+      "line": 287,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.max_distance_orient"
@@ -2973,7 +2973,7 @@
     {
       "owner": "RangeFinder",
       "name": "min_distance_cm_orient",
-      "line": 282,
+      "line": 283,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "deprecated"
@@ -2981,7 +2981,7 @@
     {
       "owner": "RangeFinder",
       "name": "min_distance_orient",
-      "line": 287,
+      "line": 288,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.min_distance_orient"
@@ -2989,7 +2989,7 @@
     {
       "owner": "RangeFinder",
       "name": "num_sensors",
-      "line": 274,
+      "line": 275,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.num_sensors"
@@ -2997,7 +2997,7 @@
     {
       "owner": "RangeFinder",
       "name": "signal_quality_pct_orient",
-      "line": 279,
+      "line": 280,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.signal_quality_pct_orient"
@@ -3005,7 +3005,7 @@
     {
       "owner": "RangeFinder",
       "name": "status_orient",
-      "line": 289,
+      "line": 290,
       "kind": "singleton-method",
       "status": "generated",
       "api": "rangefinder.status_orient"
@@ -3013,7 +3013,7 @@
     {
       "owner": "SITL::SIM",
       "name": "set_pose",
-      "line": 1175,
+      "line": 1176,
       "kind": "singleton-method",
       "status": "generated",
       "api": "sim.set_pose"
@@ -3021,7 +3021,7 @@
     {
       "owner": "SRV_Channels",
       "name": "find_channel",
-      "line": 425,
+      "line": 426,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.find_channel"
@@ -3029,7 +3029,7 @@
     {
       "owner": "SRV_Channels",
       "name": "get_emergency_stop",
-      "line": 437,
+      "line": 438,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.get_emergency_stop"
@@ -3037,7 +3037,7 @@
     {
       "owner": "SRV_Channels",
       "name": "get_output_pwm",
-      "line": 431,
+      "line": 432,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.get_output_pwm"
@@ -3045,7 +3045,7 @@
     {
       "owner": "SRV_Channels",
       "name": "get_output_pwm_chan",
-      "line": 432,
+      "line": 433,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.get_output_pwm_chan"
@@ -3053,7 +3053,7 @@
     {
       "owner": "SRV_Channels",
       "name": "get_output_scaled",
-      "line": 433,
+      "line": 434,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.get_output_scaled"
@@ -3061,7 +3061,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_angle",
-      "line": 435,
+      "line": 436,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_angle"
@@ -3069,7 +3069,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_output_norm",
-      "line": 434,
+      "line": 435,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_output_norm"
@@ -3077,7 +3077,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_output_pwm",
-      "line": 426,
+      "line": 427,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_output_pwm"
@@ -3085,7 +3085,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_output_pwm_chan",
-      "line": 427,
+      "line": 428,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_output_pwm_chan"
@@ -3093,7 +3093,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_output_pwm_chan_timeout",
-      "line": 428,
+      "line": 429,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_output_pwm_chan_timeout"
@@ -3101,7 +3101,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_output_scaled",
-      "line": 430,
+      "line": 431,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_output_scaled"
@@ -3109,7 +3109,7 @@
     {
       "owner": "SRV_Channels",
       "name": "set_range",
-      "line": 436,
+      "line": 437,
       "kind": "singleton-method",
       "status": "generated",
       "api": "SRV_Channels.set_range"
@@ -3124,7 +3124,7 @@
     {
       "owner": "ScriptingLED",
       "name": "get_rgb",
-      "line": 604,
+      "line": 605,
       "kind": "singleton-method",
       "status": "generated",
       "api": "LED.get_rgb"
@@ -3132,7 +3132,7 @@
     {
       "owner": "Sub",
       "name": "get_and_clear_button_count",
-      "line": 617,
+      "line": 618,
       "kind": "singleton-method",
       "status": "generated",
       "api": "sub.get_and_clear_button_count"
@@ -3140,7 +3140,7 @@
     {
       "owner": "Sub",
       "name": "get_rangefinder_target_cm",
-      "line": 621,
+      "line": 622,
       "kind": "singleton-method",
       "status": "generated",
       "api": "sub.get_rangefinder_target_cm"
@@ -3148,7 +3148,7 @@
     {
       "owner": "Sub",
       "name": "is_button_pressed",
-      "line": 618,
+      "line": 619,
       "kind": "singleton-method",
       "status": "generated",
       "api": "sub.is_button_pressed"
@@ -3156,7 +3156,7 @@
     {
       "owner": "Sub",
       "name": "rangefinder_alt_ok",
-      "line": 619,
+      "line": 620,
       "kind": "singleton-method",
       "status": "generated",
       "api": "sub.rangefinder_alt_ok"
@@ -3164,7 +3164,7 @@
     {
       "owner": "Sub",
       "name": "set_rangefinder_target_cm",
-      "line": 623,
+      "line": 624,
       "kind": "singleton-method",
       "status": "generated",
       "api": "sub.set_rangefinder_target_cm"
@@ -3172,7 +3172,7 @@
     {
       "owner": "hal.analogin",
       "name": "channel",
-      "line": 711,
+      "line": 712,
       "kind": "singleton-method",
       "status": "unsupported",
       "reason": "unsupported-type:AP_HAL::AnalogSource"
@@ -3180,7 +3180,7 @@
     {
       "owner": "hal.analogin",
       "name": "mcu_temperature",
-      "line": 712,
+      "line": 713,
       "kind": "singleton-method",
       "status": "generated",
       "api": "analog.mcu_temperature"
@@ -3188,7 +3188,7 @@
     {
       "owner": "hal.analogin",
       "name": "mcu_voltage",
-      "line": 714,
+      "line": 715,
       "kind": "singleton-method",
       "status": "generated",
       "api": "analog.mcu_voltage"
@@ -3196,7 +3196,7 @@
     {
       "owner": "hal.gpio",
       "name": "get_mode",
-      "line": 703,
+      "line": 704,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gpio.get_mode"
@@ -3204,7 +3204,7 @@
     {
       "owner": "hal.gpio",
       "name": "pinMode",
-      "line": 702,
+      "line": 703,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gpio.pinMode"
@@ -3212,7 +3212,7 @@
     {
       "owner": "hal.gpio",
       "name": "read",
-      "line": 699,
+      "line": 700,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gpio.read"
@@ -3220,7 +3220,7 @@
     {
       "owner": "hal.gpio",
       "name": "set_mode",
-      "line": 705,
+      "line": 706,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gpio.set_mode"
@@ -3228,7 +3228,7 @@
     {
       "owner": "hal.gpio",
       "name": "toggle",
-      "line": 701,
+      "line": 702,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gpio.toggle"
@@ -3236,7 +3236,7 @@
     {
       "owner": "hal.gpio",
       "name": "write",
-      "line": 700,
+      "line": 701,
       "kind": "singleton-method",
       "status": "generated",
       "api": "gpio.write"
@@ -3314,7 +3314,7 @@
     {
       "owner": "AP_Airspeed_Backend",
       "name": "handle_script_airspeed",
-      "line": 301,
+      "line": 302,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3322,7 +3322,7 @@
     {
       "owner": "AP_Airspeed_Backend",
       "name": "handle_script_differential_pressure",
-      "line": 300,
+      "line": 301,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3330,7 +3330,7 @@
     {
       "owner": "AP_Airspeed_Backend",
       "name": "handle_script_temperature",
-      "line": 302,
+      "line": 303,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3338,7 +3338,7 @@
     {
       "owner": "AP_EFI_Backend",
       "name": "handle_scripting",
-      "line": 1001,
+      "line": 1002,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3346,14 +3346,6 @@
     {
       "owner": "AP_HAL::AnalogSource",
       "name": "set_pin",
-      "line": 686,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_HAL::AnalogSource",
-      "name": "voltage_average",
       "line": 687,
       "kind": "ap-object-method",
       "status": "unsupported",
@@ -3361,8 +3353,16 @@
     },
     {
       "owner": "AP_HAL::AnalogSource",
+      "name": "voltage_average",
+      "line": 688,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_HAL::AnalogSource",
       "name": "voltage_average_ratiometric",
-      "line": 689,
+      "line": 690,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3370,7 +3370,7 @@
     {
       "owner": "AP_HAL::AnalogSource",
       "name": "voltage_latest",
-      "line": 688,
+      "line": 689,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3378,7 +3378,7 @@
     {
       "owner": "AP_HAL::I2CDevice",
       "name": "set_address",
-      "line": 661,
+      "line": 662,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3386,7 +3386,7 @@
     {
       "owner": "AP_HAL::I2CDevice",
       "name": "set_retries",
-      "line": 657,
+      "line": 658,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3394,7 +3394,7 @@
     {
       "owner": "AP_HAL::I2CDevice",
       "name": "write_register",
-      "line": 658,
+      "line": 659,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3416,7 +3416,7 @@
     {
       "owner": "AP_HAL::PWMSource",
       "name": "get_pwm_avg_us",
-      "line": 695,
+      "line": 696,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3424,7 +3424,7 @@
     {
       "owner": "AP_HAL::PWMSource",
       "name": "get_pwm_us",
-      "line": 694,
+      "line": 695,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3432,7 +3432,7 @@
     {
       "owner": "AP_HAL::PWMSource",
       "name": "set_pin",
-      "line": 693,
+      "line": 694,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3440,30 +3440,6 @@
     {
       "owner": "AP_Proximity_Backend",
       "name": "handle_script_3d_msg",
-      "line": 233,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_Proximity_Backend",
-      "name": "handle_script_distance_msg",
-      "line": 232,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_Proximity_Backend",
-      "name": "set_distance_min_max",
-      "line": 235,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_Proximity_Backend",
-      "name": "type",
       "line": 234,
       "kind": "ap-object-method",
       "status": "unsupported",
@@ -3471,8 +3447,32 @@
     },
     {
       "owner": "AP_Proximity_Backend",
-      "name": "update_virtual_boundary",
+      "name": "handle_script_distance_msg",
+      "line": 233,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_Proximity_Backend",
+      "name": "set_distance_min_max",
       "line": 236,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_Proximity_Backend",
+      "name": "type",
+      "line": 235,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_Proximity_Backend",
+      "name": "update_virtual_boundary",
+      "line": 237,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3480,30 +3480,6 @@
     {
       "owner": "AP_RangeFinder_Backend",
       "name": "distance",
-      "line": 263,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_RangeFinder_Backend",
-      "name": "get_state",
-      "line": 270,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_RangeFinder_Backend",
-      "name": "orientation",
-      "line": 266,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "AP_RangeFinder_Backend",
-      "name": "signal_quality_pct",
       "line": 264,
       "kind": "ap-object-method",
       "status": "unsupported",
@@ -3511,8 +3487,32 @@
     },
     {
       "owner": "AP_RangeFinder_Backend",
+      "name": "get_state",
+      "line": 271,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_RangeFinder_Backend",
+      "name": "orientation",
+      "line": 267,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_RangeFinder_Backend",
+      "name": "signal_quality_pct",
+      "line": 265,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "AP_RangeFinder_Backend",
       "name": "status",
-      "line": 268,
+      "line": 269,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3520,7 +3520,7 @@
     {
       "owner": "AP_RangeFinder_Backend",
       "name": "type",
-      "line": 267,
+      "line": 268,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3535,7 +3535,7 @@
     {
       "owner": "RC_Channel",
       "name": "get_aux_switch_pos",
-      "line": 443,
+      "line": 444,
       "kind": "ap-object-method",
       "status": "generated",
       "api": "RC_Channel.get_aux_switch_pos"
@@ -3543,7 +3543,7 @@
     {
       "owner": "RC_Channel",
       "name": "norm_input",
-      "line": 441,
+      "line": 442,
       "kind": "ap-object-method",
       "status": "generated",
       "api": "RC_Channel.norm_input"
@@ -3551,7 +3551,7 @@
     {
       "owner": "RC_Channel",
       "name": "norm_input_dz",
-      "line": 442,
+      "line": 443,
       "kind": "ap-object-method",
       "status": "generated",
       "api": "RC_Channel.norm_input_dz"
@@ -3559,7 +3559,7 @@
     {
       "owner": "RC_Channel",
       "name": "norm_input_ignore_trim",
-      "line": 444,
+      "line": 445,
       "kind": "ap-object-method",
       "status": "generated",
       "api": "RC_Channel.norm_input_ignore_trim"
@@ -3567,7 +3567,7 @@
     {
       "owner": "RC_Channel",
       "name": "set_override",
-      "line": 446,
+      "line": 447,
       "kind": "ap-object-method",
       "status": "generated",
       "api": "RC_Channel.set_override"
@@ -3575,7 +3575,7 @@
     {
       "owner": "ScriptingCANBuffer",
       "name": "add_filter",
-      "line": 763,
+      "line": 764,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3583,7 +3583,7 @@
     {
       "owner": "ScriptingCANBuffer",
       "name": "read_frame",
-      "line": 762,
+      "line": 763,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3591,7 +3591,7 @@
     {
       "owner": "ScriptingCANBuffer",
       "name": "write_frame",
-      "line": 761,
+      "line": 762,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3599,70 +3599,6 @@
     {
       "owner": "SocketAPM",
       "name": "bind",
-      "line": 670,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "connect",
-      "line": 669,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "is_connected",
-      "line": 675,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "is_pending",
-      "line": 676,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "listen",
-      "line": 673,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "pollin",
-      "line": 678,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "pollout",
-      "line": 677,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "reuseaddress",
-      "line": 679,
-      "kind": "ap-object-method",
-      "status": "unsupported",
-      "reason": "object-ownership-or-lifetime"
-    },
-    {
-      "owner": "SocketAPM",
-      "name": "send",
       "line": 671,
       "kind": "ap-object-method",
       "status": "unsupported",
@@ -3670,7 +3606,63 @@
     },
     {
       "owner": "SocketAPM",
-      "name": "sendto",
+      "name": "connect",
+      "line": 670,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "is_connected",
+      "line": 676,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "is_pending",
+      "line": 677,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "listen",
+      "line": 674,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "pollin",
+      "line": 679,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "pollout",
+      "line": 678,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "reuseaddress",
+      "line": 680,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
+      "name": "send",
       "line": 672,
       "kind": "ap-object-method",
       "status": "unsupported",
@@ -3678,8 +3670,16 @@
     },
     {
       "owner": "SocketAPM",
+      "name": "sendto",
+      "line": 673,
+      "kind": "ap-object-method",
+      "status": "unsupported",
+      "reason": "object-ownership-or-lifetime"
+    },
+    {
+      "owner": "SocketAPM",
       "name": "set_blocking",
-      "line": 674,
+      "line": 675,
       "kind": "ap-object-method",
       "status": "unsupported",
       "reason": "object-ownership-or-lifetime"
@@ -3835,7 +3835,7 @@
     {
       "owner": "Vector2f",
       "name": "angle",
-      "line": 192,
+      "line": 193,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.angle"
@@ -3843,7 +3843,7 @@
     {
       "owner": "Vector2f",
       "name": "copy",
-      "line": 196,
+      "line": 197,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.copy"
@@ -3851,7 +3851,7 @@
     {
       "owner": "Vector2f",
       "name": "is_inf",
-      "line": 190,
+      "line": 191,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.is_inf"
@@ -3859,7 +3859,7 @@
     {
       "owner": "Vector2f",
       "name": "is_nan",
-      "line": 189,
+      "line": 190,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.is_nan"
@@ -3867,7 +3867,7 @@
     {
       "owner": "Vector2f",
       "name": "is_zero",
-      "line": 191,
+      "line": 192,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.is_zero"
@@ -3875,7 +3875,7 @@
     {
       "owner": "Vector2f",
       "name": "length",
-      "line": 187,
+      "line": 188,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.length"
@@ -3883,7 +3883,7 @@
     {
       "owner": "Vector2f",
       "name": "normalize",
-      "line": 188,
+      "line": 189,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.normalize"
@@ -3891,7 +3891,7 @@
     {
       "owner": "Vector2f",
       "name": "rotate",
-      "line": 193,
+      "line": 194,
       "kind": "userdata-method",
       "status": "generated",
       "api": "Vector2f.rotate"
@@ -3899,7 +3899,7 @@
     {
       "owner": "AP_Filesystem::stat_t",
       "name": "is_directory",
-      "line": 1111,
+      "line": 1112,
       "kind": "userdata-method",
       "status": "unsupported",
       "reason": "userdata-ownership-or-mutation"
@@ -3907,22 +3907,6 @@
     {
       "owner": "AP_HAL::CANFrame",
       "name": "id_signed",
-      "line": 755,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "AP_HAL::CANFrame",
-      "name": "isErrorFrame",
-      "line": 758,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "AP_HAL::CANFrame",
-      "name": "isExtended",
       "line": 756,
       "kind": "userdata-method",
       "status": "unsupported",
@@ -3930,8 +3914,24 @@
     },
     {
       "owner": "AP_HAL::CANFrame",
-      "name": "isRemoteTransmissionRequest",
+      "name": "isErrorFrame",
+      "line": 759,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "AP_HAL::CANFrame",
+      "name": "isExtended",
       "line": 757,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "AP_HAL::CANFrame",
+      "name": "isRemoteTransmissionRequest",
+      "line": 758,
       "kind": "userdata-method",
       "status": "unsupported",
       "reason": "userdata-ownership-or-mutation"
@@ -3939,30 +3939,6 @@
     {
       "owner": "AP_Scripting_SerialAccess",
       "name": "available",
-      "line": 470,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "AP_Scripting_SerialAccess",
-      "name": "configure_parity",
-      "line": 464,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "AP_Scripting_SerialAccess",
-      "name": "read",
-      "line": 468,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "AP_Scripting_SerialAccess",
-      "name": "set_flow_control",
       "line": 471,
       "kind": "userdata-method",
       "status": "unsupported",
@@ -3970,7 +3946,7 @@
     },
     {
       "owner": "AP_Scripting_SerialAccess",
-      "name": "set_stop_bits",
+      "name": "configure_parity",
       "line": 465,
       "kind": "userdata-method",
       "status": "unsupported",
@@ -3978,7 +3954,15 @@
     },
     {
       "owner": "AP_Scripting_SerialAccess",
-      "name": "set_unbuffered_writes",
+      "name": "read",
+      "line": 469,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "AP_Scripting_SerialAccess",
+      "name": "set_flow_control",
       "line": 472,
       "kind": "userdata-method",
       "status": "unsupported",
@@ -3986,8 +3970,24 @@
     },
     {
       "owner": "AP_Scripting_SerialAccess",
-      "name": "write",
+      "name": "set_stop_bits",
       "line": 466,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "AP_Scripting_SerialAccess",
+      "name": "set_unbuffered_writes",
+      "line": 473,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "AP_Scripting_SerialAccess",
+      "name": "write",
+      "line": 467,
       "kind": "userdata-method",
       "status": "unsupported",
       "reason": "userdata-ownership-or-mutation"
@@ -4016,14 +4016,6 @@
     {
       "owner": "CRSFMenu",
       "name": "id",
-      "line": 772,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "CRSFMenu",
-      "name": "name",
       "line": 773,
       "kind": "userdata-method",
       "status": "unsupported",
@@ -4031,8 +4023,16 @@
     },
     {
       "owner": "CRSFMenu",
-      "name": "num_params",
+      "name": "name",
       "line": 774,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "CRSFMenu",
+      "name": "num_params",
+      "line": 775,
       "kind": "userdata-method",
       "status": "unsupported",
       "reason": "userdata-ownership-or-mutation"
@@ -4054,7 +4054,7 @@
     {
       "owner": "CRSFParameter",
       "name": "id",
-      "line": 767,
+      "line": 768,
       "kind": "userdata-method",
       "status": "unsupported",
       "reason": "userdata-ownership-or-mutation"
@@ -4069,7 +4069,7 @@
     {
       "owner": "DroneCAN_Handle",
       "name": "subscribe",
-      "line": 1181,
+      "line": 1182,
       "kind": "userdata-method",
       "status": "unsupported",
       "reason": "userdata-ownership-or-mutation"
@@ -4105,7 +4105,7 @@
     {
       "owner": "Parameter",
       "name": "configured",
-      "line": 543,
+      "line": 544,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "shared-parameter-adapter"
@@ -4113,30 +4113,6 @@
     {
       "owner": "Parameter",
       "name": "get",
-      "line": 540,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "shared-parameter-adapter"
-    },
-    {
-      "owner": "Parameter",
-      "name": "init",
-      "line": 538,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "shared-parameter-adapter"
-    },
-    {
-      "owner": "Parameter",
-      "name": "init_by_info",
-      "line": 539,
-      "kind": "userdata-method",
-      "status": "unsupported",
-      "reason": "userdata-ownership-or-mutation"
-    },
-    {
-      "owner": "Parameter",
-      "name": "set",
       "line": 541,
       "kind": "userdata-method",
       "status": "generated",
@@ -4144,7 +4120,23 @@
     },
     {
       "owner": "Parameter",
-      "name": "set_and_save",
+      "name": "init",
+      "line": 539,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "shared-parameter-adapter"
+    },
+    {
+      "owner": "Parameter",
+      "name": "init_by_info",
+      "line": 540,
+      "kind": "userdata-method",
+      "status": "unsupported",
+      "reason": "userdata-ownership-or-mutation"
+    },
+    {
+      "owner": "Parameter",
+      "name": "set",
       "line": 542,
       "kind": "userdata-method",
       "status": "generated",
@@ -4152,8 +4144,16 @@
     },
     {
       "owner": "Parameter",
+      "name": "set_and_save",
+      "line": 543,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "shared-parameter-adapter"
+    },
+    {
+      "owner": "Parameter",
       "name": "set_default",
-      "line": 544,
+      "line": 545,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "shared-parameter-adapter"
@@ -4161,7 +4161,7 @@
     {
       "owner": "Quaternion",
       "name": "earth_to_body",
-      "line": 211,
+      "line": 212,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
@@ -4169,7 +4169,7 @@
     {
       "owner": "Quaternion",
       "name": "from_angular_velocity",
-      "line": 214,
+      "line": 215,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
@@ -4177,7 +4177,7 @@
     {
       "owner": "Quaternion",
       "name": "from_axis_angle",
-      "line": 213,
+      "line": 214,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
@@ -4185,38 +4185,6 @@
     {
       "owner": "Quaternion",
       "name": "from_euler",
-      "line": 209,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Quaternion",
-      "name": "get_euler_pitch",
-      "line": 207,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Quaternion",
-      "name": "get_euler_roll",
-      "line": 206,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Quaternion",
-      "name": "get_euler_yaw",
-      "line": 208,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Quaternion",
-      "name": "inverse",
       "line": 210,
       "kind": "userdata-method",
       "status": "generated",
@@ -4224,15 +4192,39 @@
     },
     {
       "owner": "Quaternion",
-      "name": "length",
-      "line": 203,
+      "name": "get_euler_pitch",
+      "line": 208,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
     },
     {
       "owner": "Quaternion",
-      "name": "normalize",
+      "name": "get_euler_roll",
+      "line": 207,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Quaternion",
+      "name": "get_euler_yaw",
+      "line": 209,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Quaternion",
+      "name": "inverse",
+      "line": 211,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Quaternion",
+      "name": "length",
       "line": 204,
       "kind": "userdata-method",
       "status": "generated",
@@ -4240,8 +4232,16 @@
     },
     {
       "owner": "Quaternion",
+      "name": "normalize",
+      "line": 205,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Quaternion",
       "name": "to_axis_angle",
-      "line": 212,
+      "line": 213,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
@@ -4249,7 +4249,7 @@
     {
       "owner": "Vector3f",
       "name": "angle",
-      "line": 183,
+      "line": 184,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
@@ -4257,7 +4257,7 @@
     {
       "owner": "Vector3f",
       "name": "copy",
-      "line": 180,
+      "line": 181,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"
@@ -4265,70 +4265,6 @@
     {
       "owner": "Vector3f",
       "name": "cross",
-      "line": 178,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "dot",
-      "line": 177,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "is_inf",
-      "line": 173,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "is_nan",
-      "line": 172,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "is_zero",
-      "line": 174,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "length",
-      "line": 170,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "normalize",
-      "line": 171,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "rotate_xy",
-      "line": 182,
-      "kind": "userdata-method",
-      "status": "generated",
-      "reason": "value-adapter"
-    },
-    {
-      "owner": "Vector3f",
-      "name": "scale",
       "line": 179,
       "kind": "userdata-method",
       "status": "generated",
@@ -4336,8 +4272,72 @@
     },
     {
       "owner": "Vector3f",
+      "name": "dot",
+      "line": 178,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "is_inf",
+      "line": 174,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "is_nan",
+      "line": 173,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "is_zero",
+      "line": 175,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "length",
+      "line": 171,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "normalize",
+      "line": 172,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "rotate_xy",
+      "line": 183,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
+      "name": "scale",
+      "line": 180,
+      "kind": "userdata-method",
+      "status": "generated",
+      "reason": "value-adapter"
+    },
+    {
+      "owner": "Vector3f",
       "name": "xy",
-      "line": 181,
+      "line": 182,
       "kind": "userdata-method",
       "status": "generated",
       "reason": "value-adapter"

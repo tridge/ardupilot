@@ -176,6 +176,8 @@ def dispatcher(tmp_path, ir, selection, request):
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+// Float parsing is tested separately against the real AP_Common implementation.
+inline float ap_strtof(const char *, char **) { __builtin_trap(); }
 #define CLASS_NO_COPY(C) C(const C &) = delete; C &operator=(const C &) = delete
 #define NUM_RC_CHANNELS 16
 struct Vector3f { float x, y, z; };
@@ -291,7 +293,7 @@ private:
 };
 ''')
     paths = ['AP_HAL/AP_HAL_Boards.h', 'AP_HAL/Semaphores.h', 'AP_Scripting/AP_Scripting_config.h',
-             'AP_Vehicle/AP_Vehicle_Type.h',
+             'AP_Vehicle/AP_Vehicle_Type.h', 'AP_Common/strtod.h',
              'AP_Scheduler/AP_Scheduler.h'] + [value['include'] for value in selection.values()]
     for name in paths:
         path = tmp_path / name
