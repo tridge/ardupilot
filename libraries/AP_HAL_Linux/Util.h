@@ -68,6 +68,11 @@ public:
 
     uint32_t available_memory(void) override;
 
+#if HAL_EXECUTABLE_MEMORY_ENABLED
+    AP_HAL::ExecutableMemory::Target executable_memory_target() const override;
+    AP_HAL::ExecutableMemory *allocate_executable(uint32_t size) override;
+#endif
+
     bool get_system_id(char buf[50]) override;
     bool get_system_id_unformatted(uint8_t buf[], uint8_t &len) override;
 

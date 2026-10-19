@@ -53,6 +53,11 @@ public:
       create a new thread
      */
     bool thread_create(AP_HAL::MemberProc, const char *name, uint32_t stack_size, priority_base base, int8_t priority) override;
+
+#if HAL_OWNED_THREADS_ENABLED
+    OwnedThread *thread_create_owned(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
+                                    priority_base base, int8_t priority) override;
+#endif
     
     /*
       set cpu affinity mask to be applied on initialization - setting it
