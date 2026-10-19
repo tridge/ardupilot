@@ -13,8 +13,8 @@ AP_HAL::ExecutableMemory::Target Linux::Util::executable_memory_target() const
 #endif
 }
 
-AP_HAL::ExecutableMemory *Linux::Util::allocate_executable(uint32_t size)
+AP_HAL::ExecutableMemory *Linux::Util::allocate_executable(uint32_t size, uint32_t alignment)
 {
-    return ExecutableMemoryPosix::create(size);
+    return ExecutableMemoryPosix::create(size, alignment);
 }
 #endif
