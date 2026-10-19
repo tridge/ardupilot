@@ -95,7 +95,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
             // Ordinary RW storage may use memory (for example F405 CCM) from
             // which instructions cannot be fetched.
             const uint32_t executable_size = arm ? image.code_size() : image.memory_size();
-            module->_rx_memory = hal.util->allocate_executable(executable_size);
+            module->_rx_memory = hal.util->allocate_executable(executable_size, image.rx_alignment());
             if (module->_rx_memory == nullptr) {
                 delete module;
                 return nullptr;
@@ -129,7 +129,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
         }
     } else {
         // APRUST04 compatibility images require one contiguous allocation.
-        module->_rx_memory = hal.util->allocate_executable(image.memory_size());
+        module->_rx_memory = hal.util->allocate_executable(image.memory_size(), image.rx_alignment());
         if (module->_rx_memory == nullptr) {
             delete module;
             return nullptr;

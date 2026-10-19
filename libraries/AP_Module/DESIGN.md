@@ -110,8 +110,11 @@ target offsets. Imports are sorted by slot; at most 4096 imports and 63-byte nam
 are accepted. Duplicate hashes/slots, invalid placeholders and overlaps with
 pointer fixups are rejected.
 
-The logical RX boundary is 4096-byte aligned. Segment alignments are powers of
-two from pointer width through 4096, derived from ELF requirements. RW includes
+The logical RX boundary is word-aligned on ARM and 4096-byte aligned on x86-64
+for POSIX permission separation. Segment alignments are powers of two from
+pointer width through 4096, derived from ELF requirements. RAM-loaded ARM RX
+allocations isolate 32-byte cache lines and honor larger ELF alignment; ROMFS
+payloads need only their ELF alignment. RW includes
 initialized data and zero-filled BSS. Parsing checks bounds, overflow, entry,
 fixup destinations/targets, imports, target, core compatibility and configured
 budgets before publication. Stack declarations are trusted metadata, not a proof.

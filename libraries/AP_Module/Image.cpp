@@ -86,6 +86,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     const uint32_t code_size = word(source + 32);
     const uint32_t entry = word(source + 36);
     const uint32_t count = word(source + 40);
+    const uint32_t boundary = split && machine == 40 ? 4 : ALIGNMENT;
     if (!((machine == 40 && width == 4) || (machine == 62 && width == 8)) ||
         width != sizeof(uintptr_t) ||
         (split ? (rw_alignment < width || rw_alignment > ALIGNMENT || (rw_alignment & (rw_alignment - 1)) != 0 ||
@@ -93,8 +94,8 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
          alignment != ALIGNMENT) ||
         file_size == 0 ||
         file_size > memory_size || memory_size > memory_limit || memory_size > MAX_IMAGE ||
-        code_size == 0 || code_size % ALIGNMENT != 0 ||
-        code_size > ((memory_size + ALIGNMENT - 1) & ~(ALIGNMENT - 1)) ||
+        code_size == 0 || code_size % boundary != 0 ||
+        code_size > ((memory_size + boundary - 1) & ~(boundary - 1)) ||
         (split && code_size > file_size) ||
         entry >= code_size || entry >= file_size || (machine == 40 && (entry & 1) == 0) ||
         count > file_size / width || import_count > file_size / 4 || import_count > MAX_IMPORTS) {
@@ -348,7 +349,8 @@ bool Image::load_split(void *rx_base, size_t rx_size, void *rw_base, size_t rw_s
     const uintptr_t rx_address = reinterpret_cast<uintptr_t>(rx_base);
     const uintptr_t rw_address = reinterpret_cast<uintptr_t>(rw_base);
     const uintptr_t source_address = reinterpret_cast<uintptr_t>(_source);
-    if ((!borrowed_rx && rx_address % ALIGNMENT != 0) ||
+    const uint32_t rx_alignment = _machine == 40 ? _rx_alignment : ALIGNMENT;
+    if (rx_address % rx_alignment != 0 ||
         (_memory_size > _code_size && rw_address % _rw_alignment != 0) ||
         (_machine == 62 && rw_address != rx_address + _code_size) ||
         rx_address > UINTPTR_MAX - _code_size ||

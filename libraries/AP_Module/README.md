@@ -135,7 +135,9 @@ Enable and memory/module-count changes require reboot.
 | `RUST_RUN_CSUM` | -1 | Required running-file checksum; -1 disables |
 | `RUST_DEBUG_OPTS` | 0 | Debug options described below |
 
-The image limit rounds up to 4096 bytes; only the actual image is allocated.
+The image budget rounds up to 4096 bytes; this does not pad stored ARM modules.
+Only the actual image is allocated, with cache-line rounding for ARM RX RAM
+and page rounding on POSIX. Larger ELF alignment requirements are preserved.
 The HAL rounds stack requests to its minimum/alignment. Reports separate owned
 RX, owned RW, stack reservations and heap usage. Borrowed ROMFS RX reports zero
 owned RX bytes. Allocator bookkeeping, loader scratch, manager storage and

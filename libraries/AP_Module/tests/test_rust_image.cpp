@@ -466,6 +466,16 @@ TEST(RustImage, RejectMalformedSplitImages)
                                  RuntimeContainer::compatibility())) << mutation.offset;
     }
 
+    if (sizeof(uintptr_t) == 8) {
+        // A word-aligned but non-page RX boundary remains invalid on POSIX:
+        // otherwise mprotect could make the first RW bytes read-only too.
+        SplitContainer short_page;
+        short_page.put(32, SplitContainer::code_size - sizeof(uintptr_t));
+        short_page.checksum();
+        EXPECT_FALSE(image.parse(short_page.bytes, sizeof(short_page.bytes), 8192,
+                                 RuntimeContainer::compatibility()));
+    }
+
     SplitContainer nonzero;
     nonzero.put_pointer(SplitContainer::header_size + SplitContainer::code_size,
                         SplitContainer::memory_size + 1);
