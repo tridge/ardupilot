@@ -16,6 +16,27 @@ public:
     int vsnprintf(char* str, size_t size,
                   const char *format, va_list ap);
 
+    // Experimental typed bridge to the native printf ABI. No allocation.
+    struct FormatArg {
+        enum class Type : uint8_t { INT32 = 1, UINT32, INT64, UINT64, FLOAT64, STRING };
+        Type type;
+        union {
+            int32_t i32;
+            uint32_t u32;
+            int64_t i64;
+            uint64_t u64;
+            double real;
+            const char *text;
+        };
+    };
+    static constexpr uint8_t FORMAT_MAX_ARGS = 8;
+    // Supports d/i/u/o/x/X/c/s/f/e/g (and uppercase float forms), ll integers,
+    // literal widths <=255 and precisions <=60. Rejects mismatched/unused args,
+    // *, positional arguments, other length modifiers, %p and %n with -1.
+    // Otherwise returns snprintf's required length, which may exceed size.
+    int snprintf_args(char *str, size_t size, const char *format,
+                      const FormatArg *arguments, uint8_t count);
+
     virtual void set_soft_armed(const bool b);
     bool get_soft_armed() const { return soft_armed; }
 
