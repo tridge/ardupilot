@@ -15,6 +15,8 @@ extern const uint8_t __firmware_crc_ext_end__;
 
 namespace
 {
+constexpr uint32_t CACHE_ALIGNMENT = 32;
+
 class ExecutableMemoryChibiOS final : public AP_HAL::ExecutableMemory
 {
 public:
@@ -39,12 +41,12 @@ public:
 
     bool publish(uint32_t code_size) override
     {
-        if (_published || code_size == 0 || code_size > _size || code_size % 4096 != 0) {
+        if (_published || code_size == 0 || code_size > _size) {
             return false;
         }
         // Clean and invalidate relocated code in D-cache before invalidating I-cache.
         // Payload alignment/rounding ensures cache lines are exclusively ours.
-        stm32_cacheBufferFlush(_data, code_size);
+        stm32_cacheBufferFlush(_data, (code_size + CACHE_ALIGNMENT - 1) & ~(CACHE_ALIGNMENT - 1));
         __DSB();
 #if defined(__ICACHE_PRESENT) && __ICACHE_PRESENT == 1U
         SCB_InvalidateICache();
@@ -73,7 +75,7 @@ AP_HAL::ExecutableMemory::Target ChibiOS::Util::executable_memory_target() const
 #endif
 }
 
-AP_HAL::ExecutableMemory *ChibiOS::Util::allocate_executable(uint32_t size)
+AP_HAL::ExecutableMemory *ChibiOS::Util::allocate_executable(uint32_t size, uint32_t alignment)
 {
     // Start with explicitly verified MCU memory maps. Never fall back to
     // arbitrary fast RAM: F405 CCM cannot be used for instruction fetches.
@@ -87,10 +89,12 @@ AP_HAL::ExecutableMemory *ChibiOS::Util::allocate_executable(uint32_t size)
     return nullptr;
 #endif
 #if defined(STM32H743xx) || defined(STM32H757xx) || defined(STM32F405xx)
-    if (size == 0 || size > 16U * 1024 * 1024) {
+    if (size == 0 || size > 16U * 1024 * 1024 ||
+        (alignment != 0 && (alignment < sizeof(uintptr_t) || alignment > 4096 || (alignment & (alignment - 1)) != 0))) {
         return nullptr;
     }
-    size = (size + 4095) & ~4095U;
+    size = (size + CACHE_ALIGNMENT - 1) & ~(CACHE_ALIGNMENT - 1);
+    alignment = alignment < CACHE_ALIGNMENT ? CACHE_ALIGNMENT : alignment;
     memory_heap_t *heaps;
     const memory_region *regions;
     const uint8_t count = malloc_get_heaps(&heaps, &regions);
@@ -101,13 +105,13 @@ AP_HAL::ExecutableMemory *ChibiOS::Util::allocate_executable(uint32_t size)
         }
         // Overalignment through the default heap's core provider consumes
         // padding which chHeapFree cannot recover. Own a normally aligned raw
-        // block there, so page-alignment slack is charged and released. Fixed
+        // block there, so alignment slack is charged and released. Fixed
         // region heaps already retain their alignment fragments in free lists.
-        void *allocation = i == 0 ? chHeapAlloc(nullptr, size + 4096) : chHeapAllocAligned(&heaps[i], size, 4096);
+        void *allocation = i == 0 ? chHeapAlloc(nullptr, size + alignment - 1) : chHeapAllocAligned(&heaps[i], size, alignment);
         if (allocation == nullptr) {
             continue;
         }
-        const uintptr_t aligned_address = (reinterpret_cast<uintptr_t>(allocation) + 4095) & ~uintptr_t(4095);
+        const uintptr_t aligned_address = (reinterpret_cast<uintptr_t>(allocation) + alignment - 1) & ~uintptr_t(alignment - 1);
         void *data = reinterpret_cast<void *>(aligned_address);
         memset(data, 0, size);
         auto *memory = NEW_NOTHROW ExecutableMemoryChibiOS(allocation, data, size);
