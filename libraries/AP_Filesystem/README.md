@@ -121,7 +121,11 @@ implements parameter download via ftp.
 
 ## The @SYS VFS
 
-The @SYS VFS gives access to flight controller internals. For now the
-only file that is accessible is @SYS/threads.txt which gives
-information on the remaining stack space for all threads. This file is
-only accessible for ChibiOS builds.
+The @SYS VFS gives access to flight controller internals. `@SYS/threads.txt`
+reports HAL threads on ChibiOS and SITL and can be downloaded over MAVFTP.
+Stack values are `free/total` bytes, with free space measured by the stack's
+high-water mark. SITL reports `?` where measurements are unavailable: ordinary
+libc-managed stacks are not painted, while owned Rust worker stacks are.
+On SITL, `PRI` is the host scheduling priority, not an emulated ChibiOS priority.
+Returned owned workers remain listed as `EXITED` until reaped. The listing
+covers the main thread and HAL-created workers, not arbitrary host-library threads.
