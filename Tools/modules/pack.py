@@ -73,13 +73,14 @@ def pack_elf(data, manifest=None):
     memory_size = end - base
     file_size = max(s['sh_addr'] + s['sh_size'] - base for _, s in sections if s['sh_type'] != 'SHT_NOBITS')
     writable = [s['sh_addr'] - base for _, s in sections if s['sh_flags'] & 1]
-    rx_size = min(writable) if writable else (memory_size + PAGE - 1) // PAGE * PAGE
-    require(rx_size > 0 and rx_size % PAGE == 0, 'data must start on a separate page')
-    # The stored RX image is page-sized even when the final read-only section
-    # ends earlier. This makes code_size both a byte count and the RW offset.
+    boundary = width if manifest is not None and machine == 40 else PAGE
+    rx_size = min(writable) if writable else (memory_size + boundary - 1) // boundary * boundary
+    require(rx_size > 0 and rx_size % boundary == 0, 'invalid RX/RW boundary alignment')
+    # The RX byte count is also the logical RW offset. Only POSIX and legacy
+    # images need a page boundary; split ARM images retain ELF section alignment.
     file_size = max(file_size, rx_size)
     memory_size = max(memory_size, rx_size)
-    # APRUST05 keeps the fixed RX page boundary but allocates RW separately.
+    # APRUST05 allocates RW separately on ARM, without requiring page padding.
     # Each half of the alignment word preserves one segment's ELF alignment.
     rw_alignment = max([width] + [s['sh_addralign'] for _, s in sections if s['sh_flags'] & 1])
     rx_alignment = max([width] + [s['sh_addralign'] for _, s in sections if not s['sh_flags'] & 1])
@@ -269,7 +270,9 @@ def unpack(data):
         require(alignment == PAGE, 'unsupported module alignment')
         rw_alignment = rx_alignment = PAGE
     require(0 < file_size <= memory_size <= MAX_IMAGE, 'invalid module sizes')
-    require(0 < rx_size <= (memory_size + PAGE - 1) // PAGE * PAGE and rx_size % PAGE == 0, 'invalid code boundary')
+    boundary = width if compact and machine == 40 else PAGE
+    require(0 < rx_size <= (memory_size + boundary - 1) // boundary * boundary and rx_size % boundary == 0,
+            'invalid code boundary')
     require(entry < min(rx_size, file_size) and (machine != 40 or entry & 1), 'invalid entry')
     require(count <= file_size // width, 'too many relocations')
     require(import_count <= min(file_size // 4, MAX_IMPORTS), 'too many imports')
@@ -340,7 +343,8 @@ def unpack(data):
 
 def relocate(data, base, rw_base=None):
     module = unpack(data)
-    require(base >= 0 and base % PAGE == 0, 'unaligned load address')
+    rx_alignment = module['rx_alignment'] if data[:8] == RUNTIME_MAGIC and module['machine'] == 40 else PAGE
+    require(base >= 0 and base % rx_alignment == 0, 'unaligned load address')
     if rw_base is None:
         rw_base = base + module['rx_size']
     rw_alignment = module['rw_alignment']

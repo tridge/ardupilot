@@ -40,7 +40,10 @@ def test_exact_section_and_container_breakdown(image):
     allocated = sum(section['sh_size'] for section in elf.iter_sections()
                     if section['sh_flags'] & 2 and section['sh_type'] != 'SHT_NOBITS')
     assert sizes['Image padding'] == len(module['image']) - allocated
-    assert sizes['Image padding'] > 0
+    if module['machine'] == 40:
+        assert sizes['Image padding'] < 32
+    else:
+        assert sizes['Image padding'] > 0
     assert sizes['Container header'] == 80
     assert sizes['Relocation table'] == 4 * len(module['fixups'])
     assert sizes['Import table'] == 16 * len(module['imports'])

@@ -79,7 +79,7 @@ def test_sitl_math(tmp_path, lua, module):
 
 @pytest.mark.parametrize('module', [
     'math', 'ahrs_unavailable', 'compat', 'categories', 'enums', 'strings', 'libm',
-    'rc_channel_harness', 'values', 'files', 'logs', 'printf',
+    'rc_channel_harness', 'values', 'files', 'logs', 'printf', 'alignment',
 ])
 def test_chibios_math(tmp_path, renode, module):  # noqa: F811
     chibios_probe(tmp_path, renode, module)

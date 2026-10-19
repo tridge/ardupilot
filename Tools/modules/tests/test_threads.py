@@ -66,5 +66,5 @@ sysbus ReadDoubleWord 0x%X
         # The allocator must not select ITCM/DTCM/CCM or an unrelated SRAM bank.
         expected = {'STM32H743xx': (0x24000000, 0x24080000), 'STM32F405xx': (0x20000000, 0x20020000)}
         lower, upper = expected[generated['mcu_type']]
-        assert lower <= values[1] < upper and values[1] % 4096 == 0, output
+        assert lower <= values[1] < upper and values[1] % 32 == 0, output
     print(f'{board} {example}: free memory before={values[2]} after={values[3]}')

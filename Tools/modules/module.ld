@@ -13,7 +13,9 @@ SECTIONS
     .text : { *(.text .text.*) }
     .rodata : { *(.rodata .rodata.*) }
     .ARM.exidx : { *(.ARM.exidx .ARM.exidx.*) }
-    . = ALIGN(4096);
+    /* ARM split images need only word separation. Keep the default page
+       boundary for POSIX permission changes and legacy relocation probes. */
+    . = ALIGN(DEFINED(MODULE_DATA_ALIGNMENT) ? MODULE_DATA_ALIGNMENT : 4096);
     .data : {
         *(.data .data.*)
         *(.data.rel.ro .data.rel.ro.*)

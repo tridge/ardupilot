@@ -39,16 +39,19 @@ fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
     subprocess.run([os.environ.get('RUSTC', 'rustc'), str(source), '--edition=2021',
                     '--target', 'thumbv7em-none-eabihf', '-C', 'opt-level=s', '-C', 'panic=abort',
                     '-C', 'relocation-model=ropi-rwpi', '-C', f'link-arg=-T{HERE / "module.ld"}',
-                    '-C', 'link-arg=--emit-relocs', '-o', str(output)], check=True, capture_output=True)
+                    '-C', 'link-arg=--emit-relocs', '-C', 'link-arg=--defsym=MODULE_DATA_ALIGNMENT=4',
+                    '-o', str(output)], check=True, capture_output=True)
     manifest = dict(abi_version=1, cpu_profile=1, stack_size=4096, fingerprint=bytes(range(1, 17)).hex())
     return pack.pack_elf(output.read_bytes(), manifest)
 
 
-@pytest.mark.parametrize('alignment', [16, 64, 4096])
+@pytest.mark.parametrize('alignment', [4, 16, 64, 4096])
 def test_rw_alignment_and_odd_byte_pointer(tmp_path, alignment):
     data = arm_module(tmp_path, alignment)
     module = pack.unpack(data)
     assert module['rw_alignment'] == alignment
+    if alignment < 4096:
+        assert module['rx_size'] < 4096
     pointer_offset, target = next((offset, target) for offset, target in module['fixups']
                                   if offset >= module['rx_size'] and target >= module['rx_size'])
     assert target % alignment == 1
@@ -57,6 +60,9 @@ def test_rw_alignment_and_odd_byte_pointer(tmp_path, alignment):
     pointer = int.from_bytes(loaded[pointer_offset:pointer_offset + 4], 'little')
     assert pointer == rw_base + target - module['rx_size']
     assert pointer & 1
+    # ARM RX placement follows ELF alignment, not a hard-coded page boundary.
+    loaded = pack.relocate(data, 0x08000000 + module['rx_alignment'], rw_base)
+    assert int.from_bytes(loaded[pointer_offset:pointer_offset + 4], 'little') == pointer
     with pytest.raises(ValueError, match='unaligned RW'):
         pack.relocate(data, 0x08000000, rw_base + alignment // 2)
 

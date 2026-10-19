@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Unit tests for the Rust module builder."""
 
+import pack
 import pytest
 
 from elftools.elf.elffile import ELFFile
@@ -46,3 +47,16 @@ fn run(context: &Context<'_>) -> Result {
         assert all(not symbol.name or symbol['st_shndx'] != 'SHN_UNDEF'
                    for symbol in elf.get_section_by_name('.symtab').iter_symbols())
         assert not any(section.name.startswith(('.eh_frame', '.gcc_except_table')) for section in elf.iter_sections())
+
+
+@pytest.mark.parametrize('target', list(build.TARGETS))
+def test_target_specific_rx_boundary(tmp_path, target):
+    source = build.SDK_ROOT / 'examples/simple_loop.rs'
+    output = build.build(source, tmp_path / 'loop.apmod', target, 8192)
+    module = pack.unpack(output.read_bytes())
+    if target == 'thumbv7em-none-eabihf':
+        assert module['rx_size'] % 4 == 0
+        assert module['rx_size'] % 4096 != 0
+        assert len(output.read_bytes()) < 8192
+    else:
+        assert module['rx_size'] % 4096 == 0

@@ -75,6 +75,8 @@ def build(source, output, target, stack_size, base=0x10000, cfg=()):
     for option in cfg:
         command += ['--cfg', option]
     link_args = [f'-T{HERE / "module.ld"}', '--emit-relocs', f'--defsym=MODULE_BASE={base}']
+    if profile == 1:
+        link_args += ['--defsym=MODULE_DATA_ALIGNMENT=4']
     if profile == 2:
         command += ['-C', 'link-arg=-nostdlib', '-C', 'link-arg=-static', '-C', 'link-arg=-no-pie']
         link_args = ['-Wl,' + arg for arg in link_args]
