@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <AP_Common/AP_Common.h> // for FMT_PRINTF
 #include "AP_HAL_Namespace.h"
+#include "ExecutableMemory.h"
 #include <AP_Logger/AP_Logger_config.h>
 
 class ExpandingString;
@@ -149,6 +150,22 @@ public:
     };
     virtual void *malloc_type(size_t size, Memory_Type mem_type) { return calloc(1, size); }
     virtual void free_type(void *ptr, size_t size, Memory_Type mem_type) { return free(ptr); }
+
+#if HAL_EXECUTABLE_MEMORY_ENABLED
+    // Only targets whose native calling convention and instruction profile
+    // have been verified for the executable-memory backend are advertised.
+    virtual AP_HAL::ExecutableMemory::Target executable_memory_target() const
+    {
+        return AP_HAL::ExecutableMemory::Target::Unsupported;
+    }
+    // Returns zero-initialized storage aligned to at least 4096 bytes, or
+    // nullptr if the board cannot safely provide executable-capable memory.
+    virtual AP_HAL::ExecutableMemory *allocate_executable(uint32_t size) { return nullptr; }
+    // True only when the complete, non-empty range is immutable memory from
+    // which this target can safely fetch instructions. The caller still owns
+    // validating the image and its instruction-set profile.
+    virtual bool is_executable(const void *address, uint32_t size) const { return false; }
+#endif
 
     /**
        how much free memory do we have in bytes. If unknown return 4096

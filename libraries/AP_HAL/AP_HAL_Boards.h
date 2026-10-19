@@ -401,3 +401,30 @@
 #ifndef AP_USB_DEBUG_STARTUP_WAIT_ENABLED
 #define AP_USB_DEBUG_STARTUP_WAIT_ENABLED 0
 #endif
+
+// The native runtime and its HAL services must agree even when HAL headers
+// are included before AP_Module_config.h. Explicit build overrides win.
+#ifndef AP_MODULE_ENABLED
+// WebAssembly cannot execute native module machine code.
+#if defined(__EMSCRIPTEN__) || (defined(AP_SCRIPTING_ENABLED) && !AP_SCRIPTING_ENABLED)
+#define AP_MODULE_ENABLED 0
+#else
+#define AP_MODULE_ENABLED (HAL_PROGRAM_SIZE_LIMIT_KB > 2048)
+#endif
+#endif
+
+#ifndef HAL_OWNED_THREADS_ENABLED
+#if defined(AP_MODULE_ENABLED) && AP_MODULE_ENABLED
+#define HAL_OWNED_THREADS_ENABLED 1
+#else
+#define HAL_OWNED_THREADS_ENABLED 0
+#endif
+#endif
+
+#ifndef HAL_EXECUTABLE_MEMORY_ENABLED
+#if defined(AP_MODULE_ENABLED) && AP_MODULE_ENABLED
+#define HAL_EXECUTABLE_MEMORY_ENABLED 1
+#else
+#define HAL_EXECUTABLE_MEMORY_ENABLED 0
+#endif
+#endif
