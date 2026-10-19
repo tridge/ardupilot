@@ -344,6 +344,40 @@ def test_enum_and_literal_source_shapes():
         codec.rust_enums([m], '')
 
 
+def test_mav_severity_constants_from_xml(tmp_path):
+    m = contract(owner(), 'severity', enum_field('MAV_SEVERITY'), [], 1)
+    generated = codec.rust_enums([m], '')
+    for value, name in enumerate(('EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG')):
+        assert f'pub const {name}: Self = Self({value});' in generated
+    assert 'pub struct MavSeverity(pub i32)' in generated
+
+    xml = tmp_path / 'common.xml'
+    xml.write_text('''<mavlink><enums><enum name="MAV_SEVERITY">
+        <entry name="MAV_SEVERITY_INFO" value="42"/>
+        </enum></enums></mavlink>''')
+    generated = codec.rust_enums([m], '', mavlink_xml=xml)
+    assert 'pub const INFO: Self = Self(42);' in generated
+    assert 'pub const INFO: Self = Self(6);' not in generated
+
+
+@pytest.mark.parametrize('body', [
+    '',
+    '<enum name="MAV_SEVERITY"/>',
+    '<enum name="MAV_SEVERITY"/><enum name="MAV_SEVERITY"/>',
+    '<enum name="MAV_SEVERITY"><entry name="OTHER_INFO" value="6"/></enum>',
+    '<enum name="MAV_SEVERITY"><entry name="MAV_SEVERITY_bad" value="6"/></enum>',
+    '<enum name="MAV_SEVERITY"><entry name="MAV_SEVERITY_INFO" value="2147483648"/></enum>',
+    '<enum name="MAV_SEVERITY"><entry name="MAV_SEVERITY_INFO" value="6"/>'
+    '<entry name="MAV_SEVERITY_INFO" value="7"/></enum>',
+])
+def test_mav_severity_rejects_invalid_definitions(tmp_path, body):
+    xml = tmp_path / 'common.xml'
+    xml.write_text('<mavlink><enums>' + body + '</enums></mavlink>')
+    m = contract(owner(), 'severity', enum_field('MAV_SEVERITY'), [], 1)
+    with pytest.raises(ValueError, match='MAVLink enum'):
+        codec.rust_enums([m], '', mavlink_xml=xml)
+
+
 @pytest.mark.parametrize('a,b', [
     (b'', b''), (b'x', b'x' * 254), (b'percent %s %n', b'other'),
     (b'a' * 255, b'b' * 255), ('\u00e9'.encode(), b'end'),

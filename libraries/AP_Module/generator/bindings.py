@@ -42,6 +42,7 @@ import old_parameter_binding
 import onvif_binding
 import parameter_binding
 import periph_binding
+import printf_binding
 import rangefinder_proximity_binding
 import serial_binding
 import serialled_binding
@@ -399,6 +400,7 @@ def select(ir, selection, only=None):
                      if only is None or old_parameter_binding.OWNER in only else None)
     if old_parameter is not None:
         tail_last = old_parameter['methods'][-1]['id']
+    printf = printf_binding.specification(tail_last + 1)
     example_constants = example_constants_binding.select(ir)
     for owner in sorted(ir['userdata'], key=lambda o: o['name']):
         if only is None and owner['name'] in value_binding.TYPES:
@@ -732,7 +734,7 @@ def select(ir, selection, only=None):
                 old_parameter=old_parameter,
                 motor_config=motor_config, serialled=serialled, onvif=onvif, applet=applet, crsf=crsf,
                 examples=examples,
-                example_constants=example_constants,
+                example_constants=example_constants, printf=printf,
                 i2c=i2c,
                 camera=camera,
                 custom_mode=custom_mode,
@@ -754,6 +756,7 @@ def emit(contract):
            '#include <AP_Module/BindingSupport.h>', '#include <AP_Module/HostApi.h>',
            '#include <AP_Module/BindingParam.h>', '#include <AP_Module/BindingFile.h>',
            '#include <AP_Module/BindingLog.h>', '#include <AP_Module/BindingBattery.h>',
+           '#include <AP_Module/BindingPrintf.h>',
            '#include <AP_Module/BindingDroneCAN.h>',
            '#include <AP_Scripting/AP_Scripting_config.h>', '#include <AP_Vehicle/AP_Vehicle_Type.h>',
            '#include <AP_Scheduler/AP_Scheduler.h>', '#include <stdlib.h>']
@@ -866,6 +869,8 @@ def emit(contract):
         cpp += camera_binding.cpp(contract['camera'])
     cpp += ['int32_t binding_dispatch(void *context, BindingId id, const uint8_t *input, uint32_t input_size,',
             '                         uint8_t *output, uint32_t output_size)', '{', '    switch (id) {']
+    cpp += [f'    case {contract["printf"]["id"]}:',
+            '        return binding_string_format_printf(input, input_size, output, output_size);']
     for method in contract['methods']:
         cpp += [f'    case {method["id"]}:',
                 f'        return binding_{method["id"]}(input, input_size, output, output_size);']
@@ -1077,6 +1082,7 @@ def emit(contract):
         'Bindings_generated.cpp': cpp_output,
         'sdk/src/bindings.rs': rust_output,
         'sdk/src/enums.rs': singleton_binding.rust_enums(contract['methods'], notice),
+        'sdk/src/format.rs': printf_binding.rust(contract['printf'], notice),
         'sdk/src/borrowed.rs': borrowed_binding.rust(
             [m for m in contract['methods'] if m.get('receiver')], notice, singleton_binding.rust),
         'sdk/src/values.rs': value_binding.rust(contract['methods'], notice, singleton_binding.rust),

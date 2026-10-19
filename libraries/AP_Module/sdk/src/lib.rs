@@ -3,7 +3,6 @@
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_void;
-use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::panic::PanicInfo;
 use core::ptr;
@@ -46,6 +45,8 @@ generated_module!(example_constants);
 generated_module!(examples);
 generated_module!(file);
 generated_module!(filesystem);
+generated_module!(format);
+mod gcs;
 generated_module!(log);
 generated_module!(mavlink);
 generated_module!(imports);
@@ -55,6 +56,7 @@ generated_module!(network);
 generated_module!(strtof);
 generated_module!(math);
 mod memory;
+mod printf;
 generated_module!(motor_config);
 generated_module!(onvif);
 generated_module!(old_parameter);
@@ -114,6 +116,7 @@ pub use serial::{SerialFlowControl, SerialParity, SerialPort, SerialStopBits, SE
 pub use telemetry::{EscTelemetryUpdate, ServoTelemetryData, ServoTelemetryUpdate};
 pub use log::LogValue;
 pub use values::{Location, MissionItem, Vector2f};
+pub use printf::{PrintfArg, PrintfText};
 
 /// A bounded copy of a static firmware version string.
 ///
@@ -180,6 +183,12 @@ impl Import {
 #[cfg(test)]
 mod binding_tests;
 #[cfg(test)]
+mod gcs_tests;
+#[cfg(test)]
+mod printf_tests;
+#[cfg(test)]
+mod panic_tests;
+#[cfg(test)]
 mod analog_pwm_tests;
 #[cfg(test)]
 mod camera_tests;
@@ -211,6 +220,7 @@ mod singleton_tests;
 mod serial_tests;
 
 static ENTERED: AtomicBool = AtomicBool::new(false);
+static PANICKING: AtomicBool = AtomicBool::new(false);
 static HOST: AtomicPtr<api::HostApi> = AtomicPtr::new(ptr::null_mut());
 static CONTEXT: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
@@ -370,17 +380,43 @@ unsafe impl GlobalAlloc for Allocator {
     }
 }
 
-struct PanicMessage {
-    bytes: [u8; 192],
-    length: usize,
+fn panic_prefix(text: &str, maximum: usize) -> &str {
+    let mut end = text.len().min(maximum);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    // end is in bounds and was rounded down to a UTF-8 boundary above. Avoid
+    // str's indexing panic machinery (including Unicode debug formatting) here.
+    unsafe { text.get_unchecked(..end) }
 }
 
-impl Write for PanicMessage {
-    fn write_str(&mut self, value: &str) -> fmt::Result {
-        let count = value.len().min(self.bytes.len() - self.length);
-        self.bytes[self.length..self.length + count].copy_from_slice(&value.as_bytes()[..count]);
-        self.length += count;
-        Ok(())
+fn panic_text(
+    context: &Context<'_>,
+    message: &str,
+    location: Option<(&str, u32, u32)>,
+) -> Result<PrintfText> {
+    if let Some((file, line, column)) = location {
+        // Keep the filename end, where the useful component lives. Together
+        // these bounds fit both the string pool and worst-case 255-byte output.
+        let mut start = file.len().saturating_sub(128);
+        while !file.is_char_boundary(start) {
+            start += 1;
+        }
+        // start is in bounds and was rounded up to a UTF-8 boundary above.
+        let file = unsafe { file.get_unchecked(start..) };
+        context.string().format_printf(
+            "%s at %s:%u:%u",
+            &[
+                panic_prefix(message, 96).into(),
+                file.into(),
+                line.into(),
+                column.into(),
+            ],
+        )
+    } else {
+        context
+            .string()
+            .format_printf("%s", &[panic_prefix(message, 192).into()])
     }
 }
 
@@ -391,34 +427,45 @@ impl Write for PanicMessage {
 pub fn panic(info: &PanicInfo<'_>) -> ! {
     let host = HOST.load(Ordering::Acquire);
     if !host.is_null() {
-        let mut message = PanicMessage {
-            bytes: [0; 192],
-            length: 0,
-        };
         // Formatting a user-supplied Display value can allocate or panic
-        // recursively. Only copy a literal message and format primitive
-        // location fields; never invoke arbitrary user formatting here.
-        let _ = message.write_str(
-            info.message()
-                .as_str()
-                .unwrap_or("Rust panic (formatted message omitted)"),
-        );
-        if let Some(location) = info.location() {
-            let _ = write!(
-                &mut message,
-                " at {}:{}:{}",
-                location.file(),
-                location.line(),
-                location.column()
-            );
-        }
+        // recursively. Pass only a literal message and primitive location
+        // fields to firmware printf instead of Rust's formatting machinery.
+        let recursive = PANICKING.swap(true, Ordering::Relaxed);
+        let fallback = if recursive {
+            "Rust panic while reporting panic"
+        } else {
+            panic_prefix(
+                info.message()
+                    .as_str()
+                    .unwrap_or("Rust panic (formatted message omitted)"),
+                192,
+            )
+        };
         unsafe {
             if let Some(report) = (*host).panic {
-                report(
-                    CONTEXT.load(Ordering::Relaxed),
-                    message.bytes.as_ptr(),
-                    message.length as u32,
-                );
+                let raw = CONTEXT.load(Ordering::Relaxed);
+                let context = Context {
+                    api: &*host,
+                    raw,
+                    _not_send_sync: PhantomData,
+                };
+                let formatted = if recursive {
+                    Err(Error::Host)
+                } else {
+                    panic_text(
+                        &context,
+                        fallback,
+                        info.location()
+                            .map(|location| (location.file(), location.line(), location.column())),
+                    )
+                };
+                // Formatting can be rejected after stop, or fail for malformed
+                // input. Still mark the module panicked using bounded raw text.
+                let message = formatted
+                    .as_ref()
+                    .map(PrintfText::as_str)
+                    .unwrap_or(fallback);
+                report(raw, message.as_ptr(), message.len() as u32);
             }
         }
     }

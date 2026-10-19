@@ -36,6 +36,7 @@ GENERATED = [
     'sdk/src/examples.rs',
     'sdk/src/file.rs',
     'sdk/src/filesystem.rs',
+    'sdk/src/format.rs',
     'sdk/src/i2c.rs',
     'sdk/src/imports.rs',
     'sdk/src/libm.rs',
@@ -81,6 +82,7 @@ def build(bld):
     targets = [bld.bldnode.find_or_declare('libraries/AP_Module/' + name) for name in GENERATED]
     sources = generator.ant_glob('*.py *.json')
     sources += lua_generator.ant_glob('*.py templates/*.tmpl description/bindings.desc')
+    sources += [bld.srcnode.make_node('modules/mavlink/message_definitions/v1.0/common.xml')]
     bld(
         name='rust_bindings',
         source=sources,

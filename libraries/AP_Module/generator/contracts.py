@@ -135,6 +135,8 @@ def describe(spec):
     add(method, method['name'], method['arguments'], method['result'], method['policy'])
     method = spec['strtof']
     add(method, method['name'], method['arguments'], method['result'], method['policy'])
+    method = spec['printf']
+    add(method, method['name'], method['arguments'], method['result'], method['policy'])
     method = spec['battery']
     add(method, method['name'], method['arguments'], method['result'], method['policy'])
     for method in spec['dronecan']['methods']:

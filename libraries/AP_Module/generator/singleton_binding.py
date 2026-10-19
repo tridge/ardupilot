@@ -3,11 +3,16 @@
 """Signature-category codecs and adapters for declarative singleton methods."""
 
 import re
+import xml.etree.ElementTree as ET
+
+from pathlib import Path
 
 import borrowed_binding
 import fwversion_binding
 import math_binding
 import value_binding
+
+MAVLINK_COMMON = Path(__file__).resolve().parents[3] / 'modules/mavlink/message_definitions/v1.0/common.xml'
 
 SCALARS = {'boolean': ('bool', 1), 'uint8_t': ('u8', 1), 'uint16_t': ('u16', 2),
            'uint32_t': ('u32', 4), 'int8_t': ('i8', 1), 'int16_t': ('i16', 2),
@@ -259,17 +264,41 @@ def rust_type(field):
     return 'crate::enums::' + enum_name(field['enum']) if field['type'] == 'enum' else TYPES[field['type']][0]
 
 
-def rust_enums(methods, notice):
+def mavlink_constants(path, name):
+    enums = ET.parse(path).getroot().findall(f"./enums/enum[@name='{name}']")
+    if len(enums) != 1:
+        raise ValueError(f'missing or duplicate MAVLink enum {name}')
+    constants = {}
+    prefix = name + '_'
+    for entry in enums[0].findall('entry'):
+        full_name = entry.get('name', '')
+        member = full_name[len(prefix):]
+        if not full_name.startswith(prefix) or not re.fullmatch(r'[A-Z][A-Z0-9_]*', member):
+            raise ValueError(f'invalid MAVLink enum member {entry.get("name")}')
+        value = int(entry.attrib['value'], 0)
+        if member in constants or not -(1 << 31) <= value < 1 << 31:
+            raise ValueError(f'duplicate or out-of-range MAVLink enum member {member}')
+        constants[member] = value
+    if not constants:
+        raise ValueError(f'empty MAVLink enum {name}')
+    return constants
+
+
+def rust_enums(methods, notice, mavlink_xml=MAVLINK_COMMON):
     names = sorted({a['enum'] for m in methods for a in [m['result']] + m['arguments'] if a['type'] == 'enum'})
     if len({enum_name(name) for name in names}) != len(names):
         raise ValueError('duplicate Rust enum name')
     lines = [notice, '// Distinct numeric enum types; firmware validates binding-specific ranges.',
-             '// Numeric constants are not exported by the description IR; modules must use',
-             '// documented protocol/parameter values, checked against firmware in their tests.', '']
+             '// Named constants are generated from protocol definitions where available.', '']
     for name in names:
         lines += [f'/// `{name}` from bindings.desc. Unknown numeric values remain representable.',
                   '#[repr(transparent)]', '#[derive(Clone, Copy, Debug, Eq, PartialEq)]',
                   f'pub struct {enum_name(name)}(pub i32);', '']
+        if name == 'MAV_SEVERITY':
+            lines += ['// Values from MAVLink common.xml.', f'impl {enum_name(name)} {{']
+            lines += [f'    pub const {member}: Self = Self({value});'
+                      for member, value in mavlink_constants(mavlink_xml, name).items()]
+            lines += ['}', '']
     return '\n'.join(lines)
 
 
