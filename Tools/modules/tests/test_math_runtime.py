@@ -8,6 +8,8 @@ import re
 import shutil
 import subprocess
 
+from pathlib import Path
+
 import pytest
 
 from elftools.elf.elffile import ELFFile
@@ -77,7 +79,7 @@ def test_sitl_math(tmp_path, lua, module):
 
 @pytest.mark.parametrize('module', [
     'math', 'ahrs_unavailable', 'compat', 'categories', 'enums', 'strings', 'libm',
-    'rc_channel_harness', 'values', 'files', 'logs',
+    'rc_channel_harness', 'values', 'files', 'logs', 'printf',
 ])
 def test_chibios_math(tmp_path, renode, module):  # noqa: F811
     chibios_probe(tmp_path, renode, module)
@@ -86,7 +88,8 @@ def test_chibios_math(tmp_path, renode, module):  # noqa: F811
 def chibios_probe(tmp_path, emulator, module, oracle=None, files=None, heap_limit=128, expected_heap=4096,
                   expected_code=65536, cycles=20, timeout_ms=5000):
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
-    executable = ROOT / 'build' / board / 'examples/RustMath'
+    build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
+    executable = build_root / board / 'examples/RustMath'
     if not executable.is_file():
         pytest.skip('Build examples/RustMath with --enable-modules')
     if not shutil.which('mcopy') or not shutil.which('mmd'):

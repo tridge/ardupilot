@@ -49,8 +49,8 @@ fn unused(context: &Context<'_>) -> Result { let _ = context.ahrs().get_gyro()?;
 
 def test_only_live_imports_survive(one_import):
     info = pack.unpack(one_import)
-    assert len(info['imports']) == 1
-    binding_hash, offset, name = info['imports'][0]
+    assert {name for _, _, name in info['imports']} == {'arming.is_armed', 'string.format_printf'}
+    binding_hash, offset, name = next(entry for entry in info['imports'] if entry[2] == 'arming.is_armed')
     assert binding_hash != 0 and offset >= info['rx_size']
     assert name == 'arming.is_armed'
     assert info['image'][offset:offset + 4] == b'\xff' * 4
@@ -66,7 +66,7 @@ def test_apmod_info(one_import):
     assert f'Initialized image: {len(info["image"])} bytes' in output
     assert f'Memory image: {info["memory_size"]} bytes' in output
     assert f'RX image: {info["rx_size"]} bytes' in output
-    assert 'Imports: 1' in output
+    assert f'Imports: {len(info["imports"])}' in output
     assert f'{binding_hash:016x}  0x{offset:08x}  {name}' in output
     assert output.endswith('Validation: OK')
 
@@ -108,7 +108,7 @@ def test_invalid_import_metadata(one_import):
     with pytest.raises(ValueError, match='checksum'):
         pack.unpack(bad)
     bad = bytearray(one_import)
-    bad[records + pack.IMPORT.size] = 0
+    bad[records + len(info['imports']) * pack.IMPORT.size] = 0
     with pytest.raises(ValueError, match='import name'):
         pack.unpack(crc(bad))
     with pytest.raises(ValueError):
