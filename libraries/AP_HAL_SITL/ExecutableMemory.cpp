@@ -13,9 +13,9 @@ AP_HAL::ExecutableMemory::Target HALSITL::Util::executable_memory_target() const
 #endif
 }
 
-AP_HAL::ExecutableMemory *HALSITL::Util::allocate_executable(uint32_t size)
+AP_HAL::ExecutableMemory *HALSITL::Util::allocate_executable(uint32_t size, uint32_t alignment)
 {
-    return ExecutableMemoryPosix::create(size);
+    return ExecutableMemoryPosix::create(size, alignment);
 }
 
 bool HALSITL::Util::is_executable(const void *address, uint32_t size) const

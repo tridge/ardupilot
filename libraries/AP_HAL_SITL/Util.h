@@ -27,7 +27,7 @@ public:
 
 #if HAL_EXECUTABLE_MEMORY_ENABLED
     AP_HAL::ExecutableMemory::Target executable_memory_target() const override;
-    AP_HAL::ExecutableMemory *allocate_executable(uint32_t size) override;
+    AP_HAL::ExecutableMemory *allocate_executable(uint32_t size, uint32_t alignment = 0) override;
     bool is_executable(const void *address, uint32_t size) const override;
 #endif
 
