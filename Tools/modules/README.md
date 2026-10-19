@@ -48,6 +48,14 @@ or 16 KiB on x86-64; backend overhead is additional.
 `apmod_info.py` validates the file and reports its target, ABI, code/data sizes,
 alignments, stack requirement, relocations and imported API names. It does not
 check whether a particular firmware provides those APIs or has enough RAM.
+It automatically uses a companion `.elf` to split file size into code, read-only
+data, initialized RW data, alignment padding and container overhead. The ELF
+must reproduce the module exactly; `--elf PATH` selects a different companion,
+and `--no-elf` ignores it. Without an ELF, the tool reports the combined image
+size and container overhead; section boundaries cannot be recovered from the
+module alone. Padding means gaps between ELF sections and the RX/RW boundary,
+not zero-valued instructions or constants within a section. Stack, heap and
+zero-fill RAM are not stored in the file.
 
 `pack.py` is the lower-level ELF converter. Normal SDK builds should use
 `build.py`, which supplies the generated ABI manifest and target profile.

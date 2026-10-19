@@ -4,11 +4,15 @@
 """Validate and display metadata from an ArduPilot Rust module."""
 
 import argparse
+import io
 import struct
 
 from pathlib import Path
 
 import pack
+
+from elftools.common.exceptions import ELFError
+from elftools.elf.elffile import ELFFile
 
 MACHINES = {
     40: 'ARM',
@@ -21,7 +25,43 @@ PROFILES = {
 }
 
 
-def format_module(path, data, show_fixups=False):
+def file_breakdown(data, module, elf_data=None):
+    runtime = module['contract'] is not None
+    compact = data[:8] == pack.RUNTIME_MAGIC
+    named = data[:8] in (pack.RUNTIME_MAGIC, pack.OLD_RUNTIME_MAGIC)
+    sizes = {'Container header': pack.RUNTIME_HEADER.size if runtime else pack.HEADER.size}
+    if elf_data is None:
+        sizes['Image (code/data/padding)'] = len(module['image'])
+    else:
+        try:
+            rebuilt = pack.pack_elf(elf_data, module['contract'])
+        except ELFError as error:
+            raise ValueError(f'invalid companion ELF: {error}') from error
+        if rebuilt != data:
+            raise ValueError('companion ELF does not match module; use the matching ELF or --no-elf')
+        elf = ELFFile(io.BytesIO(elf_data))
+        sizes.update({'Code': 0, 'Read-only data': 0, 'Read-only metadata': 0, 'Initialized RW data': 0})
+        for section in elf.iter_sections():
+            if not section['sh_flags'] & 2 or section['sh_type'] == 'SHT_NOBITS':
+                continue
+            if section['sh_flags'] & 4:
+                category = 'Code'
+            elif section['sh_flags'] & 1:
+                category = 'Initialized RW data'
+            elif section.name == '.ARM.exidx':
+                category = 'Read-only metadata'
+            else:
+                category = 'Read-only data'
+            sizes[category] += section['sh_size']
+        section_size = sum(value for key, value in sizes.items() if key != 'Container header')
+        sizes['Image padding'] = len(module['image']) - section_size
+    sizes['Relocation table'] = len(module['fixups']) * (pack.FIXUP.size if compact else pack.LEGACY_FIXUP.size)
+    sizes['Import table'] = len(module['imports']) * (pack.IMPORT.size if named else pack.LEGACY_IMPORT.size)
+    sizes['Import names'] = len(data) - sum(sizes.values())
+    return sizes
+
+
+def format_module(path, data, show_fixups=False, elf_data=None, elf_path=None):
     module = pack.unpack(data)
     magic = data[:8].decode('ascii')
     version = struct.unpack_from('<I', data, 8)[0]
@@ -52,6 +92,13 @@ def format_module(path, data, show_fixups=False):
         ]
     else:
         lines.append('Runtime contract: none (relocation probe)')
+    lines.append('File breakdown:')
+    if elf_data is not None:
+        lines.append(f'  Section sizes from verified ELF: {elf_path or "<provided>"}')
+    else:
+        lines.append('  Code/data/padding split unavailable without matching ELF.')
+    lines += [f'  {label}: {size} bytes' for label, size in file_breakdown(data, module, elf_data).items()]
+    lines.append(f'  Total: {len(data)} bytes')
     lines += [
         f'Initialized image: {image_size} bytes',
         f'Memory image: {memory_size} bytes ({memory_size - image_size} bytes zero-fill)',
@@ -84,10 +131,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('module', type=Path)
     parser.add_argument('--fixups', action='store_true', help='list relocation offsets and targets')
+    elf_options = parser.add_mutually_exclusive_group()
+    elf_options.add_argument('--elf', type=Path, help='matching unstripped ELF (default: MODULE with .elf suffix)')
+    elf_options.add_argument('--no-elf', action='store_true', help='inspect only the module, ignoring any companion ELF')
     args = parser.parse_args()
     try:
         data = args.module.read_bytes()
-        output = format_module(args.module, data, args.fixups)
+        elf_path = args.elf or args.module.with_suffix('.elf')
+        elf_data = None
+        if not args.no_elf and (args.elf is not None or elf_path.is_file()):
+            elf_data = elf_path.read_bytes()
+        output = format_module(args.module, data, args.fixups, elf_data, elf_path)
     except (OSError, ValueError) as error:
         parser.exit(1, f'{parser.prog}: {args.module}: {error}\n')
     print(output)
