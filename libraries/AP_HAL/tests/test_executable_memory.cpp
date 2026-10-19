@@ -18,6 +18,8 @@ TEST(ExecutableMemory, BoundsAndPublication)
 #endif
     EXPECT_EQ(hal.util->allocate_executable(0), nullptr);
     EXPECT_EQ(hal.util->allocate_executable(UINT32_MAX), nullptr);
+    EXPECT_EQ(hal.util->allocate_executable(64, 3), nullptr);
+    EXPECT_EQ(hal.util->allocate_executable(64, 8192), nullptr);
     EXPECT_FALSE(hal.util->is_executable(nullptr, 1));
     EXPECT_FALSE(hal.util->is_executable(reinterpret_cast<const void *>(UINTPTR_MAX), 2));
     std::unique_ptr<AP_HAL::ExecutableMemory> memory(hal.util->allocate_executable(4097));

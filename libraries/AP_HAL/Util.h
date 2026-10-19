@@ -179,9 +179,11 @@ public:
     {
         return AP_HAL::ExecutableMemory::Target::Unsupported;
     }
-    // Returns zero-initialized storage aligned to at least 4096 bytes, or
-    // nullptr if the board cannot safely provide executable-capable memory.
-    virtual AP_HAL::ExecutableMemory *allocate_executable(uint32_t size) { return nullptr; }
+    // Returns zero-initialized executable-capable storage. alignment is zero
+    // for the backend default, or a power of two from pointer width to 4096.
+    // POSIX uses pages; STM32 isolates cache lines and honors larger ELF alignment.
+    // Returns nullptr when storage or the requested alignment is unavailable.
+    virtual AP_HAL::ExecutableMemory *allocate_executable(uint32_t size, uint32_t alignment = 0) { return nullptr; }
     // True only when the complete, non-empty range is immutable memory from
     // which this target can safely fetch instructions. The caller still owns
     // validating the image and its instruction-set profile.

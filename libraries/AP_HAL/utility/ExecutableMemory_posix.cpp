@@ -5,11 +5,12 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-AP_HAL::ExecutableMemory *ExecutableMemoryPosix::create(uint32_t size)
+AP_HAL::ExecutableMemory *ExecutableMemoryPosix::create(uint32_t size, uint32_t alignment)
 {
     // The initial module profiles have 4 KiB permission boundaries. Refuse
     // incompatible host page sizes rather than sharing code and data pages.
-    if (size == 0 || size > 16U * 1024 * 1024 || sysconf(_SC_PAGESIZE) != 4096) {
+    if (size == 0 || size > 16U * 1024 * 1024 || sysconf(_SC_PAGESIZE) != 4096 ||
+        (alignment != 0 && (alignment < sizeof(uintptr_t) || alignment > 4096 || (alignment & (alignment - 1)) != 0))) {
         return nullptr;
     }
     size = (size + 4095) & ~4095U;

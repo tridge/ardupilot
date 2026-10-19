@@ -7,7 +7,7 @@
 class ExecutableMemoryPosix final : public AP_HAL::ExecutableMemory
 {
 public:
-    static ExecutableMemory *create(uint32_t size);
+    static ExecutableMemory *create(uint32_t size, uint32_t alignment = 0);
     ~ExecutableMemoryPosix() override;
     void *data() const override
     {

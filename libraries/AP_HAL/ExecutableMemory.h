@@ -27,7 +27,7 @@ public:
     virtual uint32_t allocation_size() const = 0;
 
     // Publish once after loading/relocation, before executing. code_size is
-    // the page-aligned RX prefix; the rest is mutable data. On STM32 this
+    // the RX prefix (page-aligned on POSIX); the rest is mutable data. On STM32 this
     // performs cache maintenance, not per-image MPU permission enforcement.
     // Never modify the code or call it after a failed publication.
     virtual bool publish(uint32_t code_size) = 0;
