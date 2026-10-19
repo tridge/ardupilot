@@ -20,10 +20,11 @@ embed = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(embed)
 
 
-def make_apmod(fixups=((4, 9), (4096, 0)), imports=(), alignment=4, rx_alignment=4):
-    rx_size = 4096
-    file_size = 4100
-    memory_size = 4104
+def make_apmod(fixups=None, imports=(), alignment=4, rx_alignment=4, rx_size=4096):
+    if fixups is None:
+        fixups = ((4, 9), (rx_size, 0))
+    file_size = rx_size + 4
+    memory_size = rx_size + 8
     image = bytearray(file_size)
     destinations = []
     for destination, target in fixups:
@@ -49,6 +50,24 @@ def test_apmod_rw_alignment_and_odd_data_pointer(alignment):
     machine, width, rx_size, fixups = embed.apmod_details(module, 'rust/odd.apmod')
     assert (machine, width, rx_size) == (40, 4, 4096)
     assert fixups[-1] == (4096, 4097)
+
+
+@pytest.mark.parametrize('rx_size', [16, 32, 5556])
+def test_compact_arm_rx_boundary(tmp_path, rx_size):
+    contents = make_apmod(rx_size=rx_size)
+    assert embed.apmod_details(contents, 'rust/compact.apmod')[2] == rx_size
+    module = tmp_path / 'compact.apmod'
+    module.write_bytes(contents)
+    generated = generate(tmp_path, [('rust/compact.apmod', str(module))], prelink=True)
+    assert 'ap_romfs_0' in generated and '.balign 4' in generated
+
+
+def test_x86_rx_boundary_still_requires_page_alignment():
+    contents = bytearray(make_apmod(rx_size=16))
+    for offset, value in [(12, 62), (16, 8), (20, 8 | 8 << 16), (36, 0), (48, 2)]:
+        struct.pack_into('<I', contents, offset, value)
+    with pytest.raises(ValueError, match='invalid RX image'):
+        embed.apmod_details(replace_crc(contents), 'rust/not-page-aligned.apmod')
 
 
 @pytest.mark.parametrize('alignment', [0, 2, 24, 8192])

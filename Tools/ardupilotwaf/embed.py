@@ -51,7 +51,8 @@ def apmod_details(contents, embedded_name):
             file_size == 0 or file_size > memory_size or
             memory_size > APMOD_MAX_IMAGE or rx_size == 0):
         raise ValueError("Invalid AP_Module module %s: invalid image sizes" % embedded_name)
-    if rx_size > file_size or rx_size % APMOD_ALIGNMENT != 0 or entry >= rx_size:
+    boundary = width if machine == APMOD_MACHINE_ARM else APMOD_ALIGNMENT
+    if rx_size > file_size or rx_size % boundary != 0 or entry >= rx_size:
         raise ValueError("Invalid AP_Module module %s: invalid RX image" % embedded_name)
     if machine == APMOD_MACHINE_ARM and (entry & 1) == 0:
         raise ValueError("Invalid AP_Module module %s: ARM entry is not Thumb" % embedded_name)
