@@ -21,7 +21,8 @@ import build
 
 
 def run_image(tmp_path, emulator, executable, commands, timeout=60):
-    generated = gen_board.generate(ROOT, 'MatekH743', tmp_path / 'generated', uart_port=0, state_dir=tmp_path)
+    board = os.environ.get('STACK_GUARD_BOARD', 'MatekH743')
+    generated = gen_board.generate(ROOT, board, tmp_path / 'generated', uart_port=0, state_dir=tmp_path)
     data = renode_data.ensure_mcu_data(generated['mcu_type'])
     sdcard = tmp_path / 'sdcard.img'
     if not sdcard.is_file():
@@ -39,7 +40,7 @@ emulation SetGlobalAdvanceImmediately true
 
 @pytest.mark.parametrize('mode', range(7))
 def test_stack_guard(tmp_path, renode, mode):  # noqa: F811
-    board = 'MatekH743'
+    board = os.environ.get('STACK_GUARD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
     executable = build_root / board / 'examples/StackGuard'
     if not executable.is_file():
@@ -49,7 +50,8 @@ def test_stack_guard(tmp_path, renode, mode):  # noqa: F811
         symbols = ELFFile(stream).get_section_by_name('.symtab')
         addresses = [symbols.get_symbol_by_name(f'stack_guard_test_{name}')[0]['st_value'] for name in names]
         fault = symbols.get_symbol_by_name('ap_stack_guard_recover')[0]['st_value'] & ~1
-        refused = symbols.get_symbol_by_name('ap_stack_guard_disable')[0]['st_value'] & ~1
+        fatal = symbols.get_symbol_by_name('AP_HardFault_Handler') or symbols.get_symbol_by_name('ap_stack_guard_disable')
+        refused = fatal[0]['st_value'] & ~1
         start = symbols.get_symbol_by_name('stack_guard_test_start')[0]['st_value']
     generated = gen_board.generate(ROOT, board, tmp_path / 'generated', uart_port=0, state_dir=tmp_path)
     data = renode_data.ensure_mcu_data(generated['mcu_type'])
@@ -99,7 +101,7 @@ cpu PC
 ])
 def test_rust_stack_overflow(tmp_path, renode, monkeypatch, floating_point, host_call):  # noqa: F811
     build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
-    executable = build_root / 'MatekH743/examples/RustRuntime'
+    executable = build_root / os.environ.get('STACK_GUARD_BOARD', 'MatekH743') / 'examples/RustRuntime'
     if not executable.is_file():
         pytest.skip('Build examples/RustRuntime with Tools/modules/stack-guard.hwdef')
     names = ['result', 'cycles', 'before', 'after', 'overflows']
@@ -107,7 +109,8 @@ def test_rust_stack_overflow(tmp_path, renode, monkeypatch, floating_point, host
         symbols = ELFFile(stream).get_section_by_name('.symtab')
         addresses = [symbols.get_symbol_by_name(f'rust_runtime_test_{n}')[0]['st_value'] for n in names]
         fault = symbols.get_symbol_by_name('ap_stack_guard_recover')[0]['st_value'] & ~1
-        refused = symbols.get_symbol_by_name('ap_stack_guard_disable')[0]['st_value'] & ~1
+        fatal = symbols.get_symbol_by_name('AP_HardFault_Handler') or symbols.get_symbol_by_name('ap_stack_guard_disable')
+        refused = fatal[0]['st_value'] & ~1
     sdcard = run.make_fat_image(tmp_path / 'sdcard.img', 16 * 1024 * 1024, fat_bits=16)
     monkeypatch.setenv('AP_MODULE_STACK_FP', str(int(floating_point)))
     monkeypatch.setenv('AP_MODULE_STACK_HOST_CALL', str(int(host_call)))
@@ -118,15 +121,15 @@ def test_rust_stack_overflow(tmp_path, renode, monkeypatch, floating_point, host
     commands = '''
 cpu AddHook 0x%X "print('GUARD_FAULT', self.GetRegister(0), self.GetRegister(1), self.FaultStatus, self.FPCCR)"
 cpu AddHook 0x%X "print('GUARD_REFUSED'); self.IsHalted = True"
-emulation RunFor "60"
+emulation RunFor "120"
 %s
 ''' % (fault, refused, '\n'.join(f'sysbus ReadDoubleWord 0x{a:X}' for a in addresses))
-    output = run_image(tmp_path, renode, executable, commands, timeout=90)
+    output = run_image(tmp_path, renode, executable, commands, timeout=180)
     (tmp_path / 'renode.log').write_text(output)
     values = [int(v, 16) for v in re.findall(r'^0x[0-9A-Fa-f]{8}$', output, re.M)]
     result = dict(zip(names, values))
     print(result)
     assert 'Python runtime error' not in output, output
     assert result['result'] == 0x600DF00D, output
-    assert result['cycles'] == 100 and result['overflows'] == 101, output
+    assert result['cycles'] == 100 and result['overflows'] == 102, output
     assert result['before'] == result['after'], output

@@ -200,6 +200,24 @@ and `AP_MODULE_ROMFS_BUILD_ROOT` select existing example build roots. Tests for
 require a Renode build with the Cortex-M stacking-fault fix; they do not establish
 real-hardware fault recovery or flight safety.
 
+To exercise stack recovery with USB debugging enabled, build the CubeOrangePlus
+examples and run both the unattached and attached-monitor tests. Use the patched
+Renode described in [the USB debug guide](../renode/patches/README.md):
+
+```sh
+./waf configure --board CubeOrangePlus --enable-modules --enable-STACK_GUARD --enable-USB-debug --debug-symbols
+./waf --targets examples/StackGuard,examples/RustRuntime
+STACK_GUARD_BOARD=CubeOrangePlus RENODE=/path/to/renode \
+    python3 -m pytest -q Tools/modules/tests/test_stack_guard.py
+AP_STACK_USB_ELF=build/CubeOrangePlus/examples/StackGuard RENODE=/path/to/renode \
+    python3 -m pytest -q Tools/modules/tests/test_stack_guard_usb.py
+```
+
+The attached tests check debugger probes against an active guard, repeated
+overflow recovery, mutex release, FP use and refusal of unattributable or
+critical-section faults. `AP_MODULE_BUILD_ROOT` selects a non-default build root
+for the unattached tests; `STACK_GUARD_BOARD` defaults to `MatekH743`.
+
 Vehicle autotests build and install modules through scoped helpers that refuse
 to overwrite existing files. For example:
 
