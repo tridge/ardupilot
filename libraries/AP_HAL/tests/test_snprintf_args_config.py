@@ -15,11 +15,13 @@ ARCHITECTURES = [
     (['__x86_64__'], True),
     (['__x86_64__', '__CYGWIN__'], True),
     (['__APPLE__', '__aarch64__'], True),
+    (['__aarch64__'], True),
+    (['__aarch64__', '__AARCH64EB__'], True),
     (['__XTENSA__'], False),
     (['__hexagon__'], False),
-    (['__aarch64__'], False),
     (['__riscv'], False),
     (['__x86_64__', '_WIN32'], False),
+    (['__aarch64__', '_WIN32'], False),
 ]
 
 

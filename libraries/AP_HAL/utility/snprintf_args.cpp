@@ -12,7 +12,7 @@
 // Keep compiler/architecture-specific va_list construction in the HAL, never
 // in modules or their wire protocol. The layouts below are ABI-specific.
 #if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32)) || \
-    (defined(__APPLE__) && defined(__aarch64__))
+    (defined(__aarch64__) && !defined(_WIN32))
 namespace
 {
 using Arg = AP_HAL::Util::FormatArg;
@@ -33,8 +33,13 @@ template<typename T>
 void append(uint8_t *buffer, size_t &offset, const T &value)
 {
     offset = (offset + alignof(T) - 1) & ~(alignof(T) - 1);
+#if defined(__aarch64__) && defined(__AARCH64EB__)
+    // AAPCS64 right-justifies scalars smaller than eight bytes on big-endian.
+    memcpy(buffer + offset + 8 - sizeof(T), &value, sizeof(value));
+#else
     memcpy(buffer + offset, &value, sizeof(value));
-#if defined(__x86_64__) || (defined(__APPLE__) && defined(__aarch64__))
+#endif
+#if defined(__x86_64__) || defined(__aarch64__)
     offset += (sizeof(T) + 7) & ~size_t(7);
 #else
     offset += sizeof(T);
@@ -120,7 +125,7 @@ int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
                                 const FormatArg *arguments, uint8_t count)
 {
 #if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32)) || \
-    (defined(__APPLE__) && defined(__aarch64__))
+    (defined(__aarch64__) && !defined(_WIN32))
     static_assert(sizeof(int) == 4 && sizeof(long long) == 8 && sizeof(double) == 8, "printf argument ABI");
     if (format == nullptr || (size != 0 && str == nullptr) || count > FORMAT_MAX_ARGS ||
         (count != 0 && arguments == nullptr)) {
@@ -149,6 +154,18 @@ int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
     void *cursor = buffer;
     static_assert(sizeof(ap) == sizeof(cursor), "Darwin ARM64 va_list layout");
     memcpy(&ap, &cursor, sizeof(ap));
+#elif defined(__aarch64__)
+    // AAPCS64: exhaust both register save areas so va_arg reads all supported
+    // scalars from consecutive eight-byte stack slots, including doubles.
+    struct Layout {
+        void *stack;
+        void *gr_top;
+        void *vr_top;
+        int gr_offs;
+        int vr_offs;
+    } layout {buffer, nullptr, nullptr, 0, 0};
+    static_assert(sizeof(ap) == sizeof(layout), "AAPCS64 va_list layout");
+    memcpy(&ap, &layout, sizeof(ap));
 #elif defined(__CYGWIN__)
     // Windows x64 va_list is a pointer into consecutive eight-byte slots,
     // including slots for promoted integers, pointers and double values.

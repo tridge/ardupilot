@@ -234,6 +234,22 @@ TEST(vsnprintf_Test, TypedArgumentsScalarSlots)
     EXPECT_STREQ(actual, expected);
 }
 
+TEST(vsnprintf_Test, TypedArgumentsFloatSlots)
+{
+    using Arg = AP_HAL::Util::FormatArg;
+    Arg args[8]{};
+    for (uint8_t i = 0; i < ARRAY_SIZE(args); i++) {
+        args[i].type = Arg::Type::FLOAT64;
+        args[i].real = (i - 4) * 0.25;
+    }
+    const char *format = "%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f";
+    char actual[128], expected[128];
+    const int length = hal.util->snprintf(expected, sizeof(expected), format,
+                                        -1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75);
+    EXPECT_EQ(length, hal.util->snprintf_args(actual, sizeof(actual), format, args, ARRAY_SIZE(args)));
+    EXPECT_STREQ(actual, expected);
+}
+
 TEST(vsnprintf_Test, TypedArgumentsRejectInvalidFormats)
 {
     using Arg = AP_HAL::Util::FormatArg;
