@@ -487,9 +487,9 @@ BUILD_OPTIONS = [
 
     Feature('Developer', 'KILL_IMU', 'AP_INERTIALSENSOR_KILL_IMU_ENABLED', 'Allow IMUs to be disabled at runtime', 0, None),
     Feature('Developer', 'CRASHDUMP_FLASH', 'AP_CRASHDUMP_FLASH_ENABLED', 'Enable crash dumps to flash', 0, None),
-    # H7 only; the HAL deliberately rejects unsupported MCUs and USB-debug builds.
+    # H7 only; the HAL deliberately rejects unsupported MCUs.
     Feature('Developer', 'STACK_GUARD', 'HAL_STACK_GUARD_ENABLED',
-            'Enable experimental H7 owned-thread MPU stack recovery (no USB debugger)', 0, None),
+            'Enable experimental H7 owned-thread MPU stack recovery', 0, None),
     Feature('Developer', 'CRASHDUMP_FATFS', 'AP_CRASHDUMP_FATFS_ENABLED', 'Enable crash dumps to microSD', 0, None),
     Feature('Developer', 'FAILURE_INJECTION', 'AP_MAVLINK_FAILURE_CREATION_ENABLED', 'Enable autopilot failure injection via MAVLink ', 0, None),  # noqa:E501
 
