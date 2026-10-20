@@ -38,6 +38,7 @@
 #include "hwdef/common/usbcfg.h"
 #include "hwdef/common/stm32_util.h"
 #include "hwdef/common/watchdog.h"
+#include "hwdef/common/stack_guard.h"
 #include <string.h>
 
 #if !defined(STM32H7) || !HAL_HAVE_DUAL_USB_CDC || !STM32_USB_USE_OTG1
@@ -334,7 +335,23 @@ __attribute__((naked)) void HardFault_Handler()
         "3:\n"
         "str r1,[r0,#24]\n"
         "bx lr\n"
-        "1: ldr r0,=(usb_debug+4292)\n"
+        "1:\n"
+#if HAL_STACK_GUARD_ENABLED
+        // The PSP frame may be incomplete. Recover before reading it or
+        // triggering lazy FP stacking in USB_Debug_Handler. Keep the original
+        // interrupt masks: the classifier rejects faults in critical sections.
+        "push {r4,lr}\n"
+        "mov r0,lr\n"
+        "mrs r1,psp\n"
+        "bl ap_stack_guard_recover\n"
+        "cbz r0,5f\n"
+        "mov lr,r0\n"
+        "ldr r4,[sp]\n"
+        "add sp,sp,#8\n"
+        "bx lr\n"
+        "5: pop {r4,lr}\n"
+#endif
+        "ldr r0,=(usb_debug+4292)\n"
         "ldr r0,[r0]\n"
         "cbz r0,4f\n"
         // Stacking/unstacking faults have no trustworthy exception frame.

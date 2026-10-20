@@ -8,9 +8,8 @@
 #endif
 
 #if HAL_STACK_GUARD_ENABLED
-#if !defined(STM32H7) || defined(HAL_BOOTLOADER_BUILD) || defined(IOMCU_FW) || \
-    (defined(AP_USB_DEBUG_ENABLED) && AP_USB_DEBUG_ENABLED)
-#error Stack fault recovery currently requires H7 without the USB debugger
+#if !defined(STM32H7) || defined(HAL_BOOTLOADER_BUILD) || defined(IOMCU_FW)
+#error Stack fault recovery currently requires an H7 application build
 #endif
 #define HAL_STACK_GUARD_BYTES 1024U
 #define HAL_STACK_GUARD_MPU_REGION 7

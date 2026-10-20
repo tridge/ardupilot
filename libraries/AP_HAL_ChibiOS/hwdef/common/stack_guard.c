@@ -126,6 +126,9 @@ void __attribute__((target("general-regs-only"), used, noinline)) ap_stack_guard
     __ISB();
 }
 
+/* USB debug owns the fault vectors when enabled and attempts recovery before
+ * inspecting an application exception frame or completing lazy FP stacking. */
+#if !defined(AP_USB_DEBUG_ENABLED) || !AP_USB_DEBUG_ENABLED
 /* Preserve EXC_RETURN and the original MSP for the ordinary fatal path. */
 #define STACK_FAULT_ENTRY(fallback) \
     __asm volatile("push {r4, lr}\n" \
@@ -150,4 +153,5 @@ void __attribute__((naked)) HardFault_Handler(void)
 {
     STACK_FAULT_ENTRY("AP_StackGuard_HardFault_Fallback");
 }
+#endif
 #endif
