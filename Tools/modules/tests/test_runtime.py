@@ -237,13 +237,13 @@ def test_byte_granular_stack_size(tmp_path, launch, monkeypatch, stack_size):
     vehicle = launch({'odd.apmod': module.read_bytes()}, SCR_ENABLE=0, RUST_STACK_SIZE=stack_size)
     if stack_size < 8193 + 16384:
         # Keep the callback margin even when the HAL could round the stack up.
-        vehicle.text('odd.apmod load failed (3)')
+        vehicle.text('odd.apmod load failed: stack exceeds')
         vehicle.arm(accepted=False)
         return
     vehicle.text('ready')
     page = os.sysconf('SC_PAGESIZE')
     reserved = ((stack_size + page - 1) // page) * page
-    vehicle.text(f'stack {reserved} heap initial')
+    vehicle.text(f'stack {reserved}')
     vehicle.arm()
     vehicle.arm(False)
     vehicle.restart(1)
@@ -260,7 +260,8 @@ def test_rounded_code_size(launch, images, budget):
                  'round_up': previous_page + 1, 'generous': 131071}[budget]
     vehicle = launch({'code.apmod': data}, SCR_ENABLE=0, RUST_CODE_SIZE=requested)
     if budget in ('negative', 'too_small'):
-        vehicle.text('invalid memory limits' if budget == 'negative' else 'code.apmod load failed (3)')
+        vehicle.text('invalid memory limits' if budget == 'negative' else
+                     'code.apmod load failed: image exceeds')
         vehicle.arm(accepted=False)
         return
     vehicle.text('ready')
@@ -269,14 +270,31 @@ def test_rounded_code_size(launch, images, budget):
     assert vehicle.parameter('RUST_CODE_SIZE') == requested
     page = os.sysconf('SC_PAGESIZE')
     reserved = ((image_size + page - 1) // page) * page
-    vehicle.text('Rust RAM: image ')
-    report = next(t for t in vehicle.texts if t.startswith('Rust RAM: image '))
+    vehicle.text('Rust RAM: RX ')
+    report = next(t for t in vehicle.texts if t.startswith('Rust RAM: RX '))
     reported = int(report.split()[3])
     # The RAM report includes the executable-memory handle as well as pages.
     assert reserved <= reported < reserved + page, report
     vehicle.arm()
     vehicle.arm(False)
     vehicle.restart(1)
+
+
+@pytest.mark.parametrize('offset,value,reason', [
+    (0, 0, 'unsupported image'),
+    (12, 40, 'wrong target'),
+    (44, 0, 'ABI version mismatch'),
+    (48, 1, 'CPU profile mismatch'),
+    (60, 0, 'API fingerprint'),
+    (76, 0, 'image checksum mismatch'),
+])
+def test_load_failure_diagnostics(launch, images, offset, value, reason):
+    data = bytearray(images['cooperative'])
+    # Metadata is checked before CRC; the last case changes the CRC itself.
+    data[offset:offset + 4] = value.to_bytes(4, 'little')
+    vehicle = launch({'x.apmod': data}, SCR_ENABLE=0)
+    vehicle.text(f'x.apmod load failed: {reason}')
+    vehicle.arm(accepted=False)
 
 
 def test_normal_exit_checksums_and_arming_bypasses(launch, images):
