@@ -35,6 +35,11 @@ public:
     // A failed load may leave partial output; never publish or execute it.
     bool parse(const uint8_t *source, size_t length, uint32_t memory_limit, const Compatibility &compatibility,
                SourcePolicy policy = SourcePolicy::Canonical);
+    // Static diagnostic string, valid after the source buffer is released.
+    const char *parse_error() const
+    {
+        return _parse_error;
+    }
 #if AP_MODULE_LEGACY_PROBE_ENABLED
     // Legacy relocation probes have no API identity. Only test builds expose
     // this path; runtime module discovery must use the strict parse().
@@ -108,6 +113,11 @@ public:
     }
 
 private:
+    bool reject(const char *reason)
+    {
+        _parse_error = reason;
+        return false;
+    }
     static uint32_t word(const uint8_t *pointer);
     bool parse_internal(const uint8_t *source, size_t length, uint32_t memory_limit,
                         uint32_t machine, const Compatibility *compatibility, SourcePolicy policy);
@@ -129,6 +139,7 @@ private:
     uint32_t _rx_alignment{};
     SourcePolicy _source_policy{SourcePolicy::Canonical};
     bool _split{};
+    const char *_parse_error{};
 };
 
 }

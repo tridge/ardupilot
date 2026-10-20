@@ -362,6 +362,42 @@ TEST(RustImage, RequireRuntimeCompatibility)
     EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
 }
 
+TEST(RustImage, ParseFailureDiagnostics)
+{
+    const auto expected = RuntimeContainer::compatibility();
+    const struct {
+        uint32_t offset;
+        uint32_t value;
+        const char *reason;
+    } mutations[] = {
+        {0, 0, "unsupported image format"},
+        {12, 0, "wrong target architecture"},
+        {44, 0, "ABI version mismatch"},
+        {48, 0, "CPU profile mismatch"},
+        {52, 0, "invalid stack requirement"},
+        {52, 8193, "stack exceeds RUST_STACK_SIZE"},
+        {60, 0, "API fingerprint mismatch"},
+        {28, 8193, "image exceeds RUST_CODE_SIZE"},
+        {16, 0, "invalid image layout"},
+        {40, 2, "truncated relocation/import tables"},
+        {80 + 4104, 4103, "invalid relocation offset"},
+        {80 + 4104 + 4, 4121, "invalid relocation target"},
+        {76, 0, "image checksum mismatch"},
+    };
+    AP_Module::Image image;
+    for (const auto &mutation : mutations) {
+        RuntimeContainer container;
+        container.put(mutation.offset, mutation.value);
+        EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected)) << mutation.offset;
+        EXPECT_STREQ(image.parse_error(), mutation.reason) << mutation.offset;
+    }
+    RuntimeContainer container;
+    EXPECT_FALSE(image.parse(container.bytes, 79, 8192, expected));
+    EXPECT_STREQ(image.parse_error(), "truncated image header");
+    ASSERT_TRUE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+    EXPECT_EQ(image.parse_error(), nullptr);
+}
+
 TEST(RustImage, LoadSplitRawAndPrelinkedImages)
 {
     SplitContainer raw;

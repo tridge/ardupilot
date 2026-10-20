@@ -40,23 +40,26 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
 {
     *this = Image{};
     const uint32_t header_size = compatibility == nullptr ? PROBE_HEADER_SIZE : RUNTIME_HEADER_SIZE;
-    if (source == nullptr || length < header_size || word(source + 12) != machine) {
-        return false;
+    if (source == nullptr || length < header_size) {
+        return reject("truncated image header");
     }
     bool split = false;
     if (compatibility == nullptr) {
         if (memcmp(source, "APRUST01", 8) != 0 || word(source + 8) != 1 ||
             policy != SourcePolicy::Canonical) {
-            return false;
+            return reject("unsupported image format");
         }
     } else if (memcmp(source, "APRUST04", 8) == 0 && word(source + 8) == 4) {
         if (policy != SourcePolicy::Canonical) {
-            return false;
+            return reject("image is not ROMFS prelinked");
         }
     } else if (memcmp(source, "APRUST05", 8) == 0 && word(source + 8) == 5) {
         split = true;
     } else {
-        return false;
+        return reject("unsupported image format");
+    }
+    if (word(source + 12) != machine) {
+        return reject("wrong target architecture");
     }
     uint32_t stack_size = 0;
     uint32_t import_count = 0;
@@ -65,17 +68,25 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         stack_size = word(source + 52);
         import_count = word(source + 56);
         const uint8_t empty_fingerprint[16] {};
-        if (word(source + 44) == 0 || word(source + 44) != compatibility->abi_version ||
-            !((machine == 40 && profile == 1) || (machine == 62 && profile == 2)) ||
-            profile != compatibility->cpu_profile ||
-            stack_size < 256 || stack_size > MAX_IMAGE ||
-            stack_size > compatibility->stack_limit ||
-            memcmp(source + 60, empty_fingerprint, sizeof(empty_fingerprint)) == 0 ||
+        if (word(source + 44) == 0 || word(source + 44) != compatibility->abi_version) {
+            return reject("ABI version mismatch");
+        }
+        if (!((machine == 40 && profile == 1) || (machine == 62 && profile == 2)) ||
+            profile != compatibility->cpu_profile) {
+            return reject("CPU profile mismatch");
+        }
+        if (stack_size < 256 || stack_size > MAX_IMAGE) {
+            return reject("invalid stack requirement");
+        }
+        if (stack_size > compatibility->stack_limit) {
+            return reject("stack exceeds RUST_STACK_SIZE");
+        }
+        if (memcmp(source + 60, empty_fingerprint, sizeof(empty_fingerprint)) == 0 ||
             memcmp(source + 60, compatibility->fingerprint, sizeof(compatibility->fingerprint)) != 0) {
-            return false;
+            return reject("API fingerprint mismatch");
         }
     } else if (word(source + 44) != 0 || word(source + 48) != 0) {
-        return false;
+        return reject("invalid probe metadata");
     }
     const uint32_t width = word(source + 16);
     const uint32_t alignment = word(source + 20);
@@ -87,32 +98,35 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     const uint32_t entry = word(source + 36);
     const uint32_t count = word(source + 40);
     const uint32_t boundary = split && machine == 40 ? 4 : ALIGNMENT;
+    if (memory_size > memory_limit) {
+        return reject("image exceeds RUST_CODE_SIZE");
+    }
     if (!((machine == 40 && width == 4) || (machine == 62 && width == 8)) ||
         width != sizeof(uintptr_t) ||
         (split ? (rw_alignment < width || rw_alignment > ALIGNMENT || (rw_alignment & (rw_alignment - 1)) != 0 ||
                   rx_alignment < width || rx_alignment > ALIGNMENT || (rx_alignment & (rx_alignment - 1)) != 0) :
          alignment != ALIGNMENT) ||
         file_size == 0 ||
-        file_size > memory_size || memory_size > memory_limit || memory_size > MAX_IMAGE ||
+        file_size > memory_size || memory_size > MAX_IMAGE ||
         code_size == 0 || code_size % boundary != 0 ||
         code_size > ((memory_size + boundary - 1) & ~(boundary - 1)) ||
         (split && code_size > file_size) ||
         entry >= code_size || entry >= file_size || (machine == 40 && (entry & 1) == 0) ||
         count > file_size / width || import_count > file_size / 4 || import_count > MAX_IMPORTS) {
-        return false;
+        return reject("invalid image layout");
     }
     const uint32_t fixup_record_size = split ? 4 : 8;
     const size_t import_names_offset = header_size + size_t(file_size) + size_t(count) * fixup_record_size +
                                        size_t(import_count) * IMPORT_RECORD_SIZE;
     if (import_names_offset > length) {
-        return false;
+        return reject("truncated relocation/import tables");
     }
     uint32_t previous_end = 0;
     for (uint32_t i = 0; i < count; i++) {
         const uint8_t *fixup = source + header_size + file_size + i * fixup_record_size;
         const uint32_t offset = word(fixup);
         if (offset < previous_end || offset % width != 0 || file_size < width || offset > file_size - width) {
-            return false;
+            return reject("invalid relocation offset");
         }
         const uint8_t *slot = source + header_size + offset;
         uint32_t target;
@@ -123,21 +137,21 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
             }
             const uintptr_t source_rx = reinterpret_cast<uintptr_t>(source + header_size);
             if (value < source_rx || value - source_rx > UINT32_MAX) {
-                return false;
+                return reject("invalid ROMFS relocation");
             }
             target = uint32_t(value - source_rx);
         } else if (split) {
             target = word(slot);
             for (uint32_t j = 4; j < width; j++) {
                 if (slot[j] != 0) {
-                    return false;
+                    return reject("invalid relocation slot");
                 }
             }
         } else {
             target = word(fixup + 4);
             for (uint32_t j = 0; j < width; j++) {
                 if (slot[j] != 0) {
-                    return false;
+                    return reject("invalid relocation slot");
                 }
             }
         }
@@ -146,7 +160,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         if (target > memory_size ||
             (machine == 40 && split && offset < code_size &&
              (offset + width > code_size || target >= code_size))) {
-            return false;
+            return reject("invalid relocation target");
         }
         previous_end = offset + width;
     }
@@ -161,7 +175,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         if (offset < previous_end || offset % 4 != 0 || file_size < 4 || offset > file_size - 4 ||
             word(source + header_size + offset) != UINT32_MAX || name_offset != previous_name_end ||
             import_names_offset + name_offset >= length) {
-            return false;
+            return reject("invalid import record");
         }
         const uint8_t *name = source + import_names_offset + name_offset;
         uint32_t name_length = 0;
@@ -170,18 +184,18 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
             const uint8_t c = name[name_length];
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') || c == '_' || c == '.')) {
-                return false;
+                return reject("invalid import name");
             }
             name_length++;
         }
         if (name_length == 0 || name_length > MAX_IMPORT_NAME ||
             import_names_offset + name_offset + name_length >= length || name[name_length] != 0) {
-            return false;
+            return reject("invalid import name");
         }
         previous_name_end = name_offset + name_length + 1;
         for (uint32_t j = 0; j < i; j++) {
             if (memcmp(imports + j * IMPORT_RECORD_SIZE, record, 8) == 0) {
-                return false;
+                return reject("duplicate API import");
             }
         }
         // Both lists are offset-sorted. Slots must not overlap pointer fixups.
@@ -191,12 +205,12 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         }
         if (fixup_index < count &&
             word(source + header_size + file_size + fixup_index * fixup_record_size) < offset + 4) {
-            return false;
+            return reject("import overlaps relocation");
         }
         previous_end = offset + 4;
     }
     if (import_names_offset + previous_name_end != length) {
-        return false;
+        return reject("invalid image length");
     }
     // The container checksum describes the unresolved file. ROMFS firmware
     // linking changes only declared fixup slots, so canonicalise exactly those
@@ -238,7 +252,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     };
     const uint32_t crc = canonical_crc(true);
     if (crc != word(source + header_size - 4)) {
-        return false;
+        return reject("image checksum mismatch");
     }
     _source = source;
     _length = length;

@@ -167,22 +167,28 @@ TEST_F(RustModule, ValidateBeforeAllocation)
     auto bytes = read("cooperative");
     ASSERT_FALSE(bytes.empty());
     Module::Error error;
-    auto reject = [&](Module::Limits limits, Module::Error expected) {
+    auto reject = [&](Module::Limits limits, Module::Error expected, const char *detail = nullptr,
+    Module::Source source = Module::Source::File) {
+        const char *error_detail = "stale diagnostic";
         auto *module = Module::load(bytes.data(), bytes.size(), "invalid", limits,
                                     {
                                         this, text
-                                    }, error);
+                                    }, error, {}, nullptr, nullptr, source, &error_detail);
         EXPECT_EQ(module, nullptr);
         EXPECT_EQ(error, expected);
+        EXPECT_STREQ(error_detail, detail);
+        EXPECT_STRNE(Module::error_string(error), "unknown error");
         EXPECT_TRUE(Module::release(module));
     };
     reject({0, 131072, 65536}, Module::Error::Limits);
     reject({32768, 4095, 65536}, Module::Error::Limits);
     reject({32768, UINT32_MAX, 65536}, Module::Error::Limits);
     reject({32768, 131072, 16384}, Module::Error::Limits);
-    reject({32768, 131072, 20480}, Module::Error::Image); // declared 8192 plus host margin
-    bytes.back() ^= 1;
-    reject({32768, 131072, 65536}, Module::Error::Image);
+    // Declared 8192 plus host margin; include the canonical ROMFS fallback.
+    reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds RUST_STACK_SIZE");
+    reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds RUST_STACK_SIZE", Module::Source::ROMFS);
+    bytes[76] ^= 1; // corrupt the header CRC without changing relocation metadata
+    reject({32768, 131072, 65536}, Module::Error::Image, "image checksum mismatch");
 }
 
 TEST_F(RustModule, ReleaseWithoutStarting)

@@ -78,14 +78,16 @@ public:
 
     // Zero means outside the supported range; otherwise round up safely.
     static uint32_t rounded_code_size(uint32_t requested);
+    static const char *error_string(Error error);
 
     // File source may be released on return. Borrowed ROMFS has firmware
     // lifetime. A returned missing_import_name aliases source and must be
-    // consumed before a file source is released.
+    // consumed before a file source is released. error_detail, when supplied,
+    // receives a static string describing an image validation failure.
     static Module *load(const uint8_t *source, size_t length, const char *name,
                         const Limits &limits, TextSink sink, Error &error, BindingSink bindings = {},
                         uint64_t *missing_import = nullptr, const char **missing_import_name = nullptr,
-                        Source source_type = Source::File);
+                        Source source_type = Source::File, const char **error_detail = nullptr);
     // Creates the heap and worker. Refuses repeated or stopped starts. Failed
     // creation leaves no worker; the prepared module can be retried or released.
     bool start();

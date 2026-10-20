@@ -281,12 +281,14 @@ Module *Runtime::load_bytes(const uint8_t *bytes, uint32_t length, const ModuleF
     Module::Error error;
     uint64_t missing_import = 0;
     const char *missing_import_name = nullptr;
+    const char *error_detail = nullptr;
     auto *module = Module::load(bytes, length, file.name, _limits,
                                 {
                                     &slot, text
                                 }, error, {&slot, binding_dispatch, binding_resolve}, &missing_import,
                                 &missing_import_name,
-                                file.source == ModuleSource::ROMFS ? Module::Source::ROMFS : Module::Source::File);
+                                file.source == ModuleSource::ROMFS ? Module::Source::ROMFS : Module::Source::File,
+                                &error_detail);
     if (module == nullptr) {
         char reason[144];
         if (error == Module::Error::Imports) {
@@ -299,7 +301,8 @@ Module *Runtime::load_bytes(const uint8_t *bytes, uint32_t length, const ModuleF
                                    unsigned(missing_import >> 32), unsigned(missing_import));
             }
         } else {
-            hal.util->snprintf(reason, sizeof(reason), "%.31s load failed (%u)", file.name, unsigned(error));
+            hal.util->snprintf(reason, sizeof(reason), "%.31s load failed: %s", file.name,
+                               error_detail != nullptr ? error_detail : Module::error_string(error));
         }
         fail(reason);
     }

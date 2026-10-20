@@ -23,10 +23,35 @@ uint32_t Module::rounded_code_size(uint32_t requested)
     return (requested + 4095U) & ~4095U;
 }
 
+const char *Module::error_string(Error error)
+{
+    switch (error) {
+    case Error::None:
+        return "no error";
+    case Error::Limits:
+        return "invalid memory limits";
+    case Error::Target:
+        return "unsupported native execution target";
+    case Error::Image:
+        return "invalid module image";
+    case Error::Memory:
+        return "insufficient image memory";
+    case Error::Publication:
+        return "image relocation/publication failed";
+    case Error::Imports:
+        return "missing API import";
+    }
+    return "unknown error";
+}
+
 Module *Module::load(const uint8_t *source, size_t length, const char *name,
                      const Limits &limits, TextSink sink, Error &error, BindingSink bindings,
-                     uint64_t *missing_import, const char **missing_import_name, Source source_type)
+                     uint64_t *missing_import, const char **missing_import_name, Source source_type,
+                     const char **error_detail)
 {
+    if (error_detail != nullptr) {
+        *error_detail = nullptr;
+    }
     constexpr uint32_t maximum = 16U * 1024 * 1024;
     const uint32_t code_size = rounded_code_size(limits.code);
     error = Error::Limits;
@@ -70,6 +95,9 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
         // Raw ROMFS images with canonical fixups retain the copied fallback.
         if (source_type != Source::ROMFS ||
             !image.parse(source, length, code_size, expected, Image::SourcePolicy::Canonical)) {
+            if (error_detail != nullptr) {
+                *error_detail = image.parse_error();
+            }
             return nullptr;
         }
     }
