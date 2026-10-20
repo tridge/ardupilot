@@ -212,7 +212,7 @@ The module heap does not account for all host-owned queues/registry storage.
 No module function pointers are registered with firmware.
 
 The optional H7 MPU stack guard (`--enable-STACK_GUARD`) defaults off and is
-incompatible with USB debugging. It can recover a narrowly attributable stack
+compatible with USB debugging. It can recover a narrowly attributable stack
 overflow, not arbitrary bad pointers, skipped guard pages or shared-state damage.
 See the design for its limits.
 

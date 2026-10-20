@@ -225,9 +225,16 @@ Rust errors never automatically disarm an already armed vehicle.
 ## Optional H7 stack-fault recovery
 
 `HAL_STACK_GUARD_ENABLED` defaults off and is limited to supported H7 builds,
-excluding bootloaders, IOMCU and USB debugging. Guarded workers have a 1 KiB-aligned
+excluding bootloaders and IOMCU. Guarded workers have a 1 KiB-aligned
 no-access area below the working area. MPU region 7 follows the guarded thread
 at context switch; the null-pointer guard uses region 3.
+
+USB debugging can be enabled in the same build. Its fault handler first repairs
+guarded debugger probes, then attempts stack recovery before inspecting an
+application exception frame or completing lazy FP stacking. A refused recovery
+retains the normal debugger/crash path; incomplete frames never enter the monitor.
+Recoverable overflows terminate the worker even while a debugger is attached;
+break on `ap_stack_guard_recover` to inspect one before recovery.
 
 Recovery requires a thread-mode PSP fault without suspended handler or interrupt
 mask, with guard/allocation attribution from fault status and addresses, including

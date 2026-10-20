@@ -470,10 +470,12 @@ bool RuntimeHarness::exercise_overflow()
 {
     auto &fs = AP::FS();
     char message[100];
-    // Warm up once, then require exact release of image, stack and live heap
-    // allocations for another 100 generations. An overflow latches pre-arm
-    // failure; a deliberate restart with the faulty image removed clears it.
-    for (unsigned cycle = 0; cycle <= 100; cycle++) {
+    // Warm up twice: the default ChibiOS heap may need a second provider slab
+    // before it can reuse freed blocks without growing. Then require exact
+    // release of image, stack and live heap allocations for 100 generations.
+    // An overflow latches pre-arm failure; a deliberate restart with the faulty
+    // image removed clears it.
+    for (unsigned cycle = 0; cycle <= 101; cycle++) {
         rust_runtime_test_result = 80;
         const uint32_t previous = test_gcs.overflows.load();
         if (fs.rename("/fixtures/overflow.apmod", "/APM/rust/overflow.apmod") != 0 || !restart(1)) {
@@ -497,10 +499,10 @@ bool RuntimeHarness::exercise_overflow()
             return false;
         }
         hal.scheduler->delay(20);
-        if (cycle == 0) {
+        if (cycle == 1) {
             rust_runtime_test_before = hal.util->available_memory();
-        } else {
-            rust_runtime_test_cycles = cycle;
+        } else if (cycle > 1) {
+            rust_runtime_test_cycles = cycle - 1;
         }
     }
     rust_runtime_test_overflows = test_gcs.overflows.load();
