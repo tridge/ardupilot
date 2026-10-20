@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <AP_HAL/AP_HAL.h>
+
+#if AP_MODULE_ENABLED
 #include <AP_HAL/Util.h>
 #include <string.h>
 
@@ -165,6 +167,7 @@ int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
     va_end(ap);
     return length;
 #else
-    return -1;
+#error "Unsupported architecture for rust support"
 #endif
 }
+#endif // AP_MODULE_ENABLED

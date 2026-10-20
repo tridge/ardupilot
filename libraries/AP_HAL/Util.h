@@ -16,6 +16,7 @@ public:
     int vsnprintf(char* str, size_t size,
                   const char *format, va_list ap);
 
+#if AP_MODULE_ENABLED
     // Experimental typed bridge to the native printf ABI. No allocation.
     struct FormatArg {
         enum class Type : uint8_t { INT32 = 1, UINT32, INT64, UINT64, FLOAT64, STRING };
@@ -36,6 +37,7 @@ public:
     // Otherwise returns snprintf's required length, which may exceed size.
     int snprintf_args(char *str, size_t size, const char *format,
                       const FormatArg *arguments, uint8_t count);
+#endif
 
     virtual void set_soft_armed(const bool b);
     bool get_soft_armed() const { return soft_armed; }

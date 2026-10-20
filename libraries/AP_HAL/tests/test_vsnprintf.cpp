@@ -171,8 +171,7 @@ TEST(vsnprintf_Test, SpecialFormat)
 }
 
 
-#if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32)) || \
-    (defined(__APPLE__) && defined(__aarch64__))
+#if AP_MODULE_ENABLED
 TEST(vsnprintf_Test, TypedArguments)
 {
     using Arg = AP_HAL::Util::FormatArg;
@@ -256,13 +255,6 @@ TEST(vsnprintf_Test, TypedArgumentsRejectInvalidFormats)
     EXPECT_EQ(4, hal.util->snprintf_args(output, sizeof(output), "100%%", nullptr, 0));
     EXPECT_STREQ(output, "100%");
 }
-#else
-TEST(vsnprintf_Test, TypedArgumentsUnsupportedABI)
-{
-    char output[32] = "unchanged";
-    EXPECT_EQ(-1, hal.util->snprintf_args(output, sizeof(output), "100%%", nullptr, 0));
-    EXPECT_STREQ(output, "unchanged");
-}
-#endif
+#endif // AP_MODULE_ENABLED
 
 AP_GTEST_MAIN()
