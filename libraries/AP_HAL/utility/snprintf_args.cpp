@@ -8,8 +8,9 @@
 #endif
 
 // Keep compiler/architecture-specific va_list construction in the HAL, never
-// in modules or their wire protocol. Only these two module ABIs are audited.
-#if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32))
+// in modules or their wire protocol. The layouts below are ABI-specific.
+#if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32)) || \
+    (defined(__APPLE__) && defined(__aarch64__))
 namespace
 {
 using Arg = AP_HAL::Util::FormatArg;
@@ -31,7 +32,7 @@ void append(uint8_t *buffer, size_t &offset, const T &value)
 {
     offset = (offset + alignof(T) - 1) & ~(alignof(T) - 1);
     memcpy(buffer + offset, &value, sizeof(value));
-#if defined(__x86_64__)
+#if defined(__x86_64__) || (defined(__APPLE__) && defined(__aarch64__))
     offset += (sizeof(T) + 7) & ~size_t(7);
 #else
     offset += sizeof(T);
@@ -116,7 +117,8 @@ bool marshal(const char *format, const Arg *arguments, uint8_t count, uint8_t *b
 int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
                                 const FormatArg *arguments, uint8_t count)
 {
-#if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32))
+#if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32)) || \
+    (defined(__APPLE__) && defined(__aarch64__))
     static_assert(sizeof(int) == 4 && sizeof(long long) == 8 && sizeof(double) == 8, "printf argument ABI");
     if (format == nullptr || (size != 0 && str == nullptr) || count > FORMAT_MAX_ARGS ||
         (count != 0 && arguments == nullptr)) {
@@ -128,7 +130,7 @@ int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
         return -1;
     }
     va_list ap;
-#if defined(__x86_64__)
+#if defined(__x86_64__) && !defined(__CYGWIN__)
     // SysV AMD64: exhaust GP/XMM register slots so va_arg uses only the
     // eight-byte stack slots in overflow_arg_area. No register save area needed.
     struct Layout {
@@ -139,6 +141,19 @@ int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
     } layout {48, 176, buffer, nullptr};
     static_assert(sizeof(ap) == sizeof(layout), "SysV AMD64 va_list layout");
     memcpy(&ap, &layout, sizeof(ap));
+#elif defined(__APPLE__) && defined(__aarch64__)
+    // Darwin ARM64 passes the supported variadic scalars in eight-byte stack
+    // slots, unlike generic AAPCS64. va_list points to the next stack slot.
+    void *cursor = buffer;
+    static_assert(sizeof(ap) == sizeof(cursor), "Darwin ARM64 va_list layout");
+    memcpy(&ap, &cursor, sizeof(ap));
+#elif defined(__CYGWIN__)
+    // Windows x64 va_list is a pointer into consecutive eight-byte slots,
+    // including slots for promoted integers, pointers and double values.
+    // Cygwin follows this ABI even though it does not define _WIN32.
+    void *cursor = buffer;
+    static_assert(sizeof(ap) == sizeof(cursor), "Windows x64 va_list layout");
+    memcpy(&ap, &cursor, sizeof(ap));
 #else
     // AAPCS32 __va_list contains one pointer; va_arg aligns 64-bit scalars to
     // eight bytes even with the hard-float ABI (variadic floats use base PCS).

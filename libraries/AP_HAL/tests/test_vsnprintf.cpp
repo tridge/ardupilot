@@ -171,6 +171,8 @@ TEST(vsnprintf_Test, SpecialFormat)
 }
 
 
+#if (defined(__arm__) && defined(__ARM_EABI__)) || (defined(__x86_64__) && !defined(_WIN32)) || \
+    (defined(__APPLE__) && defined(__aarch64__))
 TEST(vsnprintf_Test, TypedArguments)
 {
     using Arg = AP_HAL::Util::FormatArg;
@@ -203,6 +205,36 @@ TEST(vsnprintf_Test, TypedArguments)
     EXPECT_STREQ(actual, "-7 ");
 }
 
+TEST(vsnprintf_Test, TypedArgumentsScalarSlots)
+{
+    using Arg = AP_HAL::Util::FormatArg;
+    Arg args[8]{};
+    args[0].type = Arg::Type::INT32;
+    args[0].i32 = -1;
+    args[1].type = Arg::Type::UINT32;
+    args[1].u32 = UINT32_MAX;
+    args[2].type = Arg::Type::INT32;
+    args[2].i32 = 'Z';
+    args[3].type = Arg::Type::STRING;
+    args[3].text = "slots";
+    args[4].type = Arg::Type::INT32;
+    args[4].i32 = INT32_MIN;
+    args[5].type = Arg::Type::INT64;
+    args[5].i64 = INT64_MIN;
+    args[6].type = Arg::Type::UINT64;
+    args[6].u64 = UINT64_MAX;
+    args[7].type = Arg::Type::FLOAT64;
+    args[7].real = -0.5;
+    const char *format = "%i %u %c %s %i %lld %llu %.1f";
+    char actual[256], expected[256];
+    const int length = hal.util->snprintf(expected, sizeof(expected), format,
+                                        -1, UINT32_MAX, 'Z', "slots", INT32_MIN,
+                                        static_cast<long long>(INT64_MIN),
+                                        static_cast<unsigned long long>(UINT64_MAX), -0.5);
+    EXPECT_EQ(length, hal.util->snprintf_args(actual, sizeof(actual), format, args, 8));
+    EXPECT_STREQ(actual, expected);
+}
+
 TEST(vsnprintf_Test, TypedArgumentsRejectInvalidFormats)
 {
     using Arg = AP_HAL::Util::FormatArg;
@@ -224,5 +256,13 @@ TEST(vsnprintf_Test, TypedArgumentsRejectInvalidFormats)
     EXPECT_EQ(4, hal.util->snprintf_args(output, sizeof(output), "100%%", nullptr, 0));
     EXPECT_STREQ(output, "100%");
 }
+#else
+TEST(vsnprintf_Test, TypedArgumentsUnsupportedABI)
+{
+    char output[32] = "unchanged";
+    EXPECT_EQ(-1, hal.util->snprintf_args(output, sizeof(output), "100%%", nullptr, 0));
+    EXPECT_STREQ(output, "unchanged");
+}
+#endif
 
 AP_GTEST_MAIN()
