@@ -6,9 +6,12 @@ import argparse
 import importlib.util
 import io
 import json
+import os
 import queue
+import shutil
 import socket
 import struct
+import subprocess
 import sys
 import tempfile
 import threading
@@ -104,6 +107,58 @@ class USBLauncherTests(unittest.TestCase):
             args.elf = unittest.mock.Mock()
             args.elf.resolve.return_value = 'firmware'
             self.assertIn('target remote COM12', gdb_usb.gdb_command(args))
+
+    def test_rust_module_commands(self):
+        args = argparse.Namespace(port='/dev/ttyACM0', elf=Path('/tmp/firmware'), gdb='python-arm-gdb',
+                                  gdb_server=None, batch=False, ex=['bt'], apmod=[Path('/tmp/module symbols.apmod')])
+        command = gdb_usb.gdb_command(args)
+        self.assertIn('apmod printers', command)
+        self.assertIn('apmod symbols "/tmp/module symbols.apmod"', command)
+        helper = Path(gdb_usb.__file__).resolve().parents[1] / 'rust_modules/apmod_gdb.py'
+        self.assertIn(f'source {helper}', command)
+        self.assertEqual(command[-2:], ['-ex', 'bt'])
+
+    def test_rust_helper_source_in_gdb(self):
+        debugger = shutil.which(os.environ.get('AP_MODULE_ARM_GDB', 'gdb'))
+        if debugger is None:
+            self.skipTest('Requires Python-enabled GDB and pyelftools')
+        probe = subprocess.run([debugger, '-nx', '--batch', '-ex', 'python import elftools'],
+                               capture_output=True, text=True, timeout=15)
+        if probe.returncode != 0:
+            self.skipTest('Requires Python-enabled GDB and pyelftools')
+        with tempfile.TemporaryDirectory(prefix='usb rust debug ') as directory:
+            helper_dir = Path(directory) / 'rust_modules'
+            helper_dir.mkdir()
+            source_dir = Path(gdb_usb.__file__).resolve().parents[1] / 'rust_modules'
+            for name in ('apmod_gdb.py', 'apmod_debug.py', 'pack.py'):
+                shutil.copyfile(source_dir / name, helper_dir / name)
+            args = argparse.Namespace(port='/dev/unused', elf=Path('/tmp/unused'), gdb=debugger,
+                                      gdb_server=None, batch=True, ex=[], apmod=[Path('/tmp/unused.apmod')])
+            with patch.object(gdb_usb, '__file__', str(Path(directory) / 'debug/gdb_usb.py')):
+                command = gdb_usb.gdb_command(args)
+            source = next(word for word in command if word.startswith('source '))
+            result = subprocess.run([debugger, '-nx', '--batch', '-ex', source, '-ex', 'help apmod'],
+                                    capture_output=True, text=True, timeout=15)
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, output)
+            self.assertIn('Native Rust module symbols', output)
+            self.assertNotIn('No such file or directory', output)
+
+    def test_rust_requires_python_before_usb_attachment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            elf = Path(directory) / 'firmware'
+            header = bytearray(52)
+            header[:6] = b'\x7fELF\x01\x01'
+            struct.pack_into('<HH', header, 16, 2, 40)
+            elf.write_bytes(header)
+            module = Path(directory) / 'module.apmod'
+            module.write_bytes(b'module')
+            module.with_suffix('.elf').write_bytes(b'ELF')
+            with patch.object(gdb_usb.shutil, 'which', return_value='/tmp/gdb'), \
+                    patch.object(gdb_usb.subprocess, 'run', return_value=argparse.Namespace(returncode=1, stdout='')), \
+                    patch.object(gdb_usb, 'connect') as connect:
+                self.assertEqual(gdb_usb.main([str(elf), '--port', '/dev/fake', '--apmod', str(module)]), 1)
+                connect.assert_not_called()
 
     def test_vscode_workspace(self):
         with tempfile.TemporaryDirectory(prefix='usb debug ') as directory:

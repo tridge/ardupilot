@@ -9,6 +9,9 @@ SECTIONS
         *(.eh_frame*) *(.gcc_except_table*)
         *(.data.DW.ref.rust_eh_personality)
         *(.comment) *(.note*)
+        /* Pretty-printers are registered by the host GDB helper, not loaded
+           from target memory. Keep their bootstrap out of the packed image. */
+        *(.debug_gdb_scripts)
     }
     .text : { *(.text .text.*) }
     .rodata : { *(.rodata .rodata.*) }

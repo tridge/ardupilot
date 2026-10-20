@@ -25,6 +25,25 @@ SD-card tests also require mtools. Compiler-dependent tests fail if their
 compiler is missing or too old. Renode tests skip when their emulator or
 firmware fixture is unavailable.
 
+Debugger integration tests use a real GDB process. For SITL, set
+`AP_MODULE_SITL_BINARY` to a Plane ELF with C++ debug information and run
+`tests/test_gdb_runtime.py`; `AP_MODULE_GDB` overrides native `gdb`. The test
+checks one and two modules, Rust values, backtraces and reload cleanup.
+For the firmware USB monitor under Renode:
+
+```sh
+AP_MODULE_USB_ELF=/path/to/CubeOrangePlus/arduplane \
+AP_MODULE_ARM_GDB=/path/to/python-enabled/arm-none-eabi-gdb \
+RENODE=/path/to/patched/renode \
+    python3 -m pytest -q Tools/modules/tests/test_gdb_usb_runtime.py
+```
+
+The USB test launches its own emulator and sparse SD image; it does not attach
+to a physical board or use kernel USB/IP drivers. Renode needs the guest
+DebugMonitor and USB/IP patches described in `Tools/renode/patches/README.md`.
+Both integration suites require GDB Python dependencies and the matching Rust
+toolchain; absent optional firmware/emulator fixtures skip explicitly.
+
 ## Build and inspect
 
 Run from the repository root:
@@ -62,6 +81,79 @@ zero-fill RAM are not stored in the file.
 Without a manifest, the converter emits a test-only relocation probe, not a
 vehicle-loadable module. Unsupported sections, unresolved symbols and unsupported
 instruction relocations are rejected rather than delegated to a firmware linker.
+
+## Source-level debugging
+
+Build the module and SDK with full debug information, keeping the matching
+`.apmod` and `.elf` together on the host:
+
+```sh
+Tools/modules/build.py libraries/AP_Module/examples/simple_loop.rs \
+    build/modules/simple_loop.apmod --target thumbv7em-none-eabihf \
+    --stack-size 16384 --debug --opt-level 1
+```
+
+`--debug` enables frame pointers and host-only DWARF, including debugger unwind
+information. Debug sections and pretty-printer scripts are not packed into the
+module. Frame pointers and a different `--opt-level` can change code size,
+stack use and timing. The default optimisation level remains `s`.
+
+Use a **Python-enabled** ARM GDB for STM32 or native GDB for SITL, with
+`pyelftools` importable by its Python interpreter. Load the matching firmware
+ELF with C++ debug information.
+
+For example, configure and build SITL with:
+
+```sh
+CXXFLAGS=-g ./waf configure --board sitl --enable-modules --debug-symbols
+./waf plane
+```
+
+On STM32, configure with `--debug-symbols --enable-USB-debug
+--enable-modules` instead. Connect normally and use:
+
+```gdb
+source Tools/modules/apmod_gdb.py
+apmod printers
+apmod symbols build/modules/simple_loop.apmod
+apmod list
+info threads
+break simple_loop::run
+continue
+bt
+info locals
+```
+
+`apmod printers /path/to/rustc` selects the module's Rust toolchain; otherwise
+it uses `RUSTC` or `rustc`. Install that toolchain's `rust-src` component to step
+into `core`/`alloc`. The helper validates the companion ELF against the module,
+matches the runtime's whole-file CRC, and maps RX and RW sections independently.
+This supports separate ARM RAM allocations and RX in ROMFS. ARM RWPI static
+locations are corrected in a temporary host ELF, never on the board. An ARM
+unwinder handles the runtime's naked entry bridge.
+
+Register multiple module files with `apmod symbols FILE.apmod ...`. Registration
+can precede module startup; internal breakpoints follow `Module::start()` and
+`Module::release()` without adding firmware hooks. Before release, code
+breakpoints in that module are deleted and symbols removed, preventing stale
+software-breakpoint writes into reused RAM. Recreate those breakpoints after
+reload. Remove data watchpoints before reloading modules. `apmod clear` removes
+the helper's loaded symbols and lifecycle hooks, including module code breakpoints.
+Keep the helper enabled while module breakpoints are installed; clear it before
+changing firmware. Optimised variables may still be unavailable.
+
+For USB debugging with `--enable-USB-debug` firmware:
+
+```sh
+Tools/debug/gdb_usb.py build/CubeOrangePlus/bin/arduplane --port /dev/serial/by-id/DEVICE-if02 \
+    --gdb /path/to/python-enabled/arm-none-eabi-gdb \
+    --apmod build/modules/simple_loop.apmod
+```
+
+`--apmod` is repeatable and loads the helper and Rust pretty-printers. IDE and
+`--serve` sessions can source the helper in their own GDB client instead.
+No USB protocol or module-format change is needed. Debugging stops the vehicle;
+use a disarmed bench setup, not an aircraft in flight.
 
 ## Tests
 

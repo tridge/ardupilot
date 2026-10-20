@@ -51,7 +51,7 @@ def sdk_environment():
     return dict(os.environ, AP_MODULE_SDK_GENERATED=str(generated / 'sdk/src'))
 
 
-def build(source, output, target, stack_size, base=0x10000, cfg=()):
+def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s'):
     compiler = os.environ.get('RUSTC', 'rustc')
     version = subprocess.check_output([compiler, '--version'], text=True)
     check_rust_version(version)
@@ -66,8 +66,13 @@ def build(source, output, target, stack_size, base=0x10000, cfg=()):
     elf = output.with_suffix('.elf')
     relocation = 'ropi-rwpi' if profile == 1 else 'pic'
     common = [compiler, '--edition=2021', '--target', target, '-C', f'target-cpu={cpu}',
-              '-C', 'opt-level=s', '-C', 'panic=abort', '-C', f'relocation-model={relocation}',
+              '-C', f'opt-level={opt_level}', '-C', 'panic=abort', '-C', f'relocation-model={relocation}',
               '-C', 'codegen-units=1']
+    if debug:
+        # Host-only CFI permits debugger backtraces without retaining runtime
+        # exception tables or introducing an unwinding personality dependency.
+        common += ['-C', 'debuginfo=2', '-C', 'force-frame-pointers=yes',
+                   '-C', 'llvm-args=--force-dwarf-frame-section']
     subprocess.run(common + [str(SDK_ROOT / 'sdk/src/lib.rs'), '--crate-name', 'ap_rust_sdk', '--crate-type', 'rlib',
                              '-C', 'embed-bitcode=yes', '-o', str(library)], check=True, env=environment)
     command = common + [str(source), '--extern', f'ap_rust_sdk={library}', '-C', 'lto=fat', '-o', str(elf),
@@ -83,6 +88,11 @@ def build(source, output, target, stack_size, base=0x10000, cfg=()):
     for argument in link_args:
         command += ['-C', f'link-arg={argument}']
     subprocess.run(command, check=True, env=environment)
+    if profile == 1 and debug:
+        # Debug builds can retain an unused EHABI personality symbol from
+        # compiler-builtins. objcopy refuses this if a relocation needs it.
+        subprocess.run([os.environ.get('ARM_OBJCOPY', 'arm-none-eabi-objcopy'),
+                        '--strip-symbol=__aeabi_unwind_cpp_pr0', str(elf)], check=True, env=environment)
     if profile == 2:
         # Some prebuilt compiler-builtins retain this undefined symbol after
         # their unwind sections are discarded. Strip it only if unreferenced;
@@ -99,8 +109,10 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--target', choices=TARGETS, required=True)
     parser.add_argument('--stack-size', type=int, required=True, help='declared module stack requirement in bytes')
+    parser.add_argument('--debug', action='store_true', help='keep full DWARF in the host ELF and use frame pointers')
+    parser.add_argument('--opt-level', choices=('0', '1', '2', '3', 's', 'z'), default='s', help='Rust optimisation level')
     args = parser.parse_args()
-    build(args.source, args.output, args.target, args.stack_size)
+    build(args.source, args.output, args.target, args.stack_size, debug=args.debug, opt_level=args.opt_level)
 
 
 if __name__ == '__main__':

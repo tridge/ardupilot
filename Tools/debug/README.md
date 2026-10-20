@@ -40,6 +40,13 @@ command processing pause until `continue`. Attachment and detach re-enumerate
 both interfaces, so the GCS must reconnect after those transitions. An attached
 hardware debugger prevents USB debugger attachment.
 
+Native Rust modules can be debugged in the same session using a Python-enabled
+ARM GDB and the matching module ELF. Build the module with
+`Tools/modules/build.py --debug`, then pass `--apmod path/to/module.apmod`
+to `gdb_usb.py`. This loads relocated symbols and Rust pretty-printers; see the
+[module debugging guide](../rust_modules/README.md#source-level-debugging) for
+commands, reload handling, prerequisites and tests.
+
 Useful GDB commands:
 
 ```gdb
