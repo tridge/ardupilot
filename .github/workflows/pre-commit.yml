@@ -29,4 +29,4 @@ jobs:
         sudo apt-get update
         sudo apt-get install --yes --no-install-recommends build-essential binutils \
           gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
-    - run: PYTHONPATH="." pytest tests/ Tools/ardupilotwaf/tests/
+    - run: PYTHONPATH="." pytest tests/ Tools/ardupilotwaf/tests/ libraries/AP_HAL/tests/
