@@ -7297,17 +7297,17 @@ return update()
                                        install_name='trick72.txt', directory='scripts')
         self.customise_SITL_commandline([], model='plane-3d', wipe=True)
         self.set_parameters({
-            'RUST_ENABLE': 1,
-            'RUST_HEAP_SIZE': 32768,
-            'RUST_CODE_SIZE': 131072,
-            'RUST_STACK_SIZE': 32768,
+            'MOD_ENABLE': 1,
+            'MOD_HEAP_MAX': 32768,
+            'MOD_CODE_MAXSIZE': 131072,
+            'MOD_STACK_MAX': 32768,
             'SCR_ENABLE': 0,
             'RC7_OPTION': 300,
             'RC9_OPTION': 301,
         })
         self.context_set_speedup(5)
         self.context_collect('STATUSTEXT')
-        errors = ['Rust panic:', 'Aerobatics error', 'Too low altitude, aborting', 'Invalid path - aborting',
+        errors = ['Module fatal:', 'Aerobatics error', 'Too low altitude, aborting', 'Invalid path - aborting',
                   'NavScript time out']
         if not allow_mission_timeout:
             errors.append('NavScriptTime timed out')
@@ -7315,7 +7315,7 @@ return update()
         self.reboot_sitl()
         self.set_rc(7, 1000)
         self.set_rc(9, 1000)
-        self.wait_text('Rust: loaded 1 modules', check_context=True)
+        self.wait_text('Module: loaded 1 modules', check_context=True)
 
     def AerobaticsScripting_rust(self):
         '''Fly the native Rust RC AirShow'''
@@ -7494,10 +7494,10 @@ return update()
         self.context_collect('STATUSTEXT')
         self.set_parameters({
             "SCR_ENABLE": 0,
-            "RUST_ENABLE": 1,
-            "RUST_HEAP_SIZE": 32768,
-            "RUST_CODE_SIZE": 65536,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1,
+            "MOD_HEAP_MAX": 32768,
+            "MOD_CODE_MAXSIZE": 65536,
+            "MOD_STACK_MAX": 32768,
             "RTL_AUTOLAND": 2,
         })
         self.reboot_sitl()
@@ -9661,10 +9661,10 @@ return update()
             )
             self.set_parameters({
                 "SCR_ENABLE": 0,
-                "RUST_ENABLE": 1,
-                "RUST_HEAP_SIZE": 32768,
-                "RUST_CODE_SIZE": 65536,
-                "RUST_STACK_SIZE": 32768,
+                "MOD_ENABLE": 1,
+                "MOD_HEAP_MAX": 32768,
+                "MOD_CODE_MAXSIZE": 65536,
+                "MOD_STACK_MAX": 32768,
             })
         else:
             self.set_parameter("SCR_ENABLE", 1)
@@ -9933,10 +9933,10 @@ return update()
 
         self.set_parameters({
             "SCR_ENABLE": 0,
-            "RUST_ENABLE": 1,
-            "RUST_HEAP_SIZE": 65536,
-            "RUST_CODE_SIZE": 131072,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1,
+            "MOD_HEAP_MAX": 65536,
+            "MOD_CODE_MAXSIZE": 131072,
+            "MOD_STACK_MAX": 32768,
             "SIM_SPEEDUP": 20,
             "RC7_OPTION": 301,
         })

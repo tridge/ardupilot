@@ -5246,7 +5246,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             "SCR_ENABLE": 0,
             "SCR_SDEV_EN": 1,
             "SCR_SDEV1_PROTO": 28,
-            "RUST_ENABLE": 1,
+            "MOD_ENABLE": 1,
         })
         self.install_rust_test_module_context("serial_loopback.rs")
         self.reboot_sitl()
@@ -7188,10 +7188,10 @@ return update()
             "SCR_VM_I_COUNT": 1000000,
             "SIM_SPEEDUP": 20,
             "NET_ENABLE": 1,
-            "RUST_ENABLE": 1 if rust else 0,
-            "RUST_HEAP_SIZE": 262144,
-            "RUST_CODE_SIZE": 262144,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1 if rust else 0,
+            "MOD_HEAP_MAX": 262144,
+            "MOD_CODE_MAXSIZE": 262144,
+            "MOD_STACK_MAX": 32768,
         })
 
         self.reboot_sitl()
@@ -7244,10 +7244,10 @@ return update()
             "SIM_SPEEDUP": 20,
             "NET_ENABLE": 1,
             "SERIAL5_PROTOCOL": 48,
-            "RUST_ENABLE": 1 if rust else 0,
-            "RUST_HEAP_SIZE": 262144,
-            "RUST_CODE_SIZE": 262144,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1 if rust else 0,
+            "MOD_HEAP_MAX": 262144,
+            "MOD_CODE_MAXSIZE": 262144,
+            "MOD_STACK_MAX": 32768,
         })
 
         self.progress('rebuilding rover with ppp enabled')

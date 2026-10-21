@@ -2744,15 +2744,15 @@ class TestSuite(abc.ABC):
     def rust_scripting_restart(self, timeout=30):
         '''request a cooperative native-module reload and wait for the new generation'''
         self.progress("Restarting Rust scripting")
-        restart = int(self.get_parameter("RUST_RESTART"))
+        restart = int(self.get_parameter("MOD_RESTART"))
         self.drain_mav()
         self.context_push()
         self.context_collect('STATUSTEXT')
         try:
             # Do not restore this request counter when the context is popped.
-            self.set_parameter("RUST_RESTART", -32768 if restart == 32767 else restart + 1,
+            self.set_parameter("MOD_RESTART", -32768 if restart == 32767 else restart + 1,
                                add_to_context=False)
-            self.wait_text(r"Rust: loaded [0-9]+ modules", regex=True,
+            self.wait_text(r"Module: loaded [0-9]+ modules", regex=True,
                            check_context=True, timeout=timeout)
         finally:
             self.context_pop()
@@ -9776,7 +9776,7 @@ Also, ignores heartbeats not from our target system'''
             self.remove_message_hook(mh)
         return statustext_full
 
-    # routines helpful for testing native Rust modules:
+    # routines helpful for testing native modules:
     def rust_applet_source_path(self, filename):
         return os.path.join(self.rootdir(), "libraries", "AP_Module", "applets", filename)
 
@@ -9786,7 +9786,7 @@ Also, ignores heartbeats not from our target system'''
     def check_rust_toolchain(self, target='x86_64-unknown-linux-gnu'):
         '''fail early with setup instructions; never download a compiler during a test'''
         compiler = os.environ.get('RUSTC', 'rustc')
-        required = (pathlib.Path(self.rootdir()) / 'Tools/modules/rust-toolchain-version').read_text().strip()
+        required = (pathlib.Path(self.rootdir()) / 'Tools/modules/rust/rust-toolchain-version').read_text().strip()
         hint = ('Install Rust %s or newer and its %s target; select the compiler with RUSTC. '
                 'See Tools/modules/README.md' % (required, target))
         try:
@@ -9802,10 +9802,10 @@ Also, ignores heartbeats not from our target system'''
         if not list(pathlib.Path(libdir).glob('libcore-*.rlib')):
             raise PreconditionFailedException('Missing Rust core library for %s. %s' % (target, hint))
 
-    def build_rust_module(self, source, output, stack_size=16384, target='x86_64-unknown-linux-gnu'):
+    def build_rust_module(self, source, output, stack_size=16384, target='x86_64-unknown-linux-gnu', heap_size=32768):
         '''build a native module with Tools/modules/build.py (honours RUSTC).
         target describes the firmware CPU, not necessarily the autotest host.
-        stack_size is the module requirement; RUST_STACK_SIZE must also allow
+        stack_size is the module requirement; MOD_STACK_MAX must also allow
         the loader's host-callback margin (16 KiB on x86-64).'''
         self.check_rust_toolchain(target)
         output = os.path.abspath(output)
@@ -9814,16 +9814,17 @@ Also, ignores heartbeats not from our target system'''
         with tempfile.TemporaryDirectory(prefix='autotest-rustc-') as scratch:
             util.run_cmd([
                 sys.executable, os.path.join(self.rootdir(), 'Tools', 'modules', 'build.py'),
-                os.path.abspath(source), output, '--target', target, '--stack-size', str(stack_size),
+                os.path.abspath(source), output, '--heap-size', str(heap_size),
+                '--target', target, '--stack-size', str(stack_size),
             ], directory=self.rootdir(), env=dict(os.environ, TMPDIR=scratch))
         return output
 
-    def install_rust_file_context(self, source, install_name=None, directory='rust'):
+    def install_rust_file_context(self, source, install_name=None, directory='modules'):
         '''install a module or ancillary file, removing it when the context ends.
         Refuse to overwrite existing files, including another context's files.
-        Aerobatics schedules currently belong in scripts/, not rust/.'''
-        if directory not in ('rust', 'scripts'):
-            raise ValueError("Rust test files must be installed in rust/ or scripts/")
+        Aerobatics schedules currently belong in scripts/, not modules/.'''
+        if directory not in ('modules', 'scripts'):
+            raise ValueError("Module test files must be installed in modules/ or scripts/")
         name = os.path.basename(source if install_name is None else install_name)
         if name in ('', '.', '..'):
             raise ValueError("Invalid Rust test filename")
@@ -9838,17 +9839,17 @@ Also, ignores heartbeats not from our target system'''
         return dest
 
     def install_rust_module_context(self, source, install_name=None, stack_size=16384,
-                                    target='x86_64-unknown-linux-gnu'):
+                                    target='x86_64-unknown-linux-gnu', heap_size=32768):
         '''build a Rust source module and install only its .apmod for this context.
-        Firmware must have AP_MODULE_ENABLED; enable RUST_ENABLE and
+        Firmware must have AP_MODULE_ENABLED; enable MOD_ENABLE and
         reboot after installing. Build intermediates never enter the SD tree.'''
         if install_name is None:
             install_name = pathlib.Path(source).stem + '.apmod'
         if not install_name.endswith('.apmod'):
-            raise ValueError("Rust modules must have an .apmod filename")
+            raise ValueError("Native modules must have an .apmod filename")
         with tempfile.TemporaryDirectory(prefix='autotest-rust-') as directory:
             module = self.build_rust_module(source, os.path.join(directory, 'module.apmod'),
-                                            stack_size=stack_size, target=target)
+                                            stack_size=stack_size, target=target, heap_size=heap_size)
             return self.install_rust_file_context(module, install_name=install_name)
 
     def install_rust_applet_context(self, filename, **kwargs):

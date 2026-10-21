@@ -1966,10 +1966,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         self.set_parameters({
             "SCR_ENABLE": 0,
-            "RUST_ENABLE": 1,
-            "RUST_HEAP_SIZE": 32768,
-            "RUST_CODE_SIZE": 131072,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1,
+            "MOD_HEAP_MAX": 32768,
+            "MOD_CODE_MAXSIZE": 131072,
+            "MOD_STACK_MAX": 32768,
             "SIM_SPEEDUP": 20,
             "RC7_OPTION": 300,
         })
@@ -2157,10 +2157,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         )
 
         self.set_parameters({
-            "RUST_ENABLE": 1,
-            "RUST_HEAP_SIZE": 32768,
-            "RUST_CODE_SIZE": 131072,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1,
+            "MOD_HEAP_MAX": 32768,
+            "MOD_CODE_MAXSIZE": 131072,
+            "MOD_STACK_MAX": 32768,
             "SCR_ENABLE": 0,
             "PLND_ENABLED": 1,
             "PLND_TYPE": 4,
@@ -2298,10 +2298,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         self.set_parameters({
             "SCR_ENABLE": 0,
-            "RUST_ENABLE": 1,
-            "RUST_HEAP_SIZE": 32768,
-            "RUST_CODE_SIZE": 131072,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1,
+            "MOD_HEAP_MAX": 32768,
+            "MOD_CODE_MAXSIZE": 131072,
+            "MOD_STACK_MAX": 32768,
             "SIM_SHIP_ENABLE": 1,
             "SIM_SHIP_SPEED": 5,
             "Q_WP_SPD": 7.0,
@@ -3506,10 +3506,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
             )
             self.set_parameters({
                 "SCR_ENABLE": 0,
-                "RUST_ENABLE": 1,
-                "RUST_HEAP_SIZE": 32768,
-                "RUST_CODE_SIZE": 65536,
-                "RUST_STACK_SIZE": 32768,
+                "MOD_ENABLE": 1,
+                "MOD_HEAP_MAX": 32768,
+                "MOD_CODE_MAXSIZE": 65536,
+                "MOD_STACK_MAX": 32768,
             })
         else:
             self.set_parameter("SCR_ENABLE", 1)
@@ -3582,10 +3582,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
 
         if rust:
             self.set_parameters({
-                "RUST_ENABLE": 1,
-                "RUST_HEAP_SIZE": 65536,
-                "RUST_CODE_SIZE": 262144,
-                "RUST_STACK_SIZE": 65536,
+                "MOD_ENABLE": 1,
+                "MOD_HEAP_MAX": 65536,
+                "MOD_CODE_MAXSIZE": 262144,
+                "MOD_STACK_MAX": 65536,
             })
             self.install_rust_applet_context(
                 "quadplane_terrain_avoid/main.rs",
@@ -4194,7 +4194,7 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
         # the same periph battery the CircuitStatus messages come from.
         self.set_parameters({
             "SCR_ENABLE": 0 if rust else 1,
-            "RUST_ENABLE": 1 if rust else 0,
+            "MOD_ENABLE": 1 if rust else 0,
             "CAN_P1_DRIVER": 1,
             "BATT_MONITOR": 8,  # DroneCAN
             "BATT2_MONITOR": 29,  # scripting
@@ -4753,10 +4753,10 @@ class AutoTestQuadPlane(vehicle_test_suite.TestSuite):
             install_name="plane-precland.apmod",
         )
         self.set_parameters({
-            "RUST_ENABLE": 1,
-            "RUST_HEAP_SIZE": 32768,
-            "RUST_CODE_SIZE": 131072,
-            "RUST_STACK_SIZE": 32768,
+            "MOD_ENABLE": 1,
+            "MOD_HEAP_MAX": 32768,
+            "MOD_CODE_MAXSIZE": 131072,
+            "MOD_STACK_MAX": 32768,
             "SCR_ENABLE": 0,
             "PLND_ENABLED": 1,
             "PLND_TYPE": 1,  # MAVLink
