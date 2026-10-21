@@ -27,10 +27,11 @@ public:
         }
     }
 
-    bool start(uint32_t size = 65536)
+    bool start(uint32_t size = 65536, AP_HAL::Scheduler::priority_base base = AP_HAL::Scheduler::PRIORITY_SCRIPTING,
+               int16_t priority = 0)
     {
         thread = hal.scheduler->thread_create_owned(FUNCTOR_BIND_MEMBER(&OwnedThreadTask::run, void),
-                 "owned-test", size, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 0);
+                 "owned-test", size, base, priority);
         return thread != nullptr;
     }
 
@@ -96,6 +97,21 @@ TEST(OwnedThread, RunningThreadsRetainResources)
     second.release.store(true);
     ASSERT_TRUE(second.reap());
     EXPECT_EQ(second.result, 42U);
+}
+
+TEST(OwnedThread, AbsolutePriorityBounds)
+{
+    const uint8_t minimum = hal.scheduler->thread_priority_min();
+    const uint8_t maximum = hal.scheduler->thread_priority_max();
+    ASSERT_GE(minimum, 1);
+    ASSERT_GT(maximum, minimum);
+    OwnedThreadTask task;
+    EXPECT_FALSE(task.start(65536, AP_HAL::Scheduler::PRIORITY_ABSOLUTE, minimum - 1));
+    EXPECT_FALSE(task.start(65536, AP_HAL::Scheduler::PRIORITY_ABSOLUTE, maximum + 1));
+    EXPECT_FALSE(task.start(65536, AP_HAL::Scheduler::PRIORITY_ABSOLUTE, -1));
+    ASSERT_TRUE(task.start(65536, AP_HAL::Scheduler::PRIORITY_ABSOLUTE, minimum));
+    task.release.store(true);
+    ASSERT_TRUE(task.reap());
 }
 
 TEST(OwnedThread, RepeatedImmediateExitAndMinimumStack)
