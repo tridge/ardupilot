@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Validate and display metadata from an ArduPilot Native module."""
+"""Inspect a native module and optionally change its declared stack or initial heap."""
 
 import argparse
 import io
+import os
+import stat
 import struct
+import tempfile
+import zlib
 
 from pathlib import Path
 
@@ -23,6 +27,43 @@ PROFILES = {
     (40, 1): 'thumbv7em-none-eabihf',
     (62, 2): 'x86_64-unknown-linux-gnu',
 }
+
+
+def resize_resources(data, stack_size=None, heap_size=None):
+    module = pack.unpack(data)
+    contract = module['contract']
+    if contract is None:
+        raise ValueError('cannot change resource sizes in a relocation probe without a runtime contract')
+    stack_size = contract['stack_size'] if stack_size is None else stack_size
+    heap_size = contract['heap_size'] if heap_size is None else heap_size
+    pack.validate_contract(module['machine'], contract['abi_version'], contract['cpu_profile'],
+                           stack_size, bytes.fromhex(contract['fingerprint']), heap_size)
+    fields = list(pack.RUNTIME_HEADER.unpack_from(data))
+    # APMOD06 header fields 12 and 13 declare module stack and initial heap.
+    fields[12:14] = stack_size, heap_size
+    fields[-1] = 0
+    body = data[pack.RUNTIME_HEADER.size:]
+    fields[-1] = zlib.crc32(pack.RUNTIME_HEADER.pack(*fields) + body)
+    return pack.RUNTIME_HEADER.pack(*fields) + body
+
+
+def replace_module(path, data):
+    # Replace atomically, following a symlink to the requested module rather
+    # than replacing the link itself. Keep the original file permissions.
+    path = path.resolve()
+    mode = stat.S_IMODE(path.stat().st_mode)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f'.{path.name}.', delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.chmod(mode)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def file_breakdown(data, module, elf_data=None):
@@ -131,17 +172,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('module', type=Path)
     parser.add_argument('--fixups', action='store_true', help='list relocation offsets and targets')
+    parser.add_argument('--stack-size', type=int, metavar='BYTES',
+                        help='change declared module stack in place (256..16777216, excluding host-call margin)')
+    parser.add_argument('--heap-size', type=int, metavar='BYTES',
+                        help='change initial module heap in place (256..16777216, still limited by MOD_HEAP_MAX)')
     elf_options = parser.add_mutually_exclusive_group()
     elf_options.add_argument('--elf', type=Path, help='matching unstripped ELF (default: MODULE with .elf suffix)')
     elf_options.add_argument('--no-elf', action='store_true', help='inspect only the module, ignoring any companion ELF')
     args = parser.parse_args()
     try:
         data = args.module.read_bytes()
+        original = data
+        if args.stack_size is not None or args.heap_size is not None:
+            data = resize_resources(data, args.stack_size, args.heap_size)
         elf_path = args.elf or args.module.with_suffix('.elf')
         elf_data = None
         if not args.no_elf and (args.elf is not None or elf_path.is_file()):
             elf_data = elf_path.read_bytes()
         output = format_module(args.module, data, args.fixups, elf_data, elf_path)
+        if data != original:
+            replace_module(args.module, data)
     except (OSError, ValueError) as error:
         parser.exit(1, f'{parser.prog}: {args.module}: {error}\n')
     print(output)

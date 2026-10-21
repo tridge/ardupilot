@@ -126,3 +126,105 @@ def test_frozen_module_container_breakdown(target):
     sizes = apmod_info.file_breakdown(data, pack.unpack(data))
     assert sum(sizes.values()) == len(data)
     assert 'split unavailable' in apmod_info.format_module(Path('old.apmod'), data)
+
+
+@pytest.mark.parametrize('sizes', [
+    {'stack_size': 256}, {'heap_size': pack.MAX_IMAGE}, {'stack_size': 16384, 'heap_size': 32768},
+])
+def test_resize_resources_preserves_image_and_companion(image, sizes):
+    original = image.read_bytes()
+    before = pack.unpack(original)
+    data = apmod_info.resize_resources(original, **sizes)
+    after = pack.unpack(data)  # also verifies the updated CRC
+    assert after['contract'] == {**before['contract'], **sizes}
+    assert {k: v for k, v in after.items() if k != 'contract'} == {
+        k: v for k, v in before.items() if k != 'contract'}
+    assert data[pack.RUNTIME_HEADER.size:] == original[pack.RUNTIME_HEADER.size:]
+    assert 'Validation: OK' in apmod_info.format_module(image, data, elf_data=image.with_suffix('.elf').read_bytes())
+
+
+@pytest.mark.parametrize('option', ['stack_size', 'heap_size'])
+@pytest.mark.parametrize('size', [-1, 0, 255, pack.MAX_IMAGE + 1, 1 << 64])
+def test_invalid_resource_sizes_rejected(image, option, size):
+    with pytest.raises(ValueError, match='invalid .* requirement'):
+        apmod_info.resize_resources(image.read_bytes(), **{option: size})
+
+
+def test_cli_changes_resources_in_place(image, tmp_path):
+    path = tmp_path / 'copy.apmod'
+    path.write_bytes(image.read_bytes())
+    path.chmod(0o640)
+    path.with_suffix('.elf').write_bytes(image.with_suffix('.elf').read_bytes())
+    result = subprocess.run([sys.executable, str(TOOL), str(path), '--stack-size', '16384', '--heap-size', '32768'],
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert 'Stack requirement: 16384 bytes' in result.stdout
+    assert 'Initial heap: 32768 bytes' in result.stdout
+    assert 'Section sizes from verified ELF' in result.stdout
+    assert path.stat().st_mode & 0o777 == 0o640
+    assert not list(tmp_path.glob('.copy.apmod.*'))
+    contract = pack.unpack(path.read_bytes())['contract']
+    assert contract['stack_size'] == 16384 and contract['heap_size'] == 32768
+
+
+@pytest.mark.parametrize('args', [
+    ['--stack-size', '255'], ['--heap-size', str(pack.MAX_IMAGE + 1)],
+    ['--heap-size', 'no'], ['--stack-size', '16384', '--elf', 'missing.elf'],
+])
+def test_cli_failure_does_not_modify_module(image, tmp_path, args):
+    path = tmp_path / 'copy.apmod'
+    original = image.read_bytes()
+    path.write_bytes(original)
+    result = subprocess.run([sys.executable, str(TOOL), str(path), *args], text=True, capture_output=True)
+    assert result.returncode != 0
+    assert path.read_bytes() == original
+
+
+def test_cli_resize_rejects_stale_companion(image, tmp_path):
+    path = tmp_path / 'copy.apmod'
+    original = image.read_bytes()
+    path.write_bytes(original)
+    path.with_suffix('.elf').write_bytes(b'not an ELF')
+    result = subprocess.run([sys.executable, str(TOOL), str(path), '--stack-size', '16384'], text=True, capture_output=True)
+    assert result.returncode == 1
+    assert 'invalid companion ELF' in result.stderr
+    assert path.read_bytes() == original
+
+
+def test_resize_resources_rejects_corruption(image):
+    data = bytearray(image.read_bytes())
+    data[-1] ^= 1
+    with pytest.raises(ValueError):
+        apmod_info.resize_resources(data, heap_size=8192)
+
+
+def test_resize_resources_rejects_probe(tmp_path):
+    data = pack.pack_elf(build_probe(tmp_path, 'thumbv7em-none-eabihf'))
+    with pytest.raises(ValueError, match='relocation probe'):
+        apmod_info.resize_resources(data, stack_size=8192)
+
+
+def test_replace_module_preserves_symlink(image, tmp_path):
+    target = tmp_path / 'target.apmod'
+    target.write_bytes(image.read_bytes())
+    link = tmp_path / 'link.apmod'
+    link.symlink_to(target.name)
+    updated = apmod_info.resize_resources(target.read_bytes(), heap_size=8192)
+    apmod_info.replace_module(link, updated)
+    assert link.is_symlink()
+    assert target.read_bytes() == updated
+
+
+def test_replace_failure_preserves_original_and_removes_temporary(image, tmp_path, monkeypatch):
+    path = tmp_path / 'copy.apmod'
+    original = image.read_bytes()
+    path.write_bytes(original)
+
+    def fail_replace(source, destination):
+        raise OSError('simulated replacement failure')
+
+    monkeypatch.setattr(Path, 'replace', fail_replace)
+    with pytest.raises(OSError, match='replacement failure'):
+        apmod_info.replace_module(path, apmod_info.resize_resources(original, heap_size=8192))
+    assert path.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [path]

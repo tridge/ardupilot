@@ -86,6 +86,20 @@ module alone. Padding means gaps between ELF sections and the RX/RW boundary,
 not zero-valued instructions or constants within a section. Stack, heap and
 zero-fill RAM are not stored in the file.
 
+Change a module's resource declarations without rebuilding its code:
+
+```sh
+Tools/modules/apmod_info.py module.apmod --stack-size 16384 --heap-size 32768
+```
+
+Either option can be used alone. Sizes are bytes, from 256 through 16777216.
+The tool validates the module and companion ELF before replacing the file in
+place, updates its CRC and displays the new values. The ELF remains usable.
+Changing declarations does not establish actual memory requirements: the stack
+excludes the host-call margin and the heap is its initial capacity. Firmware
+still enforces `MOD_STACK_MAX` and `MOD_HEAP_MAX`. The file checksum changes,
+so refresh configured loaded/running checksum requirements before use.
+
 `pack.py` is the lower-level ELF converter. Normal SDK builds should use
 `build.py`, which supplies the generated ABI manifest and target profile.
 Without a manifest, the converter emits a test-only relocation probe, not a
