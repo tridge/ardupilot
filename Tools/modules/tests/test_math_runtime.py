@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from elftools.elf.elffile import ELFFile
+from rust.build import sdk_environment
 from test_runtime import ROOT
 from test_runtime import Vehicle
 from test_threads import gen_board  # noqa: F401
@@ -25,7 +26,7 @@ import build
 
 def test_sdk_math_unit(tmp_path):
     executable = tmp_path / 'sdk-math-tests'
-    environment = build.sdk_environment()
+    environment = sdk_environment()
     subprocess.run([os.environ.get('RUSTC', 'rustc'), '--edition=2021', '--test',
                     str(ROOT / 'libraries/AP_Module/sdk/rust/src/lib.rs'), '-o', str(executable)], check=True, env=environment)
     subprocess.run([str(executable)], check=True)

@@ -3,6 +3,7 @@
 """Compile both C++ target profiles and run Rust/C++ together in SITL."""
 
 import subprocess
+import sys
 
 import apmod_debug
 import pack
@@ -99,3 +100,69 @@ AP_MODULE(run)
         assert not any('panic' in t or 'returned -' in t for t in vehicle.texts), vehicle.diagnostic()
     finally:
         vehicle.stop()
+
+
+@pytest.mark.parametrize('target', build.TARGETS)
+def test_all_cpp_bindings_pack(tmp_path, target):
+    # The host sanitizer test checks wire sizes/bytes. Also retain every client
+    # here to catch target-specific compiler helpers or unsupported relocations.
+    sys.path.insert(0, str(build.SDK_ROOT / 'generator'))
+    import bindings
+    import cpp_bindings
+    _, entries, plans = cpp_bindings.describe(bindings.specification())
+    lines = ['#include <ap_module.hpp>', 'using namespace ap_module;',
+             'static volatile uint8_t checksum;', 'static volatile int32_t status;',
+             '__attribute__((noinline)) static int32_t call(void *, uint32_t, const uint8_t *p, uint32_t ni,',
+             '                                             uint8_t *out, uint32_t no) {',
+             '    for (uint32_t i = 0; i < ni; i++) { checksum ^= p[i]; }',
+             '    for (uint32_t i = 0; i < no; i++) { out[i] = 0; }',
+             '    return status;', '}',
+             'static Result<void> run(Context &) {',
+             'AP_ModuleHostApi api{}; api.binding_call = call;', 'ContextBase base(api, nullptr); Context c(base);']
+    for name, inputs, _, _, _, _ in plans:
+        group, _, method = name.partition('.')
+        group = 'parameter_cache' if group == 'Parameter' else group.lower()
+        lines += ['{']
+        args = []
+        for i, (_, kind, _) in enumerate(inputs):
+            lines += [f'{kind} a{i}' + ('("x");' if kind == 'StringView' else '{};')]
+            args.append(f'a{i}')
+        lines += [f'(void)c.{cpp_bindings.identifier(group)}().{cpp_bindings.identifier(method)}({", ".join(args)});', '}']
+    lines += ['return {Error::Ok};', '}', 'AP_MODULE(run)']
+    source = tmp_path / 'all.cpp'
+    source.write_text('\n'.join(lines))
+    image = build.build(source, tmp_path / 'all.apmod', target, 65536)
+    assert {item[2] for item in pack.unpack(image.read_bytes())['imports']} == {
+        entry['contract']['name'] for entry in entries}
+
+
+@pytest.mark.parametrize('target', build.TARGETS)
+def test_runtime_helpers_pack(tmp_path, target):
+    build.build(ROOT / 'Tools/modules/cpp/probe.cpp', tmp_path / 'helpers.apmod', target, 8192)
+
+
+def test_runtime_helpers_sitl(tmp_path):
+    image = build.build(ROOT / 'Tools/modules/cpp/probe.cpp', tmp_path / 'helpers.apmod',
+                        'x86_64-unknown-linux-gnu', 8192)
+    vehicle = Vehicle(tmp_path / 'vehicle', {image.name: image.read_bytes()}, {'SCR_ENABLE': 0})
+    try:
+        vehicle.start()
+        vehicle.text('ready')
+        vehicle.restart(1)
+        vehicle.text('ready')
+    finally:
+        vehicle.stop()
+
+
+def test_cli_requires_initial_heap(tmp_path):
+    result = subprocess.run([sys.executable, str(ROOT / 'Tools/modules/build.py'),
+                             str(ROOT / 'Tools/modules/cpp/probe.cpp'), str(tmp_path / 'unused.apmod'),
+                             '--target', 'thumbv7em-none-eabihf', '--stack-size', '8192'],
+                            capture_output=True, text=True)
+    assert result.returncode == 2 and '--heap-size' in result.stderr
+
+
+def test_rust_backend_cli_help():
+    result = subprocess.run([sys.executable, str(ROOT / 'Tools/modules/rust/build.py'), '--help'],
+                            capture_output=True, text=True)
+    assert result.returncode == 0 and '--heap-size' in result.stdout

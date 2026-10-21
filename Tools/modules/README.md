@@ -68,7 +68,7 @@ Tools/modules/apmod_info.py --fixups build/modules/airshow.apmod
 `build/modules/libraries/AP_Module/`. Rust uses fat LTO; C++ uses Clang/LLD.
 Both package the linked ELF, retaining the companion `.elf` beside the output.
 Rust also retains `lib<name>_sdk.rlib`; C++ retains its intermediate `.o` files.
-`--heap-size` declares initial heap capacity (default 4096), checked against
+`--heap-size` is required and declares initial heap capacity, checked against
 `MOD_HEAP_MAX` on load. Armed growth is permitted only up to that cap.
 `--stack-size` declares module stack use, not a measured bound. The firmware's
 `MOD_STACK_MAX` must additionally cover the host-call margin: 4 KiB on Cortex-M
@@ -100,7 +100,7 @@ Build the module and SDK with full debug information, keeping the matching
 ```sh
 Tools/modules/build.py libraries/AP_Module/examples/simple_loop.rs \
     build/modules/simple_loop.apmod --target thumbv7em-none-eabihf \
-    --stack-size 16384 --debug --opt-level 1
+    --stack-size 16384 --heap-size 4096 --debug --opt-level 1
 ```
 
 `--debug` enables frame pointers and host-only DWARF, including debugger unwind
@@ -184,7 +184,7 @@ flake8 Tools/modules
 ```
 
 Remaining tests exercise SITL vehicles or ChibiOS examples. Build Plane with
-Rust enabled before running `tests/test_runtime.py` or the binding/applet tests.
+native modules enabled before running `tests/test_runtime.py` or the binding/applet tests.
 Lua comparison tests also require Lua. `AP_MODULE_SITL_BINARY` selects a separately
 built Plane executable. Do not replace it during a test: SITL executes it again
 on reboot.

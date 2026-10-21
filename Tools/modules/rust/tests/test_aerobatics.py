@@ -10,6 +10,7 @@ import subprocess
 import pytest
 
 from pymavlink import DFReader
+from rust.build import sdk_environment
 from test_math_runtime import chibios_probe
 from test_runtime import ROOT
 from test_runtime import Vehicle
@@ -22,7 +23,7 @@ LUA = ROOT / 'libraries/AP_Scripting/applets/Aerobatics/FixedWing/plane_aerobati
 
 def test_host_units(tmp_path):
     rustc = os.environ.get('RUSTC', 'rustc')
-    environment = build.sdk_environment()
+    environment = sdk_environment()
     sdk = tmp_path / 'libap_rust_sdk.rlib'
     subprocess.run([rustc, '--edition=2021', '--crate-name', 'ap_rust_sdk', '--crate-type', 'rlib',
                     str(ROOT / 'libraries/AP_Module/sdk/rust/src/lib.rs'), '-o', str(sdk)], check=True, env=environment)

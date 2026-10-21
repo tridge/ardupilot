@@ -1,3 +1,3 @@
-# Native Rust ROMFS integration test fixture.
+# Native module ROMFS integration test fixture.
 include ../../libraries/AP_Module/tests/enabled.hwdef
 ROMFS modules/romfs.apmod build/modules/romfs_runtime/romfs.apmod

@@ -28,11 +28,6 @@ def generate_bindings():
     return GENERATED_ROOT
 
 
-def sdk_environment():
-    generated = generate_bindings()
-    return dict(os.environ, AP_MODULE_SDK_GENERATED=str(generated / 'sdk/rust/src'))
-
-
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096):
     source, output = Path(source), Path(output)
     profile, _ = TARGETS[target]
@@ -61,7 +56,7 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--target', choices=TARGETS, required=True)
     parser.add_argument('--stack-size', type=int, required=True, help='declared module stack requirement in bytes')
-    parser.add_argument('--heap-size', type=int, default=4096, help='initial module heap, capped by MOD_HEAP_MAX')
+    parser.add_argument('--heap-size', type=int, required=True, help='initial module heap, capped by MOD_HEAP_MAX')
     parser.add_argument('--debug', action='store_true', help='retain DWARF and frame pointers in companion ELF')
     parser.add_argument('--opt-level', choices=('0', '1', '2', '3', 's', 'z'), default='s')
     args = parser.parse_args()

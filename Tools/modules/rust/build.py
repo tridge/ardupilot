@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Build a standalone no_std Native module with the experimental ArduPilot SDK."""
+"""Build a standalone no_std Rust module with the experimental ArduPilot SDK."""
 
 import argparse
 import json
 import os
 import re
 import subprocess
+import sys
 
 from pathlib import Path
 
-import pack
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import pack  # noqa: E402
 
 HERE = Path(__file__).resolve().parents[1]
 MIN_RUST_VERSION = (HERE / 'rust/rust-toolchain-version').read_text().strip()
@@ -109,7 +113,7 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--target', choices=TARGETS, required=True)
     parser.add_argument('--stack-size', type=int, required=True, help='declared module stack requirement in bytes')
-    parser.add_argument('--heap-size', type=int, default=4096, help='initial module heap in bytes, capped by MOD_HEAP_MAX')
+    parser.add_argument('--heap-size', type=int, required=True, help='initial module heap in bytes, capped by MOD_HEAP_MAX')
     parser.add_argument('--debug', action='store_true', help='keep full DWARF in the host ELF and use frame pointers')
     parser.add_argument('--opt-level', choices=('0', '1', '2', '3', 's', 'z'), default='s', help='Rust optimisation level')
     args = parser.parse_args()
