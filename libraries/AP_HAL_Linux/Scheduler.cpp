@@ -19,6 +19,10 @@
 #include "UARTDriver.h"
 #include "Util.h"
 
+#if HAL_OWNED_THREADS_ENABLED
+#include <AP_HAL/utility/OwnedThread_posix.h>
+#endif
+
 using namespace Linux;
 
 extern const AP_HAL::HAL& hal;
@@ -424,3 +428,20 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
 
     return true;
 }
+
+#if HAL_OWNED_THREADS_ENABLED
+AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
+                                                             uint32_t stack_size, priority_base base, int8_t priority)
+{
+    // Follow the active scheduler policy, not uid: root in a container may
+    // lack realtime privileges, and unit tests do not initialise the scheduler.
+    // Realtime workers still get their own low priority rather than inheriting it.
+    const int policy = sched_getscheduler(0);
+    if (policy == -1) {
+        return nullptr;
+    }
+    const bool realtime = policy == SCHED_FIFO || policy == SCHED_RR;
+    return OwnedThreadPosix::create(proc, name, stack_size, realtime ? SCHED_FIFO : SCHED_OTHER,
+                                    realtime ? calculate_thread_priority(base, priority) : 0);
+}
+#endif
