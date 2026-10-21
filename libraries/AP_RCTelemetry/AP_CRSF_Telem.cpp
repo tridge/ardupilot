@@ -1992,7 +1992,9 @@ AP_CRSF_Telem::ScriptedMenu::~ScriptedMenu()
 
 // add a scripted sub-menu to this menu
 // called from lua
-AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* menu_name, uint8_t size, uint8_t parent_menu)
+AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* menu_name, uint8_t size,
+                                                                   uint8_t parent_menu,
+                                                                   const void* menu_owner)
 {
     WITH_SEMAPHORE(AP::crsf_telem()->get_semaphore());
 
@@ -2001,8 +2003,9 @@ AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* m
     for (; tail->next_menu != nullptr; tail = tail->next_menu) {
     }
 
-    ScriptedMenu* menu = NEW_NOTHROW ScriptedMenu(menu_name, size, parent_menu);
-    if (menu == nullptr) {
+    ScriptedMenu* menu = NEW_NOTHROW ScriptedMenu(menu_name, size, parent_menu, menu_owner);
+    if (menu == nullptr || menu->name == nullptr || menu->params == nullptr) {
+        delete menu;
         return nullptr;
     }
 
@@ -2012,17 +2015,30 @@ AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* m
     // dummy parameter for a submenu
     if (parent_menu != 0) {
         ScriptedParameter* param = add_parameter(0, nullptr);
+        if (param == nullptr) {
+            tail->next_menu = nullptr;
+            delete menu;
+            return nullptr;
+        }
         param->id = menu->id;
     }
     return menu;
 }
 
-AP_CRSF_Telem::ScriptedMenu::ScriptedMenu(const char* menu_name, uint8_t size, uint8_t parent_menu)
+AP_CRSF_Telem::ScriptedMenu::ScriptedMenu(const char* menu_name, uint8_t size, uint8_t parent_menu,
+                                           const void* menu_owner) :
+    num_params(0),
+    name(nullptr),
+    params(nullptr),
+    next_menu(nullptr),
+    owner(menu_owner)
 {
+    id = 0;
     parent_id = parent_menu;
-    name = (const char*)malloc(MAX_SCRIPTED_MENU_NAME_LEN+1);
-    strncpy((char*)name, menu_name, MAX_SCRIPTED_MENU_NAME_LEN);
-//    num_params = size;
+    name = (const char*)calloc(MAX_SCRIPTED_MENU_NAME_LEN + 1U, 1U);
+    if (name != nullptr) {
+        strncpy((char*)name, menu_name, MAX_SCRIPTED_MENU_NAME_LEN);
+    }
     params = (ScriptedParameter*)calloc(size, sizeof(ScriptedParameter));
 }
 
@@ -2114,30 +2130,73 @@ bool AP_CRSF_Telem::process_scripted_param_read(ParameterSettingsReadFrame* read
 
 // add a scripted top-level menu
 // called from lua
-AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::add_menu(const char* name)
+AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::add_menu(const char* name, const void* owner)
 {
     WITH_SEMAPHORE(scr_sem);
 
     // create a new menu
-    ScriptedMenu* new_menu = scripted_menus.add_menu(name, 2, 0);
-    debug("adding menu %d", new_menu->id);
+    ScriptedMenu* new_menu = scripted_menus.add_menu(name, 2, 0, owner);
+    if (new_menu != nullptr) {
+        debug("adding menu %d", new_menu->id);
+    }
     return new_menu;
 }
 
-// called from lua
-void AP_CRSF_Telem::clear_menus()
+static bool menu_contains_parameter(const AP_CRSF_Telem::ScriptedMenu& menu,
+                                    const AP_CRSF_Telem::ScriptedParameter* parameter)
+{
+    for (uint8_t i = 0; i < menu.num_params; i++) {
+        if (&menu.params[i] == parameter) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Called when one scripting runtime stops. Queue entries must be discarded
+// before their menu-owned parameter pointers become invalid.
+void AP_CRSF_Telem::clear_menus(const void* owner)
 {
     WITH_SEMAPHORE(scr_sem);
 
 #ifdef CRSF_DEBUG
     dump_menu_structure();
 #endif
-    for (ScriptedMenu* m = scripted_menus.next_menu; m != nullptr; ) {
-        ScriptedMenu* next = m->next_menu;
-        delete m;
-        m = next;
+    auto owned_parameter = [this, owner](const ScriptedParameter* parameter) {
+        for (ScriptedMenu* menu = scripted_menus.next_menu; menu != nullptr; menu = menu->next_menu) {
+            if (menu->owner == owner && menu_contains_parameter(*menu, parameter)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    auto prune = [&owned_parameter](ObjectBuffer<ScriptedParameterWrite>& queue) {
+        const uint32_t available_count = queue.available();
+        const uint32_t count = available_count > UINT8_MAX ? UINT8_MAX : available_count;
+        for (uint32_t i = 0; i < count; i++) {
+            ScriptedParameterWrite request;
+            if (!queue.pop(request)) {
+                break;
+            }
+            if (!owned_parameter(request.param)) {
+                queue.push(request);
+            }
+        }
+    };
+    prune(inbound_params);
+    prune(outbound_params);
+    prune(ready_params);
+
+    ScriptedMenu* previous = &scripted_menus;
+    while (previous->next_menu != nullptr) {
+        ScriptedMenu* menu = previous->next_menu;
+        if (menu->owner == owner) {
+            previous->next_menu = menu->next_menu;
+            delete menu;
+        } else {
+            previous = menu;
+        }
     }
-    scripted_menus.next_menu = nullptr;
 }
 
 #ifdef CRSF_DEBUG
