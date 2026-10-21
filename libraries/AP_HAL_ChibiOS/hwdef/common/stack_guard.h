@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
 
-/* Independent HAL facility: no dependency on the optional Rust runtime.
+/* Independent HAL facility: no dependency on the optional module runtime.
  * Opt-in until fault entry/return has also been validated on physical H7s. */
 #ifndef HAL_STACK_GUARD_ENABLED
 #define HAL_STACK_GUARD_ENABLED 0
