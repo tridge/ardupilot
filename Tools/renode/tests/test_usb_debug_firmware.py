@@ -97,6 +97,16 @@ def session():
     startup = os.environ.get('USB_DEBUG_STARTUP_WAIT') == '1'
     if not startup:
         assert GCS(usb).recv('HEARTBEAT', 60)
+        if os.environ.get('USB_DEBUG_MONITOR_PORT'):
+            # Setup delay callbacks already send heartbeats. Wait for setup to
+            # finish before borrowing SysTick; initialization can still reset it.
+            output = subprocess.check_output(['arm-none-eabi-gdb', '-nx', '-batch', elf,
+                                              '-ex', 'p/x &schedulerInstance._initialized'], text=True)
+            initialized = int(re.search(r'= 0x([0-9a-fA-F]+)', output)[1], 16)
+            deadline = time.monotonic() + 60
+            while ((monitor_read(initialized & ~3) >> (8 * (initialized & 3))) & 0xff) == 0:
+                assert time.monotonic() < deadline, 'vehicle setup did not finish'
+                time.sleep(.1)
     # A running application-owned SysTick must not prevent attachment or be
     # reprogrammed by the debugger. Leave its interrupt off until the dedicated
     # coexistence test installs a handler; the application's vector may be weak.
