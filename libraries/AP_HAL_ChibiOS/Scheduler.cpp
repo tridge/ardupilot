@@ -829,6 +829,31 @@ public:
         return _thread != nullptr;
     }
     uint32_t stack_size() const override { return _stack_size; }
+    bool cpu_load(float &percent) const override
+    {
+#if HAL_ENABLE_THREAD_STATISTICS
+        chSysLock();
+        uint64_t total = currcore->kernel_stats.m_crit_isr.cumulative;
+        chSysUnlock();
+        uint64_t used = 0;
+        for (thread_t *tp = chRegFirstThread(); tp != nullptr; tp = chRegNextThread(tp)) {
+            chSysLock();
+            if (tp->stats.n > 0) {
+                const uint64_t sample = tp->stats.cumulative;
+                total += sample;
+                if (tp == _thread) {
+                    used = sample;
+                }
+            }
+            chSysUnlock();
+        }
+        if (total != 0) {
+            percent = 100.0f * float(used) / float(total);
+            return true;
+        }
+#endif
+        return false;
+    }
     uint32_t allocation_size() const override
     {
         return THD_WORKING_AREA_SIZE(_stack_size) + sizeof(*this)
