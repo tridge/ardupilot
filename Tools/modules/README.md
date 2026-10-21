@@ -5,6 +5,10 @@ modules, plus a small Fortran talk demo. See the [runtime guide](../../libraries
 configuration and installation, and the [design](../../libraries/AP_Module/DESIGN.md)
 for the container, ABI and resource-ownership contracts.
 
+The [loadable C Lua applet](../../libraries/AP_Module/applets/lua/README.md)
+uses `lua/build.py` to run selected existing Lua scripts in modules-only
+firmware on Cortex-M7 or x86-64 SITL.
+
 ## Prerequisites
 
 Install Python with `pyelftools`. Rust builds require Rust **1.98.1 or newer**. The minimum compiler
