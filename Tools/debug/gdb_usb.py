@@ -12,6 +12,7 @@ GCS traffic while the target runs; telemetry pauses at debugger stops.
 """
 
 import argparse
+import glob
 import json
 import os
 import shutil
@@ -283,6 +284,29 @@ def gdb_command(args):
     return command
 
 
+def expand_apmod_paths(patterns):
+    """Expand quoted globs in stable order, keeping overlapping matches once."""
+    modules = []
+    seen = set()
+    for path in patterns:
+        pattern = str(path)
+        if any(c in pattern for c in '\r\n\x00'):
+            raise DebugError('--apmod path must not contain newlines or NUL')
+        # An existing literal filename may itself contain glob metacharacters.
+        if path.is_file() or not glob.has_magic(pattern):
+            matches = [path]
+        else:
+            matches = [Path(name) for name in sorted(glob.glob(pattern))]
+            if not matches:
+                raise DebugError(f'--apmod pattern matched no files: {pattern}')
+        for match in matches:
+            resolved = match.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                modules.append(resolved)
+    return modules
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('elf', type=Path, help='matching build/<board>/bin/arducopter (or another vehicle ELF)')
@@ -292,7 +316,8 @@ def main(argv=None):
                           help='connect to an existing bridge (for example Windows USB with a WSL debugger)')
     parser.add_argument('--gdb', default='arm-none-eabi-gdb', help='GDB executable')
     parser.add_argument('--apmod', type=Path, action='append', default=[],
-                        help='load matching Native module ELF and pretty-printers (repeatable; requires Python GDB)')
+                        help="load module ELF and pretty-printers; accepts quoted globs such as '*.apmod' "
+                        '(repeatable; requires Python GDB)')
     parser.add_argument('--timeout', type=float, default=30, help='monitor connection deadline in seconds')
     parser.add_argument('--no-break', action='store_true',
                         help='reattach to an existing debug session, interrupting if running')
@@ -321,6 +346,7 @@ def main(argv=None):
         if args.apmod:
             if args.serve or args.vscode:
                 raise DebugError('--apmod applies to GDB sessions; source Tools/modules/apmod_gdb.py in the IDE')
+            args.apmod = expand_apmod_paths(args.apmod)
             for path in args.apmod:
                 if any(c in str(path) for c in '\r\n\x00') or not path.is_file() or not path.with_suffix('.elf').is_file():
                     raise DebugError(f'--apmod needs a module and its matching companion .elf: {path}')

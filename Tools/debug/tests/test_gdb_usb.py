@@ -130,7 +130,7 @@ class USBLauncherTests(unittest.TestCase):
             helper_dir = Path(directory) / 'modules'
             helper_dir.mkdir()
             source_dir = Path(gdb_usb.__file__).resolve().parents[1] / 'modules'
-            for name in ('apmod_gdb.py', 'apmod_debug.py', 'pack.py'):
+            for name in ('apmod_gdb.py', 'apmod_debug.py', 'pack.py', 'targets.py'):
                 shutil.copyfile(source_dir / name, helper_dir / name)
             args = argparse.Namespace(port='/dev/unused', elf=Path('/tmp/unused'), gdb=debugger,
                                       gdb_server=None, batch=True, ex=[], apmod=[Path('/tmp/unused.apmod')])
@@ -143,6 +143,78 @@ class USBLauncherTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, output)
             self.assertIn('Native module symbols', output)
             self.assertNotIn('No such file or directory', output)
+
+    def test_apmod_wildcards_sorted_and_deduplicated(self):
+        with tempfile.TemporaryDirectory(prefix='module symbols ') as directory:
+            root = Path(directory)
+            for name in ('b.apmod', 'a.apmod', 'ignored.elf'):
+                (root / name).touch()
+            modules = gdb_usb.expand_apmod_paths([root / '*.apmod', root / 'a.apmod'])
+            self.assertEqual(modules, [(root / name).resolve() for name in ('a.apmod', 'b.apmod')])
+            literal = root / 'literal[1].apmod'
+            literal.touch()
+            self.assertEqual(gdb_usb.expand_apmod_paths([literal]), [literal.resolve()])
+
+    def test_apmod_wildcard_command(self):
+        with tempfile.TemporaryDirectory(prefix='module symbols ') as directory:
+            root = Path(directory)
+            for name in ('b.apmod', 'a.apmod'):
+                module = root / name
+                module.touch()
+                module.with_suffix('.elf').touch()
+            with patch.object(gdb_usb, 'validate_elf'), \
+                    patch.object(gdb_usb.shutil, 'which', return_value='/tmp/gdb'), \
+                    patch.object(gdb_usb.subprocess, 'run',
+                                 return_value=argparse.Namespace(returncode=0, stdout='APMOD_PYTHON_OK')), \
+                    patch.object(gdb_usb.subprocess, 'Popen') as child, \
+                    patch.object(gdb_usb, 'connect') as connect:
+                child.return_value.wait.return_value = 0
+                arguments = ['firmware', '--port', '/dev/fake', '--apmod', str(root / '*.apmod'),
+                             '--apmod', str(root / 'a.apmod')]
+                self.assertEqual(gdb_usb.main(arguments), 0)
+                command = child.call_args.args[0]
+                paths = [json.dumps(str((root / name).resolve())) for name in ('a.apmod', 'b.apmod')]
+                expected = 'apmod symbols ' + ' '.join(paths)
+                self.assertIn(expected, command)
+                connect.assert_called_once()
+
+    def test_apmod_symlink_matches_debugger_resolution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / 'build/module.apmod'
+            target.parent.mkdir()
+            target.touch()
+            target.with_suffix('.elf').touch()
+            alias = root / 'module.apmod'
+            try:
+                alias.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest('Requires symbolic-link support')
+            # ModuleSymbols and gdb_command resolve the module before looking
+            # for its ELF. Preflight must validate that same companion path.
+            modules = gdb_usb.expand_apmod_paths([alias, target])
+            self.assertEqual(modules, [target.resolve()])
+            self.assertTrue(modules[0].with_suffix('.elf').is_file())
+            self.assertFalse(alias.with_suffix('.elf').exists())
+
+    def test_apmod_wildcard_errors_before_usb_attachment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for error in ('no matches', 'missing companion'):
+                with self.subTest(error=error):
+                    if error == 'missing companion':
+                        (root / 'module.apmod').touch()
+                    with patch.object(gdb_usb, 'validate_elf'), \
+                            patch.object(gdb_usb.shutil, 'which', return_value='/tmp/gdb'), \
+                            patch.object(gdb_usb.subprocess, 'run') as probe, \
+                            patch.object(gdb_usb, 'connect') as connect, \
+                            patch('sys.stderr', new_callable=io.StringIO) as stderr:
+                        self.assertEqual(gdb_usb.main(['firmware', '--port', '/dev/fake',
+                                                      '--apmod', str(root / '*.apmod')]), 1)
+                        diagnostic = 'matched no files' if error == 'no matches' else 'matching companion .elf'
+                        self.assertIn(diagnostic, stderr.getvalue())
+                        probe.assert_not_called()
+                        connect.assert_not_called()
 
     def test_rust_requires_python_before_usb_attachment(self):
         with tempfile.TemporaryDirectory() as directory:
