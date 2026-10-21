@@ -184,7 +184,7 @@ int AP_HAL::Util::snprintf_args(char *str, size_t size, const char *format,
     va_end(ap);
     return length;
 #else
-#error "Unsupported architecture for rust support"
+#error "Unsupported architecture for module support"
 #endif
 }
 #endif // AP_MODULE_ENABLED

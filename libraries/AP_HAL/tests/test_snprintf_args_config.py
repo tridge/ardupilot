@@ -36,15 +36,15 @@ def test_formatter_configuration(tmp_path, architecture, supported, enabled):
     headers = tmp_path / 'AP_HAL'
     headers.mkdir()
     (headers / 'AP_HAL.h').write_text('#define CONFIG_HAL_BOARD 1\n#define HAL_BOARD_CHIBIOS 2\n')
-    (headers / 'Util.h').write_text('' if enabled else '#error Rust-only header included\n')
-    (tmp_path / 'string.h').write_text('' if enabled else '#error Rust-only header included\n')
+    (headers / 'Util.h').write_text('' if enabled else '#error Module-only header included\n')
+    (tmp_path / 'string.h').write_text('' if enabled else '#error Module-only header included\n')
     result = subprocess.run([compiler, '-E', '-P', '-undef', '-nostdinc', '-I', str(tmp_path),
                              f'-DAP_MODULE_ENABLED={int(enabled)}',
                              *(f'-D{macro}=1' for macro in architecture), str(SOURCE)],
                             capture_output=True, text=True)
     if enabled and not supported:
         assert result.returncode != 0
-        assert 'Unsupported architecture for rust support' in result.stderr
+        assert 'Unsupported architecture for module support' in result.stderr
     else:
         assert result.returncode == 0, result.stderr
         assert ('AP_HAL::Util::snprintf_args' in result.stdout) == enabled
