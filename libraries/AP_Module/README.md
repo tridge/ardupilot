@@ -169,6 +169,9 @@ RX, owned RW, stack reservations and heap usage. Borrowed ROMFS RX reports zero
 owned RX bytes. Allocator bookkeeping, loader scratch, manager storage and
 persistent firmware registrations are additional; heap usage is not total RAM.
 The manager requests a separate 4 KiB stack on ARM or 32 KiB on x86-64.
+Download `@SYS/modules.txt` over MAVFTP for per-module state, source, priority,
+image/stack reservations, heap capacity, used/free bytes and allocation peaks.
+CPU load is included where the HAL can measure it, otherwise shown as `?`.
 Discovery filenames and address-stable callback records are heap allocated, not
 placed on the manager stack. Their storage is released only after the entire
 generation has stopped and all binding resources are cleaned up. `MOD_MAX_MOD`

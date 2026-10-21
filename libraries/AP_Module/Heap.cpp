@@ -85,11 +85,13 @@ void Heap::clear()
     _stats.allocations = 0;
 }
 
-Heap::Stats Heap::stats()
+Heap::Stats Heap::stats(bool include_free)
 {
     WITH_SEMAPHORE(_sem);
     _stats.expanded_to = _heap.get_expansion_size();
     _stats.expansion_failures = _heap.get_expansion_failures();
+    _stats.capacity = _heap.get_size();
+    _stats.free = include_free ? _heap.get_free_size() : 0;
     return _stats;
 }
 

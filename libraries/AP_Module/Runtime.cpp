@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Runtime.h"
+#include <AP_Common/ExpandingString.h>
 
 #if AP_MODULE_ENABLED
 #include "BindingAnalogPWM.h"
@@ -402,7 +403,10 @@ bool Runtime::add_file(const char *name, ModuleSource source)
     memcpy(slot->file.name, name, length + 1);
     slot->file.source = source;
     slot->next = *link;
-    *link = slot;
+    {
+        WITH_SEMAPHORE(_modules_sem);
+        *link = slot;
+    }
     return true;
 }
 
@@ -410,9 +414,15 @@ void Runtime::clear_slots()
 {
     // Only called after all_released(): no worker, owned-thread epilogue or
     // binding registry may still reference any of these contexts.
-    while (_slots != nullptr) {
-        Slot *slot = _slots;
-        _slots = slot->next;
+    Slot *slots;
+    {
+        WITH_SEMAPHORE(_modules_sem);
+        slots = _slots;
+        _slots = nullptr;
+    }
+    while (slots != nullptr) {
+        Slot *slot = slots;
+        slots = slot->next;
         delete slot;
     }
 }
@@ -495,7 +505,11 @@ bool Runtime::load_generation()
     size_t count = 0;
     for (Slot *item = _slots; item != nullptr; item = item->next) {
         auto &slot = *item;
-        slot.module = load_file(slot.file, slot);
+        Module *prepared = load_file(slot.file, slot);
+        {
+            WITH_SEMAPHORE(_modules_sem);
+            slot.module = prepared;
+        }
         if (slot.module == nullptr) {
             return false;
         }
@@ -505,7 +519,12 @@ bool Runtime::load_generation()
     }
     for (Slot *item = _slots; item != nullptr; item = item->next) {
         auto &slot = *item;
-        if (!slot.module->start()) {
+        bool started;
+        {
+            WITH_SEMAPHORE(_modules_sem);
+            started = slot.module->start();
+        }
+        if (!started) {
             char reason[112];
             hal.util->snprintf(reason, sizeof(reason), "%.63s heap/thread creation failed", slot.file.name);
             fail(reason);
@@ -554,7 +573,11 @@ void Runtime::poll_modules()
             GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Module fatal: %.37s", module->panic_message());
             report_memory(*module);
         }
-        const bool joined = module->poll_join();
+        bool joined;
+        {
+            WITH_SEMAPHORE(_modules_sem);
+            joined = module->poll_join();
+        }
         // Sample after joining too: a worker can expand and return between
         // manager polls. Its final requirement must survive heap destruction.
         const auto heap_stats = module->stats().heap;
@@ -609,7 +632,48 @@ void Runtime::poll_modules()
         binding_onvif_cleanup(&slot);
         binding_serialled_cleanup(&slot);
         binding_arming_cleanup(&slot);
-        Module::release(slot.module);
+        {
+            WITH_SEMAPHORE(_modules_sem);
+            Module::release(slot.module);
+        }
+    }
+}
+
+void Runtime::module_info(ExpandingString &str)
+{
+    str.printf("ModulesV1\n");
+    Runtime *runtime = get_singleton();
+    if (runtime == nullptr) {
+        return;
+    }
+    WITH_SEMAPHORE(runtime->_modules_sem);
+    for (const Slot *slot = runtime->_slots; slot != nullptr; slot = slot->next) {
+        Module *module = slot->module;
+        if (module == nullptr) {
+            continue;
+        }
+        const char *state = "?";
+        switch (module->state()) {
+        case Module::State::Prepared: state = "PREPARED"; break;
+        case Module::State::Running: state = "RUNNING"; break;
+        case Module::State::Returned: state = "RETURNED"; break;
+        case Module::State::Joined: state = "JOINED"; break;
+        case Module::State::Panicked: state = "PANICKED"; break;
+        }
+        const auto stats = module->stats(true);
+        str.printf("%s STATE=%s SOURCE=%s PRI=%u RX=%u RW=%u STACK=%u "
+                   "HEAP=%u USED=%u FREE=%u ALLOC=%u PEAK=%u ALLOCS=%u LOAD=",
+                   slot->file.name, state, slot->file.source == ModuleSource::ROMFS ? "ROMFS" : "FILE",
+                   unsigned(module->thread_priority()), unsigned(stats.rx_reserved), unsigned(stats.rw_reserved),
+                   unsigned(stats.stack_reserved), unsigned(stats.heap.capacity),
+                   unsigned(stats.heap.capacity - stats.heap.free), unsigned(stats.heap.free),
+                   unsigned(stats.heap.used), unsigned(stats.heap.peak), unsigned(stats.heap.allocations));
+        float load;
+        if (module->cpu_load(load)) {
+            str.printf("%.1f%%\n", double(load));
+        } else {
+            str.printf("?\n");
+        }
     }
 }
 

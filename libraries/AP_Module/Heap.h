@@ -29,8 +29,12 @@ public:
         uint32_t allocations;
         uint32_t expanded_to;
         uint8_t expansion_failures;
+        uint32_t capacity; // Current backing arena budget, including expansion.
+        uint32_t free;     // Allocator free bytes, populated only by stats(true).
     };
-    Stats stats();
+    // Free-space inspection may walk fragmented arenas; only diagnostic
+    // callers request it, not the manager's regular allocation-counter polls.
+    Stats stats(bool include_free = false);
 
 private:
     struct Allocation {

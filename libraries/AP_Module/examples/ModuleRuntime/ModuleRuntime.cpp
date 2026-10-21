@@ -254,6 +254,56 @@ static bool ensure_directory(const char *path)
     return fs.stat(path, &status) == 0 && S_ISDIR(status.st_mode);
 }
 
+static bool verify_module_report()
+{
+    auto &fs = AP::FS();
+    const int fd = fs.open("@SYS/modules.txt", O_RDONLY);
+    if (fd < 0) {
+        return false;
+    }
+    char report[768];
+    const int32_t count = fs.read(fd, report, sizeof(report) - 1);
+    const bool closed = fs.close(fd) == 0;
+    if (!closed || count <= 0 || count >= int32_t(sizeof(report) - 1)) {
+        return false;
+    }
+    report[count] = '\0';
+    if (strncmp(report, "ModulesV1\n", 10) != 0) {
+        return false;
+    }
+    char *line = report + 10;
+    for (const char *name : {"one.apmod ", "two.apmod "}) {
+        char *end = strchr(line, '\n');
+        if (end == nullptr || strncmp(line, name, strlen(name)) != 0) {
+            return false;
+        }
+        *end = '\0';
+        const char *heap = strstr(line, " HEAP=");
+        const char *used = strstr(line, " USED=");
+        const char *free = strstr(line, " FREE=");
+        if (heap == nullptr || used == nullptr || free == nullptr || strstr(line, "STATE=RUNNING ") == nullptr) {
+            return false;
+        }
+        const uint32_t capacity = strtoul(heap + 6, nullptr, 10);
+        const uint32_t used_bytes = strtoul(used + 6, nullptr, 10);
+        const uint32_t free_bytes = strtoul(free + 6, nullptr, 10);
+        if (capacity != 4096 || used_bytes > capacity || free_bytes > capacity || used_bytes + free_bytes != capacity) {
+            return false;
+        }
+#if HAL_ENABLE_THREAD_STATISTICS
+        if (strstr(line, "LOAD=?") != nullptr || strchr(line, '%') == nullptr) {
+            return false;
+        }
+#else
+        if (strstr(line, "LOAD=?") == nullptr) {
+            return false;
+        }
+#endif
+        line = end + 1;
+    }
+    return *line == '\0';
+}
+
 static void romfs_stage(uint32_t stage)
 {
     rust_runtime_test_result = stage;
@@ -511,7 +561,7 @@ bool RuntimeHarness::exercise()
     // difference; every subsequent generation must match the exact baseline.
     constexpr uint8_t warmup_generations = 3;
     for (uint8_t generation = 0; generation < warmup_generations; generation++) {
-        if (!restart(2)) {
+        if (!restart(2) || !verify_module_report()) {
             return false;
         }
     }
@@ -520,7 +570,7 @@ bool RuntimeHarness::exercise()
     rust_runtime_test_generation_free[0] = rust_runtime_test_before;
     for (unsigned cycle = 0; cycle < 20; cycle++) {
         rust_runtime_test_result = 4;
-        if (!restart(2)) {
+        if (!restart(2) || !verify_module_report()) {
             return false;
         }
         hal.scheduler->delay(100);

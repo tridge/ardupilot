@@ -292,9 +292,9 @@ const char *Module::panic_message() const
     return _panicked.load(std::memory_order_acquire) ? _panic_message : nullptr;
 }
 
-Module::Stats Module::stats()
+Module::Stats Module::stats(bool include_free)
 {
-    return {_heap.stats(), _initial_heap,
+    return {_heap.stats(include_free), _initial_heap,
             _rx_memory == nullptr ? 0 : _rx_memory->allocation_size(), _rw_allocation_size,
             _thread == nullptr ? 0 : _thread->stack_size(),
             _thread == nullptr ? 0 : _thread->allocation_size(), sizeof(*this)};

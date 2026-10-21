@@ -110,7 +110,9 @@ public:
     {
         return _checksum;
     }
-    Stats stats();
+    Stats stats(bool include_free = false);
+    uint8_t thread_priority() const { return _thread_priority; }
+    bool cpu_load(float &percent) const { return _thread != nullptr && _thread->cpu_load(percent); }
 
 private:
     using Start = int32_t (*)(const AP_ModuleHostApi *, void *);

@@ -11,6 +11,8 @@
 #include <AP_Mission/AP_Mission_config.h>
 #include <AP_Param/AP_Param.h>
 
+class ExpandingString;
+
 namespace AP_Module
 {
 
@@ -38,6 +40,7 @@ public:
     void init();
     void update();
     bool arming_checks(size_t length, char *message) const;
+    static void module_info(ExpandingString &str);
 #if AP_MISSION_ENABLED
     void handle_mission_command(uint16_t p1, float content_p1, float content_p2, float content_p3);
     bool pop_mission_command(MissionCommand &command);
@@ -98,6 +101,9 @@ private:
     // Manager-owned, address-stable callback contexts. Retain the complete
     // generation until every worker is joined and its bindings are cleaned up.
     Slot *_slots{};
+    // Exclude diagnostic readers while publishing, starting, reaping or
+    // destroying handles. Never held across filesystem IO or binding cleanup.
+    mutable HAL_Semaphore _modules_sem;
     bool _reload_after_stop{};
     uint32_t _stop_start_ms{};
 
