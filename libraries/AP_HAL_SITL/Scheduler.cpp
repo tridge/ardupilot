@@ -342,8 +342,11 @@ void *Scheduler::thread_create_trampoline(void *ctx)
 
 #if HAL_OWNED_THREADS_ENABLED
 AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
-                                                             uint32_t stack_size, priority_base base, int8_t priority)
+                                                             uint32_t stack_size, priority_base base, int16_t priority)
 {
+    if (base == PRIORITY_ABSOLUTE && (priority < thread_priority_min() || priority > thread_priority_max())) {
+        return nullptr;
+    }
     // Like other SITL workers, modules use the ordinary host scheduler.
     return OwnedThreadPosix::create(proc, name, stack_size, SCHED_OTHER, 0);
 }

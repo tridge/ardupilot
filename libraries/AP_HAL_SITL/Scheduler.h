@@ -59,8 +59,10 @@ public:
                        uint32_t stack_size, priority_base base, int8_t priority) override;
 
 #if HAL_OWNED_THREADS_ENABLED
+    uint8_t thread_priority_min() const override { return 1; }
+    uint8_t thread_priority_max() const override { return 20; }
     OwnedThread *thread_create_owned(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
-                                    priority_base base, int8_t priority) override;
+                                    priority_base base, int16_t priority) override;
 #endif
 
     void set_in_semaphore_take_wait(bool value) { _in_semaphore_take_wait = value; }
