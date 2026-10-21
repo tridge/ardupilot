@@ -50,7 +50,7 @@ def validate_prelinked_romfs(executable, build_directory, module_path):
             assert actual == expected, (offset, target, hex(actual), hex(expected))
 
 
-@pytest.mark.parametrize('sd_language', ['rust', 'cpp'])
+@pytest.mark.parametrize('sd_language', ['rust', 'cpp', 'fortran'])
 def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch, sd_language):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_ROMFS_BUILD_ROOT', ROOT / 'build/romfs-runtime'))
@@ -70,8 +70,11 @@ def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch, sd_language):  # n
 
     monkeypatch.setenv('AP_MODULE_LIFECYCLE', 'cleanup')
     sd_module = tmp_path / 'sd.apmod'
-    source = ROOT / ('libraries/AP_Module/tests/modules/lifecycle.rs' if sd_language == 'rust'
-                     else 'Tools/modules/cpp/probe.cpp')
+    sources = {'rust': 'libraries/AP_Module/tests/modules/lifecycle.rs', 'cpp': 'Tools/modules/cpp/probe.cpp',
+               'fortran': 'Tools/modules/fortran/probe.F90'}
+    source = ROOT / sources[sd_language]
+    if sd_language == 'fortran':
+        monkeypatch.setenv('FC', os.environ.get('ARM_FC', 'arm-linux-gnueabihf-gfortran'))
     build.build(source, sd_module,
                 'thumbv7em-none-eabihf', 8193)
     expected_checksum = (zlib.crc32(embedded.read_bytes()) ^ zlib.crc32(sd_module.read_bytes())) & CHECKSUM_MASK

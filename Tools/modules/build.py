@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Build a trusted native module from Rust or freestanding C++ source."""
+"""Build a trusted native module from Rust, freestanding C++ or demo Fortran source."""
 
 import argparse
 import json
@@ -44,8 +44,12 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
         if cfg:
             raise ValueError('Rust cfg options are not supported for C++ modules')
         from cpp import build as backend
+    elif source.suffix.lower() == '.f90':
+        if cfg:
+            raise ValueError('Rust cfg options are not supported for Fortran modules')
+        from fortran import build as backend
     else:
-        raise ValueError('expected .rs, .cpp, .cc or .cxx module source')
+        raise ValueError('expected .rs, .cpp, .cc, .cxx or .f90 module source')
     return backend.build(source, output, target, stack_size, base=base, cfg=cfg,
                          debug=debug, opt_level=opt_level, heap_size=heap_size)
 

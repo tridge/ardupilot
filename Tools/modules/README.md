@@ -1,13 +1,13 @@
 # Native module tools
 
 These tools build, inspect and test ArduPilot's experimental Rust and C++ native
-modules. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
+modules, plus a small Fortran talk demo. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
 configuration and installation, and the [design](../../libraries/AP_Module/DESIGN.md)
 for the container, ABI and resource-ownership contracts.
 
 ## Prerequisites
 
-Install Python with `pyelftools` and Rust **1.98.1 or newer**. The minimum compiler
+Install Python with `pyelftools`. Rust builds require Rust **1.98.1 or newer**. The minimum compiler
 version is shared by the builder and CI through `rust/rust-toolchain-version`.
 `RUSTC` selects a compiler other than the default `rustc`.
 
@@ -63,8 +63,8 @@ Tools/modules/apmod_info.py build/modules/airshow.apmod
 Tools/modules/apmod_info.py --fixups build/modules/airshow.apmod
 ```
 
-`build.py` dispatches `.rs` to `rust/build.py` and `.cpp`/`.cc`/`.cxx` to
-`cpp/build.py`. Shared bindings are generated below
+`build.py` dispatches `.rs` to `rust/build.py`, `.cpp`/`.cc`/`.cxx` to
+`cpp/build.py`, and `.f90` to the demo `fortran/build.py`. Shared bindings are generated below
 `build/modules/libraries/AP_Module/`. Rust uses fat LTO; C++ uses Clang/LLD.
 Both package the linked ELF, retaining the companion `.elf` beside the output.
 Rust also retains `lib<name>_sdk.rlib`; C++ retains its intermediate `.o` files.
@@ -105,6 +105,77 @@ so refresh configured loaded/running checksum requirements before use.
 Without a manifest, the converter emits a test-only relocation probe, not a
 vehicle-loadable module. Unsupported sections, unresolved symbols and unsupported
 instruction relocations are rejected rather than delegated to a firmware linker.
+
+## Fortran talk demo (SITL and STM32H7)
+
+The [Fortran simple loop](../../libraries/AP_Module/examples/simple_loop.f90)
+reads gyro values, computes their magnitude in Fortran, and sends
+`Fortran tick <seconds> gyro <magnitude>` once per second. The small SDK in
+`libraries/AP_Module/sdk/fortran/` uses `ISO_C_BINDING` and the generated C++
+clients; formatted text uses the firmware formatter, not Fortran I/O. The loader,
+firmware, container and resource limits are identical for all three languages.
+
+Install GNU Fortran (tested with gfortran 15.2), Clang 21+ and standalone LLD 21+.
+`FC`, `CXX` and `LLD` select the compilers/linker. Rust is not needed to build or
+run a Fortran module. From the repository root:
+
+```sh
+mkdir -p /tmp/fortran-demo/modules
+Tools/modules/build.py libraries/AP_Module/examples/simple_loop.f90 \
+    /tmp/fortran-demo/modules/fortran.apmod --target x86_64-unknown-linux-gnu \
+    --stack-size 8192 --heap-size 4096
+Tools/modules/apmod_info.py /tmp/fortran-demo/modules/fortran.apmod
+Tools/autotest/sim_vehicle.py -v ArduPlane --waf-configure-arg=--enable-modules --use-dir /tmp/fortran-demo
+```
+
+In MAVProxy, set `MOD_ENABLE` to 1 and reboot (`param set MOD_ENABLE 1`, then
+`reboot`). The Fortran module can run alongside Rust and C++ modules; increase
+`MOD_MAX_MOD` before reboot if loading more than its default two modules.
+Do not install modules in the repository's `modules/` submodule directory.
+
+For STM32H7, use an ARM GNU Fortran cross compiler (tested with 15.2), for example
+the `gfortran-arm-linux-gnueabihf` package. Although that compiler targets Linux
+by default, the builder explicitly selects Cortex-M4-compatible Thumb hard float,
+assembles with Clang and links without Linux startup, libc or libgfortran.
+The ArduPilot `arm-none-eabi-gcc` toolchain supplies only referenced compiler
+helpers from its Cortex-M4 hard-float `libgcc.a`; `ARM_GCC` overrides that compiler.
+
+```sh
+FC=arm-linux-gnueabihf-gfortran Tools/modules/build.py \
+    libraries/AP_Module/examples/simple_loop.f90 build/modules/fortran_H7.apmod \
+    --target thumbv7em-none-eabihf --stack-size 8192 --heap-size 4096
+```
+
+Copy `fortran_H7.apmod` to `/APM/modules/` on microSD and enable `MOD_ENABLE`.
+SITL and STM32 require separately compiled images. No firmware loader changes
+or additional runtime resolver are needed.
+
+This is a runtime-free demo subset, not a complete generated Fortran SDK.
+Only `-Os` is accepted; `--debug` retains Fortran/C++ DWARF. Fixed-size storage
+and simple scalar/array arithmetic work. `PRINT`, `WRITE` (including internal
+formatted writes), runtime-dependent allocation/intrinsics, and other uses of
+libgfortran are not supplied and must fail the build. Avoid compiler-created
+array temporaries requiring allocation. ARM Fortran uses a GOT-free PIC subset:
+keep mutable variables in automatic stack locals, not `SAVE`, initialized locals,
+`DATA` or mutable module globals. The packer rejects GOT/RW references it cannot
+relocate safely. GCC reserves `r9` for the C++ bridge's RWPI static base; read-only
+Fortran constants and code use PC-relative addressing. These restrictions do not
+apply to the existing Rust/C++ backends. Flang 21 cannot lower ARM Fortran yet.
+
+Run the package/rebase checks for both profiles, known-value maths and status
+tests, and three-language SITL reload test with native and ARM GNU Fortran installed:
+
+```sh
+AP_MODULE_SITL_BINARY=/path/to/sitl/bin/arduplane ARM_FC=arm-linux-gnueabihf-gfortran \
+    python3 -m pytest -q Tools/modules/fortran/tests
+```
+
+`ARM_FC` selects the cross compiler for tests without changing their native `FC`.
+For H743 Renode SD/ROMFS execution and leak-free restart checks, build
+`Tools/modules/build_romfs_runtime.py --language fortran` and run
+`Tools/modules/tests/test_romfs_manager.py` with the matching
+`AP_MODULE_ROMFS_BUILD_ROOT` and `RENODE` settings. The harness uses a known
+vector rather than vehicle IMU hardware to check the Fortran calculation.
 
 ## Source-level debugging
 

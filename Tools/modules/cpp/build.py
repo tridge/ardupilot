@@ -17,7 +17,8 @@ SDK = ROOT / 'libraries/AP_Module/sdk/cpp'
 GENERATED = ROOT / 'build/modules/libraries/AP_Module'
 
 
-def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096):
+def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096,
+          extra_objects=()):
     if opt_level != 's':
         raise ValueError('C++ modules currently require --opt-level=s; other relocation output is unaudited')
     compiler = os.environ.get('CXX', 'clang++')
@@ -56,6 +57,6 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
                f'--defsym=MODULE_BASE={base}', '-o', str(elf)]
     if arm:
         command += ['--defsym=MODULE_DATA_ALIGNMENT=4']
-    subprocess.run(command + objects, check=True)
+    subprocess.run(command + objects + [str(path) for path in extra_objects], check=True)
     output.write_bytes(pack.pack_elf(elf.read_bytes(), contract))
     return output
