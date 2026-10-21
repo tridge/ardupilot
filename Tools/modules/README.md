@@ -78,9 +78,14 @@ Rust also retains `lib<name>_sdk.rlib`; C++ retains its intermediate `.o` files.
 `--stack-size` declares module stack use, not a measured bound. The firmware's
 `MOD_STACK_MAX` must additionally cover the host-call margin: 4 KiB on Cortex-M
 or 16 KiB on x86-64; backend overhead is additional.
+`--thread-priority` declares native worker priority, defaulting to 2 on ARM and
+1 on Linux. Firmware rejects priorities above `MOD_THD_PRIO_MAX` or outside its
+HAL's application range. The manager runs at that parameter plus one. SITL and
+non-realtime Linux retain host time slicing rather than enforcing these priorities.
 
 `apmod_info.py` validates the file and reports its target, ABI, code/data sizes,
-alignments, CPU/FPU requirement, stack requirement, initial heap, relocations and imported API names.
+alignments, CPU/FPU requirement, stack requirement, initial heap, thread priority,
+relocations and imported API names.
 It does not check whether a particular firmware provides those APIs or has enough RAM.
 It automatically uses a companion `.elf` to split file size into code, read-only
 data, initialized RW data, alignment padding and container overhead. The ELF
@@ -95,15 +100,19 @@ Change a module's resource declarations without rebuilding its code:
 
 ```sh
 Tools/modules/apmod_info.py module.apmod --stack-size 16384 --heap-size 32768
+Tools/modules/apmod_info.py module.apmod --thread-priority 2
 ```
 
-Either option can be used alone. Sizes are bytes, from 256 through 16777216.
+Each option can be used alone. Sizes are bytes, from 256 through 16777216;
+priorities are integers from 1 through 254, further restricted by the firmware.
 The tool validates the module and companion ELF before replacing the file in
 place, updates its CRC and displays the new values. The ELF remains usable.
 Changing declarations does not establish actual memory requirements: the stack
 excludes the host-call margin and the heap is its initial capacity. Firmware
-still enforces `MOD_STACK_MAX` and `MOD_HEAP_MAX`. The file checksum changes,
+still enforces `MOD_STACK_MAX`, `MOD_HEAP_MAX` and `MOD_THD_PRIO_MAX`. The file checksum changes,
 so refresh configured loaded/running checksum requirements before use.
+The current `APMOD07` format adds thread priority; rebuild older modules and
+firmware together rather than relabelling an old header.
 
 `pack.py` is the lower-level ELF converter. Normal SDK builds should use
 `build.py`, which supplies the generated ABI manifest and target profile.

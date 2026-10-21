@@ -54,16 +54,18 @@ def sdk_environment():
     return dict(os.environ, AP_MODULE_SDK_GENERATED=str(generated / 'sdk/rust/src'))
 
 
-def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None):
+def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None,
+          thread_priority=None):
     profile = targets.select(target, cpu)
+    thread_priority = profile.default_thread_priority if thread_priority is None else thread_priority
     compiler = os.environ.get('RUSTC', 'rustc')
     version = subprocess.check_output([compiler, '--version'], text=True)
     check_rust_version(version)
     environment = sdk_environment()
     contract = json.loads((GENERATED_ROOT / 'sdk/abi.json').read_text())
-    contract.update(cpu_profile=profile.id, stack_size=stack_size, heap_size=heap_size)
+    contract.update(cpu_profile=profile.id, stack_size=stack_size, heap_size=heap_size, thread_priority=thread_priority)
     pack.validate_contract(profile.machine, contract['abi_version'], profile.id,
-                           stack_size, bytes.fromhex(contract['fingerprint']), heap_size)
+                           stack_size, bytes.fromhex(contract['fingerprint']), heap_size, thread_priority)
     output.parent.mkdir(parents=True, exist_ok=True)
     library = output.with_name(f'lib{output.stem}_sdk.rlib')
     elf = output.with_suffix('.elf')
@@ -116,11 +118,12 @@ def main():
                         help='module CPU requirement (default depends on target)')
     parser.add_argument('--stack-size', type=int, required=True, help='declared module stack requirement in bytes')
     parser.add_argument('--heap-size', type=int, required=True, help='initial module heap in bytes, capped by MOD_HEAP_MAX')
+    parser.add_argument('--thread-priority', type=int, help='native thread priority (default depends on target)')
     parser.add_argument('--debug', action='store_true', help='keep full DWARF in the host ELF and use frame pointers')
     parser.add_argument('--opt-level', choices=('0', '1', '2', '3', 's', 'z'), default='s', help='Rust optimisation level')
     args = parser.parse_args()
     build(args.source, args.output, args.target, args.stack_size, debug=args.debug,
-          opt_level=args.opt_level, heap_size=args.heap_size, cpu=args.cpu)
+          opt_level=args.opt_level, heap_size=args.heap_size, cpu=args.cpu, thread_priority=args.thread_priority)
 
 
 if __name__ == '__main__':

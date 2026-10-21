@@ -13,6 +13,10 @@ class CpuProfile:
     machine: int
     fpu: str = ''
 
+    @property
+    def default_thread_priority(self):
+        return 2 if self.machine == 40 else 1
+
 
 # IDs are container requirements, not an ordered CPU capability level.
 CPU_PROFILES = {

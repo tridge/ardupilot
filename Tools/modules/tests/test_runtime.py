@@ -10,6 +10,7 @@ import zlib
 
 from pathlib import Path
 
+import apmod_info
 import pack
 import pytest
 
@@ -335,7 +336,7 @@ def test_rounded_code_size(launch, images, budget):
     (48, 1, 'CPU profile mismatch'),
     (48, 3, 'CPU profile mismatch'),
     (64, 0, 'API fingerprint'),
-    (80, 0, 'image checksum mismatch'),
+    (84, 0, 'image checksum mismatch'),
 ])
 def test_load_failure_diagnostics(launch, images, offset, value, reason):
     data = bytearray(images['cooperative'])
@@ -343,6 +344,29 @@ def test_load_failure_diagnostics(launch, images, offset, value, reason):
     data[offset:offset + 4] = value.to_bytes(4, 'little')
     vehicle = launch({'x.apmod': data}, SCR_ENABLE=0)
     vehicle.text(f'x.apmod load failed: {reason}')
+    vehicle.arm(accepted=False)
+
+
+@pytest.mark.parametrize('priority,limit,accepted', [(1, 1, True), (2, 1, False), (3, 5, True), (6, 5, False)])
+def test_module_thread_priority_limit(launch, images, priority, limit, accepted):
+    data = apmod_info.resize_resources(images['cooperative'], thread_priority=priority)
+    vehicle = launch({'p.apmod': data}, MOD_THD_PRIO_MAX=limit, SCR_ENABLE=0)
+    if accepted:
+        vehicle.text('Module: loaded 1 modules')
+        assert vehicle.worker('p.apmod') is not None
+        vehicle.restart(1)
+        assert vehicle.worker('p.apmod') is not None
+    else:
+        vehicle.text('p.apmod load failed: thread priority exceeds MOD_THD_PRIO_MAX')
+        vehicle.arm(accepted=False)
+        assert vehicle.worker('p.apmod') is None
+
+
+@pytest.mark.parametrize('limit', [0, 20, 130, 255])
+def test_invalid_module_priority_limit(launch, limit):
+    vehicle = launch({}, MOD_THD_PRIO_MAX=limit, SCR_ENABLE=0)
+    assert vehicle.parameter('MOD_THD_PRIO_MAX') == limit
+    vehicle.text('invalid MOD_THD_PRIO_MAX; reboot required')
     vehicle.arm(accepted=False)
 
 

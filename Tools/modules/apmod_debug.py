@@ -28,7 +28,7 @@ class ModuleSymbols:
         self.data = self.path.read_bytes()
         self.module = pack.unpack(self.data)
         if self.data[:8] != pack.RUNTIME_MAGIC:
-            raise ValueError('module debugging requires APMOD06')
+            raise ValueError('module debugging requires APMOD07')
         self.elf_path = self.path.with_suffix('.elf')
         self.elf_data = self.elf_path.read_bytes()
         if pack.pack_elf(self.elf_data, self.module['contract']) != self.data:

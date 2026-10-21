@@ -14,6 +14,7 @@ import pytest
 
 from elftools.elf.elffile import ELFFile
 from rust.build import sdk_environment
+from test_modules import upgrade_frozen_container
 from test_runtime import ROOT
 from test_runtime import Vehicle
 from test_threads import gen_board  # noqa: F401
@@ -37,7 +38,8 @@ def test_frozen_host_dispatch(tmp_path):
     if not executable.is_file():
         pytest.skip('Build tests/test_rust_sdk with Rust enabled')
     image = tmp_path / 'compat.apmod'
-    image.write_bytes(bytes.fromhex((ROOT / 'libraries/AP_Module/tests/compat/x86_64.apmod.hex').read_text()))
+    image.write_bytes(upgrade_frozen_container(bytes.fromhex(
+        (ROOT / 'libraries/AP_Module/tests/compat/x86_64.apmod.hex').read_text())))
     environment = dict(os.environ, AP_MODULE_TEST_COMPAT_MODULE=str(image))
     subprocess.run([str(executable), '--gtest_filter=ModuleMathSDK.FrozenImageSurvives*'], env=environment, check=True)
 
@@ -50,6 +52,7 @@ def test_sitl_math(tmp_path, lua, module):
     if module == 'compat':
         # Intentionally do not invoke the compiler on the frozen old SDK probe.
         data = bytes.fromhex((ROOT / 'libraries/AP_Module/tests/compat/x86_64.apmod.hex').read_text())
+        data = upgrade_frozen_container(data)
     else:
         image = build.build(ROOT / f'libraries/AP_Module/tests/modules/{module}.rs', tmp_path / 'math.apmod',
                             'x86_64-unknown-linux-gnu', 8192)
@@ -115,7 +118,8 @@ def chibios_probe(tmp_path, emulator, module, oracle=None, files=None, heap_limi
     subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/modules'], check=True)
     if module == 'compat':
         image = tmp_path / 'math.apmod'
-        image.write_bytes(bytes.fromhex((ROOT / 'libraries/AP_Module/tests/compat/thumbv7em.apmod.hex').read_text()))
+        image.write_bytes(upgrade_frozen_container(bytes.fromhex(
+            (ROOT / 'libraries/AP_Module/tests/compat/thumbv7em.apmod.hex').read_text())))
     else:
         image = build.build(ROOT / f'libraries/AP_Module/tests/modules/{module}.rs', tmp_path / 'math.apmod',
                             'thumbv7em-none-eabihf', 8192)

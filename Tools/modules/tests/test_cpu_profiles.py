@@ -55,6 +55,7 @@ def test_arm_builds_encode_the_actual_cpu(tmp_path, monkeypatch, suffix, cpu, pr
     raw = image.read_bytes()
     contract = pack.unpack(raw)['contract']
     assert contract['cpu_profile'] == profile
+    assert contract['thread_priority'] == 2
     elf_data = image.with_suffix('.elf').read_bytes()
     elf = ELFFile(io.BytesIO(elf_data))
     attributes = {attribute.tag: attribute.value
@@ -76,3 +77,19 @@ def test_cpu_option_reaches_the_cli_builder(tmp_path):
                     str(image), '--target', ARM, '--cpu', 'cortex-m7', '--stack-size', '8192', '--heap-size', '4096'],
                    check=True)
     assert pack.unpack(image.read_bytes())['contract']['cpu_profile'] == 3
+
+
+@pytest.mark.parametrize('suffix,priority', [('rs', 3), ('cpp', 4), ('f90', 5)])
+def test_explicit_thread_priority_reaches_every_backend(tmp_path, monkeypatch, suffix, priority):
+    if suffix == 'f90':
+        monkeypatch.setenv('FC', os.environ.get('ARM_FC', 'arm-linux-gnueabihf-gfortran'))
+    source = build.SDK_ROOT / ('examples/simple_loop.' + suffix)
+    image = build.build(source, tmp_path / 'priority.apmod', ARM, 8192, thread_priority=priority)
+    assert pack.unpack(image.read_bytes())['contract']['thread_priority'] == priority
+
+
+@pytest.mark.parametrize('priority', [-1, 0, 255, 1 << 64, True, 1.5])
+def test_bad_thread_priority_fails_before_compiling(tmp_path, monkeypatch, priority):
+    monkeypatch.setenv('RUSTC', '/no/compiler')
+    with pytest.raises(ValueError, match='invalid module thread priority'):
+        build.build(tmp_path / 'bad.rs', tmp_path / 'bad.apmod', ARM, 8192, thread_priority=priority)

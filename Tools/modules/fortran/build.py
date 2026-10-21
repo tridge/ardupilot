@@ -15,7 +15,8 @@ from cpp import build as cpp
 SDK = Path(__file__).resolve().parents[3] / 'libraries/AP_Module/sdk/fortran'
 
 
-def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None):
+def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None,
+          thread_priority=None):
     profile = targets.select(target, cpu)
     if opt_level != 's':
         raise ValueError('Fortran demo modules currently require --opt-level=s')
@@ -73,4 +74,5 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     # Reuse the validated C++ entry/allocator, generated clients and packer.
     # Deliberately do not link libgfortran: runtime dependencies must fail here.
     return cpp.build(SDK / 'bridge.cpp', output, target, stack_size, base=base,
-                     debug=debug, opt_level=opt_level, heap_size=heap_size, extra_objects=objects, cpu=profile.cpu)
+                     debug=debug, opt_level=opt_level, heap_size=heap_size, extra_objects=objects, cpu=profile.cpu,
+                     thread_priority=thread_priority)

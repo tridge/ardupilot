@@ -72,7 +72,23 @@ def checksum(data, header_size=pack.HEADER.size):
 
 def runtime_manifest(target):
     return dict(abi_version=1, cpu_profile=1 if target == 'thumbv7em-none-eabihf' else 2,
+                thread_priority=2 if target == 'thumbv7em-none-eabihf' else 1,
                 stack_size=4096, heap_size=32768, fingerprint=bytes(range(1, 17)).hex())
+
+
+def upgrade_frozen_container(data):
+    # Keep the frozen old SDK machine code/import identities unchanged while
+    # updating only the container envelope for the current loader contract.
+    old = struct.Struct('<8s14I16sI')
+    fields = list(old.unpack_from(data))
+    assert fields[0] == b'APMOD06\0' and fields[1] == 6
+    assert fields[-1] == zlib.crc32(data[:80] + bytes(4) + data[84:])
+    fields[0], fields[1] = pack.RUNTIME_MAGIC, 7
+    fields.insert(-1, 2 if fields[2] == 40 else 1)
+    fields[-1] = 0
+    body = data[old.size:]
+    fields[-1] = zlib.crc32(pack.RUNTIME_HEADER.pack(*fields) + body)
+    return pack.RUNTIME_HEADER.pack(*fields) + body
 
 
 @pytest.mark.parametrize('target', ['thumbv7em-none-eabihf', 'x86_64-unknown-linux-gnu'])
@@ -80,7 +96,7 @@ def test_runtime_contract(tmp_path, target):
     manifest = runtime_manifest(target)
     elf = build(tmp_path, target)
     data = pack.pack_elf(elf, manifest)
-    assert data[:8] == b'APMOD06\0'
+    assert data[:8] == b'APMOD07\0'
     assert data == pack.pack_elf(build(tmp_path, target, base=0x24123000), manifest)
     assert pack.unpack(data)['contract'] == manifest
     # Tagging changes the compatibility envelope, not the image or relocation.

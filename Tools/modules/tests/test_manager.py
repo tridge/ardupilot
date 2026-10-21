@@ -22,7 +22,8 @@ import build
 
 
 @pytest.mark.parametrize('ending', ['never', 'panic'])
-def test_chibios_runtime_manager(tmp_path, renode, monkeypatch, ending):  # noqa: F811
+@pytest.mark.parametrize('priority_max', [2, 5])
+def test_chibios_runtime_manager(tmp_path, renode, monkeypatch, ending, priority_max):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
     executable = build_root / board / 'examples/ModuleRuntime'
@@ -40,17 +41,22 @@ def test_chibios_runtime_manager(tmp_path, renode, monkeypatch, ending):  # noqa
         addresses += list(range(error_address, error_address + 100, 4))
         memory_address = symbols.get_symbol_by_name('rust_runtime_test_memory')[0]['st_value']
         addresses += list(range(memory_address, memory_address + 256, 4))
+        generation_address = symbols.get_symbol_by_name('rust_runtime_test_generation_free')[0]['st_value']
+        addresses += list(range(generation_address, generation_address + 21 * 4, 4))
     generated = gen_board.generate(ROOT, board, tmp_path / 'generated', uart_port=0, state_dir=tmp_path)
     data = renode_data.ensure_mcu_data(generated['mcu_type'])
     sdcard = run.make_fat_image(tmp_path / 'sdcard.img', 16 * 1024 * 1024, fat_bits=16)
     subprocess.run(['mmd', '-i', str(sdcard), '::/fixtures'], check=True)
+    priority_file = tmp_path / 'priority.bin'
+    priority_file.write_bytes(bytes([priority_max]))
+    subprocess.run(['mcopy', '-i', str(sdcard), str(priority_file), '::/fixtures/priority.bin'], check=True)
     for name, mode in [('one', 'cleanup'), ('two', 'parameters'), ('end', ending)]:
         monkeypatch.setenv('AP_MODULE_LIFECYCLE', mode)
         monkeypatch.setenv('AP_MODULE_PARAM_MODE', 'renode')
         output = tmp_path / f'{name}.apmod'
         source = 'parameters.rs' if mode == 'parameters' else 'lifecycle.rs'
         build.build(ROOT / 'libraries/AP_Module/tests/modules' / source, output,
-                    'thumbv7em-none-eabihf', 8193)
+                    'thumbv7em-none-eabihf', 8193, thread_priority=priority_max if name == 'end' else 2)
         subprocess.run(['mcopy', '-i', str(sdcard), str(output), f'::/fixtures/{name}.apmod'], check=True)
     output = renode('''
 $elf=@%s
@@ -65,19 +71,23 @@ emulation RunFor "40"
        '\n'.join(f'sysbus ReadDoubleWord 0x{address:X}' for address in addresses)))
     values = [int(value, 16) for value in re.findall(r'^0x[0-9A-Fa-f]{8}$', output, re.M)]
     (tmp_path / 'renode.log').write_text(output)
-    assert len(values) == len(names) + 25 + 64, output
+    assert len(values) == len(names) + 25 + 64 + 21, output
     result = dict(zip(names, values[:len(names)]))
     error_words = values[len(names):len(names)+25]
     result['error'] = b''.join(value.to_bytes(4, 'little') for value in error_words).split(b'\0')[0].decode()
-    memory = b''.join(value.to_bytes(4, 'little') for value in values[len(names)+25:]).split(b'\0')[0].decode()
+    memory = b''.join(value.to_bytes(4, 'little') for value in values[len(names)+25:len(names)+25+64])
+    memory = memory.split(b'\0')[0].decode()
+    print(f'Generation free memory: {values[-21:]}', flush=True)
     print(f'{board} {ending}: {result}', flush=True)
     print(memory, flush=True)
     assert result['result'] == 0x600DF00D, (result, output)
     assert result['cycles'] == 20 and result['before'] == result['after'], result
+    assert values[-21:] == [result['before']] * 21, 'Every measured generation must restore the same free memory'
     assert result['stack_free'] > 1024 and 4096 <= result['stack_total'] < 4096 + 1024, result
     # The registry includes port context overhead, but not a 4 KiB rounding gap.
     assert 8193 + 4096 <= result['worker_stack_total'] < 8193 + 4096 + 1024, result
-    assert result['manager_priority'] > result['worker_priority'], result
+    assert result['manager_priority'] == priority_max + 1, result
+    assert result['worker_priority'] == priority_max, result
     fast_regions = {'STM32F405xx': (0x10000000, 0x10010000), 'STM32H743xx': (0x20000000, 0x20020000)}
     low, high = fast_regions[generated['mcu_type']]
     assert low <= result['manager_stack'] < high and low <= result['worker_stack'] < high, result

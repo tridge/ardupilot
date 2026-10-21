@@ -23,8 +23,8 @@ from targets import CPU_PROFILES
 
 MAGIC = b'APMOD01\0'
 HEADER = struct.Struct('<8s12I')
-RUNTIME_MAGIC = b'APMOD06\0'
-RUNTIME_HEADER = struct.Struct('<8s14I16sI')
+RUNTIME_MAGIC = b'APMOD07\0'
+RUNTIME_HEADER = struct.Struct('<8s14I16s2I')
 FIXUP = struct.Struct('<I')
 LEGACY_FIXUP = struct.Struct('<II')
 IMPORT = struct.Struct('<QII')
@@ -44,12 +44,13 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def validate_contract(machine, abi, profile, stack, fingerprint, heap):
+def validate_contract(machine, abi, profile, stack, fingerprint, heap, thread_priority=1):
     require(type(abi) is int and 0 < abi <= 0xFFFFFFFF, 'invalid ABI version')
     require(type(profile) is int and profile in CPU_PROFILES and CPU_PROFILES[profile].machine == machine,
             'invalid CPU profile')
     require(type(stack) is int and 256 <= stack <= MAX_IMAGE, 'invalid stack requirement')
     require(type(heap) is int and 256 <= heap <= MAX_IMAGE, 'invalid initial heap requirement')
+    require(type(thread_priority) is int and 1 <= thread_priority <= 254, 'invalid module thread priority')
     require(len(fingerprint) == 16 and fingerprint != bytes(16), 'invalid API fingerprint')
 
 
@@ -78,7 +79,7 @@ def pack_elf(data, manifest=None):
     # images need a page boundary; split ARM images retain ELF section alignment.
     file_size = max(file_size, rx_size)
     memory_size = max(memory_size, rx_size)
-    # APMOD06 allocates RW separately on ARM, without requiring page padding.
+    # APMOD07 allocates RW separately on ARM, without requiring page padding.
     # Each half of the alignment word preserves one segment's ELF alignment.
     rw_alignment = max([width] + [s['sh_addralign'] for _, s in sections if s['sh_flags'] & 1])
     rx_alignment = max([width] + [s['sh_addralign'] for _, s in sections if not s['sh_flags'] & 1])
@@ -214,7 +215,7 @@ def pack_elf(data, manifest=None):
             records.append((binding_hash, offset, name_offset))
         body += b''.join(IMPORT.pack(*item) for item in records) + names
         require(isinstance(manifest, dict), 'manifest must be an object')
-        require(set(manifest) == {'abi_version', 'cpu_profile', 'stack_size', 'heap_size', 'fingerprint'},
+        require(set(manifest) == {'abi_version', 'cpu_profile', 'stack_size', 'heap_size', 'fingerprint', 'thread_priority'},
                 'invalid manifest fields')
         require(isinstance(manifest['fingerprint'], str), 'invalid API fingerprint')
         try:
@@ -223,9 +224,10 @@ def pack_elf(data, manifest=None):
             raise ValueError('invalid API fingerprint') from error
         abi, profile, stack = (manifest[key] for key in ('abi_version', 'cpu_profile', 'stack_size'))
         heap = manifest['heap_size']
-        validate_contract(machine, abi, profile, stack, fingerprint, heap)
-        fields = (6, machine, width, rw_alignment | rx_alignment << 16, file_size, memory_size, rx_size, entry, len(fixups),
-                  abi, profile, stack, heap, len(imports), fingerprint)
+        priority = manifest['thread_priority']
+        validate_contract(machine, abi, profile, stack, fingerprint, heap, priority)
+        fields = (7, machine, width, rw_alignment | rx_alignment << 16, file_size, memory_size, rx_size, entry, len(fixups),
+                  abi, profile, stack, heap, len(imports), fingerprint, priority)
         header = RUNTIME_HEADER.pack(RUNTIME_MAGIC, *fields, 0)
         return RUNTIME_HEADER.pack(RUNTIME_MAGIC, *fields, zlib.crc32(header + body)) + body
     # Untagged containers remain restricted to the original relocation probes.
@@ -249,10 +251,11 @@ def unpack(data):
         require(len(data) >= RUNTIME_HEADER.size, 'truncated header')
         header_size = RUNTIME_HEADER.size
         (magic, version, machine, width, alignment, file_size, memory_size, rx_size,
-         entry, count, abi, profile, stack, heap, import_count, fp, crc) = RUNTIME_HEADER.unpack_from(data)
-        require(version == 6, 'invalid module version')
-        validate_contract(machine, abi, profile, stack, fp, heap)
-        contract = dict(abi_version=abi, cpu_profile=profile, stack_size=stack, heap_size=heap, fingerprint=fp.hex())
+         entry, count, abi, profile, stack, heap, import_count, fp, priority, crc) = RUNTIME_HEADER.unpack_from(data)
+        require(version == 7, 'invalid module version')
+        validate_contract(machine, abi, profile, stack, fp, heap, priority)
+        contract = dict(abi_version=abi, cpu_profile=profile, stack_size=stack, heap_size=heap, fingerprint=fp.hex(),
+                        thread_priority=priority)
     else:
         header_size = HEADER.size
         magic, version, machine, width, alignment, file_size, memory_size, rx_size, entry, count, abi, flags, crc = \

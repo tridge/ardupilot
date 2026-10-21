@@ -15,6 +15,7 @@ import pack
 import pytest
 
 from elftools.elf.elffile import ELFFile
+from test_modules import upgrade_frozen_container
 
 import build
 
@@ -27,7 +28,8 @@ def test_frozen_probe_identity(target, sha256):
     root = Path(__file__).resolve().parents[3]
     data = bytes.fromhex((root / f'libraries/AP_Module/tests/compat/{target}.apmod.hex').read_text())
     assert hashlib.sha256(data).hexdigest() == sha256
-    assert {item[2] for item in pack.unpack(data)['imports']} == {'Vector3f.length', 'string.format_printf'}
+    assert {item[2] for item in pack.unpack(upgrade_frozen_container(data))['imports']} == {
+        'Vector3f.length', 'string.format_printf'}
 
 
 @pytest.fixture(params=list(build.TARGETS))
@@ -61,7 +63,7 @@ def test_apmod_info(one_import):
     binding_hash, offset, name = info['imports'][0]
     output = apmod_info.format_module(Path('one.apmod'), one_import)
     assert 'Module: one.apmod' in output
-    assert 'Format: APMOD06 (version 6)' in output
+    assert 'Format: APMOD07 (version 7)' in output
     assert f'Pointer width: {info["width"] * 8} bits' in output
     assert f'Initialized image: {len(info["image"])} bytes' in output
     assert f'Memory image: {info["memory_size"]} bytes' in output
@@ -85,8 +87,8 @@ fn run(_: &Context<'_>) -> Result { Ok(()) }
 
 
 def crc(data):
-    data[80:84] = bytes(4)
-    data[80:84] = struct.pack('<I', zlib.crc32(data))
+    data[84:88] = bytes(4)
+    data[84:88] = struct.pack('<I', zlib.crc32(data))
     return data
 
 

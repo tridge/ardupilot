@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Inspect a native module and optionally change its declared stack or initial heap."""
+"""Inspect a native module and optionally change its stack, initial heap or thread priority."""
 
 import argparse
 import io
@@ -25,18 +25,20 @@ MACHINES = {
 }
 
 
-def resize_resources(data, stack_size=None, heap_size=None):
+def resize_resources(data, stack_size=None, heap_size=None, thread_priority=None):
     module = pack.unpack(data)
     contract = module['contract']
     if contract is None:
         raise ValueError('cannot change resource sizes in a relocation probe without a runtime contract')
     stack_size = contract['stack_size'] if stack_size is None else stack_size
     heap_size = contract['heap_size'] if heap_size is None else heap_size
+    thread_priority = contract['thread_priority'] if thread_priority is None else thread_priority
     pack.validate_contract(module['machine'], contract['abi_version'], contract['cpu_profile'],
-                           stack_size, bytes.fromhex(contract['fingerprint']), heap_size)
+                           stack_size, bytes.fromhex(contract['fingerprint']), heap_size, thread_priority)
     fields = list(pack.RUNTIME_HEADER.unpack_from(data))
-    # APMOD06 header fields 12 and 13 declare module stack and initial heap.
+    # APMOD07 fields 12/13 declare stack/heap; field 16 is native priority.
     fields[12:14] = stack_size, heap_size
+    fields[16] = thread_priority
     fields[-1] = 0
     body = data[pack.RUNTIME_HEADER.size:]
     fields[-1] = zlib.crc32(pack.RUNTIME_HEADER.pack(*fields) + body)
@@ -128,6 +130,7 @@ def format_module(path, data, show_fixups=False, elf_data=None, elf_path=None):
             f'API fingerprint: {contract["fingerprint"]}',
             f'Stack requirement: {contract["stack_size"]} bytes',
             f'Initial heap: {contract["heap_size"]} bytes',
+            f'Thread priority: {contract["thread_priority"]}',
         ]
     else:
         lines.append('Runtime contract: none (relocation probe)')
@@ -174,6 +177,8 @@ def main():
                         help='change declared module stack in place (256..16777216, excluding host-call margin)')
     parser.add_argument('--heap-size', type=int, metavar='BYTES',
                         help='change initial module heap in place (256..16777216, still limited by MOD_HEAP_MAX)')
+    parser.add_argument('--thread-priority', type=int, metavar='PRIORITY',
+                        help='change native thread priority in place (1..254, limited by HAL and MOD_THD_PRIO_MAX)')
     elf_options = parser.add_mutually_exclusive_group()
     elf_options.add_argument('--elf', type=Path, help='matching unstripped ELF (default: MODULE with .elf suffix)')
     elf_options.add_argument('--no-elf', action='store_true', help='inspect only the module, ignoring any companion ELF')
@@ -181,8 +186,8 @@ def main():
     try:
         data = args.module.read_bytes()
         original = data
-        if args.stack_size is not None or args.heap_size is not None:
-            data = resize_resources(data, args.stack_size, args.heap_size)
+        if args.stack_size is not None or args.heap_size is not None or args.thread_priority is not None:
+            data = resize_resources(data, args.stack_size, args.heap_size, args.thread_priority)
         elf_path = args.elf or args.module.with_suffix('.elf')
         elf_data = None
         if not args.no_elf and (args.elf is not None or elf_path.is_file()):

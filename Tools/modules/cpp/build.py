@@ -19,7 +19,7 @@ GENERATED = ROOT / 'build/modules/libraries/AP_Module'
 
 
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096,
-          extra_objects=(), cpu=None):
+          extra_objects=(), cpu=None, thread_priority=None):
     profile = targets.select(target, cpu)
     if opt_level != 's':
         raise ValueError('C++ modules currently require --opt-level=s; other relocation output is unaudited')
@@ -35,7 +35,10 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
             raise ValueError(f'C++ modules require {name} 21 or newer; got {version.splitlines()[0]}')
     arm = profile.machine == 40
     contract = json.loads((GENERATED / 'sdk/abi.json').read_text())
-    contract.update(cpu_profile=profile.id, stack_size=stack_size, heap_size=heap_size)
+    priority = profile.default_thread_priority if thread_priority is None else thread_priority
+    contract.update(cpu_profile=profile.id, stack_size=stack_size, heap_size=heap_size, thread_priority=priority)
+    pack.validate_contract(profile.machine, contract['abi_version'], profile.id,
+                           stack_size, bytes.fromhex(contract['fingerprint']), heap_size, priority)
     output.parent.mkdir(parents=True, exist_ok=True)
     common = [compiler, '--target=arm-none-eabi' if arm else '--target=x86_64-unknown-linux-gnu',
               '-std=c++17', '-Os', '-ffreestanding', '-fno-builtin', '-fno-exceptions', '-fno-rtti',
