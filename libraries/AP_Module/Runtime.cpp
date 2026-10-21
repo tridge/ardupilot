@@ -152,7 +152,8 @@ void Runtime::init()
     }
     uint32_t manager_stack;
     switch (hal.util->executable_memory_target()) {
-    case AP_HAL::ExecutableMemory::Target::ThumbV7EMHardFloat:
+    case AP_HAL::ExecutableMemory::Target::CortexM4HardFloat:
+    case AP_HAL::ExecutableMemory::Target::CortexM7HardFloat:
         // Module code and binding calls run on worker stacks. The manager
         // only loads images, handles messages and reaps stopped workers.
         manager_stack = 4096;

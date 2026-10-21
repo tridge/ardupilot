@@ -69,8 +69,10 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         if (word(source + 44) == 0 || word(source + 44) != compatibility->abi_version) {
             return reject("ABI version mismatch");
         }
-        if (!((machine == 40 && profile == 1) || (machine == 62 && profile == 2)) ||
-            profile != compatibility->cpu_profile) {
+        if (!supports_cpu_profile(machine, profile, compatibility->cpu_profile)) {
+            if (machine == 40 && profile == 3 && compatibility->cpu_profile == 1) {
+                return reject("requires Cortex-M7 with double-precision FPU");
+            }
             return reject("CPU profile mismatch");
         }
         if (stack_size < 256 || stack_size > MAX_IMAGE) {

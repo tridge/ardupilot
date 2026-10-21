@@ -37,8 +37,8 @@ The independent options are `--enable-modules` /
 build without scripting. Extra hwdefs should use `AP_MODULE_ENABLED`
 and `AP_SCRIPTING_LUA_ENABLED`; `AP_SCRIPTING_ENABLED` denotes shared support.
 
-Supported module profiles are Cortex-M4-compatible Thumb-2 hard float on STM32
-and x86-64 on SITL/Linux. Other Linux architectures need a separate target
+Supported module profiles are Cortex-M4/FPv4-SP and Cortex-M7/FPv5-D16 Thumb-2
+hard float on STM32, and x86-64 on SITL/Linux. Other Linux architectures need a separate target
 profile; ARM Linux cannot use the STM32 module. Executable-memory support covers
 STM32H743/H757 and F405. Small-board flash/RAM limits may prevent a complete
 vehicle build with the desired features.
@@ -78,12 +78,18 @@ Build an existing applet from the repository root:
 Tools/modules/build.py \
     libraries/AP_Module/applets/aerobatics/main.rs \
     build/modules/airshow.apmod \
-    --target thumbv7em-none-eabihf --stack-size 16384 --heap-size 32768
+    --target thumbv7em-none-eabihf --cpu cortex-m7 --stack-size 16384 --heap-size 32768
 Tools/modules/apmod_info.py build/modules/airshow.apmod
 ```
 
-Use `--target x86_64-unknown-linux-gnu` for x86-64 SITL/Linux. Modules are
-target-specific. The stack declaration excludes the host-call margin, currently
+Use `--target x86_64-unknown-linux-gnu` and omit `--cpu` for x86-64 SITL/Linux.
+Modules are target-specific. For ARM, `--cpu cortex-m4` is the portable default; use
+`--cpu cortex-m7` for H743/H757, including their double-precision FPU. H7 boards
+accept either profile; F405 accepts only M4 modules. The loader rejects unsupported
+CPU requirements before allocating the image. This choice applies to Rust,
+C++ and Fortran. `apmod_info.py` shows each module's CPU/FPU requirement.
+
+The stack declaration excludes the host-call margin, currently
 4 KiB on Cortex-M and 16 KiB on x86-64. The declaration plus margin must fit
 `MOD_STACK_MAX`; OS/guard overhead is additional. Measure the complete applet
 and host-call stack usage; the declaration is not a stack proof.

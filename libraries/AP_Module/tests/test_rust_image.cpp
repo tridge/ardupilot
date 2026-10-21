@@ -654,6 +654,34 @@ TEST(RustImage, RejectRuntimeMetadataErrors)
     EXPECT_FALSE(image.parse(nullptr, sizeof(container.bytes), 8192, expected));
 }
 
+TEST(ModuleImage, CpuProfileCapabilities)
+{
+    for (const uint32_t available : {0U, 1U, 2U, 3U, 4U, UINT32_MAX}) {
+        for (const uint32_t required : {0U, 1U, 2U, 3U, 4U, UINT32_MAX}) {
+            const bool arm = (required == 1 && (available == 1 || available == 3)) ||
+                             (required == 3 && available == 3);
+            EXPECT_EQ(AP_Module::Image::supports_cpu_profile(40, required, available), arm);
+            EXPECT_EQ(AP_Module::Image::supports_cpu_profile(62, required, available),
+                      required == 2 && available == 2);
+            EXPECT_FALSE(AP_Module::Image::supports_cpu_profile(0, required, available));
+        }
+    }
+}
+
+TEST(ModuleImage, RejectM7OnM4BeforeImageAllocation)
+{
+    RuntimeContainer container;
+    auto expected = RuntimeContainer::compatibility();
+    expected.machine = 40;
+    expected.cpu_profile = 1;
+    container.put(12, 40);
+    container.put(48, 3);
+    container.checksum();
+    AP_Module::Image image;
+    EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+    EXPECT_STREQ(image.parse_error(), "requires Cortex-M7 with double-precision FPU");
+}
+
 TEST(ModuleImage, InitialHeapAdmissionAndOldFormats)
 {
     RuntimeContainer container;

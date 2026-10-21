@@ -24,11 +24,20 @@ public:
     struct Compatibility {
         uint32_t machine;
         uint32_t abi_version;
-        uint32_t cpu_profile;
+        uint32_t cpu_profile; // Board capability: 1=M4/SP, 2=x86-64, 3=M7/DP.
         uint32_t stack_limit;
         uint8_t fingerprint[16];
         uint32_t heap_limit;
     };
+
+    // Profile IDs are not ordered: M7/DP also supports the M4/SP baseline,
+    // while neither ARM capability may admit x86-64 or unknown profiles.
+    static constexpr bool supports_cpu_profile(uint32_t machine, uint32_t required, uint32_t available)
+    {
+        return (machine == 40 && ((required == 1 && (available == 1 || available == 3)) ||
+                                 (required == 3 && available == 3))) ||
+               (machine == 62 && required == 2 && available == 2);
+    }
 
     // Source bytes must stay alive and immutable through load(). No allocation
     // or executable-memory permission changes are performed by this class.

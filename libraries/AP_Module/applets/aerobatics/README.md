@@ -20,12 +20,12 @@ using this applet on F405; F405 is not an acceptance target for AirShow.
 
 ```sh
 Tools/modules/build.py libraries/AP_Module/applets/aerobatics/main.rs \
-    build/modules/airshow.apmod --target thumbv7em-none-eabihf \
+    build/modules/airshow.apmod --target thumbv7em-none-eabihf --cpu cortex-m7 \
     --stack-size 16384 --heap-size 32768
 Tools/modules/apmod_info.py build/modules/airshow.apmod
 ```
 
-For x86-64 SITL/Linux, use `--target x86_64-unknown-linux-gnu` instead.
+For x86-64 SITL/Linux, use `--target x86_64-unknown-linux-gnu` and omit `--cpu`.
 Images are target-specific. See the [runtime guide](../../README.md) for
 firmware options, ROMFS installation and memory accounting.
 

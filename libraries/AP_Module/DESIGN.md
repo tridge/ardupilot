@@ -15,8 +15,8 @@ arbitrary faults, unbounded host calls and locks held indefinitely can affect th
 vehicle. Low priority and the optional stack guard do not make untrusted modules
 safe. There is no general fault containment or per-module CPU quota.
 
-Supported profiles are Thumb-2 Cortex-M4-compatible hard float on STM32 and
-baseline x86-64 Linux for SITL/Linux. Rust builds require Rust 1.98.1 or newer;
+Supported profiles are Thumb-2 Cortex-M4/FPv4-SP and Cortex-M7/FPv5-D16 hard float
+on STM32, and baseline x86-64 Linux for SITL/Linux. Rust builds require Rust 1.98.1 or newer;
 C++ builds require Clang/standalone LLD and do not invoke Rust tools.
 Thumb uses ROPI/RWPI; x86-64 uses PIC. Fat LTO applies that model to linked Rust
 bitcode, including core/alloc. Rust modules use `no_std`, panic-abort semantics
@@ -180,6 +180,21 @@ only by the separate test parser with `AP_MODULE_LEGACY_PROBE_ENABLED`.
 Current SDK builds emit version 6; core ABI version 3 is separately versioned.
 These are not released compatibility promises. Frozen `tests/compat/` fixtures
 and catalogue checks detect unintended changes; do not routinely regenerate them.
+
+CPU requirements are explicit container profiles, not ordered capability levels:
+
+| Profile | Requirement | Supported boards |
+| --- | --- | --- |
+| 1 | Cortex-M4, FPv4-SP-D16, hard float | F405 and supported H7 |
+| 2 | Baseline x86-64 Linux | x86-64 SITL/Linux |
+| 3 | Cortex-M7, FPv5-D16 including double precision, hard float | H743/H757 |
+
+The HAL reports the execution CPU capability, including the active core on H7.
+The image parser accepts profile 1 on an M7/DP board as well as profile 3, but
+rejects M7 requirements on M4, cross-architecture combinations and unknown IDs
+before allocation. Older firmware rejects the new M7 profile; rebuild firmware
+before using it. APMOD06 layout and existing profile IDs are unchanged. CPU and
+stack requirements are trusted declarations, not a sandbox or instruction verifier.
 
 ## Executable memory and ROMFS
 

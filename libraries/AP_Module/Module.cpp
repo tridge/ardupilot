@@ -64,9 +64,11 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     uint32_t margin = 0;
     error = Error::Target;
     switch (hal.util->executable_memory_target()) {
-    case AP_HAL::ExecutableMemory::Target::ThumbV7EMHardFloat:
+    case AP_HAL::ExecutableMemory::Target::CortexM4HardFloat:
+    case AP_HAL::ExecutableMemory::Target::CortexM7HardFloat:
         expected.machine = 40;
-        expected.cpu_profile = 1;
+        expected.cpu_profile = hal.util->executable_memory_target() ==
+                               AP_HAL::ExecutableMemory::Target::CortexM7HardFloat ? 3 : 1;
         // Provisional host callback margin, including the TextSink contract.
         // Measure the complete binding set before enabling vehicle modules.
         margin = 4096;
@@ -115,8 +117,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     module->_worker_stack = image.required_stack_size() + margin;
     strncpy(module->_name, name, sizeof(module->_name) - 1);
     if (image.is_split()) {
-        const bool arm = hal.util->executable_memory_target() ==
-                         AP_HAL::ExecutableMemory::Target::ThumbV7EMHardFloat;
+        const bool arm = expected.machine == 40;
         const bool borrow_rx = arm && source_type == Source::ROMFS && image.can_execute_in_place() &&
                                hal.util->is_executable(image.code_source(), image.code_size());
         if (borrow_rx) {
