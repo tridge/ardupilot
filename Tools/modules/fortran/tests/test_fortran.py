@@ -174,7 +174,7 @@ def test_three_language_sitl_demo(tmp_path, monkeypatch):
     for index, source in enumerate(sources):
         image = build.build(source, tmp_path / f'{index}.apmod', TARGET, 8192)
         images[image.name] = image.read_bytes()
-    vehicle = Vehicle(tmp_path / 'vehicle', images, {'SCR_ENABLE': 0, 'MOD_MAX_MOD': 3})
+    vehicle = Vehicle(tmp_path / 'vehicle', images, {'SCR_ENABLE': 0})
     try:
         vehicle.start()
         for generation in range(3):

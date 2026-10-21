@@ -446,11 +446,54 @@ def test_failed_generation_cleanup_and_recovery(launch, images):
     vehicle.arm()
     vehicle.arm(False)
     (vehicle.modules / 'three.apmod').write_bytes(images['return'])
+    vehicle.restart(2, expected=3)
+    assert vehicle.worker('one.apmod') is not None
+    too_long = vehicle.modules / ('x' * 58 + '.apmod')
+    too_long.write_bytes(images['return'])
     mark = len(vehicle.texts)
-    vehicle.parameter('MOD_RESTART', 2)
-    vehicle.text('module count', after=mark)
+    vehicle.parameter('MOD_RESTART', 3)
+    vehicle.text('module filename exceeds 63 characters', after=mark)
     vehicle.arm(accepted=False)
     assert vehicle.worker('one.apmod') is None
+    too_long.unlink()
+    vehicle.restart(4, expected=3)
+
+
+@pytest.fixture(scope='module')
+def many_module_image(tmp_path_factory):
+    directory = tmp_path_factory.mktemp('many-modules')
+    path = build.build(ROOT / 'libraries/AP_Module/tests/modules/many_modules.rs', directory / 'many.apmod',
+                       'x86_64-unknown-linux-gnu', 1024, heap_size=256)
+    return path.read_bytes()
+
+
+@pytest.mark.parametrize('count', [12, 32])
+def test_many_modules_restart_and_partial_failure(launch, many_module_image, count):
+    names = [f'm{i:03d}.apmod' for i in reversed(range(count))]
+    vehicle = launch(dict.fromkeys(names, many_module_image), SCR_ENABLE=0)
+    vehicle.text(f'Module: loaded {count} modules')
+    for generation in range(4):
+        vehicle.pump(0.5)
+        workers = [vehicle.worker(name) for name in names]
+        assert all(worker is not None for worker in workers), vehicle.diagnostic()
+        assert len({worker[0] for worker in workers}) == count
+        if generation < 3:
+            vehicle.restart(generation + 1, expected=count)
+            assert all(vehicle.worker(name)[0] != worker[0] for name, worker in zip(names, workers))
+    # A late bad file must release every prepared image/context, without
+    # starting a partial generation. Discovery order must not hide the file.
+    (vehicle.modules / 'z-bad.apmod').write_bytes(b'bad image')
+    mark = len(vehicle.texts)
+    vehicle.parameter('MOD_RESTART', 4)
+    vehicle.text('z-bad.apmod load failed', after=mark)
+    assert all(vehicle.worker(name) is None for name in names)
+    (vehicle.modules / 'z-bad.apmod').unlink()
+    vehicle.restart(5, expected=count)
+    for name in names:
+        (vehicle.modules / name).unlink()
+    vehicle.restart(6, expected=0)
+    assert all(vehicle.worker(name) is None for name in names)
+    assert not any('returned -' in text or 'panic' in text for text in vehicle.texts), vehicle.diagnostic()
 
 
 def test_saved_checksum_action_does_not_repeat_on_reboot(launch, images):

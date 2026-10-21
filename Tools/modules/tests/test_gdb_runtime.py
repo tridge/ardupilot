@@ -17,7 +17,7 @@ import build
 ROOT = Path(__file__).resolve().parents[3]
 
 
-@pytest.mark.parametrize('module_count', [1, 2])
+@pytest.mark.parametrize('module_count', [1, 2, 12])
 def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     firmware = Path(os.environ.get('AP_MODULE_SITL_BINARY', ROOT / 'build/sitl/bin/arduplane'))
     debugger = os.environ.get('AP_MODULE_GDB', 'gdb')
@@ -27,18 +27,26 @@ def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     modules.mkdir()
     module = build.build(ROOT / 'libraries/AP_Module/tests/modules/debug.rs', modules / 'debug.apmod',
                          'x86_64-unknown-linux-gnu', 16384, debug=True, opt_level='1')
-    if module_count == 2:
+    if module_count >= 2:
         shutil.copyfile(module, modules / 'second.apmod')
+    for index in range(2, module_count):
+        shutil.copyfile(module, modules / f'z{index:02d}.apmod')
     params = tmp_path / 'debug.parm'
     params.write_text('MOD_ENABLE 1\nMOD_HEAP_MAX 4096\nMOD_STACK_MAX 32768\nLOG_BACKEND_TYPE 0\n')
     commands = [
         'set pagination off', 'set confirm off', 'set debuginfod enabled off', 'set breakpoint pending on',
         f'source {ROOT / "Tools/modules/apmod_gdb.py"}', 'apmod printers', f'apmod symbols {module}',
-        'break apmod_debug_tick', 'run', 'next', 'apmod list', 'print label', 'print *values',
+        'tbreak AP_Module::Runtime::poll_modules()', 'run',
+        'python tick = gdb.Breakpoint("apmod_debug_tick"); '
+        'tick.thread = next(t.num for t in gdb.selected_inferior().threads() if t.name == "debug.apmod")',
+        'continue', 'next', 'apmod list', 'print label', 'print *values',
         'print debug::APMOD_DEBUG_COUNT', 'print debug::APMOD_DEBUG_MAGIC', 'bt 8', 'next',
         'set language c++', "set var 'AP_Module::Runtime::_singleton'->_restart._value = 1",
-        'disable 1', 'tbreak AP_Module::Module::start()', 'continue', 'apmod list',
-        'break apmod_debug_tick', 'continue', 'next', 'print label', 'print debug::APMOD_DEBUG_COUNT',
+        'python tick.enabled = False', 'tbreak AP_Module::Module::start()', 'continue',
+        'tbreak AP_Module::Runtime::poll_modules()', 'continue', 'apmod list',
+        'python tick = gdb.Breakpoint("apmod_debug_tick"); '
+        'tick.thread = next(t.num for t in gdb.selected_inferior().threads() if t.name == "debug.apmod")',
+        'continue', 'next', 'print label', 'print debug::APMOD_DEBUG_COUNT',
         'apmod list',
         'apmod clear', 'quit',
     ]
@@ -60,7 +68,9 @@ def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     output = log.read_text()
     assert process.returncode == 0, output
     assert output.count('apmod: debug.apmod RX=') == 2, output
-    assert output.count('apmod: second.apmod RX=') == (2 if module_count == 2 else 0), output
+    assert output.count('apmod: second.apmod RX=') == (2 if module_count >= 2 else 0), output
+    for index in range(2, module_count):
+        assert output.count(f'apmod: z{index:02d}.apmod RX=') == 2, output
     assert 'apmod: removing breakpoint' in output, output
     assert '"apmod debug"' in output and 'Vec(size=3)' in output, output
     assert '305419896' in output, output

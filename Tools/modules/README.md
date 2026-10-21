@@ -147,8 +147,8 @@ Tools/autotest/sim_vehicle.py -v ArduPlane --waf-configure-arg=--enable-modules 
 ```
 
 In MAVProxy, set `MOD_ENABLE` to 1 and reboot (`param set MOD_ENABLE 1`, then
-`reboot`). The Fortran module can run alongside Rust and C++ modules; increase
-`MOD_MAX_MOD` before reboot if loading more than its default two modules.
+`reboot`). The Fortran module can run alongside Rust and C++ modules; the number
+loaded is limited by available memory, not a module-count parameter.
 Do not install modules in the repository's `modules/` submodule directory.
 
 For STM32H7, use an ARM GNU Fortran cross compiler (tested with 15.2), for example

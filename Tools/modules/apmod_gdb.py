@@ -37,7 +37,17 @@ def loaded_modules():
     if not int(runtime):
         return []
     slots = runtime.dereference()['_slots']
-    return [module_info(slots[i]['module']) for i in range(8) if int(slots[i]['module'])]
+    result = []
+    seen = set()
+    while int(slots):
+        if int(slots) in seen:
+            raise ValueError('module registry contains a cycle')
+        seen.add(int(slots))
+        slot = slots.dereference()
+        if int(slot['module']):
+            result.append(module_info(slot['module']))
+        slots = slot['next']
+    return result
 
 
 class InvokeUnwinder(gdb.unwinder.Unwinder):
