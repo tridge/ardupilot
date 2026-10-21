@@ -203,7 +203,7 @@ def rust(spec, notice):
 
 pub const FLEXDEBUG_PAYLOAD_MAX: usize = {FLEXDEBUG_PAYLOAD_MAX};
 
-/// One command destructively popped from the Rust runtime mission queue.
+/// One command destructively popped from the module runtime mission queue.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MissionCommand {{
     pub time_ms: u32,
@@ -257,7 +257,7 @@ impl crate::bindings::SrvChannels<'_, '_> {{
 }}
 
 impl crate::bindings::Mission<'_, '_> {{
-    /// Destructively pop the oldest command from the Rust runtime mission
+    /// Destructively pop the oldest command from the module runtime mission
     /// queue. `None` means the queue is empty.
     pub fn receive(&self) -> Result<Option<MissionCommand>> {{
         let mut output = [0u8; {MISSION_WIRE_SIZE}];

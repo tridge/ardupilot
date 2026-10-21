@@ -1,18 +1,19 @@
-# Native Rust modules
+# Native modules
 
-`AP_Module` loads trusted native Rust modules from SD card or ROMFS. Each module
+`AP_Module` loads trusted native modules from SD card or ROMFS. Each module
 has its own worker thread, heap and stack and uses generated bindings to call
-ArduPilot APIs. Lua and Rust can be enabled independently or together.
+ArduPilot APIs. Rust and freestanding C++ share one loader and ABI. Lua can be
+enabled independently or alongside native modules.
 
 See [DESIGN.md](DESIGN.md) for implementation contracts and the
 [module tools guide](../../Tools/modules/README.md) for packaging and tests.
 
 ## Build the firmware
 
-Rust support is included by default when `HAL_PROGRAM_SIZE_LIMIT_KB > 2048`,
-including SITL. Runtime loading is disabled until `RUST_ENABLE` is set.
+Native module support is included by default when `HAL_PROGRAM_SIZE_LIMIT_KB > 2048`,
+including SITL. Runtime loading is disabled until `MOD_ENABLE` is set.
 
-For a Rust-only SITL Plane build:
+For a modules-only SITL Plane build:
 
 ```sh
 ./waf configure --board sitl --enable-modules --disable-lua-scripting
@@ -62,7 +63,7 @@ ap_rust_sdk::module!(run);
 
 fn run(context: &Context<'_>) -> Result {
     loop {
-        context.text(6, "Rust module alive")?;
+        context.text(6, "Native module alive")?;
         context.sleep_ms(1000)?;
     }
 }
@@ -74,14 +75,14 @@ Build an existing applet from the repository root:
 Tools/modules/build.py \
     libraries/AP_Module/applets/aerobatics/main.rs \
     build/modules/airshow.apmod \
-    --target thumbv7em-none-eabihf --stack-size 16384
+    --target thumbv7em-none-eabihf --stack-size 16384 --heap-size 32768
 Tools/modules/apmod_info.py build/modules/airshow.apmod
 ```
 
 Use `--target x86_64-unknown-linux-gnu` for x86-64 SITL/Linux. Modules are
 target-specific. The stack declaration excludes the host-call margin, currently
 4 KiB on Cortex-M and 16 KiB on x86-64. The declaration plus margin must fit
-`RUST_STACK_SIZE`; OS/guard overhead is additional. Measure the complete applet
+`MOD_STACK_MAX`; OS/guard overhead is additional. Measure the complete applet
 and host-call stack usage; the declaration is not a stack proof.
 
 Waf generates bindings below `build/<board>/libraries/AP_Module/` and rebuilds them
@@ -89,25 +90,39 @@ when inputs change. The module builder uses
 `build/modules/libraries/AP_Module/`; Cargo SDK tests use Cargo's `OUT_DIR`.
 Generated bindings are not checked into the source tree.
 
+For C++, install Clang 21 or newer and standalone LLD 21 or newer (no Rust installation is required):
+
+```sh
+Tools/modules/build.py libraries/AP_Module/examples/simple_loop.cpp \
+    build/modules/simple_cpp.apmod --target thumbv7em-none-eabihf \
+    --stack-size 8192 --heap-size 4096
+```
+
+`CXX` selects Clang and `LLD` selects `ld.lld`. C++ modules use the freestanding
+C++17 SDK in `sdk/cpp/`; exceptions, RTTI, TLS and automatic global constructors
+or destructors are unsupported. Local RAII, virtual dispatch and module-owned
+`new`/`delete` are supported. ARM C++ currently requires the default `-Os`;
+`--debug` is supported, but other optimisation levels are rejected.
+
 ## Install and run
 
-Copy `.apmod` files into `/APM/rust/` on SD card, or `./rust/` relative to the
-SITL/Linux working directory. Set `RUST_ENABLE=1` and reboot. Check GCS messages
+Copy `.apmod` files into `/APM/modules/` on SD card, or `./modules/` relative to the
+SITL/Linux working directory. Set `MOD_ENABLE=1` and reboot. Check GCS messages
 for loading, errors and memory reports before enabling application behavior.
 The directory is not searched recursively.
 
 For built-in modules, build the `.apmod` first and add an extra-hwdef entry:
 
 ```text
-ROMFS rust/airshow.apmod build/modules/airshow.apmod
+ROMFS modules/airshow.apmod build/modules/airshow.apmod
 ```
 
 Pass that hwdef to `./waf configure --extra-hwdef <file>`, then build the firmware.
-Alternatively put the module in `ROMFS_custom/rust/` before configuration.
+Alternatively put the module in `ROMFS_custom/modules/` before configuration.
 The firmware build stores `.apmod` entries without compression and prelinks code
 pointers. Other ROMFS files retain the normal compression policy.
 
-STM32 can execute a version-5 ROMFS module directly from qualifying executable
+STM32 can execute a version-6 ROMFS module directly from qualifying executable
 flash, allocating only mutable data/BSS, heap and stack in RAM. SD modules also
 copy code into executable RAM. SITL/Linux copy ROMFS code because their embedded
 data is not an executable mapping. Ordinary `@ROMFS/` reads reconstruct the
@@ -116,7 +131,7 @@ builds retain canonical bytes and copy code rather than prelinking.
 
 ROMFS and writable files are combined in basename order. ROMFS wins a duplicate
 basename, with a warning on each load generation. Deduplication precedes
-`RUST_MAX_MOD`; exceeding that limit fails loading rather than silently ignoring
+`MOD_MAX_MOD`; exceeding that limit fails loading rather than silently ignoring
 modules. All images are prepared before workers start.
 
 ## Configuration and memory
@@ -125,15 +140,15 @@ Enable and memory/module-count changes require reboot.
 
 | Parameter | Default | Purpose |
 | --- | --- | --- |
-| `RUST_ENABLE` | 0 | Enable module loading |
-| `RUST_HEAP_SIZE` | 32768 | Initial heap bytes per module |
-| `RUST_CODE_SIZE` | 131072 | Per-module RX plus RW/BSS image limit |
-| `RUST_STACK_SIZE` | 32768 | Worker stack bytes, including host-call margin |
-| `RUST_MAX_MOD` | 2 | Maximum unique modules, from 1 to 8 |
-| `RUST_RESTART` | 0 | Change to request cooperative restart-all |
-| `RUST_LD_CSUM` | -1 | Required loaded-file checksum; -1 disables |
-| `RUST_RUN_CSUM` | -1 | Required running-file checksum; -1 disables |
-| `RUST_DEBUG_OPTS` | 0 | Debug options described below |
+| `MOD_ENABLE` | 0 | Enable module loading |
+| `MOD_HEAP_MAX` | 32768 | Maximum backing heap capacity per module |
+| `MOD_CODE_MAXSIZE` | 131072 | Per-module RX plus RW/BSS image limit |
+| `MOD_STACK_MAX` | 32768 | Maximum declared stack plus host-call margin |
+| `MOD_MAX_MOD` | 2 | Maximum unique modules, from 1 to 8 |
+| `MOD_RESTART` | 0 | Change to request cooperative restart-all |
+| `MOD_LD_CSUM` | -1 | Required loaded-file checksum; -1 disables |
+| `MOD_RUN_CSUM` | -1 | Required running-file checksum; -1 disables |
+| `MOD_DEBUG_OPTS` | 0 | Debug options described below |
 
 The image budget rounds up to 4096 bytes; this does not pad stored ARM modules.
 Only the actual image is allocated, with cache-line rounding for ARM RX RAM
@@ -144,13 +159,25 @@ owned RX bytes. Allocator bookkeeping, loader scratch, manager storage and
 persistent firmware registrations are additional; heap usage is not total RAM.
 The manager requests a separate 4 KiB stack on ARM or 32 KiB on x86-64.
 
-Like Lua, heaps can expand while armed, retaining 20 KiB of system memory.
-Expansion warns with the module name and required heap capacity, and latches a
-pre-arm failure until reload/reboot without stopping the module or disarming.
-Expanded capacity remains usable after disarm. Increase `RUST_HEAP_SIZE` and
-reboot to change initial capacity. Fragmentation can still prevent allocation.
+`--heap-size` stores each module's initial heap request (default 4096). The loader
+rejects requests over `MOD_HEAP_MAX`. Each worker receives its own declared stack
+plus the host-call margin, not the entire `MOD_STACK_MAX` budget.
 
-`RUST_DEBUG_OPTS` bit 4 disables Rust pre-arm checks. Bit 5 saves both current
+Like Lua, heaps can expand while armed, retaining 20 KiB of system memory.
+Growth is bounded by `MOD_HEAP_MAX` and ten backing arenas. Capacity is charged
+for all arenas, not just live allocations; freeing objects does not lower it.
+Expansion warns with the module name and required initial heap, and latches a
+pre-arm failure until reload/reboot without stopping the module or disarming.
+Expanded capacity remains usable after disarm. Rebuild with a larger `--heap-size`
+to change initial capacity; raise `MOD_HEAP_MAX` if needed. Fragmentation can
+still prevent allocation. Capacity and arena-slot exhaustion are reported separately.
+
+This pre-alpha cutover intentionally rejects old `APRUST` modules: rebuild all
+modules and update install paths and parameter names. Parameter storage indices
+are unchanged, so old saved values carry over. In particular the former initial
+heap value now becomes a maximum; review limits before enabling modules.
+
+`MOD_DEBUG_OPTS` bit 4 disables Rust pre-arm checks. Bit 5 saves both current
 checksums and clears itself. Bit 6 disables heap expansion for the next module
 generation. Checksums are 23-bit-masked XORs of whole-file CRC32 values, not
 authentication; identical files can cancel. Normally returned modules stay in
@@ -158,7 +185,7 @@ the loaded checksum but leave the running checksum.
 
 ## Restart, errors and scheduling
 
-Changing `RUST_RESTART` requests stop for all workers, joins them and reloads the
+Changing `MOD_RESTART` requests stop for all workers, joins them and reloads the
 files, including while armed. SDK sleeps return `Error::Stopped` promptly;
 propagate that result or poll `stop_requested()` and return normally so Rust
 destructors run. Restart does not itself disarm the vehicle.

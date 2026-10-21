@@ -57,7 +57,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     error = Error::Limits;
     if (name == nullptr || name[0] == '\0' || limits.heap < 256 || limits.heap > maximum ||
         code_size == 0 ||
-        limits.stack < 4096 || limits.stack > maximum) {
+        limits.stack < 256 || limits.stack > maximum) {
         return nullptr;
     }
     Image::Compatibility expected{0, AP_MODULE_ABI_VERSION, 0, 0, AP_MODULE_API_FINGERPRINT};
@@ -85,6 +85,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
         return nullptr;
     }
     expected.stack_limit = limits.stack - margin;
+    expected.heap_limit = limits.heap;
     Image image;
     error = Error::Image;
     const Image::SourcePolicy first_policy = source_type == Source::ROMFS ?
@@ -110,6 +111,8 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     if (module == nullptr) {
         return nullptr;
     }
+    module->_initial_heap = image.initial_heap_size();
+    module->_worker_stack = image.required_stack_size() + margin;
     strncpy(module->_name, name, sizeof(module->_name) - 1);
     if (image.is_split()) {
         const bool arm = hal.util->executable_memory_target() ==
@@ -155,21 +158,6 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
             delete module;
             return nullptr;
         }
-    } else {
-        // APRUST04 compatibility images require one contiguous allocation.
-        module->_rx_memory = hal.util->allocate_executable(image.memory_size(), image.rx_alignment());
-        if (module->_rx_memory == nullptr) {
-            delete module;
-            return nullptr;
-        }
-        module->_rx = static_cast<uint8_t *>(module->_rx_memory->data());
-        module->_rw = module->_rx + image.code_size();
-        error = Error::Publication;
-        if (!image.load(module->_rx, module->_rx_memory->size(), bindings.resolve, bindings.context) ||
-            !module->_rx_memory->publish(image.code_size())) {
-            delete module;
-            return nullptr;
-        }
     }
     module->_entry = reinterpret_cast<Start>(module->_rx + image.entry_offset());
     module->_checksum = image.checksum();
@@ -194,13 +182,13 @@ bool Module::start()
     // ordinary heaps until here keeps them out of scarce executable SRAM while
     // those images are being reserved. A failed thread start can reuse its heap.
     if (!_heap_ready) {
-        if (!_heap.create(_limits.heap, _limits.allow_heap_expansion)) {
+        if (!_heap.create(_initial_heap, _limits.allow_heap_expansion, _limits.heap)) {
             return false;
         }
         _heap_ready = true;
     }
     _thread = hal.scheduler->thread_create_owned_guarded(FUNCTOR_BIND_MEMBER(&Module::run, void), _name,
-              _limits.stack, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 0,
+              _worker_stack, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 0,
               {this, stack_fault});
     _started = _thread != nullptr;
     return _started;
@@ -220,7 +208,7 @@ __attribute__((naked, noinline)) int32_t Module::invoke(Start entry, const AP_Mo
     // and LR across the native call while retaining 8-byte stack alignment.
     // There are no firmware-to-module callbacks: the single initial entry
     // passes this gate. Module-to-firmware callbacks obey AAPCS and therefore
-    // preserve r9. A Rust panic deliberately never returns or unwinds this
+    // preserve r9. A module fatal callback never returns or unwinds this
     // frame, so all module resources remain owned.
     asm volatile(
         "push {r9, lr}\n"
@@ -296,7 +284,7 @@ const char *Module::panic_message() const
 
 Module::Stats Module::stats()
 {
-    return {_heap.stats(), _limits.heap,
+    return {_heap.stats(), _initial_heap,
             _rx_memory == nullptr ? 0 : _rx_memory->allocation_size(), _rw_allocation_size,
             _thread == nullptr ? 0 : _thread->stack_size(),
             _thread == nullptr ? 0 : _thread->allocation_size(), sizeof(*this)};
@@ -305,7 +293,7 @@ Module::Stats Module::stats()
 uint8_t *Module::allocate(void *context, uint32_t size, uint32_t alignment)
 {
     auto &module = *static_cast<Module *>(context);
-    // Rust destructors and in-flight work can still allocate after stop. A
+    // Module destructors and in-flight work can still allocate after stop. A
     // synthetic OOM here would turn cooperative exit into a permanent panic.
     return static_cast<uint8_t *>(module._heap.allocate(size, alignment));
 }
@@ -386,7 +374,7 @@ void Module::panic(void *context, const uint8_t *message, uint32_t length)
     }
     module._panicked.store(true, std::memory_order_release);
     // This callback never returns. In particular it must not use sleep_ms(),
-    // which returns immediately after a stop request. Keep Rust frames alive
+    // which returns immediately after a stop request. Keep module frames alive
     // at the existing scripting priority; only the delayed wakeup runs.
     while (true) {
         hal.scheduler->delay(1000);

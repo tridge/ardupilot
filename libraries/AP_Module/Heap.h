@@ -18,7 +18,7 @@ public:
     CLASS_NO_COPY(Heap);
     ~Heap();
 
-    bool create(uint32_t size, bool allow_expansion = true);
+    bool create(uint32_t size, bool allow_expansion = true, uint32_t max_capacity = 0);
     void *allocate(uint32_t size, uint32_t alignment);
     bool deallocate(void *pointer);
     void clear();
@@ -28,6 +28,7 @@ public:
         uint32_t peak;
         uint32_t allocations;
         uint32_t expanded_to;
+        uint8_t expansion_failures;
     };
     Stats stats();
 

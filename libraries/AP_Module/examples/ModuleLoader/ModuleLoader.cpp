@@ -63,7 +63,8 @@ private:
         auto *module = Module::load(bytes, length, "rust-test",
                                     {
                                         4096, 65536, 16384
-                                    }, {this, text}, error);
+                                    }, {this, text}, error,
+                                    {nullptr, AP_Module::binding_dispatch, AP_Module::binding_resolve});
         if (module == nullptr) {
             rust_module_test_result = 10 + uint8_t(error);
             rust_module_test_free_on_failure = hal.util->available_memory();
@@ -87,7 +88,7 @@ private:
     {
         const uint32_t expected = _messages.load() + 2;
         for (auto &module : _modules) {
-            module = load("/APM/rust/cleanup.apmod");
+            module = load("/APM/modules/cleanup.apmod");
             if (module == nullptr) {
                 return false;
             }
@@ -200,7 +201,7 @@ private:
             rust_module_test_result = 8;
             return false;
         }
-        _modules[0] = load("/APM/rust/panic.apmod");
+        _modules[0] = load("/APM/modules/panic.apmod");
         if (_modules[0] == nullptr || !_modules[0]->start()) {
             rust_module_test_result = 9;
             return false;

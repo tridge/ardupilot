@@ -443,7 +443,7 @@ impl crate::bindings::Networking<'_, '_> {{
 
 impl crate::bindings::Scripting<'_, '_> {{
     /// Request a restart of the Lua scripting backend. This call returns
-    /// normally and does not stop or restart this Rust module or other native
+    /// normally and does not stop or restart this Native module or other native
     /// modules. Firmware without the Lua backend returns `Error::Unavailable`.
     pub fn restart_all(&self) -> Result {{
         result(unsafe {{

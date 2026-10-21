@@ -2,11 +2,12 @@
 #include <AP_gtest.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Module/Module.h>
+#include <AP_Math/crc.h>
 
 const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 
 #if AP_MODULE_ENABLED && HAL_OWNED_THREADS_ENABLED && HAL_EXECUTABLE_MEMORY_ENABLED
-TEST(RustModuleLimits, RoundCodeBudget)
+TEST(ModuleLoaderLimits, RoundCodeBudget)
 {
     EXPECT_EQ(AP_Module::Module::rounded_code_size(0), 0U);
     EXPECT_EQ(AP_Module::Module::rounded_code_size(4095), 0U);
@@ -32,7 +33,7 @@ TEST(RustModuleLimits, RoundCodeBudget)
 
 using AP_Module::Module;
 
-class RustModule : public ::testing::Test
+class ModuleLoader : public ::testing::Test
 {
 protected:
     void SetUp() override
@@ -55,7 +56,7 @@ protected:
     }
     static void text(void *context, uint8_t severity, const char *message, uint32_t length)
     {
-        auto &test = *static_cast<RustModule *>(context);
+        auto &test = *static_cast<ModuleLoader *>(context);
         if (severity != 6 || length != 5 || memcmp(message, "ready", 5) != 0) {
             test.bad_text.store(true);
         }
@@ -87,7 +88,9 @@ protected:
         auto *module = Module::load(bytes.data(), bytes.size(), name,
                                     {
                                         heap, 131072, 65536
-                                    }, {this, text}, error, {}, nullptr, nullptr, source);
+                                    }, {this, text}, error,
+                                    {nullptr, AP_Module::binding_dispatch, AP_Module::binding_resolve},
+                                    nullptr, nullptr, source);
         EXPECT_EQ(error, Module::Error::None);
         return module;
     }
@@ -162,7 +165,7 @@ protected:
     std::atomic<bool> bad_text{false};
 };
 
-TEST_F(RustModule, ValidateBeforeAllocation)
+TEST_F(ModuleLoader, ValidateBeforeAllocation)
 {
     auto bytes = read("cooperative");
     ASSERT_FALSE(bytes.empty());
@@ -185,13 +188,13 @@ TEST_F(RustModule, ValidateBeforeAllocation)
     reject({32768, UINT32_MAX, 65536}, Module::Error::Limits);
     reject({32768, 131072, 16384}, Module::Error::Limits);
     // Declared 8192 plus host margin; include the canonical ROMFS fallback.
-    reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds RUST_STACK_SIZE");
-    reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds RUST_STACK_SIZE", Module::Source::ROMFS);
-    bytes[76] ^= 1; // corrupt the header CRC without changing relocation metadata
+    reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds MOD_STACK_MAX");
+    reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds MOD_STACK_MAX", Module::Source::ROMFS);
+    bytes[80] ^= 1; // corrupt the header CRC without changing relocation metadata
     reject({32768, 131072, 65536}, Module::Error::Image, "image checksum mismatch");
 }
 
-TEST_F(RustModule, ReleaseWithoutStarting)
+TEST_F(ModuleLoader, ReleaseWithoutStarting)
 {
     modules[0] = load("cooperative");
     ASSERT_NE(modules[0], nullptr);
@@ -203,7 +206,7 @@ TEST_F(RustModule, ReleaseWithoutStarting)
     EXPECT_EQ(modules[0], nullptr);
 }
 
-TEST_F(RustModule, RawROMFSSourceUsesCopiedExecutableMapping)
+TEST_F(ModuleLoader, RawROMFSSourceUsesCopiedExecutableMapping)
 {
     modules[0] = load("return", 32768, Module::Source::ROMFS);
     ASSERT_NE(modules[0], nullptr);
@@ -216,7 +219,7 @@ TEST_F(RustModule, RawROMFSSourceUsesCopiedExecutableMapping)
     EXPECT_TRUE(Module::release(modules[0]));
 }
 
-TEST_F(RustModule, TwoModulesStopAndDropBeforeRelease)
+TEST_F(ModuleLoader, TwoModulesStopAndDropBeforeRelease)
 {
     for (auto &module : modules) {
         module = load("cooperative");
@@ -230,7 +233,7 @@ TEST_F(RustModule, TwoModulesStopAndDropBeforeRelease)
         const auto stats = module->stats();
         EXPECT_GT(stats.heap.used, 512U);
         EXPECT_GT(stats.rx_reserved, 4096U);
-        EXPECT_EQ(stats.stack_reserved, 65536U);
+        EXPECT_EQ(stats.stack_reserved, 8192U + 16384U);
         EXPECT_GT(stats.thread_reserved, stats.stack_reserved);
         EXPECT_GT(stats.metadata, 0U);
         module->request_stop();
@@ -246,7 +249,7 @@ TEST_F(RustModule, TwoModulesStopAndDropBeforeRelease)
     }
 }
 
-TEST_F(RustModule, RepeatedNormalReturn)
+TEST_F(ModuleLoader, RepeatedNormalReturn)
 {
     for (unsigned i = 0; i < 100; i++) {
         modules[0] = load("return");
@@ -260,9 +263,25 @@ TEST_F(RustModule, RepeatedNormalReturn)
     EXPECT_EQ(messages.load(), 100U);
 }
 
-TEST_F(RustModule, FallibleAllocationFailureReturns)
+TEST_F(ModuleLoader, FallibleAllocationFailureReturns)
 {
-    modules[0] = load("cooperative", 256);
+    auto bytes = read("cooperative");
+    ASSERT_GT(bytes.size(), 84U);
+    // Declare the small initial heap as well as capping it; a request above
+    // the cap must now be rejected before image allocation, not at runtime.
+    for (uint8_t i = 0; i < 4; i++) {
+        bytes[56 + i] = uint8_t(256U >> (8 * i));
+        bytes[80 + i] = 0;
+    }
+    const uint32_t crc = crc32_small(UINT32_MAX, bytes.data(), bytes.size()) ^ UINT32_MAX;
+    for (uint8_t i = 0; i < 4; i++) {
+        bytes[80 + i] = uint8_t(crc >> (8 * i));
+    }
+    Module::Error error;
+    modules[0] = Module::load(bytes.data(), bytes.size(), "small", {256, 131072, 65536},
+                              {this, text}, error,
+                              {nullptr, AP_Module::binding_dispatch, AP_Module::binding_resolve});
+    EXPECT_EQ(error, Module::Error::None);
     ASSERT_NE(modules[0], nullptr);
     ASSERT_TRUE(modules[0]->start());
     ASSERT_TRUE(join(modules[0]));
@@ -270,7 +289,7 @@ TEST_F(RustModule, FallibleAllocationFailureReturns)
     EXPECT_EQ(modules[0]->stats().heap.used, 0U);
 }
 
-TEST_F(RustModule, CleanupMayAllocateAfterStop)
+TEST_F(ModuleLoader, CleanupMayAllocateAfterStop)
 {
     for (unsigned i = 0; i < 100; i++) {
         modules[0] = load("cleanup");
@@ -285,7 +304,7 @@ TEST_F(RustModule, CleanupMayAllocateAfterStop)
     }
 }
 
-TEST_F(RustModule, ReleaseReclaimsForgottenAllocations)
+TEST_F(ModuleLoader, ReleaseReclaimsForgottenAllocations)
 {
     for (unsigned i = 0; i < 100; i++) {
         modules[0] = load("leak");
@@ -298,7 +317,7 @@ TEST_F(RustModule, ReleaseReclaimsForgottenAllocations)
     }
 }
 
-TEST_F(RustModule, RetainUntilLateExit)
+TEST_F(ModuleLoader, RetainUntilLateExit)
 {
     modules[0] = load("late");
     ASSERT_NE(modules[0], nullptr);
@@ -315,17 +334,17 @@ TEST_F(RustModule, RetainUntilLateExit)
     EXPECT_TRUE(Module::release(modules[0]));
 }
 
-TEST_F(RustModule, PanicRetainsResourcesWithoutBusyLoop)
+TEST_F(ModuleLoader, PanicRetainsResourcesWithoutBusyLoop)
 {
     ASSERT_EXIT(panic_child("panic"), ::testing::ExitedWithCode(73), "");
 }
 
-TEST_F(RustModule, InfallibleOOMRetainsResourcesWithoutBusyLoop)
+TEST_F(ModuleLoader, InfallibleOOMRetainsResourcesWithoutBusyLoop)
 {
     ASSERT_EXIT(panic_child("oom"), ::testing::ExitedWithCode(73), "");
 }
 
-TEST_F(RustModule, NoncooperatingWorkerCannotBeReleased)
+TEST_F(ModuleLoader, NoncooperatingWorkerCannotBeReleased)
 {
     ASSERT_EXIT({
         auto *module = load("never");
@@ -346,7 +365,7 @@ TEST_F(RustModule, NoncooperatingWorkerCannotBeReleased)
     }, ::testing::ExitedWithCode(73), "");
 }
 
-TEST_F(RustModule, RetryAfterThreadAllocationFailure)
+TEST_F(ModuleLoader, RetryAfterThreadAllocationFailure)
 {
     ASSERT_EXIT({
         auto *module = load("return");
@@ -376,7 +395,7 @@ TEST_F(RustModule, RetryAfterThreadAllocationFailure)
 }
 
 #else
-TEST(RustModule, RequiresEnabledLinuxBuild)
+TEST(ModuleLoader, RequiresEnabledLinuxBuild)
 {
     GTEST_SKIP() << "Requires enabled native Linux HAL build; exercise SITL sleeps with a simulated vehicle";
 }

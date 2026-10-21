@@ -28,51 +28,51 @@ namespace AP_Module
 {
 
 #if HAL_OS_FATFS_IO || HAL_OS_LITTLEFS_IO
-static constexpr const char *DIRECTORY = "/APM/rust";
+static constexpr const char *DIRECTORY = "/APM/modules";
 #else
-static constexpr const char *DIRECTORY = "./rust";
+static constexpr const char *DIRECTORY = "./modules";
 #endif
 
 Runtime *Runtime::_singleton;
 
 const AP_Param::GroupInfo Runtime::var_info[] = {
     // @Param: ENABLE
-    // @DisplayName: Native Rust modules enable
-    // @Description: Enable experimental trusted native Rust modules. Native code is not isolated from the autopilot.
+    // @DisplayName: Native modules enable
+    // @Description: Enable experimental trusted native modules. Native code is not isolated from the autopilot.
     // @Values: 0:Disabled,1:Enabled
     // @RebootRequired: True
     // @User: Advanced
     AP_GROUPINFO_FLAGS("ENABLE", 1, Runtime, _enable, 0, AP_PARAM_FLAG_ENABLE),
 
-    // @Param: HEAP_SIZE
-    // @DisplayName: Rust module initial heap size
-    // @Description: Initial allocation arena size per module. May expand while armed unless DEBUG_OPTS bit 6 is set, retaining 20 KiB of system memory. Excludes code, stack and allocator metadata.
+    // @Param: HEAP_MAX
+    // @DisplayName: Native module heap capacity limit
+    // @Description: Maximum backing heap arena capacity per module. Initial size comes from the module file. Armed expansion is capped here and retains 20 KiB of system memory unless disabled by DEBUG_OPTS bit 6. Excludes code, stack and allocator metadata.
     // @Units: B
     // @Range: 256 16777216
     // @RebootRequired: True
     // @User: Advanced
-    AP_GROUPINFO("HEAP_SIZE", 2, Runtime, _heap_size, 32768),
+    AP_GROUPINFO("HEAP_MAX", 2, Runtime, _heap_size, 32768),
 
-    // @Param: CODE_SIZE
-    // @DisplayName: Rust module image limit
+    // @Param: CODE_MAXSIZE
+    // @DisplayName: Native module image limit
     // @Description: Per-module code and data image limit in bytes, rounded up to a multiple of 4096. Only the loaded image is allocated, not this entire limit. Alignment and allocator overhead are additional.
     // @Units: B
     // @Range: 4096 16777216
     // @RebootRequired: True
     // @User: Advanced
-    AP_GROUPINFO("CODE_SIZE", 3, Runtime, _code_size, 131072),
+    AP_GROUPINFO("CODE_MAXSIZE", 3, Runtime, _code_size, 131072),
 
-    // @Param: STACK_SIZE
-    // @DisplayName: Rust module stack limit
-    // @Description: Requested stack per module in bytes, including host callback margin. Rounded up to the platform minimum and alignment. OS and guard overhead are additional.
+    // @Param: STACK_MAX
+    // @DisplayName: Native module stack limit
+    // @Description: Maximum logical worker stack per module, including the declared module requirement plus host callback margin. Only the requested stack is allocated, rounded to platform minimum and alignment. OS and guard overhead are additional.
     // @Units: B
-    // @Range: 8192 16777216
+    // @Range: 256 16777216
     // @RebootRequired: True
     // @User: Advanced
-    AP_GROUPINFO("STACK_SIZE", 4, Runtime, _stack_size, 32768),
+    AP_GROUPINFO("STACK_MAX", 4, Runtime, _stack_size, 32768),
 
     // @Param: MAX_MOD
-    // @DisplayName: Maximum Rust modules
+    // @DisplayName: Maximum Native modules
     // @Description: Maximum unique module filenames loaded across ROMFS and the writable module directory. A ROMFS module overrides a writable module with the same filename. Extra unique files cause a load failure rather than being silently ignored.
     // @Range: 1 8
     // @RebootRequired: True
@@ -80,29 +80,29 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
     AP_GROUPINFO("MAX_MOD", 5, Runtime, _max_modules, 2),
 
     // @Param: RESTART
-    // @DisplayName: Rust restart request counter
-    // @Description: Change this value to request cooperative restart of all Rust modules, including while armed. Non-cooperating workers prevent reload and retain their memory.
+    // @DisplayName: Native module restart request counter
+    // @Description: Change this value to request cooperative restart of all Native modules, including while armed. Non-cooperating workers prevent reload and retain their memory.
     // @Range: 0 32767
     // @User: Advanced
     AP_GROUPINFO("RESTART", 6, Runtime, _restart, 0),
 
     // @Param: LD_CSUM
-    // @DisplayName: Required loaded Rust module checksum
+    // @DisplayName: Required loaded Native module checksum
     // @Description: Required masked XOR of whole-file CRC32 values of loaded modules. Minus one disables this pre-arm requirement.
     // @Range: -1 8388607
     // @User: Advanced
     AP_GROUPINFO("LD_CSUM", 7, Runtime, _loaded_required, -1),
 
     // @Param: RUN_CSUM
-    // @DisplayName: Required running Rust module checksum
+    // @DisplayName: Required running Native module checksum
     // @Description: Required masked XOR of whole-file CRC32 values of running modules. Minus one disables this pre-arm requirement.
     // @Range: -1 8388607
     // @User: Advanced
     AP_GROUPINFO("RUN_CSUM", 8, Runtime, _running_required, -1),
 
     // @Param: DEBUG_OPTS
-    // @DisplayName: Rust module debug options
-    // @Description: Disable Rust pre-arm checks, save current loaded and running checksums, or disable heap expansion. The save bit clears after storing both values. Changes to the heap expansion option take effect on module restart.
+    // @DisplayName: Native module debug options
+    // @Description: Disable module pre-arm checks, save current loaded and running checksums, or disable heap expansion. The save bit clears after storing both values. Changes to the heap expansion option take effect on module restart.
     // @Bitmask: 4:Disable pre-arm checks,5:Save checksums,6:Disable heap expansion
     // @User: Advanced
     AP_GROUPINFO("DEBUG_OPTS", 9, Runtime, _debug_options, 0),
@@ -113,7 +113,7 @@ Runtime::Runtime()
 {
     AP_Param::setup_object_defaults(this, var_info);
     if (_singleton != nullptr) {
-        AP_HAL::panic("Duplicate Rust runtime");
+        AP_HAL::panic("Duplicate module runtime");
     }
     _singleton = this;
     for (auto &slot : _slots) {
@@ -129,7 +129,7 @@ void Runtime::fail(const char *reason, bool preserve_error)
             hal.util->snprintf(_error, sizeof(_error), "%s", reason);
         }
     }
-    GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Rust: %s", reason);
+    GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Module: %s", reason);
 }
 
 void Runtime::init()
@@ -145,7 +145,7 @@ void Runtime::init()
     constexpr int32_t maximum = 16 * 1024 * 1024;
     const uint32_t code_size = Module::rounded_code_size(uint32_t(_code_size.get()));
     if (_heap_size < 256 || _heap_size > maximum || code_size == 0 ||
-        _stack_size < 8192 || _stack_size > maximum ||
+        _stack_size < 256 || _stack_size > maximum ||
         _max_modules < 1 || _max_modules > MAX_MODULES) {
         fail("invalid memory limits; reboot required");
         return;
@@ -158,10 +158,6 @@ void Runtime::init()
         manager_stack = 4096;
         break;
     case AP_HAL::ExecutableMemory::Target::X86_64Baseline:
-        if (_stack_size <= 16384) {
-            fail("stack must exceed host margin; reboot");
-            return;
-        }
         manager_stack = 32768;
         break;
     default:
@@ -176,7 +172,7 @@ void Runtime::init()
     }
     // Preempt non-yielding workers on ChibiOS and Linux FIFO. SITL and
     // unprivileged Linux use the host's time-sliced SCHED_OTHER instead.
-    _manager_thread = hal.scheduler->thread_create_owned(FUNCTOR_BIND_MEMBER(&Runtime::manager, void), "RustMgr",
+    _manager_thread = hal.scheduler->thread_create_owned(FUNCTOR_BIND_MEMBER(&Runtime::manager, void), "ModMgr",
                       manager_stack, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 1);
     if (_manager_thread == nullptr) {
         fail("manager thread creation failed");
@@ -209,7 +205,7 @@ void Runtime::update()
         _loaded_required.set_and_save(loaded);
         _running_required.set_and_save(running);
         _debug_options.set_and_save(uint8_t(_debug_options.get()) & ~(1U << 5));
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust: saved checksums");
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module: saved checksums");
     }
     uint32_t dropped;
     {
@@ -218,7 +214,7 @@ void Runtime::update()
         _messages_dropped = 0;
     }
     if (dropped != 0) {
-        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Rust: dropped %lu text messages", (unsigned long)dropped);
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: dropped %lu text messages", (unsigned long)dropped);
     }
 }
 
@@ -229,19 +225,19 @@ bool Runtime::arming_checks(size_t length, char *message) const
     }
     WITH_SEMAPHORE(_sem);
     if (_error[0] != '\0') {
-        hal.util->snprintf(message, length, "Rust: %s", _error);
+        hal.util->snprintf(message, length, "Module: %s", _error);
         return false;
     }
     if (_heap_required != 0) {
-        hal.util->snprintf(message, length, "Rust: Required RUST_HEAP_SIZE over %u", unsigned(_heap_required));
+        hal.util->snprintf(message, length, "Module: rebuild with initial heap at least %u", unsigned(_heap_required));
         return false;
     }
     if (_loaded_required != -1 && (uint32_t(_loaded_required.get()) & CHECKSUM_MASK) != (_loaded_checksum & CHECKSUM_MASK)) {
-        hal.util->snprintf(message, length, "Rust: loaded checksum mismatch");
+        hal.util->snprintf(message, length, "Module: loaded checksum mismatch");
         return false;
     }
     if (_running_required != -1 && (uint32_t(_running_required.get()) & CHECKSUM_MASK) != (_running_checksum & CHECKSUM_MASK)) {
-        hal.util->snprintf(message, length, "Rust: running checksum mismatch");
+        hal.util->snprintf(message, length, "Module: running checksum mismatch");
         return false;
     }
     return true;
@@ -313,8 +309,8 @@ Module *Runtime::load_file(const ModuleFile &file, Slot &slot)
 {
 #ifdef HAL_HAVE_AP_ROMFS_EMBEDDED_APMOD
     if (file.source == ModuleSource::ROMFS) {
-        char path[sizeof(file.name) + sizeof("rust/")];
-        hal.util->snprintf(path, sizeof(path), "rust/%s", file.name);
+        char path[sizeof(file.name) + sizeof("modules/")];
+        hal.util->snprintf(path, sizeof(path), "modules/%s", file.name);
         uint32_t length = 0;
         const uint8_t *bytes = AP_ROMFS::find_uncompressed(path, length);
         if (bytes == nullptr) {
@@ -338,7 +334,7 @@ Module *Runtime::load_file(const ModuleFile &file, Slot &slot)
     }
     const int32_t length = fs.lseek(fd, 0, SEEK_END);
     // Image, worst-case 32-bit relocations, and capped import records/names.
-    const uint32_t maximum = _limits.code * 3U + 4096U * (16U + 64U) + 80U;
+    const uint32_t maximum = _limits.code * 3U + 4096U * (16U + 64U) + 84U;
     const uint32_t input_size = length > 0 ? uint32_t(length) : 0;
     const auto free_input = [input_size](uint8_t *buffer) {
         hal.util->free_type(buffer, input_size, AP_HAL::Util::MEM_FAST);
@@ -383,15 +379,15 @@ bool Runtime::load_generation()
     uint8_t count = 0;
 #ifdef HAL_HAVE_AP_ROMFS_EMBEDDED_APMOD
     uint16_t romfs_offset = 0;
-    while (const char *path = AP_ROMFS::dir_list("rust", romfs_offset)) {
-        constexpr size_t prefix_length = sizeof("rust/") - 1;
-        if (strncmp(path, "rust/", prefix_length) != 0) {
+    while (const char *path = AP_ROMFS::dir_list("modules", romfs_offset)) {
+        constexpr size_t prefix_length = sizeof("modules/") - 1;
+        if (strncmp(path, "modules/", prefix_length) != 0) {
             continue;
         }
         const char *name = path + prefix_length;
         const size_t length = strlen(name);
         // Runtime module discovery is deliberately non-recursive, matching
-        // the writable rust directory.
+        // the writable module directory.
         if (strchr(name, '/') != nullptr || length < 6 || strcmp(name + length - 6, ".apmod") != 0) {
             continue;
         }
@@ -423,7 +419,7 @@ bool Runtime::load_generation()
             for (uint8_t i = 0; i < count; i++) {
                 if (files[i].source == ModuleSource::ROMFS && strcmp(files[i].name, entry->d_name) == 0) {
                     duplicate = true;
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Rust: ignored writable %.31s; ROMFS wins", entry->d_name);
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: ignored writable %.31s; ROMFS wins", entry->d_name);
                     break;
                 }
             }
@@ -456,6 +452,7 @@ bool Runtime::load_generation()
         auto &slot = _slots[i];
         slot.panic_reported = slot.running = false;
         slot.heap_expansion_reported = 0;
+        slot.heap_failures_reported = 0;
         slot.module = load_file(files[i], slot);
         if (slot.module == nullptr) {
             return false;
@@ -474,10 +471,10 @@ bool Runtime::load_generation()
             WITH_SEMAPHORE(_sem);
             _running_checksum ^= slot.module->checksum();
         }
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust: started %s", slot.module->name());
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module: started %s", slot.module->name());
         report_memory(*slot.module);
     }
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust: loaded %u modules", unsigned(count));
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module: loaded %u modules", unsigned(count));
     return true;
 }
 
@@ -486,12 +483,12 @@ void Runtime::report_memory(Module &module)
     // Separate reservations/counters, not total RAM: backend heap overhead,
     // manager storage and temporary input buffers are not included here.
     const auto stats = module.stats();
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: RX %u RW %u stack %u",
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module RAM: RX %u RW %u stack %u",
                   unsigned(stats.rx_reserved), unsigned(stats.rw_reserved), unsigned(stats.stack_reserved));
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: heap %u used %u peak %u thread %u", unsigned(stats.heap_initial),
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module RAM: heap %u used %u peak %u thread %u", unsigned(stats.heap_initial),
                   unsigned(stats.heap.used), unsigned(stats.heap.peak), unsigned(stats.thread_reserved));
     if (stats.heap.expanded_to != 0) {
-        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust RAM: heap expanded to %u", unsigned(stats.heap.expanded_to));
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module RAM: heap expanded to %u", unsigned(stats.heap.expanded_to));
     }
 }
 
@@ -508,21 +505,30 @@ void Runtime::poll_modules()
             char reason[80];
             hal.util->snprintf(reason, sizeof(reason), "%.24s panic; reboot required", module->name());
             fail(reason);
-            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Rust panic: %.37s", module->panic_message());
+            GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Module fatal: %.37s", module->panic_message());
             report_memory(*module);
         }
         const bool joined = module->poll_join();
         // Sample after joining too: a worker can expand and return between
         // manager polls. Its final requirement must survive heap destruction.
-        const uint32_t expanded_to = module->stats().heap.expanded_to;
+        const auto heap_stats = module->stats().heap;
+        const uint32_t expanded_to = heap_stats.expanded_to;
         if (expanded_to > slot.heap_expansion_reported) {
             slot.heap_expansion_reported = expanded_to;
             {
                 WITH_SEMAPHORE(_sem);
                 _heap_required = MAX(_heap_required, expanded_to);
             }
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Rust: %.31s required RUST_HEAP_SIZE over %u",
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: %.24s initial heap needs %u",
                           module->name(), unsigned(expanded_to));
+        }
+        const uint8_t failures = heap_stats.expansion_failures & ~slot.heap_failures_reported;
+        slot.heap_failures_reported |= failures;
+        if ((failures & MultiHeap::Capacity) != 0) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: %.24s MOD_HEAP_MAX reached", module->name());
+        }
+        if ((failures & MultiHeap::Arenas) != 0) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: %.24s heap arena slots exhausted", module->name());
         }
         if (slot.running && (joined || state == Module::State::Returned || state == Module::State::Panicked)) {
             slot.running = false;
@@ -543,7 +549,7 @@ void Runtime::poll_modules()
                 hal.util->snprintf(reason, sizeof(reason), "%.31s returned %ld", module->name(), long(result));
                 fail(reason);
             }
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Rust: exited %s", module->name());
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Module: exited %s", module->name());
             report_memory(*module);
         }
         binding_dronecan_cleanup(&slot);
@@ -667,7 +673,7 @@ void Runtime::drain_messages()
             _message_head = (_message_head + 1) % ARRAY_SIZE(_messages);
             _message_count--;
         }
-        GCS_SEND_TEXT(MAV_SEVERITY(message.severity), "Rust: %s", message.text);
+        GCS_SEND_TEXT(MAV_SEVERITY(message.severity), "Module: %s", message.text);
     }
 }
 

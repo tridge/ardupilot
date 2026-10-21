@@ -1080,21 +1080,21 @@ def emit(contract):
     )
     outputs = {
         'Bindings_generated.cpp': cpp_output,
-        'sdk/src/bindings.rs': rust_output,
-        'sdk/src/enums.rs': singleton_binding.rust_enums(contract['methods'], notice),
-        'sdk/src/format.rs': printf_binding.rust(contract['printf'], notice),
-        'sdk/src/borrowed.rs': borrowed_binding.rust(
+        'sdk/rust/src/bindings.rs': rust_output,
+        'sdk/rust/src/enums.rs': singleton_binding.rust_enums(contract['methods'], notice),
+        'sdk/rust/src/format.rs': printf_binding.rust(contract['printf'], notice),
+        'sdk/rust/src/borrowed.rs': borrowed_binding.rust(
             [m for m in contract['methods'] if m.get('receiver')], notice, singleton_binding.rust),
-        'sdk/src/values.rs': value_binding.rust(contract['methods'], notice, singleton_binding.rust),
-        'sdk/src/libm.rs': libm_binding.rust(contract['libm'], notice),
-        'sdk/src/strtof.rs': strtof_binding.rust(contract['strtof'], notice),
-        'sdk/src/file.rs': file_binding.rust(contract['file'], notice),
-        'sdk/src/log.rs': log_binding.rust(contract['log'], notice),
-        'sdk/src/battery.rs': battery_binding.rust(contract['battery'], notice),
-        'sdk/src/dronecan.rs': dronecan_binding.rust(contract['dronecan'], notice),
+        'sdk/rust/src/values.rs': value_binding.rust(contract['methods'], notice, singleton_binding.rust),
+        'sdk/rust/src/libm.rs': libm_binding.rust(contract['libm'], notice),
+        'sdk/rust/src/strtof.rs': strtof_binding.rust(contract['strtof'], notice),
+        'sdk/rust/src/file.rs': file_binding.rust(contract['file'], notice),
+        'sdk/rust/src/log.rs': log_binding.rust(contract['log'], notice),
+        'sdk/rust/src/battery.rs': battery_binding.rust(contract['battery'], notice),
+        'sdk/rust/src/dronecan.rs': dronecan_binding.rust(contract['dronecan'], notice),
         'BindingLog_generated.h': log_binding.header(notice),
-        'sdk/src/parameter.rs': parameter_binding.rust(contract['parameter'], notice),
-        'sdk/src/math.rs': math_binding.rust(contract['math'], notice),
+        'sdk/rust/src/parameter.rs': parameter_binding.rust(contract['parameter'], notice),
+        'sdk/rust/src/math.rs': math_binding.rust(contract['math'], notice),
         'BindingMath_generated.cpp': math_binding.cpp(contract['math'], notice),
         'BindingConfig.h': notice + '#pragma once\n\n' +
         f'#define AP_MODULE_FILE_PATH_SIZE {file_binding.PATH_SIZE}U\n' +
@@ -1110,52 +1110,52 @@ def emit(contract):
         'generator/coverage.json': json.dumps(contract['coverage'], indent=2) + '\n',
     }
     if contract['command_int'] is not None:
-        outputs['sdk/src/command_int.rs'] = command_int_binding.rust(contract['command_int'], notice)
+        outputs['sdk/rust/src/command_int.rs'] = command_int_binding.rust(contract['command_int'], notice)
     if contract['serial'] is not None:
-        outputs['sdk/src/serial.rs'] = serial_binding.rust(contract['serial'], notice)
+        outputs['sdk/rust/src/serial.rs'] = serial_binding.rust(contract['serial'], notice)
     if contract['mavlink'] is not None:
-        outputs['sdk/src/mavlink.rs'] = mavlink_binding.rust(contract['mavlink'], notice)
+        outputs['sdk/rust/src/mavlink.rs'] = mavlink_binding.rust(contract['mavlink'], notice)
     if contract['arming'] is not None:
-        outputs['sdk/src/arming.rs'] = arming_binding.rust(contract['arming'], notice)
+        outputs['sdk/rust/src/arming.rs'] = arming_binding.rust(contract['arming'], notice)
     if contract['efi'] is not None:
-        outputs['sdk/src/efi.rs'] = efi_binding.rust(contract['efi'], notice)
+        outputs['sdk/rust/src/efi.rs'] = efi_binding.rust(contract['efi'], notice)
     if contract['rangefinder_proximity'] is not None:
-        outputs['sdk/src/rangefinder_proximity.rs'] = rangefinder_proximity_binding.rust(
+        outputs['sdk/rust/src/rangefinder_proximity.rs'] = rangefinder_proximity_binding.rust(
             contract['rangefinder_proximity'], notice)
     if contract['filesystem'] is not None:
-        outputs['sdk/src/filesystem.rs'] = filesystem_binding.rust(contract['filesystem'], notice)
+        outputs['sdk/rust/src/filesystem.rs'] = filesystem_binding.rust(contract['filesystem'], notice)
     if contract['network'] is not None:
-        outputs['sdk/src/network.rs'] = network_binding.rust(contract['network'], notice)
+        outputs['sdk/rust/src/network.rs'] = network_binding.rust(contract['network'], notice)
     if contract['can'] is not None:
-        outputs['sdk/src/can.rs'] = can_binding.rust(contract['can'], notice)
+        outputs['sdk/rust/src/can.rs'] = can_binding.rust(contract['can'], notice)
     if contract['telemetry'] is not None:
-        outputs['sdk/src/telemetry.rs'] = telemetry_binding.rust(contract['telemetry'], notice)
+        outputs['sdk/rust/src/telemetry.rs'] = telemetry_binding.rust(contract['telemetry'], notice)
     if contract['airspeed'] is not None:
-        outputs['sdk/src/airspeed.rs'] = airspeed_binding.rust(contract['airspeed'], notice)
+        outputs['sdk/rust/src/airspeed.rs'] = airspeed_binding.rust(contract['airspeed'], notice)
     if contract['periph'] is not None:
-        outputs['sdk/src/periph.rs'] = periph_binding.rust(contract['periph'], notice)
+        outputs['sdk/rust/src/periph.rs'] = periph_binding.rust(contract['periph'], notice)
     if contract['old_parameter'] is not None:
-        outputs['sdk/src/old_parameter.rs'] = old_parameter_binding.rust(contract['old_parameter'], notice)
+        outputs['sdk/rust/src/old_parameter.rs'] = old_parameter_binding.rust(contract['old_parameter'], notice)
     if contract['motor_config'] is not None:
-        outputs['sdk/src/motor_config.rs'] = motor_config_binding.rust(contract['motor_config'], notice)
+        outputs['sdk/rust/src/motor_config.rs'] = motor_config_binding.rust(contract['motor_config'], notice)
     if contract['serialled'] is not None:
-        outputs['sdk/src/serialled.rs'] = serialled_binding.rust(contract['serialled'], notice)
+        outputs['sdk/rust/src/serialled.rs'] = serialled_binding.rust(contract['serialled'], notice)
     if contract['onvif'] is not None:
-        outputs['sdk/src/onvif.rs'] = onvif_binding.rust(contract['onvif'], notice)
+        outputs['sdk/rust/src/onvif.rs'] = onvif_binding.rust(contract['onvif'], notice)
     if contract['applet'] is not None:
-        outputs['sdk/src/applet.rs'] = applet_binding.rust(contract['applet'], notice)
+        outputs['sdk/rust/src/applet.rs'] = applet_binding.rust(contract['applet'], notice)
     if contract['crsf'] is not None:
-        outputs['sdk/src/crsf.rs'] = crsf_binding.rust(contract['crsf'], notice)
+        outputs['sdk/rust/src/crsf.rs'] = crsf_binding.rust(contract['crsf'], notice)
     if contract['examples'] is not None:
-        outputs['sdk/src/examples.rs'] = examples_binding.rust(contract['examples'], notice)
-    outputs['sdk/src/example_constants.rs'] = example_constants_binding.rust(
+        outputs['sdk/rust/src/examples.rs'] = examples_binding.rust(contract['examples'], notice)
+    outputs['sdk/rust/src/example_constants.rs'] = example_constants_binding.rust(
         contract['example_constants'], notice)
     if contract['i2c'] is not None:
-        outputs['sdk/src/i2c.rs'] = i2c_binding.rust(contract['i2c'], notice)
+        outputs['sdk/rust/src/i2c.rs'] = i2c_binding.rust(contract['i2c'], notice)
     if contract['camera'] is not None:
-        outputs['sdk/src/camera.rs'] = camera_binding.rust(contract['camera'], notice)
+        outputs['sdk/rust/src/camera.rs'] = camera_binding.rust(contract['camera'], notice)
     if contract['custom_mode'] is not None:
-        outputs['sdk/src/custom_mode.rs'] = custom_mode_binding.rust(contract['custom_mode'], notice)
+        outputs['sdk/rust/src/custom_mode.rs'] = custom_mode_binding.rust(contract['custom_mode'], notice)
     if contract['analog_pwm'] is not None:
-        outputs['sdk/src/analog_pwm.rs'] = analog_pwm_binding.rust(contract['analog_pwm'], notice)
+        outputs['sdk/rust/src/analog_pwm.rs'] = analog_pwm_binding.rust(contract['analog_pwm'], notice)
     return outputs

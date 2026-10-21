@@ -6,7 +6,7 @@ use std::process::Command;
 
 fn main() {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let root = manifest.parent().unwrap();
+    let root = manifest.parent().unwrap().parent().unwrap();
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("AP_Module");
     let python = env::var_os("PYTHON").unwrap_or_else(|| "python3".into());
     let status = Command::new(python)
@@ -18,5 +18,5 @@ fn main() {
     assert!(status.success(), "AP_Module binding generator failed");
     println!("cargo:rerun-if-changed={}", root.join("generator").display());
     println!("cargo:rerun-if-changed={}", root.join("../AP_Scripting/generator").display());
-    println!("cargo:rustc-env=AP_MODULE_SDK_GENERATED={}", output.join("sdk/src").display());
+    println!("cargo:rustc-env=AP_MODULE_SDK_GENERATED={}", output.join("sdk/rust/src").display());
 }

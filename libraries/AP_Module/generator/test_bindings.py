@@ -200,7 +200,7 @@ def test_fwversion_public_contract_and_sdk(ir, selection):
     }
     assert 'reject-null-or-overlength' in string['policy']
     generated = bindings.emit(contract)
-    rust = generated['sdk/src/bindings.rs']
+    rust = generated['sdk/rust/src/bindings.rs']
     assert 'pub fn fw_version(&self) -> FwVersion' in rust
     assert 'pub fn r#type(&self) -> Result<u8>' in rust
     assert 'pub fn string(&self) -> Result<FirmwareString>' in rust
@@ -217,15 +217,15 @@ def test_standalone_bindings_are_wired_into_public_generation():
     catalogue = {entry['contract']['name'] for entry in contracts.describe(contract)}
 
     expected_outputs = {
-        'sdk/src/applet.rs',
-        'sdk/src/crsf.rs',
-        'sdk/src/motor_config.rs',
-        'sdk/src/onvif.rs',
-        'sdk/src/serialled.rs',
-        'sdk/src/telemetry.rs',
-        'sdk/src/airspeed.rs',
-        'sdk/src/periph.rs',
-        'sdk/src/old_parameter.rs',
+        'sdk/rust/src/applet.rs',
+        'sdk/rust/src/crsf.rs',
+        'sdk/rust/src/motor_config.rs',
+        'sdk/rust/src/onvif.rs',
+        'sdk/rust/src/serialled.rs',
+        'sdk/rust/src/telemetry.rs',
+        'sdk/rust/src/airspeed.rs',
+        'sdk/rust/src/periph.rs',
+        'sdk/rust/src/old_parameter.rs',
     }
     assert expected_outputs.issubset(generated)
     assert {
@@ -252,7 +252,7 @@ def test_standalone_bindings_are_wired_into_public_generation():
         assert target in cpp
     assert 'binding_crsf_menu_add_parameter' in cpp
 
-    sdk = (bindings.ROOT / 'sdk/src/lib.rs').read_text()
+    sdk = (bindings.ROOT / 'sdk/rust/src/lib.rs').read_text()
     for module in ('airspeed', 'applet', 'crsf', 'motor_config', 'old_parameter', 'onvif', 'periph',
                    'serialled', 'telemetry'):
         assert f'generated_module!({module});' in sdk
@@ -730,9 +730,9 @@ def test_parameter_signature_change_requires_audit(ir, selection, change):
 def test_manual_sdk_operations_are_namespaced():
     generated = bindings.emit(bindings.specification())
     for path, source in generated.items():
-        if path.startswith('sdk/src/') and path != 'sdk/src/parameter.rs':
+        if path.startswith('sdk/rust/src/') and path != 'sdk/rust/src/parameter.rs':
             assert "impl Context<'_>" not in source, path
-    bindings_source = generated['sdk/src/bindings.rs']
+    bindings_source = generated['sdk/rust/src/bindings.rs']
     for namespace in bindings.MANUAL_NAMESPACES:
         accessor = bindings.naming.rust_identifier(namespace)
         assert f'pub fn {accessor}(&self)' in bindings_source

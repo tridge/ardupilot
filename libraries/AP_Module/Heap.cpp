@@ -12,10 +12,12 @@ Heap::~Heap()
     _heap.destroy();
 }
 
-bool Heap::create(uint32_t size, bool allow_expansion)
+bool Heap::create(uint32_t size, bool allow_expansion, uint32_t max_capacity)
 {
     WITH_SEMAPHORE(_sem);
-    return size >= 256 && size <= 16U * 1024 * 1024 && _heap.create(size, 10, allow_expansion, 20 * 1024);
+    constexpr uint8_t max_arenas = 10;
+    return size >= 256 && size <= 16U * 1024 * 1024 &&
+           _heap.create(size, max_arenas, allow_expansion, 20 * 1024, max_capacity);
 }
 
 void *Heap::allocate(uint32_t size, uint32_t alignment)
@@ -32,7 +34,7 @@ void *Heap::allocate(uint32_t size, uint32_t alignment)
     auto *allocation = static_cast<Allocation *>(_heap.allocate(charge));
     if (allocation == nullptr) {
         // MultiHeap deliberately fails once before expanding so Lua can try GC.
-        // Rust has no GC retry: make a second attempt before reporting OOM.
+        // Native modules have no GC retry: make a second attempt before OOM.
         // MultiHeap still enforces its armed-only expansion and memory reserve.
         allocation = static_cast<Allocation *>(_heap.allocate(charge));
     }
@@ -87,6 +89,7 @@ Heap::Stats Heap::stats()
 {
     WITH_SEMAPHORE(_sem);
     _stats.expanded_to = _heap.get_expansion_size();
+    _stats.expansion_failures = _heap.get_expansion_failures();
     return _stats;
 }
 

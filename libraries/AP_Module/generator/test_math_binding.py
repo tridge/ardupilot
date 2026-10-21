@@ -98,7 +98,7 @@ def test_math_directions_and_fingerprint(ir, selection):
     assert 'ud.from_euler(arg0, arg1, arg2);' in cpp
     for operator in ('+', '-', '*'):
         assert f'const auto value = ud {operator} arg0;' in cpp
-    assert 'isfinite' not in cpp and 'is_finite' not in original['sdk/src/math.rs']
+    assert 'isfinite' not in cpp and 'is_finite' not in original['sdk/rust/src/math.rs']
     assert len([method for owner in types.values() for method in owner['methods']]) == 24
     for change in ('direction', 'default', 'fields', 'policy', 'guard'):
         changed = copy.deepcopy(contract)

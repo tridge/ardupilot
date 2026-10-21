@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Frozen ABI-3 compatibility source. Do not rebuild the checked-in images
+// Frozen AP_Module ABI-3 compatibility source. Do not rebuild checked-in images
 // during tests: their purpose is to exercise older, unchanged machine code.
 #![no_std]
 #![no_main]

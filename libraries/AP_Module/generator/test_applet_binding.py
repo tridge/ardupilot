@@ -371,4 +371,4 @@ def test_cpp_and_rust_emission_shape():
     assert 'pub struct VideoStreamInformation' in rust
     assert "impl crate::bindings::Scripting<'_, '_>" in rust
     assert 'pub fn restart_all(&self) -> Result' in rust
-    assert 'does not stop or restart this Rust module' in rust
+    assert 'does not stop or restart this Native module' in rust

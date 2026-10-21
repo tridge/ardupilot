@@ -34,7 +34,7 @@ struct Container {
 
     Container()
     {
-        memcpy(bytes, "APRUST01", 8);
+        memcpy(bytes, "APMOD01\0", 8);
         put(8, 1);
         put(12, sizeof(uintptr_t) == 8 ? 62 : 40);
         put(16, sizeof(uintptr_t));
@@ -59,7 +59,7 @@ struct Container {
 };
 
 struct RuntimeContainer {
-    uint8_t bytes[80 + 4104 + 8] {};
+    uint8_t bytes[84 + 4104 + 4] {};
 
     static AP_Module::Image::Compatibility compatibility()
     {
@@ -77,28 +77,32 @@ struct RuntimeContainer {
 
     void checksum()
     {
-        put(76, 0);
-        put(76, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
+        put(80, 0);
+        put(80, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
     }
 
     RuntimeContainer()
     {
         Container probe;
         memcpy(bytes, probe.bytes, 44);
-        memcpy(bytes, "APRUST04", 8);
-        put(8, 4);
+        memcpy(bytes, "APMOD06\0", 8);
+        put(8, 6);
+        put(20, sizeof(uintptr_t) | sizeof(uintptr_t) << 16);
         const auto expected = compatibility();
         put(44, expected.abi_version);
         put(48, expected.cpu_profile);
         put(52, 4096);
-        memcpy(bytes + 60, expected.fingerprint, sizeof(expected.fingerprint));
-        memcpy(bytes + 80, probe.bytes + 56, sizeof(probe.bytes) - 56);
+        put(56, 32768);
+        memcpy(bytes + 64, expected.fingerprint, sizeof(expected.fingerprint));
+        memcpy(bytes + 84, probe.bytes + 56, 4104);
+        put(84 + 4096, 8);
+        put(84 + 4104, 4096);
         checksum();
     }
 };
 
 struct alignas(uintptr_t) SplitContainer {
-    static constexpr uint32_t header_size = 80;
+    static constexpr uint32_t header_size = 84;
     static constexpr uint32_t code_size = 4096;
     static constexpr uint32_t file_size = code_size + 2 * sizeof(uintptr_t);
     static constexpr uint32_t memory_size = file_size + 16;
@@ -121,14 +125,14 @@ struct alignas(uintptr_t) SplitContainer {
 
     void checksum()
     {
-        put(76, 0);
-        put(76, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
+        put(80, 0);
+        put(80, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
     }
 
     SplitContainer()
     {
-        memcpy(bytes, "APRUST05", 8);
-        put(8, 5);
+        memcpy(bytes, "APMOD06\0", 8);
+        put(8, 6);
         const auto expected = RuntimeContainer::compatibility();
         put(12, expected.machine);
         put(16, sizeof(uintptr_t));
@@ -141,7 +145,8 @@ struct alignas(uintptr_t) SplitContainer {
         put(44, expected.abi_version);
         put(48, expected.cpu_profile);
         put(52, 4096);
-        memcpy(bytes + 60, expected.fingerprint, sizeof(expected.fingerprint));
+        put(56, 32768);
+        memcpy(bytes + 64, expected.fingerprint, sizeof(expected.fingerprint));
         bytes[header_size] = 0xA5;
         put_pointer(header_size + sizeof(uintptr_t), 17);
         put_pointer(header_size + code_size, 17);
@@ -159,7 +164,7 @@ struct alignas(uintptr_t) SplitContainer {
 };
 
 struct ImportContainer {
-    uint8_t bytes[80 + 4112 + 8 + 32 + 21] {};
+    uint8_t bytes[84 + 4112 + 4 + 32 + 21] {};
 
     void put(uint32_t offset, uint32_t value)
     {
@@ -170,22 +175,21 @@ struct ImportContainer {
 
     void checksum()
     {
-        put(76, 0);
-        put(76, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
+        put(80, 0);
+        put(80, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
     }
 
     ImportContainer()
     {
         RuntimeContainer base;
-        memcpy(bytes, base.bytes, 80 + 4104);
+        memcpy(bytes, base.bytes, 84 + 4104);
         put(24, 4112);
         put(28, 4128);
-        put(56, 2);
-        put(80 + 4104, UINT32_MAX);
-        put(80 + 4108, UINT32_MAX);
-        put(80 + 4112, 4096);
-        put(80 + 4112 + 4, 8);
-        const uint32_t records = 80 + 4112 + 8;
+        put(60, 2);
+        put(84 + 4104, UINT32_MAX);
+        put(84 + 4108, UINT32_MAX);
+        put(84 + 4112, 4096);
+        const uint32_t records = 84 + 4112 + 4;
         put(records, 0x55667788);
         put(records + 4, 0x11223344);
         put(records + 8, 4104);
@@ -212,7 +216,7 @@ struct ImportContainer {
 };
 
 struct SplitImportContainer {
-    static constexpr uint32_t header_size = 80;
+    static constexpr uint32_t header_size = 84;
     static constexpr uint32_t code_size = 4096;
     static constexpr uint32_t file_size = 4104;
     static constexpr uint32_t memory_size = 4112;
@@ -228,14 +232,14 @@ struct SplitImportContainer {
 
     void checksum()
     {
-        put(76, 0);
-        put(76, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
+        put(80, 0);
+        put(80, crc32_small(UINT32_MAX, bytes, sizeof(bytes)) ^ UINT32_MAX);
     }
 
     SplitImportContainer()
     {
-        memcpy(bytes, "APRUST05", 8);
-        put(8, 5);
+        memcpy(bytes, "APMOD06\0", 8);
+        put(8, 6);
         const auto expected = RuntimeContainer::compatibility();
         put(12, expected.machine);
         put(16, sizeof(uintptr_t));
@@ -247,8 +251,9 @@ struct SplitImportContainer {
         put(44, expected.abi_version);
         put(48, expected.cpu_profile);
         put(52, 4096);
-        put(56, 1);
-        memcpy(bytes + 60, expected.fingerprint, sizeof(expected.fingerprint));
+        put(60, 1);
+        put(56, 32768);
+        memcpy(bytes + 64, expected.fingerprint, sizeof(expected.fingerprint));
         put(header_size + code_size, UINT32_MAX);
         put(record, 0x55667788);
         put(record + 4, 0x11223344);
@@ -267,14 +272,14 @@ TEST(RustImage, ResolveImportsBeforePublication)
     ASSERT_TRUE(image.parse(container.bytes, sizeof(container.bytes), 8192, RuntimeContainer::compatibility()));
     alignas(4096) uint8_t destination[8192];
     memset(destination, 0x5A, sizeof(destination));
-    EXPECT_FALSE(image.load(destination, sizeof(destination)));
+    EXPECT_FALSE(image.load_split(destination, 4096, destination + 4096, sizeof(destination) - 4096));
     uint32_t offset = UINT16_MAX; // first known, second unknown
     uint64_t missing = 0;
     const char *missing_name = nullptr;
     EXPECT_FALSE(image.check_imports(ImportContainer::resolve, &offset, &missing, &missing_name));
     EXPECT_EQ(missing, UINT64_C(0x8877665544332211));
     EXPECT_STREQ(missing_name, "second.api");
-    EXPECT_FALSE(image.load(destination, sizeof(destination), ImportContainer::resolve, &offset));
+    EXPECT_FALSE(image.load_split(destination, 4096, destination + 4096, sizeof(destination) - 4096, ImportContainer::resolve, &offset));
     for (const auto byte : destination) {
         ASSERT_EQ(byte, 0x5A);
     }
@@ -283,7 +288,7 @@ TEST(RustImage, ResolveImportsBeforePublication)
              0U, 1000U
          }) {
         offset = firmware_offset;
-        ASSERT_TRUE(image.load(destination, sizeof(destination), ImportContainer::resolve, &offset));
+        ASSERT_TRUE(image.load_split(destination, 4096, destination + 4096, sizeof(destination) - 4096, ImportContainer::resolve, &offset));
         uint32_t first, second;
         memcpy(&first, destination + 4104, 4);
         memcpy(&second, destination + 4108, 4);
@@ -295,17 +300,17 @@ TEST(RustImage, ResolveImportsBeforePublication)
 
 TEST(RustImage, RejectImportMetadataErrors)
 {
-    const uint32_t records = 80 + 4112 + 8;
+    const uint32_t records = 84 + 4112 + 4;
     const struct {
         uint32_t offset;
         uint32_t value;
     } mutations[] = {
-        {56, 0}, {56, UINT32_MAX}, {56, 4097},
+        {60, 0}, {60, UINT32_MAX}, {60, 4097},
         {records + 8, 4092}, {records + 8, 4096}, {records + 8, 4105},
         {records + 12, 1}, {records + 12, UINT32_MAX},
         {records + 24, 4104}, {records + 24, 4112}, {records + 24, UINT32_MAX},
         {records + 28, 0}, {records + 28, 9}, {records + 28, UINT32_MAX},
-        {80 + 4104, 0}, {80 + 4108, 0},
+        {84 + 4104, 0}, {84 + 4108, 0},
     };
     AP_Module::Image image;
     for (const auto &mutation : mutations) {
@@ -346,7 +351,7 @@ TEST(RustImage, RequireRuntimeCompatibility)
     ASSERT_TRUE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
     EXPECT_EQ(image.required_stack_size(), 4096U);
     alignas(4096) uint8_t destination[8192];
-    ASSERT_TRUE(image.load(destination, sizeof(destination)));
+    ASSERT_TRUE(image.load_split(destination, 4096, destination + 4096, sizeof(destination) - 4096));
     EXPECT_EQ(destination[0], 0xA5);
     uintptr_t pointer;
     memcpy(&pointer, destination + 4096, sizeof(pointer));
@@ -355,7 +360,7 @@ TEST(RustImage, RequireRuntimeCompatibility)
 
     expected.stack_limit = 4095;
     EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
-    EXPECT_FALSE(image.load(destination, sizeof(destination)));
+    EXPECT_FALSE(image.load_split(destination, 4096, destination + 4096, sizeof(destination) - 4096));
     expected.stack_limit = 4096;
     EXPECT_TRUE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
     expected.fingerprint[15] ^= 1;
@@ -375,14 +380,14 @@ TEST(RustImage, ParseFailureDiagnostics)
         {44, 0, "ABI version mismatch"},
         {48, 0, "CPU profile mismatch"},
         {52, 0, "invalid stack requirement"},
-        {52, 8193, "stack exceeds RUST_STACK_SIZE"},
-        {60, 0, "API fingerprint mismatch"},
-        {28, 8193, "image exceeds RUST_CODE_SIZE"},
+        {52, 8193, "stack exceeds MOD_STACK_MAX"},
+        {64, 0, "API fingerprint mismatch"},
+        {28, 8193, "image exceeds MOD_CODE_MAXSIZE"},
         {16, 0, "invalid image layout"},
         {40, 2, "truncated relocation/import tables"},
-        {80 + 4104, 4103, "invalid relocation offset"},
-        {80 + 4104 + 4, 4121, "invalid relocation target"},
-        {76, 0, "image checksum mismatch"},
+        {84 + 4104, 4103, "invalid relocation offset"},
+        {84 + 4096, 4121, "invalid relocation target"},
+        {80, 0, "image checksum mismatch"},
     };
     AP_Module::Image image;
     for (const auto &mutation : mutations) {
@@ -628,8 +633,8 @@ TEST(RustImage, RejectRuntimeMetadataErrors)
         uint32_t value;
     } mutations[] = {
         {8, 1}, {44, 0}, {44, 2}, {48, 0}, {48, 3U - expected.cpu_profile},
-        {52, 0}, {52, 255}, {52, 8193}, {52, UINT32_MAX}, {56, 1},
-        {60, 0}, {80 + 4104, 4103}, {80 + 4104 + 4, 4121}, {56, UINT32_MAX},
+        {52, 0}, {52, 255}, {52, 8193}, {52, UINT32_MAX}, {60, 1},
+        {64, 0}, {84 + 4104, 4103}, {84 + 4096, 4121}, {60, UINT32_MAX},
     };
     AP_Module::Image image;
     for (const auto &mutation : mutations) {
@@ -644,9 +649,44 @@ TEST(RustImage, RejectRuntimeMetadataErrors)
          }) {
         EXPECT_FALSE(image.parse(container.bytes, length, 8192, expected));
     }
-    container.bytes[80] ^= 1;
+    container.bytes[84] ^= 1;
     EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
     EXPECT_FALSE(image.parse(nullptr, sizeof(container.bytes), 8192, expected));
+}
+
+TEST(ModuleImage, InitialHeapAdmissionAndOldFormats)
+{
+    RuntimeContainer container;
+    auto expected = RuntimeContainer::compatibility();
+    AP_Module::Image image;
+    for (const uint32_t requested : {256U, 257U, 32768U, 16U * 1024 * 1024}) {
+        container.put(56, requested);
+        container.checksum();
+        expected.heap_limit = requested;
+        ASSERT_TRUE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+        EXPECT_EQ(image.initial_heap_size(), requested);
+        expected.heap_limit = requested - 1;
+        EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+        EXPECT_STREQ(image.parse_error(), "initial heap exceeds MOD_HEAP_MAX");
+    }
+    expected.heap_limit = 32768;
+    for (const uint32_t invalid : {0U, 255U, 16U * 1024 * 1024 + 1, UINT32_MAX}) {
+        container.put(56, invalid);
+        container.checksum();
+        EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+        EXPECT_STREQ(image.parse_error(), "invalid initial heap requirement");
+    }
+    container.put(56, 32768);
+    container.checksum();
+    container.put(56, 32767);
+    EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+    EXPECT_STREQ(image.parse_error(), "image checksum mismatch");
+    for (const char *old_magic : {"APRUST01", "APRUST04", "APRUST05"}) {
+        memcpy(container.bytes, old_magic, 8);
+        container.checksum();
+        EXPECT_FALSE(image.parse(container.bytes, sizeof(container.bytes), 8192, expected));
+        EXPECT_STREQ(image.parse_error(), "unsupported image format");
+    }
 }
 
 #if AP_MODULE_LEGACY_PROBE_ENABLED
@@ -733,7 +773,7 @@ bool callback_error;
 
 void probe_output(const uint8_t *text, size_t size)
 {
-    callback_error |= size != 17 || memcmp(text, "Rust module probe", 17) != 0;
+    callback_error |= size != 17 || memcmp(text, "Native module probe", 17) != 0;
     outputs++;
 }
 

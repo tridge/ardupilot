@@ -14,6 +14,7 @@ from pathlib import Path
 
 import bindings
 import contracts
+import cpp_bindings
 
 ROOT = Path(__file__).resolve().parents[1]
 TYPES = {
@@ -103,8 +104,9 @@ def generate(spec, binding_spec=None):
     rust += [f'            && self.{function["name"]}.is_some()' for function in spec['functions']]
     rust += ['    }', '}', '']
     contract = dict(abi_version=spec['version'], fingerprint=fingerprint.hex())
-    outputs = {'HostApi.h': '\n'.join(cpp), 'sdk/src/api.rs': '\n'.join(rust),
+    outputs = {'HostApi.h': '\n'.join(cpp), 'sdk/rust/src/api.rs': '\n'.join(rust),
                'sdk/abi.json': json.dumps(contract, indent=2) + '\n'}
+    outputs.update(cpp_bindings.emit(binding_spec, notice))
     outputs.update(bindings.emit(binding_spec))
     outputs.update(contracts.emit(binding_spec, notice))
     binding_names = contracts.binding_names(binding_spec)

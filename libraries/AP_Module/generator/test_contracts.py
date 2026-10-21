@@ -29,9 +29,9 @@ def test_canonical_hash():
 
 def test_import_section_includes_diagnostic_name(spec):
     entry = next(entry for entry in contracts.describe(spec) if entry['contract']['name'] == 'ahrs.get_gyro')
-    imports = contracts.emit(spec, '')['sdk/src/imports.rs']
-    assert f'#[link_section = ".ap_rust_import_{entry["hash"]}.ahrs.get_gyro"]' in imports
-    assert f'#[export_name = "__ap_rust_import_{entry["hash"]}.ahrs.get_gyro"]' in imports
+    imports = contracts.emit(spec, '')['sdk/rust/src/imports.rs']
+    assert f'#[link_section = ".ap_module_import_{entry["hash"]}.ahrs.get_gyro"]' in imports
+    assert f'#[export_name = "__ap_module_import_{entry["hash"]}.ahrs.get_gyro"]' in imports
 
 
 @pytest.mark.parametrize('text,value', [('+360', 360), ('-20', -20), ('0.5', 0.5), ('+.5', 0.5),
@@ -122,7 +122,7 @@ def test_dronecan_handle_check_message_is_same_id_contract_alias(spec):
     assert handle['contract'] == subscription_contract
     emitted = contracts.emit(spec, '')
     binding_name = contracts.binding_names(spec)[handle['id']].upper()
-    assert emitted['sdk/src/imports.rs'].count(f'BINDING_{binding_name}:') == 1
+    assert emitted['sdk/rust/src/imports.rs'].count(f'BINDING_{binding_name}:') == 1
     dispatch_id = f'uint32_t(BindingId::{binding_name})'
     assert f'UINT64_C(0x{subscription["hash"]}), {dispatch_id}' in emitted['BindingImports_generated.cpp']
     assert f'UINT64_C(0x{handle["hash"]}), {dispatch_id}' in emitted['BindingImports_generated.cpp']

@@ -14,8 +14,7 @@ class Image
 {
 public:
     enum class SourcePolicy : uint8_t {
-        // Unmodified container encoding: v5 keeps target offsets in fixup
-        // slots, while older formats keep those slots zero.
+        // Unmodified container encoding: target offsets remain in fixup slots.
         Canonical,
         // ROMFS has resolved RX-to-RX fixup slots at firmware link time.
         // RW slots retain target offsets and RX bytes have firmware lifetime.
@@ -28,6 +27,7 @@ public:
         uint32_t cpu_profile;
         uint32_t stack_limit;
         uint8_t fingerprint[16];
+        uint32_t heap_limit;
     };
 
     // Source bytes must stay alive and immutable through load(). No allocation
@@ -51,7 +51,7 @@ public:
                        const char **missing_name = nullptr) const;
     // UINT32_MAX rejects an unknown contract. Resolve only before publication.
     bool load(void *destination, size_t size, Resolver resolver = nullptr, void *context = nullptr) const;
-    // Load an APRUST05 split image. rx_base is either writable destination
+    // Load an APMOD06 split image. rx_base is either writable destination
     // storage or code_source() for a prelinked ROMFS image. RW is always
     // copied, zero-filled and relocated in writable memory.
     bool load_split(void *rx_base, size_t rx_size, void *rw_base, size_t rw_size,
@@ -105,6 +105,7 @@ public:
     {
         return _stack_size;
     }
+    uint32_t initial_heap_size() const { return _heap_size; }
     // Whole-file CRC32 of the canonical unresolved container. This remains
     // identical when ROMFS firmware linking has resolved RX fixup slots.
     uint32_t checksum() const
@@ -131,6 +132,7 @@ private:
     uint32_t _width{};
     uint32_t _header_size{};
     uint32_t _stack_size{};
+    uint32_t _heap_size{};
     uint32_t _import_count{};
     uint32_t _import_names_offset{};
     uint32_t _checksum{};

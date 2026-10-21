@@ -5,7 +5,7 @@
 
 #if AP_MODULE_ENABLED
 #if !HAL_OWNED_THREADS_ENABLED || !HAL_EXECUTABLE_MEMORY_ENABLED
-#error "Rust modules require owned threads and executable memory"
+#error "Native modules require owned threads and executable memory"
 #endif
 #include "Module.h"
 #include <AP_Mission/AP_Mission_config.h>
@@ -58,6 +58,7 @@ private:
         bool running;
         bool panic_reported;
         uint32_t heap_expansion_reported;
+        uint8_t heap_failures_reported;
     };
     struct Message {
         uint8_t severity;

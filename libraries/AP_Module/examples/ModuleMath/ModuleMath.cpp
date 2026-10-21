@@ -171,7 +171,7 @@ private:
     bool load()
     {
         auto &fs = AP::FS();
-        const int fd = fs.open("/APM/rust/math.apmod", O_RDONLY);
+        const int fd = fs.open("/APM/modules/math.apmod", O_RDONLY);
         if (fd < 0) {
             rust_math_test_result = 5;
             return false;

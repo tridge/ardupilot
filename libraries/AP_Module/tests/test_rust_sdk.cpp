@@ -404,7 +404,7 @@ TEST_F(RustSDK, PanicDoesNotInvokeUserFormatter)
     ASSERT_EXIT({ module.run(); _exit(1); }, ::testing::ExitedWithCode(73), "formatted message omitted");
 }
 
-TEST(RustMathSDK, RealBindingsUseNoHeap)
+TEST(ModuleMathSDK, RealBindingsUseNoHeap)
 {
     const char *path = getenv("AP_MODULE_TEST_MATH_MODULE");
     if (path == nullptr) {
@@ -448,7 +448,7 @@ static void check_compatible_image(const char *path, uint32_t expected_calls)
     EXPECT_EQ(incompatible.binding_calls, 0U);
 }
 
-TEST(RustMathSDK, OldImageSurvivesPrivateRenumberingAndUnusedChanges)
+TEST(ModuleMathSDK, OldImageSurvivesPrivateRenumberingAndUnusedChanges)
 {
     const char *path = getenv("AP_MODULE_TEST_MATH_MODULE");
     if (path == nullptr) {
@@ -457,7 +457,7 @@ TEST(RustMathSDK, OldImageSurvivesPrivateRenumberingAndUnusedChanges)
     check_compatible_image(path, 3100);
 }
 
-TEST(RustMathSDK, FrozenImageSurvivesPrivateRenumberingAndUnusedChanges)
+TEST(ModuleMathSDK, FrozenImageSurvivesPrivateRenumberingAndUnusedChanges)
 {
     const char *path = getenv("AP_MODULE_TEST_COMPAT_MODULE");
     if (path == nullptr) {

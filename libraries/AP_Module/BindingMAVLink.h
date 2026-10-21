@@ -23,7 +23,7 @@ int32_t binding_mavlink_block_command(void *context, const uint8_t *input, uint3
 // Called for every locally routed packet. No module pointers are retained.
 void binding_mavlink_handle_message(const mavlink_message_t &msg, mavlink_channel_t chan);
 
-// True when any live Rust module owns a block for this command.
+// True when any live Native module owns a block for this command.
 bool binding_mavlink_is_handling_command(uint16_t command);
 
 // Called by the manager only after the module worker has joined.

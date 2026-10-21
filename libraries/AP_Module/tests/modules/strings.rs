@@ -25,7 +25,7 @@ fn run(context: &Context<'_>) -> Result {
     let longest = core::str::from_utf8(&long[..255]).unwrap();
     let two_strings = context.gcs().send_named_string(longest, longest);
     match context.gcs().send_text(MavSeverity(6), "STRING literal %s %n") {
-        // RustMath has no GCS singleton; the vehicle exercises the live calls.
+        // ModuleMath has no GCS singleton; the vehicle exercises the live calls.
         Err(Error::Unavailable) => {
             if two_strings != Err(Error::Unavailable) {
                 return Err(Error::Host);

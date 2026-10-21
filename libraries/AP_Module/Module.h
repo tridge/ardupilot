@@ -131,6 +131,8 @@ private:
     static const AP_ModuleHostApi _api;
 
     const Limits _limits;
+    uint32_t _initial_heap;
+    uint32_t _worker_stack;
     const TextSink _sink;
     const BindingSink _bindings;
     Heap _heap;

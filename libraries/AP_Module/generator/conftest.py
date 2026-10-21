@@ -18,4 +18,4 @@ os.environ['CPLUS_INCLUDE_PATH'] = os.pathsep.join(
         os.environ.get('CPLUS_INCLUDE_PATH'),
     ) if value
 )
-os.environ['AP_MODULE_SDK_GENERATED'] = str(OUTPUT / 'sdk/src')
+os.environ['AP_MODULE_SDK_GENERATED'] = str(OUTPUT / 'sdk/rust/src')

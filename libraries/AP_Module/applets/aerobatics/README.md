@@ -38,15 +38,15 @@ Whole-token validation rejects trailing junk, hexadecimal and non-finite values.
 Rounding and locale follow the board's C library, as for Lua numbers. Conversion
 may allocate firmware-owned memory outside the module heap.
 
-Set `RUST_ENABLE=1`, `RUST_HEAP_SIZE=32768`, `RUST_CODE_SIZE=131072` and
-`RUST_STACK_SIZE=32768` for the supplied H743 schedule, then reboot. Prefer a
+Set `MOD_ENABLE=1`, `MOD_HEAP_MAX=32768`, `MOD_CODE_MAXSIZE=131072` and
+`MOD_STACK_MAX=32768` for the supplied H743 schedule, then reboot. Prefer a
 48 KiB heap (`49152`) for x86-64 experiments or edited schedules. The tests
 deliberately retain the smaller initial heap to check this specific schedule,
 not arbitrary edits.
-`RUST_DEBUG_OPTS` bit 6 disables Lua-style emergency expansion while armed;
+`MOD_DEBUG_OPTS` bit 6 disables Lua-style emergency expansion while armed;
 without it, an undersized heap can expand and produce a warning/pre-arm error.
 After the module registers its parameters,
-set `TRIK_ENABLE=1` and change `RUST_RESTART` to reload. Set `TRIK1_ID=72`,
+set `TRIK_ENABLE=1` and change `MOD_RESTART` to reload. Set `TRIK1_ID=72`,
 `RC7_OPTION=300` (action) and `RC9_OPTION=301` (selection). Channel 9 low selects
 trick 1; channel 7 low aborts, middle selects and high executes. Execute only
 after a fresh switch transition in a supported Plane scripting mode. A held
@@ -83,14 +83,14 @@ error. It then repeats/aborts and restarts the native module while controlling:
 
 ```sh
 MAVLINK20=1 RUSTC=/path/to/rustc-1.98.1 \
-    python3 -m pytest -q -s Tools/modules/tests/test_aerobatics_flight.py
+    python3 -m pytest -q -s Tools/modules/rust/tests/test_aerobatics_flight.py
 ```
 
 The test flies both engines separately with the same model. It is not a
 hardware-flight procedure. Dual-aircraft time sync, unlisted built-in maneuvers,
 stall-turn/rate overrides and arbitrary Lua maneuver functions remain unsupported.
 The runner declines the dual-aircraft option; custom geometry requires rebuilding
-the Rust module. The standard Plane tests `AerobaticsScripting_rust_mission` and
+the Native module. The standard Plane tests `AerobaticsScripting_rust_mission` and
 `AerobaticsScripting_rust_mission_control` cover AUTO AirShow completion, built-in
 arguments, timeout, command replacement and mode exit with RC tricks disabled.
 The built-in mission test flies Axial Roll; the AirShow tests exercise the other
@@ -120,7 +120,7 @@ under `tests/modules`; the ordinary image is checked for absence of its markers.
 ## Primitive and composition validation
 
 The first acceptance stage covers math helpers, roll profiles, geometric path
-components and alignment. `Tools/modules/tests/test_aerobatics.py` executes the
+components and alignment. `Tools/modules/rust/tests/test_aerobatics.py` executes the
 original Lua function definitions alongside the native module in disarmed SITL,
 then compares 551 logged rows. Same-host results must match float32 bits; NaN
 payloads are ignored. A narrow signed-zero allowance covers Lua integer
@@ -152,12 +152,12 @@ probes also passed their unchanged per-probe heap bounds and reload checks.
 These probes do not measure vehicle execution timing or prove worst-case stack
 depth.
 
-Build SITL Plane with both scripting engines and `examples/RustMath` for
+Build SITL Plane with both scripting engines and `examples/ModuleMath` for
 MatekH743, then run:
 
 ```sh
 RUSTC=/path/to/rustc-1.98.1 RENODE=/path/to/renode \
-    python3 -m pytest -q -s Tools/modules/tests/test_aerobatics.py
+    python3 -m pytest -q -s Tools/modules/rust/tests/test_aerobatics.py
 ```
 
 Without `RENODE` the H743 test skips explicitly. Host unit tests additionally
@@ -197,10 +197,10 @@ The H743 path test needs a larger harness heap than the small binding probes:
 
 ```sh
 ./waf configure --board MatekH743 --enable-modules \
-    --extra-hwdef libraries/AP_Module/examples/RustMath/aerobatics.hwdef
-./waf --targets examples/RustMath
+    --extra-hwdef libraries/AP_Module/examples/ModuleMath/aerobatics.hwdef
+./waf --targets examples/ModuleMath
 RUSTC=/path/to/rustc-1.98.1 RENODE=/path/to/renode \
-    python3 -m pytest -q -s Tools/modules/tests/test_aerobatics_path.py
+    python3 -m pytest -q -s Tools/modules/rust/tests/test_aerobatics_path.py
 ```
 
 Reconfigure without that extra hwdef before running the small binding probes;
@@ -238,10 +238,10 @@ that Plane binary:
     --extra-hwdef Tools/modules/aerobatics-oracle.hwdef
 ./waf plane
 ./waf configure --board MatekH743 --enable-modules \
-    --extra-hwdef libraries/AP_Module/examples/RustMath/controller.hwdef
-./waf --targets examples/RustMath
+    --extra-hwdef libraries/AP_Module/examples/ModuleMath/controller.hwdef
+./waf --targets examples/ModuleMath
 RUSTC=/path/to/rustc-1.98.1 RENODE=/path/to/renode \
-    python3 -m pytest -q -s Tools/modules/tests/test_aerobatics_controller.py
+    python3 -m pytest -q -s Tools/modules/rust/tests/test_aerobatics_controller.py
 ```
 
 The controller harness allows 20 seconds per load. Tests verify exported heap,

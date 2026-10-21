@@ -39,7 +39,7 @@ TEST(RustArming, ModuleOwnedAuxiliaryAuthorisers)
     EXPECT_TRUE(arming.set_aux_auth_passed(b, owner_b));
     EXPECT_TRUE(arming.set_aux_auth_passed(lua, nullptr));
 
-    // Lua restart cleanup does not invalidate either Rust module. It removes
+    // Lua restart cleanup does not invalidate either Native module. It removes
     // only the null-owner slot, which may then be reused by Lua.
     arming.release_aux_auths(nullptr);
     EXPECT_TRUE(arming.set_aux_auth_failed(c, "replacement failure", owner_c));

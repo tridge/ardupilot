@@ -1,4 +1,4 @@
-# Native Rust module design
+# Native module design
 
 `AP_Module` provides trusted native extensions with explicit image, heap, worker
 and resource ownership. It is independent of Lua but shares scripting-level
@@ -16,7 +16,8 @@ vehicle. Low priority and the optional stack guard do not make untrusted modules
 safe. There is no general fault containment or per-module CPU quota.
 
 Supported profiles are Thumb-2 Cortex-M4-compatible hard float on STM32 and
-baseline x86-64 Linux for SITL/Linux. The builder requires Rust 1.98.1 or newer.
+baseline x86-64 Linux for SITL/Linux. Rust builds require Rust 1.98.1 or newer;
+C++ builds require Clang/standalone LLD and do not invoke Rust tools.
 Thumb uses ROPI/RWPI; x86-64 uses PIC. Fat LTO applies that model to linked Rust
 bitcode, including core/alloc. Modules use `no_std`, panic-abort semantics and
 SDK memory helpers, without host libc or system startup imports.
@@ -24,8 +25,8 @@ SDK memory helpers, without host libc or system startup imports.
 ## Binding generation and ABI
 
 The Python Lua generator parses `bindings.desc` and exports versioned JSON IR.
-The Rust generator consumes this IR rather than duplicating the grammar. It
-generates C++ adapters, private dispatch IDs, Rust wrappers, manifests, contract
+The native generator consumes this IR rather than duplicating the grammar. It
+generates firmware adapters, private dispatch IDs, Rust and C++ clients, manifests, contract
 catalogues and coverage reports. Outputs live under build directories. Waf
 tracks both generators' inputs; standalone and Cargo builds generate their own
 outputs.
@@ -35,7 +36,7 @@ describe ownership, lifetime, nonstandard accessors and exclusions missing from
 the Lua description. Values use explicit component wire layouts, not C++ object
 bytes. Complete Location and mission-item copies preserve hidden semantic fields.
 New value methods conservatively copy back mutable inputs on host success,
-including false results; host errors leave Rust values unchanged.
+including false results; host errors leave client values unchanged.
 
 Pointer-backed objects need a lifetime strategy: RC channels, for example, use
 revalidated indices rather than exported C++ pointers. Resource adapters track
@@ -44,7 +45,7 @@ reasons in `generator/coverage.json`. Manual Lua functions require deliberate
 native adapters.
 
 The C-compatible entry receives a host API table and opaque context and returns
-an `int32_t` status. The SDK wraps a single Rust entry using `module!`. C++
+an `int32_t` status. Rust wraps its entry using `module!`; C++ uses `AP_MODULE`. C++
 classes, Rust trait objects, slices and native strings do not cross the ABI.
 Core calls use fixed-width scalars, explicit lengths and defined C layouts.
 
@@ -91,15 +92,15 @@ relocations are rejected. ARM GOT/dynamic-linking tables and static Thumb
 MOVW/MOVT instruction patches are unsupported. x86-64 GOT entries must resolve
 to defined image symbols.
 
-The current runtime format is `APRUST05`, little-endian with an 80-byte header:
+The current runtime format is `APMOD06`, little-endian with an 84-byte header:
 
 | Field | Encoding |
 | --- | --- |
-| Magic | 8 bytes, `APRUST05` |
+| Magic | 8 bytes, `APMOD06` followed by NUL |
 | Version, ELF machine, pointer width | Three u32 values |
 | Segment alignments | u32: low 16 bits RW, high 16 bits RX |
 | Initialized size, memory size, RX boundary, entry offset | Four u32 values |
-| Fixup count, ABI version, CPU profile, stack requirement, import count | Five u32 values |
+| Fixup count, ABI version, CPU profile, stack requirement, initial heap, import count | Six u32 values |
 | Core fingerprint | 16 bytes |
 | Container CRC32 | u32 |
 
@@ -123,9 +124,9 @@ CRC32 covers the canonical file with its header CRC zeroed. Runtime loaded/runni
 checksums separately cover the complete canonical file including the stored CRC.
 ROMFS prelinking preserves both identities by normalizing patched RX slots.
 
-Legacy `APRUST04` remains accepted with copied contiguous loading. Versions 2/3
-are not runtime-loadable. `APRUST01` is a probe accepted only by the separate test
-parser with `AP_MODULE_LEGACY_PROBE_ENABLED`. Current SDK builds emit version 5.
+All old `APRUST` formats are rejected. `APMOD01` (NUL-padded) is a probe accepted
+only by the separate test parser with `AP_MODULE_LEGACY_PROBE_ENABLED`.
+Current SDK builds emit version 6; core ABI version 3 is separately versioned.
 These are not released compatibility promises. Frozen `tests/compat/` fixtures
 and catalogue checks detect unintended changes; do not routinely regenerate them.
 
@@ -138,7 +139,7 @@ firmware linker. Target offsets preserve byte-pointer and Thumb-function bits.
 
 ROMFS stores `.apmod` entries raw while other files follow normal compression
 policy. Firmware generation prelinks ARM RX-to-RX slots and places entries in
-executable flash, preserving payload alignment after the 80-byte header. Borrowing
+executable flash, preserving payload alignment after the 84-byte header. Borrowing
 requires HAL confirmation that the complete range is immutable executable flash;
 filename or ROMFS membership alone is insufficient. RW/BSS is always copied,
 fixed up and owned. Borrowed RX has firmware lifetime and is never written/freed.
@@ -162,7 +163,7 @@ heap, host context and one worker. File source bytes can be released after load;
 borrowed ROMFS RX remains valid for firmware lifetime. HAL owned threads retain
 stack ownership until join/reap, unlike fire-and-forget threads.
 
-`Runtime` discovers nonrecursive `*.apmod` files in ROMFS `rust/` and the writable
+`Runtime` discovers nonrecursive `*.apmod` files in ROMFS `modules/` and the writable
 directory, deduplicates basenames with ROMFS precedence/warning, and sorts before
 applying the module limit. All images are prepared before workers start so stacks
 and heaps do not consume scarce executable RAM first. Partial startup failure
@@ -187,7 +188,11 @@ need not be DMA-capable. Ordinary vehicle state is not restored implicitly.
 
 ## Memory, scheduling and health
 
-Budgets independently cover initial heap, RX plus RW/BSS image and worker stack.
+Budgets independently cap backing heap capacity, RX plus RW/BSS image and worker stack.
+The container declares an initial heap and module stack requirement. Admission
+checks the initial heap against `MOD_HEAP_MAX` and declared stack plus host-call
+margin against `MOD_STACK_MAX` before image allocation. Workers allocate only
+those per-module requests. Armed expansion cannot exceed the heap cap.
 Image limits round to 4096; actual allocation follows image size, not the limit.
 HAL stack rounding and OS/guard overhead are reported separately. Host-call margin
 is 4 KiB on Cortex-M and 16 KiB on x86-64, beyond the module declaration. Manager

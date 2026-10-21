@@ -67,8 +67,11 @@ public:
             ExpandingString memory(rust_runtime_test_memory, sizeof(rust_runtime_test_memory));
             hal.util->mem_info(memory);
         }
-        if (strncmp(message, "Rust: loaded ", 13) == 0 && message[13] >= '0' && message[13] <= '8') {
-            loaded_count.store(message[13] - '0');
+        constexpr char loaded_prefix[] = "Module: loaded ";
+        constexpr size_t loaded_length = sizeof(loaded_prefix) - 1;
+        if (strncmp(message, loaded_prefix, loaded_length) == 0 &&
+            message[loaded_length] >= '0' && message[loaded_length] <= '8') {
+            loaded_count.store(message[loaded_length] - '0');
             loaded_reports.fetch_add(1);
         }
         if (strstr(message, "stop timeout") != nullptr) {
@@ -89,7 +92,7 @@ public:
         if (strstr(message, "ignored writable romfs.apmod; ROMFS wins") != nullptr) {
             ignored_writable.fetch_add(1);
         }
-        constexpr char memory_prefix[] = "Rust RAM: RX ";
+        constexpr char memory_prefix[] = "Module RAM: RX ";
         if (strncmp(message, memory_prefix, sizeof(memory_prefix) - 1) == 0) {
             char *separator;
             const uint32_t rx = strtoul(message + sizeof(memory_prefix) - 1, &separator, 10);
@@ -254,18 +257,18 @@ static void romfs_stage(uint32_t stage)
 bool RuntimeHarness::exercise_romfs()
 {
     romfs_stage(20);
-    if (!ensure_directory("/APM") || !ensure_directory("/APM/rust")) {
+    if (!ensure_directory("/APM") || !ensure_directory("/APM/modules")) {
         return false;
     }
     romfs_stage(21);
-    if (!copy_file("@ROMFS/rust/romfs.apmod", "/fixtures/readback.apmod") ||
-        !copy_file("/fixtures/sd.apmod", "/APM/rust/sd.apmod") ||
-        !copy_file("/fixtures/shadow.apmod", "/APM/rust/romfs.apmod")) {
+    if (!copy_file("@ROMFS/modules/romfs.apmod", "/fixtures/readback.apmod") ||
+        !copy_file("/fixtures/sd.apmod", "/APM/modules/sd.apmod") ||
+        !copy_file("/fixtures/shadow.apmod", "/APM/modules/romfs.apmod")) {
         return false;
     }
     romfs_stage(22);
-    if (!set("ENABLE", 1) || !set("HEAP_SIZE", 4096) || !set("CODE_SIZE", 65535) ||
-        !set("STACK_SIZE", 16385) || !set("MAX_MOD", 2)) {
+    if (!set("ENABLE", 1) || !set("HEAP_MAX", 4096) || !set("CODE_MAXSIZE", 65535) ||
+        !set("STACK_MAX", 16385) || !set("MAX_MOD", 2)) {
         return false;
     }
     romfs_stage(23);
@@ -324,7 +327,7 @@ bool RuntimeHarness::exercise_romfs()
     ExpandingString threads;
     hal.util->thread_info(threads);
     const char *all_threads = threads.get_string();
-    const char *manager = all_threads == nullptr ? nullptr : strstr(all_threads, "RustMgr");
+    const char *manager = all_threads == nullptr ? nullptr : strstr(all_threads, "ModMgr");
     uint32_t priority, free_stack, total_stack, address;
     if (!thread_values(manager, priority, free_stack, total_stack, address)) {
         return false;
@@ -357,11 +360,11 @@ bool RuntimeHarness::exercise()
     }
     rust_runtime_test_result = 2;
     // Odd byte counts exercise image-budget and HAL stack rounding.
-    if (!set("ENABLE", 1) || !set("HEAP_SIZE", 4096) || !set("CODE_SIZE", 65535) || !set("STACK_SIZE", 16385)) {
+    if (!set("ENABLE", 1) || !set("HEAP_MAX", 4096) || !set("CODE_MAXSIZE", 65535) || !set("STACK_MAX", 16385)) {
         return false;
     }
     struct stat embedded_stat;
-    if (AP::FS().stat("@ROMFS/rust/romfs.apmod", &embedded_stat) == 0) {
+    if (AP::FS().stat("@ROMFS/modules/romfs.apmod", &embedded_stat) == 0) {
         return exercise_romfs();
     }
     runtime.init();
@@ -372,7 +375,7 @@ bool RuntimeHarness::exercise()
     rust_runtime_test_result = 3;
     auto &fs = AP::FS();
     if ((fs.mkdir("/APM") != 0 && errno != EEXIST) ||
-        (fs.mkdir("/APM/rust") != 0 && errno != EEXIST)) {
+        (fs.mkdir("/APM/modules") != 0 && errno != EEXIST)) {
         return false;
     }
     struct stat overflow_stat;
@@ -388,8 +391,8 @@ bool RuntimeHarness::exercise()
         return exercise_overflow();
     }
     rust_runtime_test_result = 30;
-    if (fs.rename("/fixtures/one.apmod", "/APM/rust/one.apmod") != 0 ||
-        fs.rename("/fixtures/two.apmod", "/APM/rust/two.apmod") != 0) {
+    if (fs.rename("/fixtures/one.apmod", "/APM/modules/one.apmod") != 0 ||
+        fs.rename("/fixtures/two.apmod", "/APM/modules/two.apmod") != 0) {
         return false;
     }
     rust_runtime_test_result = 31;
@@ -417,8 +420,8 @@ bool RuntimeHarness::exercise()
         return false;
     }
     rust_runtime_test_result = 5;
-    if (fs.unlink("/APM/rust/one.apmod") != 0 || fs.unlink("/APM/rust/two.apmod") != 0 ||
-        fs.rename("/fixtures/end.apmod", "/APM/rust/one.apmod") != 0 || !restart(1)) {
+    if (fs.unlink("/APM/modules/one.apmod") != 0 || fs.unlink("/APM/modules/two.apmod") != 0 ||
+        fs.rename("/fixtures/end.apmod", "/APM/modules/one.apmod") != 0 || !restart(1)) {
         return false;
     }
     hal.scheduler->delay(100);
@@ -447,7 +450,7 @@ bool RuntimeHarness::exercise()
     ExpandingString threads;
     hal.util->thread_info(threads);
     const char *all_threads = threads.get_string();
-    const char *manager = all_threads == nullptr ? nullptr : strstr(all_threads, "RustMgr");
+    const char *manager = all_threads == nullptr ? nullptr : strstr(all_threads, "ModMgr");
     const char *worker = all_threads == nullptr ? nullptr : strstr(all_threads, "one.apmod");
     uint32_t manager_priority, worker_priority, free_stack, total_stack, worker_free, worker_total;
     uint32_t manager_address, worker_address;
@@ -478,7 +481,7 @@ bool RuntimeHarness::exercise_overflow()
     for (unsigned cycle = 0; cycle <= 101; cycle++) {
         rust_runtime_test_result = 80;
         const uint32_t previous = test_gcs.overflows.load();
-        if (fs.rename("/fixtures/overflow.apmod", "/APM/rust/overflow.apmod") != 0 || !restart(1)) {
+        if (fs.rename("/fixtures/overflow.apmod", "/APM/modules/overflow.apmod") != 0 || !restart(1)) {
             return false;
         }
         const uint32_t start = AP_HAL::millis();
@@ -493,7 +496,7 @@ bool RuntimeHarness::exercise_overflow()
             rust_runtime_test_result = 82;
             return false;
         }
-        if (fs.rename("/APM/rust/overflow.apmod", "/fixtures/overflow.apmod") != 0 || !restart(0) ||
+        if (fs.rename("/APM/modules/overflow.apmod", "/fixtures/overflow.apmod") != 0 || !restart(0) ||
             !runtime.arming_checks(sizeof(message), message)) {
             rust_runtime_test_result = 83;
             return false;

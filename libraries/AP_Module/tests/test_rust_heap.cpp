@@ -107,6 +107,26 @@ TEST(RustHeap, ExpandsOnFirstRustRequestOnlyWhenArmed)
     EXPECT_GT(heap.stats().expanded_to, 4096U);
 }
 
+TEST(RustHeap, BoundedBackingCapacity)
+{
+    ArmedState armed(true);
+    AP_Module::Heap heap;
+    // Admission must reject the original request, not shrink it to the cap.
+    EXPECT_FALSE(heap.create(4096, true, 4095));
+    ASSERT_TRUE(heap.create(4096, true, 12288));
+    auto *p = heap.allocate(5000, 16);
+    ASSERT_NE(p, nullptr);
+    // The remaining 8 KiB is smaller than the usual 30 KiB growth chunk.
+    EXPECT_EQ(heap.stats().expanded_to, 12288U);
+    EXPECT_EQ(heap.allocate(9000, 16), nullptr);
+    EXPECT_NE(heap.stats().expansion_failures & MultiHeap::Capacity, 0);
+    ASSERT_TRUE(heap.deallocate(p));
+    // Freeing live bytes does not lower the backing-arena capacity charge.
+    EXPECT_EQ(heap.allocate(9000, 16), nullptr);
+    EXPECT_EQ(heap.stats().expanded_to, 12288U);
+    ASSERT_NE(heap.allocate(5000, 16), nullptr);
+}
+
 TEST(RustHeap, ExpansionPreservesSystemReserve)
 {
     ArmedState armed(true);

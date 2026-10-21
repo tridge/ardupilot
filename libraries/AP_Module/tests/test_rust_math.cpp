@@ -52,7 +52,7 @@ static void check_bool(uint32_t id, const Vector3f &v, bool expected)
     EXPECT_EQ(out, uint8_t(expected));
 }
 
-TEST(RustMath, VectorCppParity)
+TEST(ModuleMath, VectorCppParity)
 {
     for (unsigned i = 0; i < 100; i++) {
         const Vector3f a{0.5f + i * 0.13f, -2.7f + i * 0.27f, 7.3f - i * 0.07f};
@@ -76,7 +76,7 @@ TEST(RustMath, VectorCppParity)
     }
 }
 
-TEST(RustMath, UncheckedFloatComponents)
+TEST(ModuleMath, UncheckedFloatComponents)
 {
     const uint32_t patterns[] = {0, 0x80000000, 1, 0x7f7fffff, 0x7f800000, 0xff800000, 0x7fc12345};
     for (const uint32_t bits : patterns) {
@@ -92,7 +92,7 @@ TEST(RustMath, UncheckedFloatComponents)
 }
 
 #if AP_AHRS_ENABLED && AP_INTERNALERROR_ENABLED && defined(__linux__) && !defined(HAL_DEBUG_BUILD)
-TEST(RustMath, ZeroQuaternionPreservesInternalError)
+TEST(ModuleMath, ZeroQuaternionPreservesInternalError)
 {
     // Isolate the persistent error flag from the remainder of the test process.
     ASSERT_EXIT({
@@ -111,7 +111,7 @@ TEST(RustMath, ZeroQuaternionPreservesInternalError)
 #endif
 
 #if AP_AHRS_ENABLED
-TEST(RustMath, QuaternionCppParity)
+TEST(ModuleMath, QuaternionCppParity)
 {
     for (unsigned i = 0; i < 100; i++) {
         const float roll = -0.7f + i * 0.013f, pitch = 0.4f - i * 0.011f, yaw = 1.1f - i * 0.05f;
@@ -148,7 +148,7 @@ TEST(RustMath, QuaternionCppParity)
 }
 #endif
 
-TEST(RustMath, ValidWireBuffersStayWithinBounds)
+TEST(ModuleMath, ValidWireBuffersStayWithinBounds)
 {
     // id, input bytes, output bytes, AHRS dependency (independent of id order).
     const uint32_t sizes[][4] = {

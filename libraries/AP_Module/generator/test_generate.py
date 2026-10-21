@@ -25,7 +25,7 @@ def test_generated_files_match(tmp_path):
 def test_generated_binding_names_are_readable():
     outputs = generate.generate(specification())
     cpp = outputs['Bindings_generated.cpp']
-    rust = outputs['sdk/src/bindings.rs']
+    rust = outputs['sdk/rust/src/bindings.rs']
     ids = outputs['BindingIds.h']
     assert 'binding_ahrs_get_gyro' in cpp
     assert 'case BindingId::AHRS_GET_GYRO:' in cpp

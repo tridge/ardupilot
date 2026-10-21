@@ -9,7 +9,7 @@ namespace AP_Module
 {
 
 static constexpr uint32_t PROBE_HEADER_SIZE = 56;
-static constexpr uint32_t RUNTIME_HEADER_SIZE = 80;
+static constexpr uint32_t RUNTIME_HEADER_SIZE = 84;
 static constexpr uint32_t ALIGNMENT = 4096;
 static constexpr uint32_t MAX_IMAGE = 16U * 1024 * 1024;
 static constexpr uint32_t MAX_IMPORTS = 4096;
@@ -45,15 +45,11 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     }
     bool split = false;
     if (compatibility == nullptr) {
-        if (memcmp(source, "APRUST01", 8) != 0 || word(source + 8) != 1 ||
+        if (memcmp(source, "APMOD01\0", 8) != 0 || word(source + 8) != 1 ||
             policy != SourcePolicy::Canonical) {
             return reject("unsupported image format");
         }
-    } else if (memcmp(source, "APRUST04", 8) == 0 && word(source + 8) == 4) {
-        if (policy != SourcePolicy::Canonical) {
-            return reject("image is not ROMFS prelinked");
-        }
-    } else if (memcmp(source, "APRUST05", 8) == 0 && word(source + 8) == 5) {
+    } else if (memcmp(source, "APMOD06\0", 8) == 0 && word(source + 8) == 6) {
         split = true;
     } else {
         return reject("unsupported image format");
@@ -62,11 +58,13 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         return reject("wrong target architecture");
     }
     uint32_t stack_size = 0;
+    uint32_t heap_size = 0;
     uint32_t import_count = 0;
     if (compatibility != nullptr) {
         const uint32_t profile = word(source + 48);
         stack_size = word(source + 52);
-        import_count = word(source + 56);
+        heap_size = word(source + 56);
+        import_count = word(source + 60);
         const uint8_t empty_fingerprint[16] {};
         if (word(source + 44) == 0 || word(source + 44) != compatibility->abi_version) {
             return reject("ABI version mismatch");
@@ -79,10 +77,16 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
             return reject("invalid stack requirement");
         }
         if (stack_size > compatibility->stack_limit) {
-            return reject("stack exceeds RUST_STACK_SIZE");
+            return reject("stack exceeds MOD_STACK_MAX");
         }
-        if (memcmp(source + 60, empty_fingerprint, sizeof(empty_fingerprint)) == 0 ||
-            memcmp(source + 60, compatibility->fingerprint, sizeof(compatibility->fingerprint)) != 0) {
+        if (heap_size < 256 || heap_size > MAX_IMAGE) {
+            return reject("invalid initial heap requirement");
+        }
+        if (compatibility->heap_limit != 0 && heap_size > compatibility->heap_limit) {
+            return reject("initial heap exceeds MOD_HEAP_MAX");
+        }
+        if (memcmp(source + 64, empty_fingerprint, sizeof(empty_fingerprint)) == 0 ||
+            memcmp(source + 64, compatibility->fingerprint, sizeof(compatibility->fingerprint)) != 0) {
             return reject("API fingerprint mismatch");
         }
     } else if (word(source + 44) != 0 || word(source + 48) != 0) {
@@ -99,7 +103,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     const uint32_t count = word(source + 40);
     const uint32_t boundary = split && machine == 40 ? 4 : ALIGNMENT;
     if (memory_size > memory_limit) {
-        return reject("image exceeds RUST_CODE_SIZE");
+        return reject("image exceeds MOD_CODE_MAXSIZE");
     }
     if (!((machine == 40 && width == 4) || (machine == 62 && width == 8)) ||
         width != sizeof(uintptr_t) ||
@@ -266,6 +270,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     _rx_alignment = rx_alignment;
     _header_size = header_size;
     _stack_size = stack_size;
+    _heap_size = heap_size;
     _import_count = import_count;
     _import_names_offset = import_names_offset;
     _checksum = canonical_crc(false);

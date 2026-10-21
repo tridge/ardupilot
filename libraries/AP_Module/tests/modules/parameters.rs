@@ -85,9 +85,9 @@ fn run(context: &Context<'_>) -> Result {
             require(parameter.get()? == context.param().get(name)?)?;
         }
         for (name, outside) in [
-            ("RUST_MAX_MOD", 128.0),
-            ("RUST_RESTART", 32768.0),
-            ("RUST_HEAP_SIZE", 2147483648.0),
+            ("MOD_MAX_MOD", 128.0),
+            ("MOD_RESTART", 32768.0),
+            ("MOD_HEAP_MAX", 2147483648.0),
         ] {
             let before = context.param().get(name)?.ok_or(Error::Host)?;
             require(context.param().set(name, outside) == Err(Error::Invalid))?;
