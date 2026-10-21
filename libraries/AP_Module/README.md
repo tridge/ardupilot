@@ -131,7 +131,7 @@ Alternatively put the module in `ROMFS_custom/modules/` before configuration.
 The firmware build stores `.apmod` entries without compression and prelinks code
 pointers. Other ROMFS files retain the normal compression policy.
 
-STM32 can execute a version-6 ROMFS module directly from qualifying executable
+STM32 can execute an `APMOD07` ROMFS module directly from qualifying executable
 flash, allocating only mutable data/BSS, heap and stack in RAM. SD modules also
 copy code into executable RAM. SITL/Linux copy ROMFS code because their embedded
 data is not an executable mapping. Ordinary `@ROMFS/` reads reconstruct the
@@ -139,13 +139,15 @@ original file, allowing a module to be copied to SD. Globally uncompressed ROMFS
 builds retain canonical bytes and copy code rather than prelinking.
 
 ROMFS and writable files are combined in basename order. ROMFS wins a duplicate
-basename, with a warning on each load generation. Deduplication precedes
-`MOD_MAX_MOD`; exceeding that limit fails loading rather than silently ignoring
-modules. All images are prepared before workers start.
+basename, with a warning on each load generation. There is no configurable or
+fixed module-count limit: available memory determines how many modules fit.
+All discovered images are prepared before workers start; a load/start allocation failure
+stops the generation rather than silently ignoring modules. Filenames may have
+at most 63 characters, including `.apmod`.
 
 ## Configuration and memory
 
-Enable and memory/module-count changes require reboot.
+Enable, memory-limit and priority-limit changes require reboot.
 
 | Parameter | Default | Purpose |
 | --- | --- | --- |
@@ -153,7 +155,6 @@ Enable and memory/module-count changes require reboot.
 | `MOD_HEAP_MAX` | 32768 | Maximum backing heap capacity per module |
 | `MOD_CODE_MAXSIZE` | 131072 | Per-module RX plus RW/BSS image limit |
 | `MOD_STACK_MAX` | 32768 | Maximum declared stack plus host-call margin |
-| `MOD_MAX_MOD` | 2 | Maximum unique modules, from 1 to 8 |
 | `MOD_RESTART` | 0 | Change to request cooperative restart-all |
 | `MOD_LD_CSUM` | -1 | Required loaded-file checksum; -1 disables |
 | `MOD_RUN_CSUM` | -1 | Required running-file checksum; -1 disables |
@@ -168,6 +169,11 @@ RX, owned RW, stack reservations and heap usage. Borrowed ROMFS RX reports zero
 owned RX bytes. Allocator bookkeeping, loader scratch, manager storage and
 persistent firmware registrations are additional; heap usage is not total RAM.
 The manager requests a separate 4 KiB stack on ARM or 32 KiB on x86-64.
+Discovery filenames and address-stable callback records are heap allocated, not
+placed on the manager stack. Their storage is released only after the entire
+generation has stopped and all binding resources are cleaned up. `MOD_MAX_MOD`
+has been removed; its parameter index remains reserved. Individual binding
+resource limits, such as sockets per module and shared device pools, still apply.
 
 The required `--heap-size` stores each module's initial heap request. The loader
 rejects requests over `MOD_HEAP_MAX`. Each worker receives its own declared stack

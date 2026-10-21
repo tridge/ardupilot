@@ -9,8 +9,9 @@ NETWORK_OWNER = 'AP_Networking'
 TRANSFER_MAX = 1024
 PATH_SIZE = 256
 POLL_TIMEOUT_MAX_MS = 100
-POLICY = ('v1:module-context-owned,max8-modules,max50-sockets-per-module,generation-checked-handles,'
-          'generation-seeds-persist-across-context-restart,cleanup-after-worker-join,'
+POLICY = ('v2:module-context-owned,dynamic-owner-registry,max50-sockets-per-module,generation-checked-handles,'
+          'global-monotonic-generation-seeds-persist-across-context-restart,token-exhaustion-fails-closed,'
+          'cleanup-after-worker-join,'
           'blocking-registry-lock,descriptor-always-nonblocking,logical-blocking-connect-and-io-poll20ms,'
           'poll-timeout-max100ms,transfer-max1024,fixed-zero-padded-wire,accept-bounded,'
           'sendfile-transfers-fd-and-socket-to-network-worker,no-retained-module-pointers')

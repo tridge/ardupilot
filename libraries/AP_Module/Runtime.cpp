@@ -71,13 +71,7 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("STACK_MAX", 4, Runtime, _stack_size, 32768),
 
-    // @Param: MAX_MOD
-    // @DisplayName: Maximum Native modules
-    // @Description: Maximum unique module filenames loaded across ROMFS and the writable module directory. A ROMFS module overrides a writable module with the same filename. Extra unique files cause a load failure rather than being silently ignored.
-    // @Range: 1 8
-    // @RebootRequired: True
-    // @User: Advanced
-    AP_GROUPINFO("MAX_MOD", 5, Runtime, _max_modules, 2),
+    // Index 5 was MAX_MOD; do not reuse its saved parameter identity.
 
     // @Param: RESTART
     // @DisplayName: Native module restart request counter
@@ -124,9 +118,6 @@ Runtime::Runtime()
         AP_HAL::panic("Duplicate module runtime");
     }
     _singleton = this;
-    for (auto &slot : _slots) {
-        slot.owner = this;
-    }
 }
 
 void Runtime::fail(const char *reason, bool preserve_error)
@@ -153,8 +144,7 @@ void Runtime::init()
     constexpr uint32_t maximum = 16U * 1024 * 1024;
     const uint32_t code_size = Module::rounded_code_size(_code_size.get());
     if (_heap_size < 256 || _heap_size > maximum || code_size == 0 ||
-        _stack_size < 256 || _stack_size > maximum ||
-        _max_modules < 1 || _max_modules > MAX_MODULES) {
+        _stack_size < 256 || _stack_size > maximum) {
         fail("invalid memory limits; reboot required");
         return;
     }
@@ -181,7 +171,6 @@ void Runtime::init()
         return;
     }
     _limits = {_heap_size.get(), code_size, _stack_size.get(), true, priority_max};
-    _capacity = _max_modules.get();
     {
         WITH_SEMAPHORE(_sem);
         _phase = Phase::Loading;
@@ -381,8 +370,59 @@ Module *Runtime::load_file(const ModuleFile &file, Slot &slot)
     return load_bytes(bytes, input_size, file, slot);
 }
 
+bool Runtime::add_file(const char *name, ModuleSource source)
+{
+    const size_t length = strlen(name);
+    if (length >= sizeof(ModuleFile::name)) {
+        char reason[112];
+        hal.util->snprintf(reason, sizeof(reason), "module filename exceeds 63 characters: %.63s", name);
+        fail(reason);
+        return false;
+    }
+    // Insert in basename order without moving a callback context. ROMFS is
+    // discovered first and takes precedence over writable duplicates.
+    Slot **link = &_slots;
+    while (*link != nullptr && strcmp((*link)->file.name, name) < 0) {
+        link = &(*link)->next;
+    }
+    if (*link != nullptr && strcmp((*link)->file.name, name) == 0) {
+        if ((*link)->file.source == ModuleSource::ROMFS && source == ModuleSource::Writable) {
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: ignored writable %.31s; ROMFS wins", name);
+        }
+        return true;
+    }
+    auto *slot = NEW_NOTHROW Slot{};
+    if (slot == nullptr) {
+        char reason[112];
+        hal.util->snprintf(reason, sizeof(reason), "module metadata allocation failed: %.63s", name);
+        fail(reason);
+        return false;
+    }
+    slot->owner = this;
+    memcpy(slot->file.name, name, length + 1);
+    slot->file.source = source;
+    slot->next = *link;
+    *link = slot;
+    return true;
+}
+
+void Runtime::clear_slots()
+{
+    // Only called after all_released(): no worker, owned-thread epilogue or
+    // binding registry may still reference any of these contexts.
+    while (_slots != nullptr) {
+        Slot *slot = _slots;
+        _slots = slot->next;
+        delete slot;
+    }
+}
+
 bool Runtime::load_generation()
 {
+    if (_slots != nullptr) {
+        fail("previous generation still retained");
+        return false;
+    }
     {
         WITH_SEMAPHORE(_sem);
         _phase = Phase::Loading;
@@ -391,8 +431,6 @@ bool Runtime::load_generation()
         _loaded_checksum = _running_checksum = 0;
     }
     _limits.allow_heap_expansion = (uint8_t(_debug_options.get()) & (1U << 6)) == 0;
-    ModuleFile files[MAX_MODULES] {};
-    uint8_t count = 0;
 #ifdef HAL_HAVE_AP_ROMFS_EMBEDDED_APMOD
     uint16_t romfs_offset = 0;
     while (const char *path = AP_ROMFS::dir_list("modules", romfs_offset)) {
@@ -407,12 +445,9 @@ bool Runtime::load_generation()
         if (strchr(name, '/') != nullptr || length < 6 || strcmp(name + length - 6, ".apmod") != 0) {
             continue;
         }
-        if (length >= sizeof(files[0].name) || count >= _capacity) {
-            fail("ROMFS name length or module count");
+        if (!add_file(name, ModuleSource::ROMFS)) {
             return false;
         }
-        memcpy(files[count].name, name, length + 1);
-        files[count++].source = ModuleSource::ROMFS;
     }
 #endif
     auto &fs = AP::FS();
@@ -425,61 +460,55 @@ bool Runtime::load_generation()
         }
     } else {
         bool valid = true;
-        errno = 0;
-        while (const auto *entry = fs.readdir(directory)) {
+        int read_error = 0;
+        while (true) {
+            // Allocation and diagnostic calls below may change errno. Only
+            // the immediately preceding readdir determines a read failure.
+            errno = 0;
+            const auto *entry = fs.readdir(directory);
+            if (entry == nullptr) {
+                read_error = errno;
+                break;
+            }
             const size_t length = strlen(entry->d_name);
             if (length < 6 || strcmp(entry->d_name + length - 6, ".apmod") != 0) {
                 continue;
             }
-            bool duplicate = false;
-            for (uint8_t i = 0; i < count; i++) {
-                if (files[i].source == ModuleSource::ROMFS && strcmp(files[i].name, entry->d_name) == 0) {
-                    duplicate = true;
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "Module: ignored writable %.31s; ROMFS wins", entry->d_name);
-                    break;
-                }
-            }
-            if (duplicate) {
-                continue;
-            }
-            if (length >= sizeof(files[0].name) || count >= _capacity) {
+            if (!add_file(entry->d_name, ModuleSource::Writable)) {
                 valid = false;
                 break;
             }
-            memcpy(files[count].name, entry->d_name, length + 1);
-            files[count++].source = ModuleSource::Writable;
         }
-        const bool read_error = errno != 0;
         const bool closed = fs.closedir(directory) == 0;
-        if (!valid || read_error || !closed) {
-            fail("directory read, name length or module count");
+        const int close_error = errno;
+        if (!valid) {
+            return false;
+        }
+        if (read_error != 0 || !closed) {
+            char reason[96];
+            hal.util->snprintf(reason, sizeof(reason), "module directory %s failed (errno %d)",
+                               read_error != 0 ? "read" : "close", read_error != 0 ? read_error : close_error);
+            fail(reason);
             return false;
         }
     }
-    // Stable startup order regardless of FAT directory allocation order.
-    for (uint8_t i = 1; i < count; i++) {
-        for (uint8_t j = i; j > 0 && strcmp(files[j - 1].name, files[j].name) > 0; j--) {
-            const ModuleFile temporary = files[j];
-            files[j] = files[j - 1];
-            files[j - 1] = temporary;
-        }
-    }
-    for (uint8_t i = 0; i < count; i++) {
-        auto &slot = _slots[i];
-        slot.panic_reported = slot.running = false;
-        slot.heap_expansion_reported = 0;
-        slot.heap_failures_reported = 0;
-        slot.module = load_file(files[i], slot);
+    size_t count = 0;
+    for (Slot *item = _slots; item != nullptr; item = item->next) {
+        auto &slot = *item;
+        slot.module = load_file(slot.file, slot);
         if (slot.module == nullptr) {
             return false;
         }
         WITH_SEMAPHORE(_sem);
         _loaded_checksum ^= slot.module->checksum();
+        count++;
     }
-    for (uint8_t i = 0; i < count; i++) {
-        auto &slot = _slots[i];
+    for (Slot *item = _slots; item != nullptr; item = item->next) {
+        auto &slot = *item;
         if (!slot.module->start()) {
-            fail("module heap/thread creation failed");
+            char reason[112];
+            hal.util->snprintf(reason, sizeof(reason), "%.63s heap/thread creation failed", slot.file.name);
+            fail(reason);
             return false;
         }
         slot.running = true;
@@ -510,7 +539,8 @@ void Runtime::report_memory(Module &module)
 
 void Runtime::poll_modules()
 {
-    for (auto &slot : _slots) {
+    for (Slot *item = _slots; item != nullptr; item = item->next) {
+        auto &slot = *item;
         auto *module = slot.module;
         if (module == nullptr) {
             continue;
@@ -585,7 +615,8 @@ void Runtime::poll_modules()
 
 bool Runtime::all_released() const
 {
-    for (const auto &slot : _slots) {
+    for (const Slot *item = _slots; item != nullptr; item = item->next) {
+        const auto &slot = *item;
         if (slot.module != nullptr) {
             return false;
         }
@@ -597,7 +628,8 @@ void Runtime::begin_stop(bool reload)
 {
     _reload_after_stop = reload;
     _stop_start_ms = AP_HAL::millis();
-    for (auto &slot : _slots) {
+    for (Slot *item = _slots; item != nullptr; item = item->next) {
+        auto &slot = *item;
         if (slot.module != nullptr) {
             slot.module->request_stop();
         }
@@ -633,6 +665,7 @@ void Runtime::manager()
         }
         if (phase == Phase::Stopping) {
             if (all_released()) {
+                clear_slots();
                 if (_reload_after_stop) {
                     drain_messages();
                     if (load_generation()) {
@@ -647,8 +680,8 @@ void Runtime::manager()
                 }
             } else if (uint32_t(AP_HAL::millis() - _stop_start_ms) >= 10000) {
                 bool panicked = false;
-                for (const auto &slot : _slots) {
-                    panicked |= slot.module != nullptr && slot.module->state() == Module::State::Panicked;
+                for (const Slot *slot = _slots; slot != nullptr; slot = slot->next) {
+                    panicked |= slot->module != nullptr && slot->module->state() == Module::State::Panicked;
                 }
                 fail(panicked ? "stop timeout: panic requires reboot" : "stop timeout: memory retained; retry/reboot", true);
                 WITH_SEMAPHORE(_sem);

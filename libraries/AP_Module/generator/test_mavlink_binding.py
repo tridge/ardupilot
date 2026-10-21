@@ -303,6 +303,11 @@ extern "C" void inject(uint32_t id,uint8_t chan,uint8_t seed,uint32_t now) {{
     msg.msgid=id; test_millis=now; AP_Module::binding_mavlink_handle_message(msg,mavlink_channel_t(chan));
 }}
 extern "C" void cleanup(void *ctx) {{ AP_Module::binding_mavlink_cleanup(ctx); }}
+extern "C" unsigned owner_count() {{
+ unsigned count=0;
+ for(auto *entry=AP_Module::registry;entry;entry=entry->next)count++;
+ return count;
+}}
 extern "C" int send(void *ctx,const uint8_t *in,uint8_t *out) {{
     return AP_Module::binding_mavlink_send_chan(ctx,in,267,out,2);
 }}
@@ -389,6 +394,24 @@ def test_host_command_blocks_are_owner_scoped_and_cleaned(host_service):
     assert lib.handling(31000) and lib.block_count() == 1
     lib.cleanup(second_ctx)
     assert not lib.handling(31000) and lib.block_count() == 0
+
+
+def test_more_than_eight_mavlink_owners_and_cleanup(host_service):
+    lib = host_service
+    contexts = [ctypes.c_int(i) for i in range(32)]
+    added = ctypes.create_string_buffer(1)
+    output = ctypes.create_string_buffer(mavlink.RECEIVE_WIRE_SIZE)
+    for _ in range(4):
+        for context in contexts:
+            assert lib.init(ctypes.byref(context), 1, 1) == 0
+            assert lib.reg(ctypes.byref(context), 23, added) == 0
+        assert lib.owner_count() == 32
+        lib.inject(23, 1, 10, 1000)
+        for context in contexts:
+            assert lib.receive(ctypes.byref(context), output) == 0 and output.raw[0] == 1
+            lib.cleanup(ctypes.byref(context))
+            lib.cleanup(ctypes.byref(context))
+        assert lib.owner_count() == 0
 
 
 def send_wire(channel, msgid, payload=b'', target=None):

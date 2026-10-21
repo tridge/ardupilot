@@ -231,8 +231,10 @@ borrowed ROMFS RX remains valid for firmware lifetime. HAL owned threads retain
 stack ownership until join/reap, unlike fire-and-forget threads.
 
 `Runtime` discovers nonrecursive `*.apmod` files in ROMFS `modules/` and the writable
-directory, deduplicates basenames with ROMFS precedence/warning, and sorts before
-applying the module limit. All images are prepared before workers start so stacks
+directory and deduplicates basenames with ROMFS precedence/warning. A sorted,
+heap-allocated list holds filenames and address-stable callback contexts; no
+module-count parameter, fixed array or count-dependent manager stack is used.
+Metadata allocation failure rejects the generation. All images are prepared before workers start so stacks
 and heaps do not consume scarce executable RAM first. Partial startup failure
 stops/reaps the new generation. The vehicle main loop never waits for worker exit.
 
@@ -252,6 +254,13 @@ Host resources are scoped to the owning context and cleaned up only after users
 join. No module function pointers are registered with firmware. DMA-sensitive
 adapters use host storage or driver/filesystem bounce-buffer paths: worker stacks
 need not be DMA-capable. Ordinary vehicle state is not restored implicitly.
+The manager deletes the generation's list only once all modules are joined and
+binding cleanup is complete; stop timeouts retain live contexts unchanged.
+MAVLink and socket owner registries also allocate entries on demand and free
+them on cleanup. Socket generations use a global monotonic counter so freeing
+an owner cannot make stale handles valid after its address is reused. Token
+exhaustion fails closed rather than wrapping. Per-module socket/queue limits
+and shared device-pool budgets are independent of the number of modules.
 
 ## Memory, scheduling and health
 

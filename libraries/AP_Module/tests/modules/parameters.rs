@@ -85,7 +85,7 @@ fn run(context: &Context<'_>) -> Result {
             require(parameter.get()? == context.param().get(name)?)?;
         }
         for (name, outside) in [
-            ("MOD_MAX_MOD", 128.0),
+            ("MOD_THD_PRIO_MAX", 65536.0),
             ("MOD_RESTART", 32768.0),
             ("MOD_HEAP_MAX", 2147483648.0),
         ] {

@@ -16,7 +16,7 @@ ALIASES = {
     'send_chan': 'lua_mavlink_send_chan',
     'block_command': 'lua_mavlink_block_command',
 }
-POLICY = ('v1:module-context-owned-rx,cleanup-after-worker-join,max8-modules,queue-and-id-max25,'
+POLICY = ('v2:module-context-owned-rx,cleanup-after-worker-join,dynamic-owner-registry,queue-and-id-max25,'
           'full-mavlink-message298,channel-u8,timestamp-ms-u32,queue-full-drops-newest,'
           'payload-max255,target-system-u32,target32-compatible,no-retained-module-pointers')
 BLOCK_POLICY = ('v1:module-context-owned-command-blocks,cleanup-after-worker-join,u16-command-id,'

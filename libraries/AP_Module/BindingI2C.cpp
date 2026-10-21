@@ -13,9 +13,8 @@ extern const AP_HAL::HAL &hal;
 namespace AP_Module
 {
 
-static constexpr uint8_t MAX_MODULES = 8;
 static constexpr uint8_t MAX_DEVICES_PER_MODULE = 4;
-static constexpr uint8_t MAX_HANDLES = MAX_MODULES * MAX_DEVICES_PER_MODULE;
+static constexpr uint8_t MAX_HANDLES = 32; // Global device budget, not a module-count limit.
 static constexpr uint16_t TRANSFER_MAX = 255;
 
 struct I2CEntry {

@@ -22,12 +22,15 @@ static constexpr uint16_t PATH_SIZE = 256;
 static constexpr uint16_t POLL_TIMEOUT_MAX_MS = 100;
 
 #if AP_NETWORKING_ENABLED
-static constexpr uint8_t MAX_MODULES = 8;
 static constexpr uint8_t MAX_SOCKETS = 50;
 static constexpr uint16_t BLOCKING_IO_TIMEOUT_MS = 20;
 static constexpr uint8_t TOKEN_INDEX_BITS = 6;
 static constexpr uint32_t TOKEN_INDEX_MASK = (1U << TOKEN_INDEX_BITS) - 1U;
 static constexpr uint32_t TOKEN_GENERATION_MASK = (1U << (32U - TOKEN_INDEX_BITS)) - 1U;
+// Registry-semaphore protected. A fresh generation for every opened socket
+// keeps stale handles invalid even when both an owner and its registry entry
+// are freed and their addresses are reused by another generation.
+static uint32_t next_generation = 1;
 struct SocketSlot {
     SocketAPM *socket;
     uint32_t generation;
@@ -36,14 +39,6 @@ struct SocketSlot {
 
 class ModuleSockets {
 public:
-    explicit ModuleSockets(const uint32_t generations[MAX_SOCKETS])
-    {
-        for (uint8_t i = 0; i < MAX_SOCKETS; i++) {
-            const uint32_t generation = generations[i] & TOKEN_GENERATION_MASK;
-            _slots[i] = {nullptr, generation == 0 ? 1U : generation, false};
-        }
-    }
-
     ~ModuleSockets()
     {
         for (auto &slot : _slots) {
@@ -61,8 +56,14 @@ public:
         for (uint8_t i = 0; i < MAX_SOCKETS; i++) {
             auto &slot = _slots[i];
             if (slot.socket == nullptr) {
+                if (next_generation > TOKEN_GENERATION_MASK) {
+                    // Never recycle an issued handle after freeing its owner.
+                    delete socket;
+                    return AP_MODULE_STATUS_NO_MEMORY;
+                }
                 slot.socket = socket;
                 slot.blocking = false;
+                slot.generation = next_generation++;
                 token = (slot.generation << TOKEN_INDEX_BITS) | uint32_t(i + 1U);
                 return AP_MODULE_STATUS_OK;
             }
@@ -87,49 +88,26 @@ public:
         delete slot.socket;
         slot.socket = nullptr;
         slot.blocking = false;
-        advance_generation(slot);
-    }
-
-    void retire(uint32_t generations[MAX_SOCKETS])
-    {
-        for (uint8_t i = 0; i < MAX_SOCKETS; i++) {
-            auto &slot = _slots[i];
-            if (slot.socket != nullptr) {
-                delete slot.socket;
-                slot.socket = nullptr;
-                advance_generation(slot);
-            }
-            slot.blocking = false;
-            generations[i] = slot.generation;
-        }
     }
 
 private:
-    static void advance_generation(SocketSlot &slot)
-    {
-        slot.generation = (slot.generation + 1U) & TOKEN_GENERATION_MASK;
-        if (slot.generation == 0) {
-            slot.generation = 1;
-        }
-    }
-
-    SocketSlot _slots[MAX_SOCKETS];
+    SocketSlot _slots[MAX_SOCKETS] {};
 };
 
 struct RegistryEntry {
     void *context;
     ModuleSockets *sockets;
-    uint32_t generations[MAX_SOCKETS];
+    RegistryEntry *next;
 };
 
-static RegistryEntry registry[MAX_MODULES];
+static RegistryEntry *registry;
 static HAL_Semaphore registry_sem;
 
 static RegistryEntry *find_context_entry(void *context)
 {
-    for (auto &entry : registry) {
-        if (entry.context == context) {
-            return &entry;
+    for (auto *entry = registry; entry != nullptr; entry = entry->next) {
+        if (entry->context == context) {
+            return entry;
         }
     }
     return nullptr;
@@ -138,26 +116,19 @@ static RegistryEntry *find_context_entry(void *context)
 static int32_t find_or_create_entry(void *context, RegistryEntry *&entry)
 {
     entry = find_context_entry(context);
-    if (entry != nullptr && entry->sockets != nullptr) {
+    if (entry != nullptr) {
         return AP_MODULE_STATUS_OK;
     }
-    if (entry == nullptr) {
-        for (auto &candidate : registry) {
-            if (candidate.context == nullptr) {
-                entry = &candidate;
-                break;
-            }
-        }
-    }
-    if (entry == nullptr) {
-        return AP_MODULE_STATUS_NO_MEMORY;
-    }
-    auto *sockets = NEW_NOTHROW ModuleSockets(entry->generations);
+    auto *sockets = NEW_NOTHROW ModuleSockets;
     if (sockets == nullptr) {
         return AP_MODULE_STATUS_NO_MEMORY;
     }
-    entry->context = context;
-    entry->sockets = sockets;
+    entry = NEW_NOTHROW RegistryEntry{context, sockets, registry};
+    if (entry == nullptr) {
+        delete sockets;
+        return AP_MODULE_STATUS_NO_MEMORY;
+    }
+    registry = entry;
     return AP_MODULE_STATUS_OK;
 }
 
@@ -698,11 +669,14 @@ void binding_network_cleanup(void *context)
         return;
     }
     WITH_SEMAPHORE(registry_sem);
-    auto *entry = find_context_entry(context);
-    if (entry != nullptr && entry->sockets != nullptr) {
-        entry->sockets->retire(entry->generations);
-        delete entry->sockets;
-        entry->sockets = nullptr;
+    for (RegistryEntry **link = &registry; *link != nullptr; link = &(*link)->next) {
+        auto *entry = *link;
+        if (entry->context == context) {
+            *link = entry->next;
+            delete entry->sockets;
+            delete entry;
+            break;
+        }
     }
 #else
     (void)context;

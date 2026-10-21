@@ -12,9 +12,8 @@ extern const AP_HAL::HAL &hal;
 namespace AP_Module
 {
 
-static constexpr uint8_t MAX_MODULES = 8;
 static constexpr uint8_t MAX_SOURCES_PER_MODULE = 4;
-static constexpr uint8_t MAX_HANDLES = MAX_MODULES * MAX_SOURCES_PER_MODULE;
+static constexpr uint8_t MAX_HANDLES = 32; // Global source budget, not a module-count limit.
 
 struct AnalogEntry {
     void *context;

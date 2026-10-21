@@ -44,7 +44,6 @@ public:
 #endif
 
 private:
-    static constexpr uint8_t MAX_MODULES = 8;
     static constexpr uint32_t CHECKSUM_MASK = 0x007FFFFF;
     enum class Phase : uint8_t { Disabled, Loading, Running, Stopping, Failed };
     enum class ModuleSource : uint8_t { Writable, ROMFS };
@@ -53,8 +52,10 @@ private:
         ModuleSource source;
     };
     struct Slot {
+        Slot *next;
         Runtime *owner;
         Module *module;
+        ModuleFile file;
         bool running;
         bool panic_reported;
         uint32_t heap_expansion_reported;
@@ -67,6 +68,8 @@ private:
 
     void manager();
     bool load_generation();
+    bool add_file(const char *name, ModuleSource source);
+    void clear_slots();
     Module *load_file(const ModuleFile &file, Slot &slot);
     Module *load_bytes(const uint8_t *bytes, uint32_t length, const ModuleFile &file, Slot &slot);
     void poll_modules();
@@ -82,7 +85,6 @@ private:
     AP_UInt32 _heap_size;
     AP_UInt32 _code_size;
     AP_UInt32 _stack_size;
-    AP_UInt8 _max_modules;
     AP_UInt16 _restart;
     AP_Int32 _loaded_required;
     AP_Int32 _running_required;
@@ -90,11 +92,12 @@ private:
     AP_UInt16 _thread_priority_max; // Signed wire storage must represent priorities 128..254 as positive values.
 
     Module::Limits _limits{};
-    uint8_t _capacity{};
     bool _initialized{};
     uint16_t _observed_restart{};
     AP_HAL::Scheduler::OwnedThread *_manager_thread{};
-    Slot _slots[MAX_MODULES] {};
+    // Manager-owned, address-stable callback contexts. Retain the complete
+    // generation until every worker is joined and its bindings are cleaned up.
+    Slot *_slots{};
     bool _reload_after_stop{};
     uint32_t _stop_start_ms{};
 

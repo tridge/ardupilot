@@ -19,6 +19,8 @@ volatile uint32_t rust_runtime_test_result;
 volatile uint32_t rust_runtime_test_cycles;
 volatile uint32_t rust_runtime_test_before;
 volatile uint32_t rust_runtime_test_after;
+volatile uint32_t rust_runtime_test_empty_before;
+volatile uint32_t rust_runtime_test_empty_after;
 volatile uint32_t rust_runtime_test_generation_free[21];
 volatile uint32_t rust_runtime_test_stack_free;
 volatile uint32_t rust_runtime_test_stack_total;
@@ -72,8 +74,8 @@ public:
         constexpr char loaded_prefix[] = "Module: loaded ";
         constexpr size_t loaded_length = sizeof(loaded_prefix) - 1;
         if (strncmp(message, loaded_prefix, loaded_length) == 0 &&
-            message[loaded_length] >= '0' && message[loaded_length] <= '8') {
-            loaded_count.store(message[loaded_length] - '0');
+            message[loaded_length] >= '0' && message[loaded_length] <= '9') {
+            loaded_count.store(strtoul(message + loaded_length, nullptr, 10));
             loaded_reports.fetch_add(1);
         }
         if (strstr(message, "stop timeout") != nullptr) {
@@ -168,6 +170,7 @@ private:
     bool exercise();
     bool exercise_overflow();
     bool exercise_romfs();
+    bool exercise_many(uint8_t count);
     uint16_t _request{};
 };
 
@@ -270,7 +273,7 @@ bool RuntimeHarness::exercise_romfs()
     }
     romfs_stage(22);
     if (!set("ENABLE", 1) || !set("HEAP_MAX", 4096) || !set("CODE_MAXSIZE", 65535) ||
-        !set("STACK_MAX", 16385) || !set("MAX_MOD", 2)) {
+        !set("STACK_MAX", 16385)) {
         return false;
     }
     romfs_stage(23);
@@ -323,7 +326,7 @@ bool RuntimeHarness::exercise_romfs()
             return false;
         }
         hal.scheduler->delay(100);
-        rust_runtime_test_cycles++;
+        rust_runtime_test_cycles = rust_runtime_test_cycles + 1;
     }
     rust_runtime_test_after = hal.util->available_memory();
     ExpandingString threads;
@@ -340,6 +343,91 @@ bool RuntimeHarness::exercise_romfs()
            test_gcs.parameter_ready.load() == rust_runtime_test_cycles + 2 &&
            test_gcs.ignored_writable.load() == rust_runtime_test_cycles + 2 &&
            runtime.arming_checks(sizeof(message), message) && free_stack > 1024;
+}
+
+bool RuntimeHarness::exercise_many(uint8_t count)
+{
+    if (count == 0 || !ensure_directory("/APM") || !ensure_directory("/APM/modules") ||
+        !ensure_directory("/fixtures/many")) {
+        return false;
+    }
+    runtime.init();
+    if (!wait_loaded(0, 0)) {
+        return false;
+    }
+    hal.scheduler->delay(100);
+    if (AP::FS().unlink("/APM/modules") != 0) {
+        return false;
+    }
+    // Reverse order exercises sorted insertion without moving callback owners.
+    for (uint16_t i = count; i > 0; i--) {
+        char destination[48];
+        hal.util->snprintf(destination, sizeof(destination), "/fixtures/many/m%03u.apmod", unsigned(i - 1));
+        if (!copy_file("/fixtures/many.apmod", destination)) {
+            return false;
+        }
+    }
+    const auto move_files = [](bool install) {
+        // Move the directory, avoiding count-dependent FAT metadata IO on
+        // every cycle. A missing writable directory is a valid empty generation.
+        const char *active = "/APM/modules";
+        const char *parked = "/fixtures/many";
+        return AP::FS().rename(install ? parked : active, install ? active : parked) == 0;
+    };
+    // Warm the complete load/unload path: the default ChibiOS heap grows
+    // provider slabs on first use. Require exact recovery of both loaded and
+    // empty baselines once that allocator bookkeeping has settled.
+    for (uint8_t warmup = 0; warmup < 4; warmup++) {
+        if (!move_files(true) || !restart(count)) {
+            return false;
+        }
+        hal.scheduler->delay(100);
+        if (!move_files(false) || !restart(0)) {
+            return false;
+        }
+        hal.scheduler->delay(100);
+    }
+    rust_runtime_test_empty_before = hal.util->available_memory();
+    if (!move_files(true) || !restart(count)) {
+        return false;
+    }
+    hal.scheduler->delay(100);
+    rust_runtime_test_before = hal.util->available_memory();
+    rust_runtime_test_generation_free[0] = rust_runtime_test_before;
+    char message[100];
+    for (uint8_t cycle = 0; cycle < 20; cycle++) {
+        if (!restart(count)) {
+            return false;
+        }
+        hal.scheduler->delay(100);
+        rust_runtime_test_generation_free[cycle + 1] = hal.util->available_memory();
+        rust_runtime_test_after = hal.util->available_memory();
+        if (!runtime.arming_checks(sizeof(message), message) || !move_files(false) || !restart(0)) {
+            return false;
+        }
+        hal.scheduler->delay(100);
+        rust_runtime_test_empty_after = hal.util->available_memory();
+        if (rust_runtime_test_empty_before != rust_runtime_test_empty_after ||
+            (cycle < 19 && !move_files(true))) {
+            return false;
+        }
+        rust_runtime_test_cycles = rust_runtime_test_cycles + 1;
+    }
+    if (!runtime.arming_checks(sizeof(message), message) ||
+        rust_runtime_test_before != rust_runtime_test_after) {
+        return false;
+    }
+    ExpandingString threads;
+    hal.util->thread_info(threads);
+    const char *all_threads = threads.get_string();
+    uint32_t priority, address, free_stack, total_stack;
+    if (!thread_values(all_threads == nullptr ? nullptr : strstr(all_threads, "ModMgr"),
+                       priority, free_stack, total_stack, address)) {
+        return false;
+    }
+    rust_runtime_test_stack_free = free_stack;
+    rust_runtime_test_stack_total = total_stack;
+    return free_stack > 1024;
 }
 
 bool RuntimeHarness::exercise()
@@ -377,6 +465,13 @@ bool RuntimeHarness::exercise()
     if (!set("ENABLE", 1) || !set("HEAP_MAX", 4096) || !set("CODE_MAXSIZE", 65535) || !set("STACK_MAX", 16385) ||
         !set("THD_PRIO_MAX", rust_runtime_test_priority_max)) {
         return false;
+    }
+    const int many_file = AP::FS().open("/fixtures/many.count", O_RDONLY);
+    if (many_file >= 0) {
+        uint8_t count = 0;
+        const auto length = AP::FS().read(many_file, &count, sizeof(count));
+        AP::FS().close(many_file);
+        return length == sizeof(count) && exercise_many(count);
     }
     struct stat embedded_stat;
     if (AP::FS().stat("@ROMFS/modules/romfs.apmod", &embedded_stat) == 0) {

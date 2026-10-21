@@ -231,21 +231,24 @@ extern "C" void peer(bool available,uint32_t address,uint16_t port){{
  peer_available=available;peer_address=address;peer_port=port;
 }}
 extern "C" unsigned live_count(){{return live;}}
+extern "C" unsigned owner_count(){{
+ unsigned count=0;
+ for(auto *entry=AP_Module::registry;entry;entry=entry->next)count++;
+ return count;
+}}
 extern "C" unsigned files(){{return file_live;}}
 extern "C" unsigned sent(){{return sent_len;}}
 extern "C" uint32_t destination_address(){{return sent_address;}}
 extern "C" uint16_t destination_port(){{return sent_port;}}
 extern "C" bool was_reused(){{return reused;}}
-extern "C" uint32_t near_wrap_token(){{
- uint32_t generations[AP_Module::MAX_SOCKETS]={{}};
- generations[0]=AP_Module::TOKEN_GENERATION_MASK;
- AP_Module::ModuleSockets sockets(generations);
+extern "C" int exhausted_tokens(){{
+ AP_Module::next_generation=AP_Module::TOKEN_GENERATION_MASK;
+ AP_Module::ModuleSockets sockets;
  uint32_t first=0,second=0;
  sockets.add(new SocketAPM(false),first);
  auto *slot=sockets.resolve(first);
  sockets.release(*slot);
- sockets.add(new SocketAPM(false),second);
- return second;
+ return sockets.add(new SocketAPM(false),second);
 }}
 ''')
     library = tmp_path / 'host.so'
@@ -349,7 +352,7 @@ def test_host_connect_is_bounded_and_restart_tokens_do_not_alias(host_service):
     assert lib.pending_call(ctypes.byref(other), token, one) == -1
     lib.cleanup(ctypes.byref(context))
 
-    # Cleanup advances and persists the generation for the stable context.
+    # Generations persist independently of freed owner/context addresses.
     restarted = open_socket(lib, ctypes.byref(context))
     assert restarted != token
     assert lib.connect_call(ctypes.byref(context), packet, one) == -1
@@ -361,9 +364,25 @@ def test_host_connect_is_bounded_and_restart_tokens_do_not_alias(host_service):
     assert lib.pending_call(ctypes.byref(context), restarted, one) == 0 and one.raw == b'\0'
     lib.cleanup(ctypes.byref(context))
 
-    # Generation wrap skips zero, preserving nonzero handles and generation.
-    lib.near_wrap_token.restype = ctypes.c_uint32
-    assert lib.near_wrap_token() == (1 << 6) | 1
+    # Exhaustion fails closed rather than making a retired handle valid again.
+    assert lib.exhausted_tokens() == -2
+    assert lib.live_count() == 0
+
+
+def test_more_than_eight_socket_owners_and_reused_addresses(host_service):
+    lib = host_service
+    contexts = [ctypes.c_int(i) for i in range(32)]
+    previous = set()
+    for _ in range(4):
+        tokens = [open_socket(lib, ctypes.byref(context)) for context in contexts]
+        assert not previous.intersection(tokens)
+        assert lib.owner_count() == 32 and lib.live_count() == 32
+        for context, token in zip(contexts, tokens):
+            assert lib.close_call(ctypes.byref(context), token) == 0
+            lib.cleanup(ctypes.byref(context))
+            lib.cleanup(ctypes.byref(context))  # idempotent after freeing the registry node
+        assert lib.owner_count() == 0 and lib.live_count() == 0
+        previous.update(tokens)
 
 
 def test_emitted_sdk_compiles(tmp_path):

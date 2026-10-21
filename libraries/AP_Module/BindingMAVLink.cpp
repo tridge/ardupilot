@@ -23,8 +23,6 @@ static_assert(sizeof(mavlink_message_t) == MAVLINK_MESSAGE_SIZE,
               "Rust MAVLink ABI requires the MAVLink2.1 message layout");
 
 #if HAL_GCS_ENABLED
-static constexpr uint8_t MAX_MODULES = 8;
-
 struct ReceivedMessage {
     mavlink_message_t msg;
     mavlink_channel_t chan;
@@ -103,9 +101,10 @@ private:
 struct RegistryEntry {
     void *context;
     ModuleMAVLink *state;
+    RegistryEntry *next;
 };
 
-static RegistryEntry registry[MAX_MODULES];
+static RegistryEntry *registry;
 static HAL_Semaphore registry_sem;
 
 struct CommandBlock {
@@ -118,9 +117,9 @@ static CommandBlock *command_blocks;
 
 static RegistryEntry *find_entry(void *context)
 {
-    for (auto &entry : registry) {
-        if (entry.context == context && entry.state != nullptr) {
-            return &entry;
+    for (auto *entry = registry; entry != nullptr; entry = entry->next) {
+        if (entry->context == context) {
+            return entry;
         }
     }
     return nullptr;
@@ -140,22 +139,17 @@ int32_t binding_mavlink_init(void *context, const uint8_t *input, uint32_t input
         // Lua's init keeps its first queue and registration allocations.
         return AP_MODULE_STATUS_OK;
     }
-    RegistryEntry *free_entry = nullptr;
-    for (auto &entry : registry) {
-        if (entry.state == nullptr) {
-            free_entry = &entry;
-            break;
-        }
-    }
-    if (free_entry == nullptr) {
-        return AP_MODULE_STATUS_NO_MEMORY;
-    }
     auto *state = NEW_NOTHROW ModuleMAVLink(input[0], input[1]);
     if (state == nullptr || !state->valid(input[0])) {
         delete state;
         return AP_MODULE_STATUS_NO_MEMORY;
     }
-    *free_entry = {context, state};
+    auto *entry = NEW_NOTHROW RegistryEntry{context, state, registry};
+    if (entry == nullptr) {
+        delete state;
+        return AP_MODULE_STATUS_NO_MEMORY;
+    }
+    registry = entry;
     return AP_MODULE_STATUS_OK;
 #else
     return AP_MODULE_STATUS_UNAVAILABLE;
@@ -318,10 +312,8 @@ void binding_mavlink_handle_message(const mavlink_message_t &msg, mavlink_channe
 #if HAL_GCS_ENABLED
     const uint32_t timestamp_ms = AP_HAL::millis();
     WITH_SEMAPHORE(registry_sem);
-    for (auto &entry : registry) {
-        if (entry.state != nullptr) {
-            entry.state->handle(msg, chan, timestamp_ms);
-        }
+    for (auto *entry = registry; entry != nullptr; entry = entry->next) {
+        entry->state->handle(msg, chan, timestamp_ms);
     }
 #else
     (void)msg;
@@ -346,10 +338,14 @@ void binding_mavlink_cleanup(void *context)
             link = &item->next;
         }
     }
-    auto *entry = find_entry(context);
-    if (entry != nullptr) {
-        delete entry->state;
-        *entry = {};
+    for (RegistryEntry **entry_link = &registry; *entry_link != nullptr; entry_link = &(*entry_link)->next) {
+        auto *entry = *entry_link;
+        if (entry->context == context) {
+            *entry_link = entry->next;
+            delete entry->state;
+            delete entry;
+            break;
+        }
     }
 #else
     (void)context;
