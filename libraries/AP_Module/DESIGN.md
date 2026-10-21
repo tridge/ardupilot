@@ -143,16 +143,17 @@ relocations are rejected. ARM GOT/dynamic-linking tables and static Thumb
 MOVW/MOVT instruction patches are unsupported. x86-64 GOT entries must resolve
 to defined image symbols.
 
-The current runtime format is `APMOD06`, little-endian with an 84-byte header:
+The current runtime format is `APMOD07`, little-endian with an 88-byte header:
 
 | Field | Encoding |
 | --- | --- |
-| Magic | 8 bytes, `APMOD06` followed by NUL |
+| Magic | 8 bytes, `APMOD07` followed by NUL |
 | Version, ELF machine, pointer width | Three u32 values |
 | Segment alignments | u32: low 16 bits RW, high 16 bits RX |
 | Initialized size, memory size, RX boundary, entry offset | Four u32 values |
 | Fixup count, ABI version, CPU profile, stack requirement, initial heap, import count | Six u32 values |
 | Core fingerprint | 16 bytes |
+| Native thread priority | u32, 1 through 254, further restricted by the HAL and `MOD_THD_PRIO_MAX` |
 | Container CRC32 | u32 |
 
 Initialized image bytes follow, then sorted u32 pointer-fixup destination offsets,
@@ -193,7 +194,7 @@ The HAL reports the execution CPU capability, including the active core on H7.
 The image parser accepts profile 1 on an M7/DP board as well as profile 3, but
 rejects M7 requirements on M4, cross-architecture combinations and unknown IDs
 before allocation. Older firmware rejects the new M7 profile; rebuild firmware
-before using it. APMOD06 layout and existing profile IDs are unchanged. CPU and
+before using it. Existing CPU profile IDs are unchanged. CPU and
 stack requirements are trusted declarations, not a sandbox or instruction verifier.
 
 ## Executable memory and ROMFS
@@ -205,7 +206,7 @@ firmware linker. Target offsets preserve byte-pointer and Thumb-function bits.
 
 ROMFS stores `.apmod` entries raw while other files follow normal compression
 policy. Firmware generation prelinks ARM RX-to-RX slots and places entries in
-executable flash, preserving payload alignment after the 84-byte header. Borrowing
+executable flash, preserving payload alignment after the 88-byte header. Borrowing
 requires HAL confirmation that the complete range is immutable executable flash;
 filename or ROMFS membership alone is insufficient. RW/BSS is always copied,
 fixed up and owned. Borrowed RX has firmware lifetime and is never written/freed.
@@ -280,11 +281,21 @@ values; unsaved values can reset. Lua and native modules share dynamic-table lim
 trivially-destructible helper in module-owned storage and frees it on drop.
 C++ layout is not part of the public wire contract.
 
-Workers use scripting priority; the manager is one priority above on priority
-HALs, below vehicle/I/O work. ChibiOS's normal zero quantum means no peer
-round-robin: busy workers can starve other modules and Lua. Positive sleeps
-cooperate; zero sleeps and stop polling do not yield. Linux behavior depends on
-`SCHED_OTHER` versus FIFO policy.
+Workers use the native priority declared in their header. The loader checks it
+against the HAL's application range and `MOD_THD_PRIO_MAX` before allocation.
+The limit defaults to 2 on STM32 and 1 on other HALs; the manager runs at the
+limit plus one, not just one above a particular worker. Limits must leave room
+for the manager within the HAL's native priority range. STM32 permits limits
+2..254; Linux and SITL permit 1..19. SITL uses nominal Linux priority values but
+retains `SCHED_OTHER`, as does non-realtime Linux. Linux FIFO and ChibiOS honor
+the native priorities. The defaults remain below vehicle/I/O work; raising the
+limit can interfere with flight-critical threads. ChibiOS's normal zero quantum
+means no peer round-robin: busy workers can starve equal/lower-priority modules
+and Lua. Positive sleeps cooperate; zero sleeps and stop polling do not yield.
+
+The priority field makes `APMOD07` incompatible with `APMOD06`; rebuild modules
+and firmware together. The core binding ABI is unchanged. Offline resource and
+priority edits preserve machine code but change the whole-file checksum.
 
 Health participates in SYSTEM pre-arm checks and existing disable/force-arm
 bypasses. Errors latch until the next generation; empty directories/normal returns

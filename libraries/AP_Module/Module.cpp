@@ -88,6 +88,14 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     }
     expected.stack_limit = limits.stack - margin;
     expected.heap_limit = limits.heap;
+    expected.priority_min = hal.scheduler->thread_priority_min();
+    expected.priority_limit = limits.thread_priority_max == 0 ? expected.priority_min : limits.thread_priority_max;
+    // Leave a higher priority for the manager; never silently clamp a native
+    // priority or truncate it through the scheduler's relative-offset API.
+    if (expected.priority_min == 0 || expected.priority_limit < expected.priority_min ||
+        expected.priority_limit >= hal.scheduler->thread_priority_max()) {
+        return nullptr;
+    }
     Image image;
     error = Error::Image;
     const Image::SourcePolicy first_policy = source_type == Source::ROMFS ?
@@ -115,6 +123,7 @@ Module *Module::load(const uint8_t *source, size_t length, const char *name,
     }
     module->_initial_heap = image.initial_heap_size();
     module->_worker_stack = image.required_stack_size() + margin;
+    module->_thread_priority = image.thread_priority();
     strncpy(module->_name, name, sizeof(module->_name) - 1);
     if (image.is_split()) {
         const bool arm = expected.machine == 40;
@@ -189,7 +198,7 @@ bool Module::start()
         _heap_ready = true;
     }
     _thread = hal.scheduler->thread_create_owned_guarded(FUNCTOR_BIND_MEMBER(&Module::run, void), _name,
-              _worker_stack, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 0,
+              _worker_stack, AP_HAL::Scheduler::PRIORITY_ABSOLUTE, _thread_priority,
               {this, stack_fault});
     _started = _thread != nullptr;
     return _started;
@@ -376,7 +385,7 @@ void Module::panic(void *context, const uint8_t *message, uint32_t length)
     module._panicked.store(true, std::memory_order_release);
     // This callback never returns. In particular it must not use sleep_ms(),
     // which returns immediately after a stop request. Keep module frames alive
-    // at the existing scripting priority; only the delayed wakeup runs.
+    // at its declared priority; only the delayed wakeup runs.
     while (true) {
         hal.scheduler->delay(1000);
     }

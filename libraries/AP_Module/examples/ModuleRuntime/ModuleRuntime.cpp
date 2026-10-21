@@ -19,10 +19,12 @@ volatile uint32_t rust_runtime_test_result;
 volatile uint32_t rust_runtime_test_cycles;
 volatile uint32_t rust_runtime_test_before;
 volatile uint32_t rust_runtime_test_after;
+volatile uint32_t rust_runtime_test_generation_free[21];
 volatile uint32_t rust_runtime_test_stack_free;
 volatile uint32_t rust_runtime_test_stack_total;
 volatile uint32_t rust_runtime_test_manager_priority;
 volatile uint32_t rust_runtime_test_worker_priority;
+volatile uint32_t rust_runtime_test_priority_max = 2;
 volatile uint32_t rust_runtime_test_manager_stack;
 volatile uint32_t rust_runtime_test_worker_stack;
 volatile uint32_t rust_runtime_test_worker_stack_total;
@@ -359,8 +361,21 @@ bool RuntimeHarness::exercise()
         hal.scheduler->delay(100);
     }
     rust_runtime_test_result = 2;
+    // Optional emulator fixture; read after startup rather than patching a
+    // RAM initializer which the C runtime would overwrite during boot.
+    const int priority_file = AP::FS().open("/fixtures/priority.bin", O_RDONLY);
+    if (priority_file >= 0) {
+        uint8_t priority = 0;
+        const auto count = AP::FS().read(priority_file, &priority, sizeof(priority));
+        AP::FS().close(priority_file);
+        if (count != sizeof(priority)) {
+            return false;
+        }
+        rust_runtime_test_priority_max = priority;
+    }
     // Odd byte counts exercise image-budget and HAL stack rounding.
-    if (!set("ENABLE", 1) || !set("HEAP_MAX", 4096) || !set("CODE_MAXSIZE", 65535) || !set("STACK_MAX", 16385)) {
+    if (!set("ENABLE", 1) || !set("HEAP_MAX", 4096) || !set("CODE_MAXSIZE", 65535) || !set("STACK_MAX", 16385) ||
+        !set("THD_PRIO_MAX", rust_runtime_test_priority_max)) {
         return false;
     }
     struct stat embedded_stat;
@@ -396,16 +411,18 @@ bool RuntimeHarness::exercise()
         return false;
     }
     rust_runtime_test_result = 31;
-    if (!restart(2)) {
-        return false;
-    }
-    // Warm the release/reallocation path as well as first-time loading before
-    // requiring an exact baseline for subsequent generations.
-    if (!restart(2)) {
-        return false;
+    // The larger module metadata/header changes allocator placement. Three
+    // complete generations settle the observed one-time 8-byte free-list
+    // difference; every subsequent generation must match the exact baseline.
+    constexpr uint8_t warmup_generations = 3;
+    for (uint8_t generation = 0; generation < warmup_generations; generation++) {
+        if (!restart(2)) {
+            return false;
+        }
     }
     hal.scheduler->delay(100);
     rust_runtime_test_before = hal.util->available_memory();
+    rust_runtime_test_generation_free[0] = rust_runtime_test_before;
     for (unsigned cycle = 0; cycle < 20; cycle++) {
         rust_runtime_test_result = 4;
         if (!restart(2)) {
@@ -413,10 +430,11 @@ bool RuntimeHarness::exercise()
         }
         hal.scheduler->delay(100);
         rust_runtime_test_cycles = rust_runtime_test_cycles + 1;
+        rust_runtime_test_generation_free[cycle + 1] = hal.util->available_memory();
     }
     rust_runtime_test_after = hal.util->available_memory();
     if (rust_runtime_test_before != rust_runtime_test_after || !runtime.arming_checks(sizeof(message), message) ||
-        test_gcs.parameter_restored.load() != rust_runtime_test_cycles + 1) {
+        test_gcs.parameter_restored.load() != rust_runtime_test_cycles + warmup_generations - 1) {
         return false;
     }
     rust_runtime_test_result = 5;
@@ -466,7 +484,8 @@ bool RuntimeHarness::exercise()
     rust_runtime_test_manager_stack = manager_address;
     rust_runtime_test_worker_stack = worker_address;
     rust_runtime_test_worker_stack_total = worker_total;
-    return manager_priority > worker_priority && free_stack > 1024;
+    return manager_priority == rust_runtime_test_priority_max + 1 &&
+           worker_priority <= rust_runtime_test_priority_max && free_stack > 1024;
 }
 
 bool RuntimeHarness::exercise_overflow()
@@ -535,7 +554,7 @@ void setup()
     AP_Param::load_all();
     // Test driver only: it sleeps while waiting for the lower-priority manager.
     if (!hal.scheduler->thread_create(FUNCTOR_BIND(&harness, &RuntimeHarness::run, void), "RustTest", 8192,
-                                      AP_HAL::Scheduler::PRIORITY_SCRIPTING, 2)) {
+                                      AP_HAL::Scheduler::PRIORITY_SCRIPTING, 8)) {
         rust_runtime_test_result = 0xBAD0;
     }
 #else

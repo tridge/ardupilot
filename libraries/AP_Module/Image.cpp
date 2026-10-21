@@ -9,7 +9,7 @@ namespace AP_Module
 {
 
 static constexpr uint32_t PROBE_HEADER_SIZE = 56;
-static constexpr uint32_t RUNTIME_HEADER_SIZE = 84;
+static constexpr uint32_t RUNTIME_HEADER_SIZE = 88;
 static constexpr uint32_t ALIGNMENT = 4096;
 static constexpr uint32_t MAX_IMAGE = 16U * 1024 * 1024;
 static constexpr uint32_t MAX_IMPORTS = 4096;
@@ -49,7 +49,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
             policy != SourcePolicy::Canonical) {
             return reject("unsupported image format");
         }
-    } else if (memcmp(source, "APMOD06\0", 8) == 0 && word(source + 8) == 6) {
+    } else if (memcmp(source, "APMOD07\0", 8) == 0 && word(source + 8) == 7) {
         split = true;
     } else {
         return reject("unsupported image format");
@@ -59,11 +59,13 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     }
     uint32_t stack_size = 0;
     uint32_t heap_size = 0;
+    uint32_t thread_priority = 0;
     uint32_t import_count = 0;
     if (compatibility != nullptr) {
         const uint32_t profile = word(source + 48);
         stack_size = word(source + 52);
         heap_size = word(source + 56);
+        thread_priority = word(source + 80);
         import_count = word(source + 60);
         const uint8_t empty_fingerprint[16] {};
         if (word(source + 44) == 0 || word(source + 44) != compatibility->abi_version) {
@@ -86,6 +88,12 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
         }
         if (compatibility->heap_limit != 0 && heap_size > compatibility->heap_limit) {
             return reject("initial heap exceeds MOD_HEAP_MAX");
+        }
+        if (thread_priority < 1 || thread_priority > 254 || thread_priority < compatibility->priority_min) {
+            return reject("invalid module thread priority");
+        }
+        if (compatibility->priority_limit != 0 && thread_priority > compatibility->priority_limit) {
+            return reject("thread priority exceeds MOD_THD_PRIO_MAX");
         }
         if (memcmp(source + 64, empty_fingerprint, sizeof(empty_fingerprint)) == 0 ||
             memcmp(source + 64, compatibility->fingerprint, sizeof(compatibility->fingerprint)) != 0) {
@@ -273,6 +281,7 @@ bool Image::parse_internal(const uint8_t *source, size_t length, uint32_t memory
     _header_size = header_size;
     _stack_size = stack_size;
     _heap_size = heap_size;
+    _thread_priority = thread_priority;
     _import_count = import_count;
     _import_names_offset = import_names_offset;
     _checksum = canonical_crc(false);

@@ -106,6 +106,14 @@ const AP_Param::GroupInfo Runtime::var_info[] = {
     // @Bitmask: 4:Disable pre-arm checks,5:Save checksums,6:Disable heap expansion
     // @User: Advanced
     AP_GROUPINFO("DEBUG_OPTS", 9, Runtime, _debug_options, 0),
+
+    // @Param: THD_PRIO_MAX
+    // @DisplayName: Maximum native module thread priority
+    // @Description: Maximum native OS priority allowed by a module header. Defaults to 2 on STM32 and 1 on other HALs. The manager runs one level above this limit. The limit must leave room for the manager within the HAL priority range. Higher numbers mean higher priority. SITL and non-realtime Linux retain host time slicing.
+    // @Range: 1 254
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("THD_PRIO_MAX", 10, Runtime, _thread_priority_max, AP_MODULE_DEFAULT_THREAD_PRIORITY),
     AP_GROUPEND
 };
 
@@ -142,12 +150,19 @@ void Runtime::init()
     if (_enable == 0) {
         return;
     }
-    constexpr int32_t maximum = 16 * 1024 * 1024;
-    const uint32_t code_size = Module::rounded_code_size(uint32_t(_code_size.get()));
+    constexpr uint32_t maximum = 16U * 1024 * 1024;
+    const uint32_t code_size = Module::rounded_code_size(_code_size.get());
     if (_heap_size < 256 || _heap_size > maximum || code_size == 0 ||
         _stack_size < 256 || _stack_size > maximum ||
         _max_modules < 1 || _max_modules > MAX_MODULES) {
         fail("invalid memory limits; reboot required");
+        return;
+    }
+    const uint16_t priority_max = _thread_priority_max.get();
+    if (hal.scheduler->thread_priority_min() == 0 ||
+        priority_max < hal.scheduler->thread_priority_min() ||
+        priority_max >= hal.scheduler->thread_priority_max()) {
+        fail("invalid MOD_THD_PRIO_MAX; reboot required");
         return;
     }
     uint32_t manager_stack;
@@ -165,7 +180,7 @@ void Runtime::init()
         fail("unsupported native execution target");
         return;
     }
-    _limits = {uint32_t(_heap_size.get()), code_size, uint32_t(_stack_size.get())};
+    _limits = {_heap_size.get(), code_size, _stack_size.get(), true, priority_max};
     _capacity = _max_modules.get();
     {
         WITH_SEMAPHORE(_sem);
@@ -174,7 +189,7 @@ void Runtime::init()
     // Preempt non-yielding workers on ChibiOS and Linux FIFO. SITL and
     // unprivileged Linux use the host's time-sliced SCHED_OTHER instead.
     _manager_thread = hal.scheduler->thread_create_owned(FUNCTOR_BIND_MEMBER(&Runtime::manager, void), "ModMgr",
-                      manager_stack, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 1);
+                      manager_stack, AP_HAL::Scheduler::PRIORITY_ABSOLUTE, _limits.thread_priority_max + 1);
     if (_manager_thread == nullptr) {
         fail("manager thread creation failed");
         WITH_SEMAPHORE(_sem);
@@ -187,7 +202,7 @@ void Runtime::update()
     if (!_initialized) {
         return;
     }
-    const int16_t request = _restart.get();
+    const uint16_t request = _restart.get();
     if (request != _observed_restart) {
         _observed_restart = request;
         WITH_SEMAPHORE(_sem);
@@ -335,7 +350,7 @@ Module *Runtime::load_file(const ModuleFile &file, Slot &slot)
     }
     const int32_t length = fs.lseek(fd, 0, SEEK_END);
     // Image, worst-case 32-bit relocations, and capped import records/names.
-    const uint32_t maximum = _limits.code * 3U + 4096U * (16U + 64U) + 84U;
+    const uint32_t maximum = _limits.code * 3U + 4096U * (16U + 64U) + 88U;
     const uint32_t input_size = length > 0 ? uint32_t(length) : 0;
     const auto free_input = [input_size](uint8_t *buffer) {
         hal.util->free_type(buffer, input_size, AP_HAL::Util::MEM_FAST);

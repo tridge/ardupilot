@@ -28,6 +28,8 @@ public:
         uint32_t stack_limit;
         uint8_t fingerprint[16];
         uint32_t heap_limit;
+        uint32_t priority_min; // Zero selects the container minimum, 1.
+        uint32_t priority_limit; // Zero selects the container maximum, 254.
     };
 
     // Profile IDs are not ordered: M7/DP also supports the M4/SP baseline,
@@ -60,7 +62,7 @@ public:
                        const char **missing_name = nullptr) const;
     // UINT32_MAX rejects an unknown contract. Resolve only before publication.
     bool load(void *destination, size_t size, Resolver resolver = nullptr, void *context = nullptr) const;
-    // Load an APMOD06 split image. rx_base is either writable destination
+    // Load an APMOD07 split image. rx_base is either writable destination
     // storage or code_source() for a prelinked ROMFS image. RW is always
     // copied, zero-filled and relocated in writable memory.
     bool load_split(void *rx_base, size_t rx_size, void *rw_base, size_t rw_size,
@@ -115,6 +117,7 @@ public:
         return _stack_size;
     }
     uint32_t initial_heap_size() const { return _heap_size; }
+    uint32_t thread_priority() const { return _thread_priority; }
     // Whole-file CRC32 of the canonical unresolved container. This remains
     // identical when ROMFS firmware linking has resolved RX fixup slots.
     uint32_t checksum() const
@@ -142,6 +145,7 @@ private:
     uint32_t _header_size{};
     uint32_t _stack_size{};
     uint32_t _heap_size{};
+    uint32_t _thread_priority{};
     uint32_t _import_count{};
     uint32_t _import_names_offset{};
     uint32_t _checksum{};

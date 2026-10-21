@@ -158,6 +158,7 @@ Enable and memory/module-count changes require reboot.
 | `MOD_LD_CSUM` | -1 | Required loaded-file checksum; -1 disables |
 | `MOD_RUN_CSUM` | -1 | Required running-file checksum; -1 disables |
 | `MOD_DEBUG_OPTS` | 0 | Debug options described below |
+| `MOD_THD_PRIO_MAX` | 2 on STM32, 1 otherwise | Maximum native worker priority; manager runs at this plus one |
 
 The image budget rounds up to 4096 bytes; this does not pad stored ARM modules.
 Only the actual image is allocated, with cache-line rounding for ARM RX RAM
@@ -189,7 +190,7 @@ client count, directory size and aerobatics schedule length can change demand.
 Check peak/capacity reports with representative workloads before flight, and
 configure both the module's initial request and `MOD_HEAP_MAX` accordingly.
 
-This pre-alpha cutover intentionally rejects old `APRUST` modules: rebuild all
+This pre-alpha cutover intentionally rejects old `APRUST` and `APMOD06` modules: rebuild all
 modules and update install paths and parameter names. Parameter storage indices
 are unchanged, so old saved values carry over. In particular the former initial
 heap value now becomes a maximum; review limits before enabling modules.
@@ -215,12 +216,20 @@ panic. Errors latch a module pre-arm failure until the next generation. Normal
 return and an empty directory are not errors. SYSTEM-check and force-arm bypasses
 follow Lua semantics.
 
-Workers share scripting priority; the manager runs one priority above them on
-priority-scheduled HALs, below flight/I/O threads. Normal ChibiOS configuration
-has no equal-priority time slicing: a busy module can starve peer workers and
-Lua. Use positive sleeps; `sleep_ms(0)` and stop polling do not yield.
+Workers run at the native priority stored in their `APMOD07` header, defaulting
+to 2 on STM32 and 1 on Linux/SITL. Set it with `build.py --thread-priority N` or
+`apmod_info.py module.apmod --thread-priority N`. Loading fails if the requested
+priority exceeds `MOD_THD_PRIO_MAX`, or is outside the HAL's application range.
+The manager runs at `MOD_THD_PRIO_MAX + 1`. The parameter requires reboot and
+must leave a priority level available for the manager (STM32: 2..254;
+Linux/SITL: 1..19). Raising it can let modules preempt flight-critical threads.
+
+Normal ChibiOS configuration has no equal-priority time slicing: a busy module
+can starve equal/lower-priority workers and Lua. Use positive sleeps;
+`sleep_ms(0)` and stop polling do not yield.
 Higher-priority threads can still preempt. POSIX behavior depends on policy:
-`SCHED_OTHER` time-shares, whereas Linux FIFO has the same starvation concern.
+SITL and `SCHED_OTHER` time-share without native priority enforcement, whereas
+Linux FIFO has the same starvation concern.
 There is no per-module CPU quota.
 
 For load errors, use `apmod_info.py` and check the target, core ABI, imported API

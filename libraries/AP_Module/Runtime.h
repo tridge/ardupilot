@@ -78,20 +78,21 @@ private:
     static void text(void *context, uint8_t severity, const char *message, uint32_t length);
 
     static Runtime *_singleton;
-    AP_Int8 _enable;
-    AP_Int32 _heap_size;
-    AP_Int32 _code_size;
-    AP_Int32 _stack_size;
-    AP_Int8 _max_modules;
-    AP_Int16 _restart;
+    AP_UInt8 _enable;
+    AP_UInt32 _heap_size;
+    AP_UInt32 _code_size;
+    AP_UInt32 _stack_size;
+    AP_UInt8 _max_modules;
+    AP_UInt16 _restart;
     AP_Int32 _loaded_required;
     AP_Int32 _running_required;
-    AP_Int8 _debug_options;
+    AP_UInt8 _debug_options;
+    AP_UInt16 _thread_priority_max; // Signed wire storage must represent priorities 128..254 as positive values.
 
     Module::Limits _limits{};
     uint8_t _capacity{};
     bool _initialized{};
-    int16_t _observed_restart{};
+    uint16_t _observed_restart{};
     AP_HAL::Scheduler::OwnedThread *_manager_thread{};
     Slot _slots[MAX_MODULES] {};
     bool _reload_after_stop{};

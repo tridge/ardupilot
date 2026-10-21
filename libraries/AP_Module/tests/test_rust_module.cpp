@@ -190,7 +190,7 @@ TEST_F(ModuleLoader, ValidateBeforeAllocation)
     // Declared 8192 plus host margin; include the canonical ROMFS fallback.
     reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds MOD_STACK_MAX");
     reject({32768, 131072, 20480}, Module::Error::Image, "stack exceeds MOD_STACK_MAX", Module::Source::ROMFS);
-    bytes[80] ^= 1; // corrupt the header CRC without changing relocation metadata
+    bytes[84] ^= 1; // corrupt the header CRC without changing relocation metadata
     reject({32768, 131072, 65536}, Module::Error::Image, "image checksum mismatch");
 }
 
@@ -204,6 +204,43 @@ TEST_F(ModuleLoader, ReleaseWithoutStarting)
     EXPECT_FALSE(modules[0]->start());
     EXPECT_TRUE(Module::release(modules[0]));
     EXPECT_EQ(modules[0], nullptr);
+}
+
+TEST_F(ModuleLoader, ThreadPriorityAdmission)
+{
+    auto bytes = read("cooperative");
+    ASSERT_GT(bytes.size(), 88U);
+    // Keep the image and imports intact; only raise its declared priority.
+    bytes[80] = 3;
+    for (uint8_t i = 0; i < 4; i++) {
+        bytes[84 + i] = 0;
+    }
+    const uint32_t crc = crc32_small(UINT32_MAX, bytes.data(), bytes.size()) ^ UINT32_MAX;
+    for (uint8_t i = 0; i < 4; i++) {
+        bytes[84 + i] = uint8_t(crc >> (8 * i));
+    }
+    Module::Error error;
+    const char *detail = nullptr;
+    modules[0] = Module::load(bytes.data(), bytes.size(), "priority", {32768, 131072, 65536},
+                              {this, text}, error, {}, nullptr, nullptr, Module::Source::File, &detail);
+    EXPECT_EQ(modules[0], nullptr);
+    EXPECT_EQ(error, Module::Error::Image);
+    EXPECT_STREQ(detail, "thread priority exceeds MOD_THD_PRIO_MAX");
+    modules[0] = Module::load(bytes.data(), bytes.size(), "priority", {32768, 131072, 65536, true, 5},
+                              {this, text}, error,
+                              {nullptr, AP_Module::binding_dispatch, AP_Module::binding_resolve});
+    ASSERT_NE(modules[0], nullptr);
+    ASSERT_TRUE(modules[0]->start());
+    ASSERT_TRUE(ready(1));
+    modules[0]->request_stop();
+    ASSERT_TRUE(join(modules[0]));
+    ASSERT_TRUE(Module::release(modules[0]));
+    for (const uint16_t limit : {20U, 255U, 65535U}) {
+        modules[0] = Module::load(bytes.data(), bytes.size(), "priority", {32768, 131072, 65536, true, limit},
+                                  {this, text}, error);
+        EXPECT_EQ(modules[0], nullptr);
+        EXPECT_EQ(error, Module::Error::Limits);
+    }
 }
 
 TEST_F(ModuleLoader, RawROMFSSourceUsesCopiedExecutableMapping)
@@ -266,16 +303,16 @@ TEST_F(ModuleLoader, RepeatedNormalReturn)
 TEST_F(ModuleLoader, FallibleAllocationFailureReturns)
 {
     auto bytes = read("cooperative");
-    ASSERT_GT(bytes.size(), 84U);
+    ASSERT_GT(bytes.size(), 88U);
     // Declare the small initial heap as well as capping it; a request above
     // the cap must now be rejected before image allocation, not at runtime.
     for (uint8_t i = 0; i < 4; i++) {
         bytes[56 + i] = uint8_t(256U >> (8 * i));
-        bytes[80 + i] = 0;
+        bytes[84 + i] = 0;
     }
     const uint32_t crc = crc32_small(UINT32_MAX, bytes.data(), bytes.size()) ^ UINT32_MAX;
     for (uint8_t i = 0; i < 4; i++) {
-        bytes[80 + i] = uint8_t(crc >> (8 * i));
+        bytes[84 + i] = uint8_t(crc >> (8 * i));
     }
     Module::Error error;
     modules[0] = Module::load(bytes.data(), bytes.size(), "small", {256, 131072, 65536},

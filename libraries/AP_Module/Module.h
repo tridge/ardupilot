@@ -21,12 +21,14 @@ public:
     CLASS_NO_COPY(Module);
     struct Limits {
         Limits(uint32_t heap_size = 0, uint32_t code_size = 0, uint32_t stack_size = 0,
-               bool allow_expansion = true) :
-            heap(heap_size), code(code_size), stack(stack_size), allow_heap_expansion(allow_expansion) {}
+               bool allow_expansion = true, uint16_t priority_limit = 0) :
+            heap(heap_size), code(code_size), stack(stack_size), allow_heap_expansion(allow_expansion),
+            thread_priority_max(priority_limit) {}
         uint32_t heap;
         uint32_t code;
         uint32_t stack;
         bool allow_heap_expansion;
+        uint16_t thread_priority_max; // Zero selects the HAL's lowest application priority.
     };
     enum class Error : uint8_t {
         None,
@@ -133,6 +135,7 @@ private:
     const Limits _limits;
     uint32_t _initial_heap;
     uint32_t _worker_stack;
+    uint8_t _thread_priority;
     const TextSink _sink;
     const BindingSink _bindings;
     Heap _heap;
