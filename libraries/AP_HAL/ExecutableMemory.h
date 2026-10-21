@@ -14,8 +14,9 @@ class ExecutableMemory
 public:
     enum class Target : uint8_t {
         Unsupported,
-        ThumbV7EMHardFloat,
+        CortexM4HardFloat, // Armv7E-M with FPv4-SP-D16.
         X86_64Baseline,
+        CortexM7HardFloat, // Armv7E-M with FPv5-D16, including double precision.
     };
 
     CLASS_NO_COPY(ExecutableMemory);

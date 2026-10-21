@@ -13,17 +13,20 @@ volatile uintptr_t executable_memory_test_address;
 static bool exercise(uint8_t answer)
 {
 #if defined(__ARM_ARCH_7EM__)
-    const auto expected_target = AP_HAL::ExecutableMemory::Target::ThumbV7EMHardFloat;
+    const auto target = hal.util->executable_memory_target();
+    const bool target_supported = target == AP_HAL::ExecutableMemory::Target::CortexM4HardFloat ||
+                                  target == AP_HAL::ExecutableMemory::Target::CortexM7HardFloat;
     constexpr uint32_t image_size = 37;
     constexpr uint32_t data_offset = 32;
     constexpr uint32_t code_size = 4;
 #else
-    const auto expected_target = AP_HAL::ExecutableMemory::Target::X86_64Baseline;
+    const bool target_supported = hal.util->executable_memory_target() ==
+                                  AP_HAL::ExecutableMemory::Target::X86_64Baseline;
     constexpr uint32_t image_size = 8192;
     constexpr uint32_t data_offset = 4096;
     constexpr uint32_t code_size = 4096;
 #endif
-    if (hal.util->executable_memory_target() != expected_target) {
+    if (!target_supported) {
         executable_memory_test_result = 6;
         return false;
     }
