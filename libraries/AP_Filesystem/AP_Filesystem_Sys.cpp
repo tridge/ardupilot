@@ -26,6 +26,7 @@
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_Scheduler/AP_Scheduler.h>
 #include <AP_Common/ExpandingString.h>
+#include <AP_Module/Runtime.h>
 
 #ifndef AP_CRASHDUMP_FLASH_ENABLED
 #define AP_CRASHDUMP_FLASH_ENABLED 0
@@ -39,6 +40,9 @@ struct SysFileList {
 
 static const SysFileList sysfs_file_list[] = {
     {"threads.txt"},
+#if AP_MODULE_ENABLED
+    {"modules.txt"},
+#endif
     {"tasks.txt"},
     {"dma.txt"},
     {"memory.txt"},
@@ -104,6 +108,11 @@ int AP_Filesystem_Sys::open(const char *fname, int flags, bool allow_absolute_pa
     if (strcmp(fname, "threads.txt") == 0) {
         hal.util->thread_info(*r.str);
     }
+#if AP_MODULE_ENABLED
+    if (strcmp(fname, "modules.txt") == 0) {
+        AP_Module::Runtime::module_info(*r.str);
+    }
+#endif
 #if AP_SCHEDULER_ENABLED
     if (strcmp(fname, "tasks.txt") == 0) {
         AP::scheduler().task_info(*r.str);
