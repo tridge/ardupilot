@@ -268,7 +268,7 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     // @Path: ../AP_Scripting/AP_Scripting.cpp
     AP_SUBGROUPINFO(scripting, "SCR_", 28, AP_Vehicle, AP_Scripting),
 #elif AP_MODULE_ENABLED && AP_SCRIPTING_SERIALDEVICE_ENABLED
-    // Preserve the shared SCR_SDEV* configuration when Rust is the sole
+    // Preserve the shared SCR_SDEV* configuration when native modules are the sole
     // scripting runtime.
     // @Group: SCR_
     // @Path: ../AP_Scripting/AP_Scripting_SerialDevice.cpp
@@ -306,9 +306,9 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
 #endif  // AP_BEACON_ENABLED
 
 #if AP_MODULE_ENABLED
-    // @Group: RUST_
+    // @Group: MOD_
     // @Path: ../AP_Module/Runtime.cpp
-    AP_SUBGROUPINFO(rust_modules, "RUST_", 34, AP_Vehicle, AP_Module::Runtime),
+    AP_SUBGROUPINFO(native_modules, "MOD_", 34, AP_Vehicle, AP_Module::Runtime),
 #endif
 
     AP_GROUPEND
@@ -469,7 +469,7 @@ void AP_Vehicle::setup()
 #endif // AP_SCRIPTING_LUA_ENABLED
 
 #if AP_MODULE_ENABLED
-    rust_modules.init();
+    native_modules.init();
 #endif
 
 #if AP_AIRSPEED_ENABLED
@@ -1137,7 +1137,7 @@ void AP_Vehicle::one_Hz_update(void)
 #endif
 
 #if AP_MODULE_ENABLED
-    rust_modules.update();
+    native_modules.update();
 #endif
 
 #if HAL_LOGGING_ENABLED && HAL_UART_STATS_ENABLED

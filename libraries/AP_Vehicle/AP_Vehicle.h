@@ -518,7 +518,7 @@ protected:
 #endif
 
 #if AP_MODULE_ENABLED
-    AP_Module::Runtime rust_modules;
+    AP_Module::Runtime native_modules;
 #endif
 
 #if AP_MODULE_ENABLED && !AP_SCRIPTING_LUA_ENABLED && AP_SCRIPTING_SERIALDEVICE_ENABLED
