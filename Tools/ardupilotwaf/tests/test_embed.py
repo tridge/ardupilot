@@ -36,8 +36,8 @@ def make_apmod(fixups=None, imports=(), alignment=4, rx_alignment=4, rx_size=409
         image[destination:destination + 4] = b"\xff" * 4
         import_records.append(embed.APMOD_IMPORT.pack(binding_hash, destination, len(import_names)))
         import_names += name.encode("ascii") + b"\0"
-    fields = (5, 40, 4, alignment | rx_alignment << 16, file_size, memory_size, rx_size, 1, len(fixups),
-              1, 1, 8192, len(imports), bytes.fromhex("00112233445566778899aabbccddeeff"))
+    fields = (6, 40, 4, alignment | rx_alignment << 16, file_size, memory_size, rx_size, 1, len(fixups),
+              1, 1, 8192, 32768, len(imports), bytes.fromhex("00112233445566778899aabbccddeeff"))
     body = bytes(image) + b"".join(destinations) + b"".join(import_records) + import_names
     header = embed.APMOD_HEADER.pack(embed.APMOD_MAGIC, *fields, 0)
     crc = zlib.crc32(header + body)
@@ -175,7 +175,7 @@ def test_mixed_compression_keeps_apmod_raw(tmp_path):
     generated = generate(tmp_path, [("plain.txt", str(text)), ("rust/probe.apmod", str(module))])
     assert '"plain.txt"' in generated
     assert table_size(generated, "plain.txt") & ~embed.ROMFS_STORED_SIZE_MASK == 0
-    assert table_size(generated, "rust/probe.apmod") == (embed.ROMFS_FLAG_UNCOMPRESSED | 4188)
+    assert table_size(generated, "rust/probe.apmod") == (embed.ROMFS_FLAG_UNCOMPRESSED | 4192)
 
 
 def test_global_uncompressed_preserves_logical_size(tmp_path):
@@ -192,7 +192,7 @@ def test_global_uncompressed_keeps_apmod_canonical(tmp_path):
     module.write_bytes(make_apmod())
     generated = generate(tmp_path, [("rust/probe.apmod", str(module))], uncompressed=True, prelink=True)
     assert ".pushsection .ap_romfs" not in generated
-    assert table_size(generated, "rust/probe.apmod") == (embed.ROMFS_FLAG_UNCOMPRESSED | 4188)
+    assert table_size(generated, "rust/probe.apmod") == (embed.ROMFS_FLAG_UNCOMPRESSED | 4192)
 
 
 def test_arm_apmod_prelinks_only_rx_fixups(tmp_path):
@@ -202,10 +202,10 @@ def test_arm_apmod_prelinks_only_rx_fixups(tmp_path):
     module.write_bytes(contents)
     generated = generate(tmp_path, [("rust/probe.apmod", str(module))], prelink=True)
     assert '.pushsection .ap_romfs.0,\\"ax\\",%progbits' in generated
-    assert '.word ap_romfs_0 + 89' in generated
+    assert '.word ap_romfs_0 + 93' in generated
     assert generated.count('.word ap_romfs_0') == 1
     flags = embed.ROMFS_FLAG_UNCOMPRESSED | embed.ROMFS_FLAG_PRELINKED
-    assert table_size(generated, "rust/probe.apmod") == (flags | 4188)
+    assert table_size(generated, "rust/probe.apmod") == (flags | 4192)
 
 
 def test_apmod_import_metadata_is_validated(tmp_path, capsys):
@@ -220,7 +220,7 @@ def test_apmod_import_metadata_is_validated(tmp_path, capsys):
 
 
 @pytest.mark.parametrize(("mutator", "error"), [
-    (lambda data: b"NOTAPMOD" + data[8:], "expected APRUST05"),
+    (lambda data: b"NOTAPMOD" + data[8:], "expected APMOD06"),
     (lambda data: data[:-1], "truncated metadata"),
     (lambda data: data[:100] + bytes([data[100] ^ 1]) + data[101:], "checksum mismatch"),
 ])

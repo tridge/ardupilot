@@ -12,8 +12,8 @@ May 2017
 import os, re, struct, sys, zlib
 
 
-APMOD_MAGIC = b'APRUST05'
-APMOD_HEADER = struct.Struct('<8s13I16sI')
+APMOD_MAGIC = b'APMOD06\0'
+APMOD_HEADER = struct.Struct('<8s14I16sI')
 APMOD_FIXUP = struct.Struct('<I')
 APMOD_IMPORT = struct.Struct('<QII')
 APMOD_HEADER_SIZE = APMOD_HEADER.size
@@ -35,14 +35,14 @@ def write_bytes(out, contents):
 
 
 def apmod_details(contents, embedded_name):
-    '''validate an APRUST05 module and return its machine and fixups'''
+    '''validate an APMOD06 module and return its machine and fixups'''
     if len(contents) < APMOD_HEADER_SIZE:
         raise ValueError("Invalid AP_Module module %s: truncated header" % embedded_name)
     fields = APMOD_HEADER.unpack_from(contents)
     (magic, version, machine, width, alignment, file_size, memory_size, rx_size,
-     entry, count, abi, profile, stack, import_count, fingerprint, crc) = fields
-    if magic != APMOD_MAGIC or version != 5:
-        raise ValueError("Invalid AP_Module module %s: expected APRUST05" % embedded_name)
+     entry, count, abi, profile, stack, heap, import_count, fingerprint, crc) = fields
+    if magic != APMOD_MAGIC or version != 6:
+        raise ValueError("Invalid AP_Module module %s: expected APMOD06" % embedded_name)
     if (machine, width) not in ((40, 4), (62, 8)):
         raise ValueError("Invalid AP_Module module %s: unsupported target" % embedded_name)
     rw_alignment, rx_alignment = alignment & 0xffff, alignment >> 16
@@ -57,7 +57,8 @@ def apmod_details(contents, embedded_name):
     if machine == APMOD_MACHINE_ARM and (entry & 1) == 0:
         raise ValueError("Invalid AP_Module module %s: ARM entry is not Thumb" % embedded_name)
     if (abi == 0 or (machine, profile) not in ((40, 1), (62, 2)) or
-            stack < 256 or stack > APMOD_MAX_IMAGE or fingerprint == bytes(len(fingerprint))):
+            stack < 256 or stack > APMOD_MAX_IMAGE or heap < 256 or heap > APMOD_MAX_IMAGE or
+            fingerprint == bytes(len(fingerprint))):
         raise ValueError("Invalid AP_Module module %s: invalid runtime contract" % embedded_name)
     fixup_start = APMOD_HEADER_SIZE + file_size
     fixup_end = fixup_start + count * APMOD_FIXUP.size

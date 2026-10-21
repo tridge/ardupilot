@@ -112,7 +112,7 @@ class Board:
         if cfg.options.enable_scripting and cfg.options.disable_scripting:
             cfg.fatal('Cannot both enable and disable Lua scripting')
         if cfg.options.enable_modules and cfg.options.disable_modules:
-            cfg.fatal('Cannot both enable and disable Rust scripting')
+            cfg.fatal('Cannot both enable and disable native modules')
         env.DEFINES.update(
             LUA_32BITS = 1,
         )
@@ -739,9 +739,9 @@ class Board:
         if prelink_apmods and any(file[0].endswith(".apmod") for file in ctx.env.ROMFS_FILES):
             ctx.env.CXXFLAGS += ['-DHAL_HAVE_AP_ROMFS_PRELINKED_APMOD']
 
-        # Native modules under rust/ are discovered directly from ROMFS.
+        # Native modules under modules/ are discovered directly from ROMFS.
         for file in ctx.env.ROMFS_FILES:
-            if os.path.dirname(file[0]) == "rust" and file[0].endswith(".apmod"):
+            if os.path.dirname(file[0]) == "modules" and file[0].endswith(".apmod"):
                 ctx.env.CXXFLAGS += ['-DHAL_HAVE_AP_ROMFS_EMBEDDED_APMOD']
                 break
 

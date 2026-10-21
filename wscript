@@ -270,10 +270,10 @@ submodules at specific revisions.
                  help="Enable the Lua scripting engine")
 
     g.add_option('--enable-modules', action='store_true', default=False,
-                 help="Enable experimental trusted native Rust modules")
+                 help="Enable experimental trusted native modules")
 
     g.add_option('--disable-modules', action='store_true', default=False,
-                 help="Disable native Rust modules")
+                 help="Disable native modules")
 
     g.add_option('--no-gcs', action='store_true',
                  default=False,
