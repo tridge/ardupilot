@@ -2,9 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Read SITL thread diagnostics over MAVFTP, including Rust worker reloads."""
 
+import os
 import re
 import struct
+import sys
 
+import apmod_info
+import pack
 import pytest
 
 from pymavlink import mavftp_op as ftp
@@ -80,7 +84,10 @@ def test_threads_over_ftp(tmp_path, images, rust):  # noqa: F811
                 match = re.search(r'^diag.apmod\s+PRI=\s*0 sp=\S+ STACK=(\d+)/(\d+)$', listing, re.M)
                 assert match, listing
                 free, total = map(int, match.groups())
-                assert 0 < free < total == 65536
+                required = pack.unpack(images['cleanup'])['contract']['stack_size'] + 16384  # x86-64 host-call margin
+                page = os.sysconf('SC_PAGESIZE')
+                expected = (required + page - 1) // page * page
+                assert 0 < free < total == expected
             else:
                 assert 'ModMgr' not in names
             return listing
@@ -95,5 +102,82 @@ def test_threads_over_ftp(tmp_path, images, rust):  # noqa: F811
             (vehicle.modules / 'gone.apmod').unlink()
             vehicle.restart(6, expected=0)
             assert 'diag.apmod' not in reader.read('@SYS/threads.txt')
+    finally:
+        vehicle.stop()
+
+
+@pytest.mark.parametrize('count', [0, 1, 12])
+def test_modules_over_ftp(tmp_path, images, count):  # noqa: F811
+    names = [f'module_{index:02d}_with_a_long_diagnostic_name.apmod' for index in range(count)]
+    heaps = {name: 4096 if index % 2 == 0 else 8192 for index, name in enumerate(names)}
+    modules = {name: apmod_info.resize_resources(images['cleanup'], heap_size=heaps[name]) for name in names}
+    vehicle = Vehicle(tmp_path / 'vehicle', modules, {'SCR_ENABLE': 0, 'MOD_ENABLE': int(count > 0), 'MOD_HEAP_MAX': 8192})
+    try:
+        vehicle.start()
+        reader = FTPReader(vehicle)
+
+        def snapshot(complete):
+            listing = reader.read('@SYS/modules.txt')
+            assert listing.startswith('ModulesV1\n'), listing
+            rows = {}
+            for line in listing.splitlines()[1:]:
+                name, *fields = line.split()
+                assert name in heaps and name not in rows, listing
+                values = dict(field.split('=', 1) for field in fields)
+                rows[name] = values
+                assert values['SOURCE'] == 'FILE' and int(values['PRI']) == 1, listing
+                capacity, used, free = (int(values[key]) for key in ('HEAP', 'USED', 'FREE'))
+                assert capacity == used + free and 0 <= free <= capacity, listing
+                if values['STATE'] == 'RUNNING':
+                    assert capacity == heaps[name] and int(values['ALLOC']) >= 512, listing
+                    assert int(values['PEAK']) >= int(values['ALLOC']) and int(values['ALLOCS']) >= 1, listing
+                    assert int(values['STACK']) > 0 and int(values['RX']) > 0, listing
+                    if values['LOAD'] != '?' or sys.platform.startswith('linux'):
+                        assert re.fullmatch(r'\d+(?:\.\d+)?%', values['LOAD']), listing
+                        assert 0 <= float(values['LOAD'][:-1]) <= 100, listing
+            if complete:
+                assert set(rows) == set(names), listing
+                assert all(row['STATE'] == 'RUNNING' for row in rows.values()), listing
+            return listing
+
+        snapshot(True)
+        if count:
+            for generation in range(1, 6):
+                mark = len(vehicle.texts)
+                vehicle.parameter('MOD_RESTART', generation)
+                snapshot(False)  # read while handles may be loading or reaping
+                vehicle.text(f'Module: loaded {count} modules', after=mark)
+                vehicle.pump(0.1)
+                snapshot(True)
+            for name in names:
+                (vehicle.modules / name).unlink()
+            vehicle.restart(6, expected=0)
+            assert reader.read('@SYS/modules.txt') == 'ModulesV1\n'
+    finally:
+        vehicle.stop()
+
+
+@pytest.mark.parametrize('mode', ['panic', 'late_stop'])
+def test_retained_module_diagnostics(tmp_path, images, mode):  # noqa: F811
+    vehicle = Vehicle(tmp_path / 'vehicle', {'retained.apmod': images[mode]}, {'SCR_ENABLE': 0})
+    try:
+        vehicle.start()
+        if mode == 'panic':
+            vehicle.text('panic; reboot required')
+        reader = FTPReader(vehicle)
+        listing = reader.read('@SYS/modules.txt')
+        assert 'retained.apmod STATE=' + ('PANICKED' if mode == 'panic' else 'RUNNING') in listing, listing
+        if mode == 'late_stop' and sys.platform.startswith('linux'):
+            match = re.search(r'LOAD=(\d+(?:\.\d+)?)%', listing)
+            assert match and float(match.group(1)) > 0, listing
+        (vehicle.modules / 'retained.apmod').unlink()
+        mark = len(vehicle.texts)
+        vehicle.parameter('MOD_RESTART', 1)
+        vehicle.text('stop timeout', after=mark)
+        listing = reader.read('@SYS/modules.txt')
+        assert 'retained.apmod STATE=' in listing, listing
+        if mode == 'late_stop':
+            vehicle.pump(4)  # the delayed worker eventually exits and is reaped
+            assert reader.read('@SYS/modules.txt') == 'ModulesV1\n'
     finally:
         vehicle.stop()
