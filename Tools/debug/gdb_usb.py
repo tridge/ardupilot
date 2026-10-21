@@ -269,6 +269,15 @@ def gdb_command(args):
                '-ex', f'target remote {port}']
     if args.batch:
         command.append('--batch')
+    modules = getattr(args, 'apmod', [])
+    if modules:
+        helper = Path(__file__).resolve().parents[1] / 'modules/apmod_gdb.py'
+        if any(c in str(helper) for c in '\r\n\x00'):
+            raise DebugError('GDB helper path must not contain newlines or NUL')
+        # Unlike add-symbol-file, source takes the entire filename literally,
+        # including spaces: quotes would become part of the requested name.
+        command += ['-ex', f'source {helper}',
+                    '-ex', 'apmod symbols ' + ' '.join(json.dumps(str(path.resolve())) for path in modules)]
     for expression in args.ex:
         command.extend(['-ex', expression])
     return command
@@ -282,6 +291,8 @@ def main(argv=None):
     endpoint.add_argument('--gdb-server', metavar='HOST:PORT',
                           help='connect to an existing bridge (for example Windows USB with a WSL debugger)')
     parser.add_argument('--gdb', default='arm-none-eabi-gdb', help='GDB executable')
+    parser.add_argument('--apmod', type=Path, action='append', default=[],
+                        help='load matching Native module ELF and pretty-printers (repeatable; requires Python GDB)')
     parser.add_argument('--timeout', type=float, default=30, help='monitor connection deadline in seconds')
     parser.add_argument('--no-break', action='store_true',
                         help='reattach to an existing debug session, interrupting if running')
@@ -307,6 +318,16 @@ def main(argv=None):
             raise DebugError('--batch and --ex apply only to interactive/batch GDB, not --serve or --vscode')
         if not args.serve and shutil.which(args.gdb) is None:
             raise DebugError(f'GDB executable not found: {args.gdb}')
+        if args.apmod:
+            if args.serve or args.vscode:
+                raise DebugError('--apmod applies to GDB sessions; source Tools/modules/apmod_gdb.py in the IDE')
+            for path in args.apmod:
+                if any(c in str(path) for c in '\r\n\x00') or not path.is_file() or not path.with_suffix('.elf').is_file():
+                    raise DebugError(f'--apmod needs a module and its matching companion .elf: {path}')
+            result = subprocess.run([args.gdb, '-nx', '--batch', '-ex', 'python print("APMOD_PYTHON_OK")'],
+                                    capture_output=True, text=True, timeout=15)
+            if result.returncode != 0 or 'APMOD_PYTHON_OK' not in result.stdout:
+                raise DebugError('--apmod requires a Python-enabled ARM GDB; select it with --gdb')
         if args.vscode:
             vscode_workspace(args)
             return 0
