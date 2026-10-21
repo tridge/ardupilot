@@ -244,12 +244,6 @@
 #define AP_TEST_DRONECAN_DRIVERS 0
 #endif
 
-#ifdef HAVE_LIBDL
-#define AP_MODULE_SUPPORTED 1
-#else
-#define AP_MODULE_SUPPORTED 0
-#endif
-
 #ifndef HAL_SUPPORT_RCOUT_SERIAL
 #define HAL_SUPPORT_RCOUT_SERIAL 0
 #endif
