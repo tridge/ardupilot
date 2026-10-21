@@ -72,8 +72,15 @@
 #include <Filter/AP_Filter.h>
 #include <AP_Stats/AP_Stats.h>              // statistics library
 #include <AP_DDS/AP_DDS_config.h>
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_LUA_ENABLED
 #include <AP_Scripting/AP_Scripting.h>
+#endif
+#include <AP_Module/AP_Module_config.h>
+#if AP_MODULE_ENABLED
+#include <AP_Module/Runtime.h>
+#endif
+#if AP_MODULE_ENABLED && !AP_SCRIPTING_LUA_ENABLED && AP_SCRIPTING_SERIALDEVICE_ENABLED
+#include <AP_Scripting/AP_Scripting_SerialDevice.h>
 #endif
 
 #include <AP_Gripper/AP_Gripper_config.h>
@@ -506,8 +513,16 @@ protected:
     AP_TemperatureSensor temperature_sensor;
 #endif
 
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_LUA_ENABLED
     AP_Scripting scripting;
+#endif
+
+#if AP_MODULE_ENABLED
+    AP_Module::Runtime native_modules;
+#endif
+
+#if AP_MODULE_ENABLED && !AP_SCRIPTING_LUA_ENABLED && AP_SCRIPTING_SERIALDEVICE_ENABLED
+    AP_Scripting_SerialDevice scripting_serialdevice;
 #endif
 
 #if AP_RPM_ENABLED
