@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <time.h>
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <AP_Common/ExpandingString.h>
 #include <AP_HAL/Semaphores.h>
@@ -78,6 +79,12 @@ AP_HAL::Scheduler::OwnedThread *OwnedThreadPosix::create(AP_HAL::MemberProc proc
                                pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED) == 0 &&
                                pthread_attr_setschedpolicy(&attr, policy) == 0 &&
                                pthread_attr_setschedparam(&attr, &param) == 0;
+#if defined(__linux__)
+    timespec created;
+    if (clock_gettime(CLOCK_MONOTONIC, &created) == 0) {
+        thread->_created_ns = uint64_t(created.tv_sec) * 1000000000ULL + created.tv_nsec;
+    }
+#endif
     const int result = attributes_ok ? pthread_create(&thread->_thread, &attr, trampoline, thread) : -1;
     pthread_attr_destroy(&attr);
     if (result != 0) {
@@ -98,6 +105,26 @@ AP_HAL::Scheduler::OwnedThread *OwnedThreadPosix::create(AP_HAL::MemberProc proc
 #endif
     return thread;
 }
+
+#if defined(__linux__)
+bool OwnedThreadPosix::cpu_load(float &percent) const
+{
+    clockid_t clock;
+    timespec cpu, now;
+    if (_created_ns == 0 || pthread_getcpuclockid(_thread, &clock) != 0 ||
+        clock_gettime(clock, &cpu) != 0 || clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return false;
+    }
+    const uint64_t elapsed = uint64_t(now.tv_sec) * 1000000000ULL + now.tv_nsec - _created_ns;
+    if (elapsed == 0) {
+        return false;
+    }
+    // Host wall time, not the accelerated SITL clock. Lifetime average avoids
+    // one reader consuming another reader's sampling window.
+    percent = 100.0f * float(uint64_t(cpu.tv_sec) * 1000000000ULL + cpu.tv_nsec) / float(elapsed);
+    return true;
+}
+#endif
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 void OwnedThreadPosix::thread_info(ExpandingString &str)

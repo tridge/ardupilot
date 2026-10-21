@@ -23,6 +23,9 @@ public:
     {
         return _mapping_size + sizeof(*this);
     }
+#if defined(__linux__)
+    bool cpu_load(float &percent) const override;
+#endif
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     static void thread_info(ExpandingString &str);
 #endif
@@ -39,6 +42,9 @@ private:
     void *_mapping = nullptr;
     uint32_t _mapping_size = 0;
     uint32_t _stack_size = 0;
+#if defined(__linux__)
+    uint64_t _created_ns = 0;
+#endif
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     OwnedThreadPosix *_info_next = nullptr;
     static OwnedThreadPosix *_info_threads;

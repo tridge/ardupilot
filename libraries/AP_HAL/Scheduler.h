@@ -144,6 +144,9 @@ public:
         // Known reservation including stack, handle and guard/working-area bytes.
         // Excludes allocator headers and opaque OS/libc thread bookkeeping.
         virtual uint32_t allocation_size() const = 0;
+        // Percentage of one CPU; false when the HAL has no measurement.
+        // Must not reset profiler counters shared with other diagnostics.
+        virtual bool cpu_load(float &percent) const { return false; }
 
     protected:
         OwnedThread() = default;
