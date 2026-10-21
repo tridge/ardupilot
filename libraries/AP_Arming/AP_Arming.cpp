@@ -1201,8 +1201,8 @@ bool AP_Arming::system_checks(bool report)
         }
 #endif
 #if AP_MODULE_ENABLED
-        const auto *rust = AP_Module::Runtime::get_singleton();
-        if (rust != nullptr && !rust->arming_checks(sizeof(buffer), buffer)) {
+        const auto *modules = AP_Module::Runtime::get_singleton();
+        if (modules != nullptr && !modules->arming_checks(sizeof(buffer), buffer)) {
             check_failed(Check::SYSTEM, report, "%s", buffer);
             return false;
         }
