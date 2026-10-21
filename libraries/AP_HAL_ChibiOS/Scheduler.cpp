@@ -750,6 +750,155 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
     return true;
 }
 
+#if HAL_OWNED_THREADS_ENABLED
+namespace {
+class OwnedThreadChibiOS final : public AP_HAL::Scheduler::OwnedThread {
+public:
+    explicit OwnedThreadChibiOS(AP_HAL::MemberProc proc, uint32_t size) : _proc(proc), _stack_size(size) {}
+    ~OwnedThreadChibiOS() override
+    {
+#if HAL_STACK_GUARD_ENABLED
+        if (_guard_allocation != nullptr) {
+            chHeapFree(_guard_allocation);
+        }
+#endif
+    }
+
+#if HAL_STACK_GUARD_ENABLED
+    bool start_guarded(const char *name, tprio_t priority, AP_HAL::Scheduler::StackFaultHandler handler)
+    {
+        if (handler.fault == nullptr) {
+            return false;
+        }
+        memory_heap_t *heaps;
+        const memory_region *regions;
+        const uint8_t count = malloc_get_heaps(&heaps, &regions);
+        const size_t size = HAL_STACK_GUARD_BYTES + THD_WORKING_AREA_SIZE(_stack_size);
+        for (uint8_t pass = 0; pass < 2 && _guard_allocation == nullptr; pass++) {
+            for (uint8_t i = 0; i < count; i++) {
+                const bool fast = (regions[i].flags & MEM_REGION_FLAG_FAST) != 0;
+                if (fast != (pass == 0)) {
+                    continue;
+                }
+                _guard_allocation = chHeapAllocAligned(&heaps[i], size, HAL_STACK_GUARD_BYTES);
+                if (_guard_allocation != nullptr) {
+                    break;
+                }
+            }
+        }
+        if (_guard_allocation == nullptr) {
+            return false;
+        }
+        auto *base = static_cast<stkalign_t *>(_guard_allocation);
+        thread_descriptor_t td = THD_DESCRIPTOR(name, base + HAL_STACK_GUARD_BYTES / sizeof(*base),
+                                                base + size / sizeof(*base), priority, trampoline, this);
+        _thread = chThdCreateSuspended(&td);
+        _guard = {uintptr_t(base), uintptr_t(_thread), handler.context, handler.fault, false};
+        _thread->stack_guard = &_guard;
+        // Publish metadata before the first possible scheduling of the worker.
+        chSysLock();
+        mpuEnable(MPU_CTRL_PRIVDEFENA);
+        chSchWakeupS(_thread, MSG_OK);
+        chSysUnlock();
+        return true;
+    }
+#endif
+
+    bool start(const char *name, tprio_t priority)
+    {
+        // Owned stacks need no instruction fetches. Prefer fast RAM (including
+        // F405 CCM) before consuming SRAM needed for loadable native images.
+        // The existing allocator can already place stacks in these heaps as a
+        // fallback, so this does not add a DMA-capability guarantee for stacks.
+        memory_heap_t *heaps;
+        const memory_region *regions;
+        const uint8_t count = malloc_get_heaps(&heaps, &regions);
+        for (uint8_t i = 1; i < count; i++) {
+            if ((regions[i].flags & MEM_REGION_FLAG_FAST) == 0) {
+                continue;
+            }
+            _thread = chThdCreateFromHeap(&heaps[i], THD_WORKING_AREA_SIZE(_stack_size), name, priority, trampoline, this);
+            if (_thread != nullptr) {
+                return true;
+            }
+        }
+        _thread = thread_create_alloc(THD_WORKING_AREA_SIZE(_stack_size), name, priority, trampoline, this);
+        return _thread != nullptr;
+    }
+    uint32_t stack_size() const override { return _stack_size; }
+    uint32_t allocation_size() const override
+    {
+        return THD_WORKING_AREA_SIZE(_stack_size) + sizeof(*this)
+#if HAL_STACK_GUARD_ENABLED
+               + (_guard_allocation != nullptr ? HAL_STACK_GUARD_BYTES : 0)
+#endif
+               ;
+    }
+
+private:
+    static void trampoline(void *context)
+    {
+        static_cast<OwnedThreadChibiOS *>(context)->_proc();
+    }
+    bool join_if_finished() override
+    {
+        chSysLock();
+        const bool finished = chThdTerminatedX(_thread);
+        chSysUnlock();
+        if (!finished) {
+            return false;
+        }
+        // chThdWait releases our dynamic thread reference and working area.
+        // Never chThdRelease again after this call.
+        chThdWait(_thread);
+        _thread = nullptr;
+        return true;
+    }
+    AP_HAL::MemberProc _proc;
+    uint32_t _stack_size;
+    thread_t *_thread = nullptr;
+#if HAL_STACK_GUARD_ENABLED
+    void *_guard_allocation = nullptr;
+    AP_StackGuard _guard{};
+#endif
+};
+}
+
+AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
+                                                             uint32_t stack_size, priority_base base, int8_t priority)
+{
+    if (!proc || stack_size == 0 || stack_size > 16U * 1024 * 1024) {
+        return nullptr;
+    }
+    stack_size = MEM_ALIGN_NEXT(stack_size, PORT_WORKING_AREA_ALIGN);
+    auto *thread = NEW_NOTHROW OwnedThreadChibiOS(proc, stack_size);
+    if (thread != nullptr && !thread->start(name, calculate_thread_priority(base, priority))) {
+        delete thread;
+        return nullptr;
+    }
+    return thread;
+}
+
+AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned_guarded(AP_HAL::MemberProc proc, const char *name,
+    uint32_t stack_size, priority_base base, int8_t priority, StackFaultHandler handler)
+{
+#if HAL_STACK_GUARD_ENABLED
+    if (!proc || stack_size < 4096 || stack_size > 16U * 1024 * 1024) {
+        return nullptr;
+    }
+    stack_size = MEM_ALIGN_NEXT(stack_size, PORT_WORKING_AREA_ALIGN);
+    auto *thread = NEW_NOTHROW OwnedThreadChibiOS(proc, stack_size);
+    if (thread != nullptr && !thread->start_guarded(name, calculate_thread_priority(base, priority), handler)) {
+        delete thread;
+        return nullptr;
+    }
+    return thread;
+#else
+    return thread_create_owned(proc, name, stack_size, base, priority);
+#endif
+}
+#endif
+
 /*
   inform the scheduler that we are calling an operation from the
   main thread that may take an extended amount of time. This can

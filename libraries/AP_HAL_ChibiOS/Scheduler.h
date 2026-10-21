@@ -20,7 +20,11 @@
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
 #include "AP_HAL_ChibiOS_Namespace.h"
 
+#if AP_SIM_ENABLED
+#define CHIBIOS_SCHEDULER_MAX_TIMER_PROCS 16
+#else
 #define CHIBIOS_SCHEDULER_MAX_TIMER_PROCS 8
+#endif
 
 #define APM_MONITOR_PRIORITY    183
 #define APM_MAIN_PRIORITY       180
@@ -146,6 +150,13 @@ public:
       create a new thread
      */
     bool thread_create(AP_HAL::MemberProc, const char *name, uint32_t stack_size, priority_base base, int8_t priority) override;
+
+#if HAL_OWNED_THREADS_ENABLED
+    OwnedThread *thread_create_owned(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
+                                    priority_base base, int8_t priority) override;
+    OwnedThread *thread_create_owned_guarded(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
+                                            priority_base base, int8_t priority, StackFaultHandler handler) override;
+#endif
 
     // pat the watchdog
     void watchdog_pat(void);
