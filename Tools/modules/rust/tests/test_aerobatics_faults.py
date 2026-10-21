@@ -15,10 +15,10 @@ import build
 @pytest.mark.parametrize('fault', [1, 2, 3, 4, 5])
 def test_runner_contention(tmp_path, fault):
     image = build.build(APPLET / 'main.rs', tmp_path / 'fault.apmod', 'x86_64-unknown-linux-gnu', 16384,
-                        cfg=('ap_rust_aerobatics_faults',))
+                        cfg=('ap_rust_aerobatics_faults',), heap_size=32768)
     assert b'AERO finish fault injected' in image.read_bytes()
     vehicle = AerobaticVehicle(tmp_path / 'vehicle', {'fault.apmod': image.read_bytes()}, {
-        'SCR_ENABLE': 0, 'RUST_HEAP_SIZE': 32768, 'RUST_CODE_SIZE': 131072, 'RUST_STACK_SIZE': 32768,
+        'SCR_ENABLE': 0, 'MOD_HEAP_MAX': 32768, 'MOD_CODE_MAXSIZE': 131072, 'MOD_STACK_MAX': 32768,
         'RC7_OPTION': 300, 'RC9_OPTION': 301, 'RC_OVERRIDE_TIME': 3, 'FLTMODE_CH': 0,
     })
     scripts = vehicle.directory / 'scripts'

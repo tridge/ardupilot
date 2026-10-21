@@ -37,7 +37,7 @@ unsafe impl GlobalAlloc for Allocator {
 #[global_allocator]
 static ALLOCATOR: Allocator = Allocator;
 
-static MESSAGE: &[u8] = b"Rust module probe";
+static MESSAGE: &[u8] = b"Native module probe";
 static mut COUNTER: u32 = 7;
 static mut ZERO: [u32; 8] = [0; 8];
 static FUNCTIONS: [fn(u32) -> u32; 2] = [twice, three_times];

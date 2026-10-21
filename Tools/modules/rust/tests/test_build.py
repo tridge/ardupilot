@@ -1,11 +1,12 @@
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Unit tests for the Rust module builder."""
+"""Unit tests for the Native module builder."""
 
 import pack
 import pytest
 
 from elftools.elf.elffile import ELFFile
+from rust.build import check_rust_version
 
 import build
 
@@ -16,7 +17,7 @@ import build
     'rustc 1.101.0-nightly (example)',
 ])
 def test_minimum_rust_version_accepts_supported_compilers(version):
-    build.check_rust_version(version)
+    check_rust_version(version)
 
 
 @pytest.mark.parametrize('version', [
@@ -25,7 +26,7 @@ def test_minimum_rust_version_accepts_supported_compilers(version):
 ])
 def test_minimum_rust_version_rejects_unsupported_compilers(version):
     with pytest.raises(ValueError):
-        build.check_rust_version(version)
+        check_rust_version(version)
 
 
 def test_float_remainder_links_without_unwind_dependencies(tmp_path):

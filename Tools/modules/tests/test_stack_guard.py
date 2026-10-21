@@ -101,9 +101,9 @@ cpu PC
 ])
 def test_rust_stack_overflow(tmp_path, renode, monkeypatch, floating_point, host_call):  # noqa: F811
     build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
-    executable = build_root / os.environ.get('STACK_GUARD_BOARD', 'MatekH743') / 'examples/RustRuntime'
+    executable = build_root / os.environ.get('STACK_GUARD_BOARD', 'MatekH743') / 'examples/ModuleRuntime'
     if not executable.is_file():
-        pytest.skip('Build examples/RustRuntime with Tools/modules/stack-guard.hwdef')
+        pytest.skip('Build examples/ModuleRuntime with Tools/modules/stack-guard.hwdef')
     names = ['result', 'cycles', 'before', 'after', 'overflows']
     with executable.open('rb') as stream:
         symbols = ELFFile(stream).get_section_by_name('.symtab')

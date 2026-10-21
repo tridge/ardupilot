@@ -20,18 +20,13 @@ from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import RelocationSection
 from elftools.elf.sections import SymbolTableSection
 
-MAGIC = b'APRUST01'
+MAGIC = b'APMOD01\0'
 HEADER = struct.Struct('<8s12I')
-RUNTIME_MAGIC = b'APRUST05'
-# Offline inspection of previously generated modules remains supported.
-OLD_RUNTIME_MAGIC = b'APRUST04'
-# Offline inspection only; the firmware loader deliberately rejects version 3.
-LEGACY_RUNTIME_MAGIC = b'APRUST03'
-RUNTIME_HEADER = struct.Struct('<8s13I16sI')
+RUNTIME_MAGIC = b'APMOD06\0'
+RUNTIME_HEADER = struct.Struct('<8s14I16sI')
 FIXUP = struct.Struct('<I')
 LEGACY_FIXUP = struct.Struct('<II')
 IMPORT = struct.Struct('<QII')
-LEGACY_IMPORT = struct.Struct('<QI')
 PAGE = 4096
 MAX_IMAGE = 16 * 1024 * 1024
 MAX_IMPORTS = 4096
@@ -48,10 +43,11 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def validate_contract(machine, abi, profile, stack, fingerprint):
+def validate_contract(machine, abi, profile, stack, fingerprint, heap):
     require(type(abi) is int and 0 < abi <= 0xFFFFFFFF, 'invalid ABI version')
     require(type(profile) is int and (machine, profile) in ((40, 1), (62, 2)), 'invalid CPU profile')
     require(type(stack) is int and 256 <= stack <= MAX_IMAGE, 'invalid stack requirement')
+    require(type(heap) is int and 256 <= heap <= MAX_IMAGE, 'invalid initial heap requirement')
     require(len(fingerprint) == 16 and fingerprint != bytes(16), 'invalid API fingerprint')
 
 
@@ -80,7 +76,7 @@ def pack_elf(data, manifest=None):
     # images need a page boundary; split ARM images retain ELF section alignment.
     file_size = max(file_size, rx_size)
     memory_size = max(memory_size, rx_size)
-    # APRUST05 allocates RW separately on ARM, without requiring page padding.
+    # APMOD06 allocates RW separately on ARM, without requiring page padding.
     # Each half of the alignment word preserves one segment's ELF alignment.
     rw_alignment = max([width] + [s['sh_addralign'] for _, s in sections if s['sh_flags'] & 1])
     rx_alignment = max([width] + [s['sh_addralign'] for _, s in sections if not s['sh_flags'] & 1])
@@ -92,7 +88,7 @@ def pack_elf(data, manifest=None):
     for _, section in sections:
         address, size = section['sh_addr'], section['sh_size']
         import_section = re.fullmatch(
-            r'\.ap_rust_import_([0-9a-f]{16})\.([A-Za-z0-9_.]{1,63})', section.name)
+            r'\.ap_module_import_([0-9a-f]{16})\.([A-Za-z0-9_.]{1,63})', section.name)
         require(section.name in SECTIONS or import_section is not None, f'unsupported allocated section {section.name}')
         require(section.name != '.got' or machine == 62, 'ARM GOT is unsupported')
         require(section['sh_type'] in ('SHT_PROGBITS', 'SHT_NOBITS', 'SHT_ARM_EXIDX'), 'unsupported section type')
@@ -127,7 +123,7 @@ def pack_elf(data, manifest=None):
         if symbol['st_shndx'] in section_ids:
             symbol_values.add(symbol['st_value'])
             import_symbol = re.fullmatch(
-                r'__ap_rust_import_([0-9a-f]{16})\.([A-Za-z0-9_.]{1,63})', symbol.name)
+                r'__ap_module_import_([0-9a-f]{16})\.([A-Za-z0-9_.]{1,63})', symbol.name)
             if import_symbol is not None:
                 import_section = elf.get_section(symbol['st_shndx'])
                 require(symbol['st_size'] == 4 and import_section['sh_type'] == 'SHT_PROGBITS'
@@ -216,16 +212,18 @@ def pack_elf(data, manifest=None):
             records.append((binding_hash, offset, name_offset))
         body += b''.join(IMPORT.pack(*item) for item in records) + names
         require(isinstance(manifest, dict), 'manifest must be an object')
-        require(set(manifest) == {'abi_version', 'cpu_profile', 'stack_size', 'fingerprint'}, 'invalid manifest fields')
+        require(set(manifest) == {'abi_version', 'cpu_profile', 'stack_size', 'heap_size', 'fingerprint'},
+                'invalid manifest fields')
         require(isinstance(manifest['fingerprint'], str), 'invalid API fingerprint')
         try:
             fingerprint = bytes.fromhex(manifest['fingerprint'])
         except ValueError as error:
             raise ValueError('invalid API fingerprint') from error
         abi, profile, stack = (manifest[key] for key in ('abi_version', 'cpu_profile', 'stack_size'))
-        validate_contract(machine, abi, profile, stack, fingerprint)
-        fields = (5, machine, width, rw_alignment | rx_alignment << 16, file_size, memory_size, rx_size, entry, len(fixups),
-                  abi, profile, stack, len(imports), fingerprint)
+        heap = manifest['heap_size']
+        validate_contract(machine, abi, profile, stack, fingerprint, heap)
+        fields = (6, machine, width, rw_alignment | rx_alignment << 16, file_size, memory_size, rx_size, entry, len(fixups),
+                  abi, profile, stack, heap, len(imports), fingerprint)
         header = RUNTIME_HEADER.pack(RUNTIME_MAGIC, *fields, 0)
         return RUNTIME_HEADER.pack(RUNTIME_MAGIC, *fields, zlib.crc32(header + body)) + body
     # Untagged containers remain restricted to the original relocation probes.
@@ -245,15 +243,14 @@ def unpack(data):
     contract = None
     import_count = 0
     runtime_magic = data[:8]
-    if runtime_magic in (RUNTIME_MAGIC, OLD_RUNTIME_MAGIC, LEGACY_RUNTIME_MAGIC):
+    if runtime_magic == RUNTIME_MAGIC:
         require(len(data) >= RUNTIME_HEADER.size, 'truncated header')
         header_size = RUNTIME_HEADER.size
         (magic, version, machine, width, alignment, file_size, memory_size, rx_size,
-         entry, count, abi, profile, stack, import_count, fp, crc) = RUNTIME_HEADER.unpack_from(data)
-        require((magic, version) in ((RUNTIME_MAGIC, 5), (OLD_RUNTIME_MAGIC, 4),
-                                     (LEGACY_RUNTIME_MAGIC, 3)), 'invalid module version')
-        validate_contract(machine, abi, profile, stack, fp)
-        contract = dict(abi_version=abi, cpu_profile=profile, stack_size=stack, fingerprint=fp.hex())
+         entry, count, abi, profile, stack, heap, import_count, fp, crc) = RUNTIME_HEADER.unpack_from(data)
+        require(version == 6, 'invalid module version')
+        validate_contract(machine, abi, profile, stack, fp, heap)
+        contract = dict(abi_version=abi, cpu_profile=profile, stack_size=stack, heap_size=heap, fingerprint=fp.hex())
     else:
         header_size = HEADER.size
         magic, version, machine, width, alignment, file_size, memory_size, rx_size, entry, count, abi, flags, crc = \
@@ -279,11 +276,9 @@ def unpack(data):
     if compact:
         require(rx_size <= file_size and rx_size <= memory_size, 'invalid split image sizes')
     fixup_record = FIXUP if compact else LEGACY_FIXUP
-    import_record = IMPORT if runtime_magic in (RUNTIME_MAGIC, OLD_RUNTIME_MAGIC) else LEGACY_IMPORT
+    import_record = IMPORT
     metadata_end = header_size + file_size + count * fixup_record.size + import_count * import_record.size
     require(len(data) >= metadata_end, 'incorrect file length')
-    if import_record is LEGACY_IMPORT:
-        require(len(data) == metadata_end, 'incorrect file length')
     require(zlib.crc32(data[:header_size - 4] + bytes(4) + data[header_size:]) == crc, 'checksum mismatch')
     image = data[header_size:header_size + file_size]
     fixups = []
@@ -314,18 +309,14 @@ def unpack(data):
     previous_name_end = 0
     for index in range(import_count):
         record_offset = header_size + file_size + count * fixup_record.size + index * import_record.size
-        if import_record is IMPORT:
-            binding_hash, offset, name_offset = IMPORT.unpack_from(data, record_offset)
-            require(name_offset == previous_name_end and name_offset < len(names), 'invalid import name offset')
-            name_end = names.find(b'\0', name_offset)
-            require(name_end > name_offset and name_end - name_offset <= 63, 'invalid import name')
-            encoded_name = names[name_offset:name_end]
-            require(re.fullmatch(rb'[A-Za-z0-9_.]+', encoded_name) is not None, 'invalid import name')
-            name = encoded_name.decode('ascii')
-            previous_name_end = name_end + 1
-        else:
-            binding_hash, offset = LEGACY_IMPORT.unpack_from(data, record_offset)
-            name = None
+        binding_hash, offset, name_offset = IMPORT.unpack_from(data, record_offset)
+        require(name_offset == previous_name_end and name_offset < len(names), 'invalid import name offset')
+        name_end = names.find(b'\0', name_offset)
+        require(name_end > name_offset and name_end - name_offset <= 63, 'invalid import name')
+        encoded_name = names[name_offset:name_end]
+        require(re.fullmatch(rb'[A-Za-z0-9_.]+', encoded_name) is not None, 'invalid import name')
+        name = encoded_name.decode('ascii')
+        previous_name_end = name_end + 1
         require(previous_end <= offset and offset + 4 <= file_size and offset % 4 == 0, 'invalid import offset')
         require(image[offset:offset + 4] == b'\xff' * 4, 'invalid import placeholder')
         require(binding_hash not in hashes, 'duplicate import hash')
@@ -335,7 +326,7 @@ def unpack(data):
         hashes.add(binding_hash)
         imports.append((binding_hash, offset, name))
         previous_end = offset + 4
-    require(import_record is LEGACY_IMPORT or previous_name_end == len(names), 'incorrect import names length')
+    require(previous_name_end == len(names), 'incorrect import names length')
     return dict(machine=machine, width=width, image=image, memory_size=memory_size,
                 rx_size=rx_size, rw_alignment=rw_alignment, rx_alignment=rx_alignment,
                 entry=entry, fixups=fixups, imports=imports, contract=contract)

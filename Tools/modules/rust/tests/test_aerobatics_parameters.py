@@ -19,6 +19,7 @@ def table(vehicle):
     vehicle.link.mav.param_request_list_send(1, 1)
     rows = {}
     seen = set()
+    previous = None
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         m = vehicle.receive()
@@ -28,7 +29,15 @@ def table(vehicle):
         if m.param_id.startswith(('AEROM_', 'TRIK')):
             rows[m.param_id] = (m.param_index, m.param_value)
         if len(seen) == m.param_count:
-            return rows
+            # Dynamic registration can change the list during a stream. Do not
+            # compare persistence against a snapshot missing its final row.
+            snapshot = (m.param_count, rows)
+            if snapshot == previous:
+                return rows
+            previous = snapshot
+            rows = {}
+            seen = set()
+            vehicle.link.mav.param_request_list_send(1, 1)
     raise AssertionError(f'Incomplete parameter list: {len(seen)} entries; {vehicle.diagnostic()}')
 
 
@@ -51,12 +60,13 @@ def test_airshow_parameters(tmp_path):
     assert {(name, int(index), float(default)) for name, index, default in declarations} == \
         {(name, int(index), float(default)) for index, name, default in native}
     assert len(declarations) == 29
-    module = build.build(APPLET / 'main.rs', tmp_path / 'airshow.apmod', 'x86_64-unknown-linux-gnu', 16384)
+    module = build.build(APPLET / 'main.rs', tmp_path / 'airshow.apmod', 'x86_64-unknown-linux-gnu',
+                         16384, heap_size=32768)
     results = {}
     for engine in ('rust', 'lua'):
         vehicle = Vehicle(tmp_path / engine, {'airshow.apmod': module.read_bytes()}, {
-            'RUST_ENABLE': int(engine == 'rust'), 'SCR_ENABLE': int(engine == 'lua'),
-            'RUST_HEAP_SIZE': 32768, 'RUST_CODE_SIZE': 131072, 'RUST_STACK_SIZE': 32768,
+            'MOD_ENABLE': int(engine == 'rust'), 'SCR_ENABLE': int(engine == 'lua'),
+            'MOD_HEAP_MAX': 32768, 'MOD_CODE_MAXSIZE': 131072, 'MOD_STACK_MAX': 32768,
             'SCR_HEAP_SIZE': 350000, 'SCR_VM_I_COUNT': 1000000,
         })
         scripts = vehicle.directory / 'scripts'
@@ -88,7 +98,7 @@ def test_airshow_parameters(tmp_path):
             assert repaired['AEROM_ANG_ACCEL'][1] == 3000
             assert struct.pack('<f', repaired['AEROM_ANG_TC'][1]) == struct.pack('<f', 0.2)
             # Reboot into the other engine with exactly the same backing store.
-            vehicle.parameter('RUST_ENABLE', int(engine == 'lua'))
+            vehicle.parameter('MOD_ENABLE', int(engine == 'lua'))
             vehicle.parameter('SCR_ENABLE', int(engine == 'rust'))
             vehicle.pump(0.5)
             vehicle.stop()

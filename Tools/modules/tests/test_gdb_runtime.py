@@ -23,14 +23,14 @@ def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     debugger = os.environ.get('AP_MODULE_GDB', 'gdb')
     if not firmware.is_file() or not shutil.which(debugger):
         pytest.skip('requires Rust SITL firmware and Python-enabled GDB')
-    modules = tmp_path / 'rust'
+    modules = tmp_path / 'modules'
     modules.mkdir()
     module = build.build(ROOT / 'libraries/AP_Module/tests/modules/debug.rs', modules / 'debug.apmod',
                          'x86_64-unknown-linux-gnu', 16384, debug=True, opt_level='1')
     if module_count == 2:
         shutil.copyfile(module, modules / 'second.apmod')
     params = tmp_path / 'debug.parm'
-    params.write_text('RUST_ENABLE 1\nRUST_HEAP_SIZE 4096\nRUST_STACK_SIZE 32768\nLOG_BACKEND_TYPE 0\n')
+    params.write_text('MOD_ENABLE 1\nMOD_HEAP_MAX 4096\nMOD_STACK_MAX 32768\nLOG_BACKEND_TYPE 0\n')
     commands = [
         'set pagination off', 'set confirm off', 'set debuginfod enabled off', 'set breakpoint pending on',
         f'source {ROOT / "Tools/modules/apmod_gdb.py"}', 'apmod printers', f'apmod symbols {module}',

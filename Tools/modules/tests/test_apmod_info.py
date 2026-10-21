@@ -44,7 +44,7 @@ def test_exact_section_and_container_breakdown(image):
         assert sizes['Image padding'] < 32
     else:
         assert sizes['Image padding'] > 0
-    assert sizes['Container header'] == 80
+    assert sizes['Container header'] == 84
     assert sizes['Relocation table'] == 4 * len(module['fixups'])
     assert sizes['Import table'] == 16 * len(module['imports'])
     assert sizes['Import names'] == sum(len(name) + 1 for _, _, name in module['imports'])

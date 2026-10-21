@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Validate and display metadata from an ArduPilot Rust module."""
+"""Validate and display metadata from an ArduPilot Native module."""
 
 import argparse
 import io
@@ -28,7 +28,6 @@ PROFILES = {
 def file_breakdown(data, module, elf_data=None):
     runtime = module['contract'] is not None
     compact = data[:8] == pack.RUNTIME_MAGIC
-    named = data[:8] in (pack.RUNTIME_MAGIC, pack.OLD_RUNTIME_MAGIC)
     sizes = {'Container header': pack.RUNTIME_HEADER.size if runtime else pack.HEADER.size}
     if elf_data is None:
         sizes['Image (code/data/padding)'] = len(module['image'])
@@ -56,14 +55,14 @@ def file_breakdown(data, module, elf_data=None):
         section_size = sum(value for key, value in sizes.items() if key != 'Container header')
         sizes['Image padding'] = len(module['image']) - section_size
     sizes['Relocation table'] = len(module['fixups']) * (pack.FIXUP.size if compact else pack.LEGACY_FIXUP.size)
-    sizes['Import table'] = len(module['imports']) * (pack.IMPORT.size if named else pack.LEGACY_IMPORT.size)
+    sizes['Import table'] = len(module['imports']) * pack.IMPORT.size
     sizes['Import names'] = len(data) - sum(sizes.values())
     return sizes
 
 
 def format_module(path, data, show_fixups=False, elf_data=None, elf_path=None):
     module = pack.unpack(data)
-    magic = data[:8].decode('ascii')
+    magic = data[:8].rstrip(b'\0').decode('ascii')
     version = struct.unpack_from('<I', data, 8)[0]
     contract = module['contract']
     machine = module['machine']
@@ -89,6 +88,7 @@ def format_module(path, data, show_fixups=False, elf_data=None, elf_path=None):
             f'ABI version: {contract["abi_version"]}',
             f'API fingerprint: {contract["fingerprint"]}',
             f'Stack requirement: {contract["stack_size"]} bytes',
+            f'Initial heap: {contract["heap_size"]} bytes',
         ]
     else:
         lines.append('Runtime contract: none (relocation probe)')

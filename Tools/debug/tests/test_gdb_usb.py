@@ -112,9 +112,9 @@ class USBLauncherTests(unittest.TestCase):
         args = argparse.Namespace(port='/dev/ttyACM0', elf=Path('/tmp/firmware'), gdb='python-arm-gdb',
                                   gdb_server=None, batch=False, ex=['bt'], apmod=[Path('/tmp/module symbols.apmod')])
         command = gdb_usb.gdb_command(args)
-        self.assertIn('apmod printers', command)
+        self.assertNotIn('apmod printers', command)  # selected automatically from module DWARF
         self.assertIn('apmod symbols "/tmp/module symbols.apmod"', command)
-        helper = Path(gdb_usb.__file__).resolve().parents[1] / 'rust_modules/apmod_gdb.py'
+        helper = Path(gdb_usb.__file__).resolve().parents[1] / 'modules/apmod_gdb.py'
         self.assertIn(f'source {helper}', command)
         self.assertEqual(command[-2:], ['-ex', 'bt'])
 
@@ -127,9 +127,9 @@ class USBLauncherTests(unittest.TestCase):
         if probe.returncode != 0:
             self.skipTest('Requires Python-enabled GDB and pyelftools')
         with tempfile.TemporaryDirectory(prefix='usb rust debug ') as directory:
-            helper_dir = Path(directory) / 'rust_modules'
+            helper_dir = Path(directory) / 'modules'
             helper_dir.mkdir()
-            source_dir = Path(gdb_usb.__file__).resolve().parents[1] / 'rust_modules'
+            source_dir = Path(gdb_usb.__file__).resolve().parents[1] / 'modules'
             for name in ('apmod_gdb.py', 'apmod_debug.py', 'pack.py'):
                 shutil.copyfile(source_dir / name, helper_dir / name)
             args = argparse.Namespace(port='/dev/unused', elf=Path('/tmp/unused'), gdb=debugger,
@@ -141,7 +141,7 @@ class USBLauncherTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=15)
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, output)
-            self.assertIn('Native Rust module symbols', output)
+            self.assertIn('Native module symbols', output)
             self.assertNotIn('No such file or directory', output)
 
     def test_rust_requires_python_before_usb_attachment(self):

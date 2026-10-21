@@ -28,7 +28,7 @@ CHECKSUM_MASK = 0x007FFFFF
 
 def validate_prelinked_romfs(executable, build_directory, module_path):
     header = (build_directory / 'ap_romfs_embedded.h').read_text()
-    match = re.search(r'\{\s*"rust/romfs\.apmod"[^\n]*\b(ap_romfs_[0-9]+)\b', header)
+    match = re.search(r'\{\s*"modules/romfs\.apmod"[^\n]*\b(ap_romfs_[0-9]+)\b', header)
     assert match is not None, 'ROMFS module is absent from generated header'
     module = pack.unpack(module_path.read_bytes())
     with executable.open('rb') as stream:
@@ -50,10 +50,11 @@ def validate_prelinked_romfs(executable, build_directory, module_path):
             assert actual == expected, (offset, target, hex(actual), hex(expected))
 
 
-def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch):  # noqa: F811
+@pytest.mark.parametrize('sd_language', ['rust', 'cpp'])
+def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch, sd_language):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_ROMFS_BUILD_ROOT', ROOT / 'build/romfs-runtime'))
-    executable = build_root / board / 'examples/RustRuntime'
+    executable = build_root / board / 'examples/ModuleRuntime'
     embedded = ROOT / 'build/modules/romfs_runtime/romfs.apmod'
     if not executable.is_file() or not embedded.is_file():
         pytest.skip('Run Tools/modules/build_romfs_runtime.py first')
@@ -69,7 +70,9 @@ def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch):  # noqa: F811
 
     monkeypatch.setenv('AP_MODULE_LIFECYCLE', 'cleanup')
     sd_module = tmp_path / 'sd.apmod'
-    build.build(ROOT / 'libraries/AP_Module/tests/modules/lifecycle.rs', sd_module,
+    source = ROOT / ('libraries/AP_Module/tests/modules/lifecycle.rs' if sd_language == 'rust'
+                     else 'Tools/modules/cpp/probe.cpp')
+    build.build(source, sd_module,
                 'thumbv7em-none-eabihf', 8193)
     expected_checksum = (zlib.crc32(embedded.read_bytes()) ^ zlib.crc32(sd_module.read_bytes())) & CHECKSUM_MASK
 

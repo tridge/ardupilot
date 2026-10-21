@@ -18,7 +18,7 @@ import build
 
 def latest(vehicle, prefix):
     for line in reversed(vehicle.texts):
-        line = line.removeprefix('Rust: ')
+        line = line.removeprefix('Module: ')
         if line.startswith(prefix):
             return [int(number) for number in line[len(prefix):].split()]
     raise AssertionError(vehicle.diagnostic())
@@ -87,10 +87,10 @@ return update()
         vehicle.arm(False)
         vehicle.text('BIND S 0 0 ', after=len(vehicle.texts))
         before = len(vehicle.texts)
-        vehicle.parameter('RUST_RESTART', 1)
-        vehicle.text('Rust: loaded 1', after=before)
+        vehicle.parameter('MOD_RESTART', 1)
+        vehicle.text('Module: loaded 1', after=before)
         vehicle.text('BIND S ', after=before)
-        assert not any(re.search(r'Rust: .* (panic|returned -)', line) for line in vehicle.texts)
+        assert not any(re.search(r'Module: .* (panic|returned -)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()
 
@@ -133,9 +133,9 @@ def test_ahrs_value_bindings(tmp_path, lua):
         for restart in (0, 1):
             before = len(vehicle.texts)
             if restart:
-                vehicle.parameter('RUST_RESTART', restart)
-                vehicle.text('Rust: loaded 1', after=before)
-            native = valid_samples('Rust: AHRS ')
+                vehicle.parameter('MOD_RESTART', restart)
+                vehicle.text('Module: loaded 1', after=before)
+            native = valid_samples('Module: AHRS ')
             if lua:
                 script = valid_samples('LUA AHRS ')
                 # Grounded samples, NOT a cross-thread atomic snapshot. Units
@@ -143,7 +143,7 @@ def test_ahrs_value_bindings(tmp_path, lua):
                 for field, tolerance in [('G', 20), ('V', 100), ('P', 250), ('Q', 20), ('E', 250)]:
                     assert len(native[field]) == len(script[field]) == {'Q': 4, 'E': 7}.get(field, 3)
                     assert all(abs(a - b) <= tolerance for a, b in zip(native[field], script[field])), (native, script)
-        assert not any(re.search(r'Rust: .* (panic|returned -)', line) for line in vehicle.texts)
+        assert not any(re.search(r'Module: .* (panic|returned -)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()
 
@@ -197,10 +197,10 @@ return update()
                 assert all(800 <= values[2] <= 2200 for values in (native, script))
         for _ in range(3):
             before = len(vehicle.texts)
-            vehicle.parameter('RUST_RESTART', vehicle.parameter('RUST_RESTART') + 1)
-            vehicle.text('Rust: loaded 2 modules', after=before)
+            vehicle.parameter('MOD_RESTART', vehicle.parameter('MOD_RESTART') + 1)
+            vehicle.text('Module: loaded 2 modules', after=before)
             vehicle.text('ENUM ', after=before)
-        assert not any(re.search(r'Rust: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
+        assert not any(re.search(r'Module: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()
 
@@ -240,7 +240,7 @@ return update()
                     msg = vehicle.until(lambda m: m.get_type() == f'NAMED_VALUE_{kind}' and
                                         m.name == f'{prefix}_{suffix}')
                     assert msg.value == value
-        assert not any(re.search(r'Rust: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
+        assert not any(re.search(r'Module: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()
 
@@ -284,7 +284,7 @@ return update()
                     msg = vehicle.until(lambda m: m.get_type() == 'NAMED_VALUE_FLOAT' and m.name == f'{prefix}_{suffix}')
                     values.append(struct.pack('<f', msg.value))
                 assert values[0] == values[1], (suffix, values)
-        assert not any(re.search(r'Rust: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
+        assert not any(re.search(r'Module: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()
 
@@ -322,7 +322,7 @@ return update()
         for pwm, expected in ((1500, 250), (2000, 1000), (1000, -1000)):
             before = len(vehicle.texts)
             vehicle.link.mav.rc_channels_override_send(1, 1, 65535, 65535, 65535, 65535, 65535, 65535, pwm, 65535)
-            vehicle.text(f'Rust: RCB {expected} {expected} {expected} ', after=before)
+            vehicle.text(f'Module: RCB {expected} {expected} {expected} ', after=before)
             if lua:
                 vehicle.text(f'LUA RCB {expected} {expected} {expected} ', after=before)
                 assert latest(vehicle, 'RCB ') == latest(vehicle, 'LUA RCB ')
@@ -331,23 +331,23 @@ return update()
         vehicle.parameter('RC10_OPTION', 301)
         before = len(vehicle.texts)
         vehicle.link.mav.rc_channels_override_send(1, 1, 65535, 65535, 65535, 65535, 65535, 65535, 1500, 65535)
-        vehicle.text('Rust: RCB 250 250 250 ', after=before)
+        vehicle.text('Module: RCB 250 250 250 ', after=before)
         if lua:
             vehicle.text('LUA RCB 250 250 250 ', after=before)
         # Clear the override before restarting; exit does not undo shared state.
         before = len(vehicle.texts)
         vehicle.link.mav.rc_channels_override_send(1, 1, 65535, 65535, 65535, 65535, 65535, 65535, 1000, 65535)
-        vehicle.text('Rust: RCB -1000 -1000 -1000 ', after=before)
+        vehicle.text('Module: RCB -1000 -1000 -1000 ', after=before)
         vehicle.parameter('RC10_OPTION', 0)
         vehicle.parameter('RC9_OPTION', 301)
-        vehicle.text('Rust: RCC ')
+        vehicle.text('Module: RCC ')
         attempts, busy = latest(vehicle, 'RCC ')
         print(f'RC handles Lua={lua}: {busy} busy / {attempts} update attempts', flush=True)
         for cycle in range(1, 4):
             before = len(vehicle.texts)
             vehicle.restart(cycle)
-            vehicle.text('Rust: RCB -1000 -1000 -1000 ', after=before)
-        assert not any(re.search(r'Rust: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
+            vehicle.text('Module: RCB -1000 -1000 -1000 ', after=before)
+        assert not any(re.search(r'Module: .* (panic|returned -|stop timeout)', line) for line in vehicle.texts)
     finally:
         try:
             if vehicle.link is not None:
@@ -398,9 +398,9 @@ return update()
             start = len(vehicle.texts)
             if cycle:
                 vehicle.restart(cycle)
-            vehicle.text('Rust: VAL M 16 3 -353632610 1491652300 42 3', after=start)
-            vehicle.text('Rust: VAL L ', after=start)
-            vehicle.text('Rust: VAL H ', after=start)
+            vehicle.text('Module: VAL M 16 3 -353632610 1491652300 42 3', after=start)
+            vehicle.text('Module: VAL L ', after=start)
+            vehicle.text('Module: VAL H ', after=start)
             if lua:
                 vehicle.text('LUA VM 16 3 -353632610 1491652300 42 3', after=start)
                 samples = {}
@@ -413,6 +413,6 @@ return update()
                 vehicle.until(complete, 10)
                 for suffix in ('D', 'B', 'N', 'E'):
                     assert samples['VAL_' + suffix] == samples['LUA_' + suffix]
-        assert not any(re.search(r'Rust: .* (panic|returned -)', line) for line in vehicle.texts)
+        assert not any(re.search(r'Module: .* (panic|returned -)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()

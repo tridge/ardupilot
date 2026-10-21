@@ -19,8 +19,7 @@ import pack
 import pytest
 
 from elftools.elf.elffile import ELFFile
-
-from build import check_rust_version
+from rust.build import check_rust_version
 
 HERE = Path(__file__).resolve().parents[1]
 ROOT = HERE.parents[1]
@@ -35,7 +34,7 @@ def build(tmp_path, target, base=0x10000, relocation=None):
     if relocation is None:
         relocation = 'ropi-rwpi' if target == 'thumbv7em-none-eabihf' else 'pic'
     output = tmp_path / f'{target}-{base:x}-{relocation}.elf'
-    command = [compiler, str(HERE / 'probe.rs'), '--edition=2021', '--target', target,
+    command = [compiler, str(HERE / 'rust/probe.rs'), '--edition=2021', '--target', target,
                '-C', 'opt-level=s', '-C', 'panic=abort', '-C', 'lto=fat',
                '-C', f'relocation-model={relocation}', '-o', str(output)]
     arguments = [f'-T{HERE / "module.ld"}', '--emit-relocs', f'--defsym=MODULE_BASE={base}']
@@ -71,7 +70,7 @@ def checksum(data, header_size=pack.HEADER.size):
 
 def runtime_manifest(target):
     return dict(abi_version=1, cpu_profile=1 if target == 'thumbv7em-none-eabihf' else 2,
-                stack_size=4096, fingerprint=bytes(range(1, 17)).hex())
+                stack_size=4096, heap_size=32768, fingerprint=bytes(range(1, 17)).hex())
 
 
 @pytest.mark.parametrize('target', ['thumbv7em-none-eabihf', 'x86_64-unknown-linux-gnu'])
@@ -79,7 +78,7 @@ def test_runtime_contract(tmp_path, target):
     manifest = runtime_manifest(target)
     elf = build(tmp_path, target)
     data = pack.pack_elf(elf, manifest)
-    assert data[:8] == b'APRUST05'
+    assert data[:8] == b'APMOD06\0'
     assert data == pack.pack_elf(build(tmp_path, target, base=0x24123000), manifest)
     assert pack.unpack(data)['contract'] == manifest
     # Tagging changes the compatibility envelope, not the image or relocation.
@@ -94,7 +93,7 @@ def test_runtime_contract(tmp_path, target):
         with pytest.raises(ValueError):
             pack.unpack(checksum(damaged, pack.RUNTIME_HEADER.size))
     damaged = bytearray(data)
-    damaged[60:76] = bytes(16)
+    damaged[64:80] = bytes(16)
     with pytest.raises(ValueError, match='fingerprint'):
         pack.unpack(checksum(damaged, pack.RUNTIME_HEADER.size))
     for length in (0, 55, 56, 75, len(data) - 1):
@@ -256,7 +255,7 @@ def test_native_execution_two_allocations(tmp_path):
             assert start(ctypes.byref(host)) == 31
             assert start(ctypes.byref(host)) == 26
             assert allocations == {}
-        assert messages == [b'Rust module probe'] * 4
+        assert messages == [b'Native module probe'] * 4
         assert sleeps == [10] * 4
         assert allocation_errors == []
     finally:

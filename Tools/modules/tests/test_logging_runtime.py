@@ -42,7 +42,7 @@ return update()
             start = len(vehicle.texts) if cycle else 0
             if cycle:
                 vehicle.restart(cycle)
-            vehicle.text('Rust: MATH ok', after=start)
+            vehicle.text('Module: MATH ok', after=start)
             if lua:
                 vehicle.text('LUA LOG wrote', after=start)
             vehicle.pump(1)  # allow the file backend to flush

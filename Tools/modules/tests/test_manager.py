@@ -25,9 +25,9 @@ import build
 def test_chibios_runtime_manager(tmp_path, renode, monkeypatch, ending):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
-    executable = build_root / board / 'examples/RustRuntime'
+    executable = build_root / board / 'examples/ModuleRuntime'
     if not executable.is_file():
-        pytest.skip('Build examples/RustRuntime with --enable-modules')
+        pytest.skip('Build examples/ModuleRuntime with --enable-modules')
     if not shutil.which('mcopy') or not shutil.which('mmd'):
         pytest.skip('Requires mtools')
     names = ['result', 'cycles', 'before', 'after', 'stack_free', 'stack_total',
@@ -76,7 +76,7 @@ emulation RunFor "40"
     assert result['cycles'] == 20 and result['before'] == result['after'], result
     assert result['stack_free'] > 1024 and 4096 <= result['stack_total'] < 4096 + 1024, result
     # The registry includes port context overhead, but not a 4 KiB rounding gap.
-    assert 16385 <= result['worker_stack_total'] < 16385 + 1024, result
+    assert 8193 + 4096 <= result['worker_stack_total'] < 8193 + 4096 + 1024, result
     assert result['manager_priority'] > result['worker_priority'], result
     fast_regions = {'STM32F405xx': (0x10000000, 0x10010000), 'STM32H743xx': (0x20000000, 0x20020000)}
     low, high = fast_regions[generated['mcu_type']]

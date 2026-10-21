@@ -98,7 +98,7 @@ class Lifecycle(gdb.Breakpoint):
 
 
 class Apmod(gdb.Command):
-    """Native Rust module symbols. See 'apmod help' for commands."""
+    """Native module symbols. See 'apmod help' for commands."""
 
     def __init__(self):
         super().__init__('apmod', gdb.COMMAND_FILES)
@@ -117,7 +117,7 @@ class Apmod(gdb.Command):
         previous = set(gdb.objfiles())
         gdb.execute(candidate.command(target, info['rx'], info['rw']), to_string=True)
         objfile = next(item for item in gdb.objfiles() if item not in previous)
-        if self.printer:
+        if self.printer and candidate.is_rust:
             gdb.printing.register_pretty_printer(objfile, self.printer, replace=True)
         self.loaded[info['pointer']] = (candidate, info, objfile)
         gdb.write(f'apmod: {info["name"]} RX=0x{info["rx"]:x} RW=0x{info["rw"]:x}\n')
@@ -147,8 +147,9 @@ class Apmod(gdb.Command):
         sys.path.insert(0, str(directory))
         import gdb_lookup
         self.printer = gdb_lookup.printer
-        for _, _, objfile in self.loaded.values():
-            gdb.printing.register_pretty_printer(objfile, self.printer, replace=True)
+        for candidate, _, objfile in self.loaded.values():
+            if candidate.is_rust:
+                gdb.printing.register_pretty_printer(objfile, self.printer, replace=True)
         version = subprocess.check_output([compiler, '-vV'], text=True)
         commit = next(line.split(': ', 1)[1] for line in version.splitlines() if line.startswith('commit-hash: '))
         gdb.execute(f'set substitute-path /rustc/{commit} {quote(sysroot / "lib/rustlib/src/rust")}')
@@ -169,6 +170,11 @@ class Apmod(gdb.Command):
                     raise ValueError('firmware ELF needs C++ debug information; rebuild with CXXFLAGS=-g') from error
                 for path in args[1:]:
                     candidate = ModuleSymbols(path)
+                    if candidate.is_rust and self.printer is None:
+                        try:
+                            self.printers(os.environ.get('RUSTC', 'rustc'))
+                        except (OSError, subprocess.CalledProcessError, ImportError, ValueError) as error:
+                            gdb.write(f'apmod: Rust printers unavailable: {error}\n', gdb.STDERR)
                     self.candidates[candidate.checksum] = candidate
                 if not self.hooks:
                     self.hooks = [Lifecycle(self, False), Lifecycle(self, True)]

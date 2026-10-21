@@ -59,11 +59,11 @@ class FTPReader:
 @pytest.mark.parametrize('rust', [False, True])
 def test_threads_over_ftp(tmp_path, images, rust):  # noqa: F811
     modules = {'diag.apmod': images['cleanup'], 'gone.apmod': images['return']} if rust else None
-    vehicle = Vehicle(tmp_path / 'vehicle', modules, {'SCR_ENABLE': 1, 'RUST_ENABLE': int(rust)})
+    vehicle = Vehicle(tmp_path / 'vehicle', modules, {'SCR_ENABLE': 1, 'MOD_ENABLE': int(rust)})
     try:
         vehicle.start()
         if rust:
-            vehicle.text('Rust: exited gone.apmod')
+            vehicle.text('Module: exited gone.apmod')
         reader = FTPReader(vehicle)
 
         def snapshot():
@@ -76,13 +76,13 @@ def test_threads_over_ftp(tmp_path, images, rust):  # noqa: F811
             # Default SITL libc stacks have no high-water mark instrumentation.
             assert re.search(r'^Scripting\s+PRI=\s*\d+ sp=\S+ STACK=\?/\d+', listing, re.M)
             if rust:
-                assert names.count('RustMgr') == names.count('diag.apmod') == 1
+                assert names.count('ModMgr') == names.count('diag.apmod') == 1
                 match = re.search(r'^diag.apmod\s+PRI=\s*0 sp=\S+ STACK=(\d+)/(\d+)$', listing, re.M)
                 assert match, listing
                 free, total = map(int, match.groups())
                 assert 0 < free < total == 65536
             else:
-                assert 'RustMgr' not in names
+                assert 'ModMgr' not in names
             return listing
 
         snapshot()

@@ -6,8 +6,9 @@ import io
 
 from pathlib import Path
 
-import install_toolchain
 import pytest
+
+from rust import install_toolchain
 
 
 @pytest.mark.parametrize('system,machine,expected', [

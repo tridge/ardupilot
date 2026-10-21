@@ -45,12 +45,12 @@ class Vehicle:
     def __init__(self, directory, files, extra, model='plane'):
         self.directory = directory
         self.directory.mkdir()
-        self.modules = directory / 'rust'
+        self.modules = directory / 'modules'
         if files is not None:
             self.modules.mkdir()
             for name, data in files.items():
                 (self.modules / name).write_bytes(data)
-        settings = {'RUST_ENABLE': 1, 'RUST_HEAP_SIZE': 4096, 'RUST_STACK_SIZE': 65536,
+        settings = {'MOD_ENABLE': 1, 'MOD_HEAP_MAX': 4096, 'MOD_STACK_MAX': 65536,
                     'ARMING_REQUIRE': 1, 'LOG_BACKEND_TYPE': 0}
         settings.update(extra)
         self.defaults = directory / 'test.parm'
@@ -59,6 +59,7 @@ class Vehicle:
         self.link = None
         self.log = None
         self.texts = []
+        self.text_chunks = {}
         self.last_heartbeat = 0
         self.model = model
 
@@ -85,7 +86,7 @@ class Vehicle:
                 time.sleep(0.05)
         assert self.link is not None, self.diagnostic()
         self.until(lambda message: message.get_type() == 'HEARTBEAT', 20)
-        assert self.parameter('RUST_ENABLE') in (0, 1)
+        assert self.parameter('MOD_ENABLE') in (0, 1)
         self.pump(5)  # let simulated home, sensors and startup calibration settle
 
     def stop(self):
@@ -118,7 +119,24 @@ class Vehicle:
             self.last_heartbeat = time.monotonic()
         message = self.link.recv_match(blocking=True, timeout=0.1)
         if message is not None and message.get_type() == 'STATUSTEXT':
-            self.texts.append(message.text)
+            identity = getattr(message, 'id', 0)
+            sequence = getattr(message, 'chunk_seq', 0)
+            if identity == 0:
+                self.texts.append(message.text)
+            else:
+                key = (message.get_srcSystem(), message.get_srcComponent(), identity)
+                previous = self.text_chunks.pop(key, None)
+                if sequence == 0:
+                    text = message.text
+                elif previous is not None and previous[0] + 1 == sequence:
+                    text = previous[1] + message.text
+                else:
+                    text = None
+                if text is not None:
+                    if len(message.text.encode('utf8')) < 50:
+                        self.texts.append(text)
+                    else:
+                        self.text_chunks[key] = (sequence, text)
         elif message is not None and message.get_type() == 'PARAM_ERROR':
             self.texts.append(str(message))
         return message
@@ -160,19 +178,21 @@ class Vehicle:
         raise AssertionError(f'{name} != {expected}\n{self.diagnostic()}')
 
     def text(self, fragment, after=0, timeout=10):
-        if any(fragment in item for item in self.texts[after:]):
-            return
-        self.until(lambda msg: msg.get_type() == 'STATUSTEXT' and fragment in msg.text, timeout)
+        deadline = time.monotonic() + timeout
+        while not any(fragment in item for item in self.texts[after:]):
+            if time.monotonic() >= deadline:
+                raise AssertionError(self.diagnostic())
+            self.receive()
 
     def restart(self, value, expected=1):
         mark = len(self.texts)
-        self.parameter('RUST_RESTART', value)
-        self.text(f'Rust: loaded {expected} modules', after=mark)
+        self.parameter('MOD_RESTART', value)
+        self.text(f'Module: loaded {expected} modules', after=mark)
 
     def checksums(self):
-        self.parameter('RUST_DEBUG_OPTS', 32)
-        self.wait_parameter('RUST_DEBUG_OPTS', 0)
-        return self.parameter('RUST_LD_CSUM'), self.parameter('RUST_RUN_CSUM')
+        self.parameter('MOD_DEBUG_OPTS', 32)
+        self.wait_parameter('MOD_DEBUG_OPTS', 0)
+        return self.parameter('MOD_LD_CSUM'), self.parameter('MOD_RUN_CSUM')
 
     def arm(self, armed=True, force=False, accepted=True):
         self.link.mav.command_long_send(1, 1, mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
@@ -234,7 +254,7 @@ def test_byte_granular_stack_size(tmp_path, launch, monkeypatch, stack_size):
     monkeypatch.setenv('AP_MODULE_LIFECYCLE', 'cooperative')
     module = build.build(ROOT / 'libraries/AP_Module/tests/modules/lifecycle.rs',
                          tmp_path / 'odd.apmod', 'x86_64-unknown-linux-gnu', 8193)
-    vehicle = launch({'odd.apmod': module.read_bytes()}, SCR_ENABLE=0, RUST_STACK_SIZE=stack_size)
+    vehicle = launch({'odd.apmod': module.read_bytes()}, SCR_ENABLE=0, MOD_STACK_MAX=stack_size)
     if stack_size < 8193 + 16384:
         # Keep the callback margin even when the HAL could round the stack up.
         vehicle.text('odd.apmod load failed: stack exceeds')
@@ -242,12 +262,40 @@ def test_byte_granular_stack_size(tmp_path, launch, monkeypatch, stack_size):
         return
     vehicle.text('ready')
     page = os.sysconf('SC_PAGESIZE')
-    reserved = ((stack_size + page - 1) // page) * page
+    reserved = ((8193 + 16384 + page - 1) // page) * page
     vehicle.text(f'stack {reserved}')
     vehicle.arm()
     vehicle.arm(False)
     vehicle.restart(1)
-    vehicle.text('Rust: exited odd.apmod')
+    vehicle.text('Module: exited odd.apmod')
+
+
+def test_per_module_heap_and_stack_requests(tmp_path, launch, monkeypatch):
+    monkeypatch.setenv('AP_MODULE_LIFECYCLE', 'cleanup')
+    files = {}
+    for name, heap, stack in [('small', 2048, 1024), ('large', 8192, 8193)]:
+        image = build.build(ROOT / 'libraries/AP_Module/tests/modules/lifecycle.rs',
+                            tmp_path / f'{name}.apmod', 'x86_64-unknown-linux-gnu', stack, heap_size=heap)
+        files[image.name] = image.read_bytes()
+    vehicle = launch(files, SCR_ENABLE=0, MOD_HEAP_MAX=32768, MOD_STACK_MAX=65536)
+    vehicle.text('Module: loaded 2 modules')
+    vehicle.text('Module RAM: heap 2048 ')
+    vehicle.text('Module RAM: heap 8192 ')
+    for declared in (1024, 8193):
+        page = os.sysconf('SC_PAGESIZE')
+        reserved = ((declared + 16384 + page - 1) // page) * page
+        vehicle.text(f'stack {reserved}')
+    vehicle.arm()
+    vehicle.arm(False)
+
+
+def test_initial_heap_above_limit_rejected(tmp_path, launch):
+    image = build.build(ROOT / 'libraries/AP_Module/examples/simple_loop.rs',
+                        tmp_path / 'large.apmod', 'x86_64-unknown-linux-gnu', 8192, heap_size=8193)
+    vehicle = launch({'large.apmod': image.read_bytes()}, SCR_ENABLE=0, MOD_HEAP_MAX=8192)
+    vehicle.text('load failed: initial heap exceeds')
+    assert not any('Module: started' in t for t in vehicle.texts)
+    vehicle.arm(accepted=False)
 
 
 @pytest.mark.parametrize('budget', ['negative', 'too_small', 'round_up', 'generous'])
@@ -258,7 +306,7 @@ def test_rounded_code_size(launch, images, budget):
     assert 4096 <= previous_page < image_size - 1
     requested = {'negative': -1, 'too_small': previous_page,
                  'round_up': previous_page + 1, 'generous': 131071}[budget]
-    vehicle = launch({'code.apmod': data}, SCR_ENABLE=0, RUST_CODE_SIZE=requested)
+    vehicle = launch({'code.apmod': data}, SCR_ENABLE=0, MOD_CODE_MAXSIZE=requested)
     if budget in ('negative', 'too_small'):
         vehicle.text('invalid memory limits' if budget == 'negative' else
                      'code.apmod load failed: image exceeds')
@@ -267,11 +315,11 @@ def test_rounded_code_size(launch, images, budget):
     vehicle.text('ready')
     # The parameter stays as entered; rounding affects the effective budget,
     # not how much image memory is actually allocated.
-    assert vehicle.parameter('RUST_CODE_SIZE') == requested
+    assert vehicle.parameter('MOD_CODE_MAXSIZE') == requested
     page = os.sysconf('SC_PAGESIZE')
     reserved = ((image_size + page - 1) // page) * page
-    vehicle.text('Rust RAM: RX ')
-    report = next(t for t in vehicle.texts if t.startswith('Rust RAM: RX '))
+    vehicle.text('Module RAM: RX ')
+    report = next(t for t in vehicle.texts if t.startswith('Module RAM: RX '))
     reported = int(report.split()[3])
     # The RAM report includes the executable-memory handle as well as pages.
     assert reserved <= reported < reserved + page, report
@@ -285,8 +333,8 @@ def test_rounded_code_size(launch, images, budget):
     (12, 40, 'wrong target'),
     (44, 0, 'ABI version mismatch'),
     (48, 1, 'CPU profile mismatch'),
-    (60, 0, 'API fingerprint'),
-    (76, 0, 'image checksum mismatch'),
+    (64, 0, 'API fingerprint'),
+    (80, 0, 'image checksum mismatch'),
 ])
 def test_load_failure_diagnostics(launch, images, offset, value, reason):
     data = bytearray(images['cooperative'])
@@ -305,16 +353,16 @@ def test_normal_exit_checksums_and_arming_bypasses(launch, images):
     vehicle.modules.mkdir()
     (vehicle.modules / 'one.apmod').write_bytes(images['return'])
     vehicle.restart(1)
-    vehicle.text('Rust: exited one.apmod')
+    vehicle.text('Module: exited one.apmod')
     assert vehicle.checksums() == (checksum(images['return']), 0)
     vehicle.arm()
     vehicle.arm(False)
-    vehicle.parameter('RUST_LD_CSUM', checksum(images['return']) ^ 1)
+    vehicle.parameter('MOD_LD_CSUM', checksum(images['return']) ^ 1)
     vehicle.arm(accepted=False)
-    vehicle.parameter('RUST_DEBUG_OPTS', 16)
+    vehicle.parameter('MOD_DEBUG_OPTS', 16)
     vehicle.arm()
     vehicle.arm(False)
-    vehicle.parameter('RUST_DEBUG_OPTS', 0)
+    vehicle.parameter('MOD_DEBUG_OPTS', 0)
     vehicle.parameter('ARMING_SKIPCHK', SYSTEM_CHECK)
     vehicle.arm()
     vehicle.arm(False)
@@ -341,7 +389,7 @@ def test_armed_restart_panic_retention_and_cpu(launch, images):
     (vehicle.modules / 'one.apmod').write_bytes(images['panic'])
     (vehicle.modules / 'two.apmod').unlink()
     mark = len(vehicle.texts)
-    vehicle.parameter('RUST_RESTART', 6)
+    vehicle.parameter('MOD_RESTART', 6)
     vehicle.text('panic; reboot required', after=mark)
     vehicle.until(lambda msg: msg.get_type() == 'HEARTBEAT' and
                   bool(msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED))
@@ -354,10 +402,10 @@ def test_armed_restart_panic_retention_and_cpu(launch, images):
     vehicle.arm(accepted=False)
     vehicle.arm(force=True)
     mark = len(vehicle.texts)
-    vehicle.parameter('RUST_RESTART', 7)
+    vehicle.parameter('MOD_RESTART', 7)
     vehicle.text('stop timeout', after=mark, timeout=15)
     assert vehicle.worker('one.apmod')[0] == before[0]
-    assert not any('Rust: loaded' in text for text in vehicle.texts[mark:])
+    assert not any('Module: loaded' in text for text in vehicle.texts[mark:])
     vehicle.arm(False)
 
 
@@ -374,14 +422,14 @@ def test_failed_generation_cleanup_and_recovery(launch, images):
     vehicle.arm(False)
     (vehicle.modules / 'three.apmod').write_bytes(images['return'])
     mark = len(vehicle.texts)
-    vehicle.parameter('RUST_RESTART', 2)
+    vehicle.parameter('MOD_RESTART', 2)
     vehicle.text('module count', after=mark)
     vehicle.arm(accepted=False)
     assert vehicle.worker('one.apmod') is None
 
 
 def test_saved_checksum_action_does_not_repeat_on_reboot(launch, images):
-    vehicle = launch({'one.apmod': images['cooperative']}, RUST_RESTART=23)
+    vehicle = launch({'one.apmod': images['cooperative']}, MOD_RESTART=23)
     expected = checksum(images['cooperative'])
     assert vehicle.checksums() == (expected, expected)
     vehicle.pump(2)
@@ -392,15 +440,15 @@ def test_saved_checksum_action_does_not_repeat_on_reboot(launch, images):
     (vehicle.modules / 'one.apmod').write_bytes(images['cleanup'])
     vehicle.start()
     vehicle.pump(2)
-    assert vehicle.parameter('RUST_DEBUG_OPTS') == 0
-    assert vehicle.parameter('RUST_LD_CSUM') == expected
-    assert vehicle.parameter('RUST_RUN_CSUM') == expected
+    assert vehicle.parameter('MOD_DEBUG_OPTS') == 0
+    assert vehicle.parameter('MOD_LD_CSUM') == expected
+    assert vehicle.parameter('MOD_RUN_CSUM') == expected
     assert expected != checksum(images['cleanup'])
     vehicle.arm(accepted=False)
 
 
 def test_disabled_runtime_ignores_module_errors(launch):
-    vehicle = launch({'bad.apmod': b'bad image'}, RUST_ENABLE=0)
+    vehicle = launch({'bad.apmod': b'bad image'}, MOD_ENABLE=0)
     vehicle.arm()
     vehicle.arm(False)
 
@@ -412,16 +460,16 @@ def test_late_exit_and_coalesced_restarts(launch, images):
     mark = len(vehicle.texts)
     started = time.monotonic()
     for request in range(1, 7):
-        vehicle.parameter('RUST_RESTART', request)
+        vehicle.parameter('MOD_RESTART', request)
         vehicle.pump(0.2)
     vehicle.text('stop timeout', after=mark)
     # At speedup 5 the deadline is about two wall-clock seconds. Repeated
     # requests during Stopping must not keep pushing the deadline back.
     assert time.monotonic() - started < 3.5, vehicle.diagnostic()
     assert vehicle.worker('one.apmod')[0] == worker
-    vehicle.text('Rust: exited one.apmod', after=mark)
+    vehicle.text('Module: exited one.apmod', after=mark)
     assert vehicle.worker('one.apmod') is None
-    assert not any('Rust: loaded' in text for text in vehicle.texts[mark:])
+    assert not any('Module: loaded' in text for text in vehicle.texts[mark:])
     vehicle.arm(accepted=False)  # a late exit does not clear the timeout error
     vehicle.restart(7)
     vehicle.arm()
@@ -432,7 +480,7 @@ def test_directory_errors_and_text_queue_overflow(launch, images):
     vehicle = launch()
     vehicle.modules.write_bytes(b'not a directory')
     mark = len(vehicle.texts)
-    vehicle.parameter('RUST_RESTART', 1)
+    vehicle.parameter('MOD_RESTART', 1)
     vehicle.text('module directory unavailable', after=mark)
     vehicle.arm(accepted=False)
     vehicle.modules.unlink()
@@ -440,7 +488,7 @@ def test_directory_errors_and_text_queue_overflow(launch, images):
     (vehicle.modules / 'one.apmod').write_bytes(images['flood'])
     mark = len(vehicle.texts)
     vehicle.restart(2)
-    vehicle.text('Rust: dropped', after=mark)
+    vehicle.text('Module: dropped', after=mark)
     vehicle.arm()
     vehicle.arm(False)
 
@@ -457,7 +505,7 @@ def test_restart_memory_mappings(launch, images):
             (vehicle.modules / 'two.apmod').write_bytes(b'bad image' * 32)
             request += 1
             mark = len(vehicle.texts)
-            vehicle.parameter('RUST_RESTART', request)
+            vehicle.parameter('MOD_RESTART', request)
             vehicle.text('load failed', after=mark)
             (vehicle.modules / 'two.apmod').write_bytes(images['cooperative'])
         request += 1

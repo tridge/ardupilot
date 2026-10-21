@@ -58,7 +58,7 @@ def test_parser_units(tmp_path):
     environment = build.sdk_environment()
     sdk = tmp_path / 'libap_rust_sdk.rlib'
     subprocess.run([rustc, '--edition=2021', '--crate-name', 'ap_rust_sdk', '--crate-type', 'rlib',
-                    str(ROOT / 'libraries/AP_Module/sdk/src/lib.rs'), '-o', str(sdk)], check=True, env=environment)
+                    str(ROOT / 'libraries/AP_Module/sdk/rust/src/lib.rs'), '-o', str(sdk)], check=True, env=environment)
     source = tmp_path / 'test.rs'
     source.write_text('extern crate alloc;\n' + '\n'.join(
         f'#[path="{APPLET / (name + ".rs")}"] mod {name};'
@@ -75,10 +75,10 @@ def composition_results(tmp_path_factory):
     if os.environ.get('AP_MODULE_TEST_NO_LUA'):
         pytest.skip('Golden oracle requires Lua')
     image = build.build(ROOT / 'libraries/AP_Module/tests/modules/aerobatics_path.rs',
-                        tmp_path / 'path.apmod', 'x86_64-unknown-linux-gnu', 16384)
+                        tmp_path / 'path.apmod', 'x86_64-unknown-linux-gnu', 16384, heap_size=32768)
     vehicle = Vehicle(tmp_path / 'vehicle', {'path.apmod': image.read_bytes()}, {
         'SCR_ENABLE': 1, 'SCR_HEAP_SIZE': 500000, 'SCR_VM_I_COUNT': 1000000,
-        'RUST_HEAP_SIZE': 65536, 'RUST_CODE_SIZE': 131072,
+        'MOD_HEAP_MAX': 65536, 'MOD_CODE_MAXSIZE': 131072,
         'LOG_BACKEND_TYPE': 1, 'LOG_DISARMED': 1, 'LOG_FILE_DSRMROT': 0, 'LOG_FILE_BUFSIZE': 128,
     })
     scripts = vehicle.directory / 'scripts'
@@ -116,7 +116,7 @@ return golden,2000
     try:
         vehicle.start()
         vehicle.text('AEROP Lua composition done', timeout=30)
-        vehicle.text('Rust: AEROP composition done', timeout=30)
+        vehicle.text('Module: AEROP composition done', timeout=30)
         vehicle.pump(2)
         assert not any('panic' in line or 'returned -' in line for line in vehicle.texts), vehicle.diagnostic()
     finally:
@@ -143,8 +143,8 @@ return golden,2000
             maximum[field] = max(maximum.get(field, 0), abs(value - expected))
             assert struct.pack('<f', value) == struct.pack('<f', expected), (i, field, value, expected)
     print('AirShow path maximum absolute differences:', maximum)
-    memory = [tuple(map(int, re.search(r'Rust RAM: heap \d+ used (\d+) peak (\d+)', text).groups()))
-              for text in vehicle.texts if re.search(r'Rust RAM: heap \d+ used (\d+) peak (\d+)', text)]
+    memory = [tuple(map(int, re.search(r'Module RAM: heap \d+ used (\d+) peak (\d+)', text).groups()))
+              for text in vehicle.texts if re.search(r'Module RAM: heap \d+ used (\d+) peak (\d+)', text)]
     assert memory[-1][0] == 0 and 0 < memory[-1][1] < 32768, memory
     print('AirShow SITL final heap used/peak:', memory[-1])
     oracle = bytearray()
@@ -168,9 +168,9 @@ def test_airshow_h743(tmp_path, renode, composition_results):  # noqa: F811
 @pytest.mark.parametrize('heap_size', [1024, 8192, 16384])
 def test_allocation_failure_reload(tmp_path, heap_size):
     image = build.build(ROOT / 'libraries/AP_Module/tests/modules/aerobatics_path.rs',
-                        tmp_path / 'path.apmod', 'x86_64-unknown-linux-gnu', 16384)
+                        tmp_path / 'path.apmod', 'x86_64-unknown-linux-gnu', 16384, heap_size=heap_size)
     vehicle = Vehicle(tmp_path / 'vehicle', {'path.apmod': image.read_bytes()},
-                      {'RUST_HEAP_SIZE': heap_size, 'RUST_CODE_SIZE': 131072})
+                      {'MOD_HEAP_MAX': heap_size, 'MOD_CODE_MAXSIZE': 131072})
     shutil.copyfile(APPLET / 'AirShow.txt', vehicle.directory / 'trick72.txt')
     try:
         vehicle.start()
@@ -179,17 +179,17 @@ def test_allocation_failure_reload(tmp_path, heap_size):
             if cycle:
                 vehicle.restart(cycle)
             vehicle.text('path.apmod returned -2', after=mark)
-            vehicle.text('Rust: exited path.apmod', after=mark)
+            vehicle.text('Module: exited path.apmod', after=mark)
             vehicle.pump(0.5)
-            memory = [text for text in vehicle.texts[mark:] if 'Rust RAM: heap used' in text]
-            assert 'heap used 0' in memory[-1], memory
+            memory = [text for text in vehicle.texts[mark:] if 'Module RAM: heap ' in text]
+            assert ' used 0 ' in memory[-1], memory
             assert not any('panic' in text for text in vehicle.texts)
         if heap_size >= 8192:
             # Limits are boot-time parameters. Prove the failed allocation
             # doesn't poison later generations, using a path that fits them.
             (vehicle.directory / 'trick72.txt').write_text('name: Short\nloop 25\n')
             vehicle.restart(4)
-            vehicle.text('Rust: AEROP composition done', timeout=30)
+            vehicle.text('Module: AEROP composition done', timeout=30)
     finally:
         vehicle.stop()
 
@@ -197,17 +197,17 @@ def test_allocation_failure_reload(tmp_path, heap_size):
 def test_sampling_has_no_allocations(tmp_path, monkeypatch, composition_results):
     monkeypatch.setenv('AP_MODULE_AERO_BUILD_ONLY', '1')
     image = build.build(ROOT / 'libraries/AP_Module/tests/modules/aerobatics_path.rs',
-                        tmp_path / 'path.apmod', 'x86_64-unknown-linux-gnu', 16384)
+                        tmp_path / 'path.apmod', 'x86_64-unknown-linux-gnu', 16384, heap_size=32768)
     vehicle = Vehicle(tmp_path / 'vehicle', {'path.apmod': image.read_bytes()},
-                      {'RUST_HEAP_SIZE': 65536, 'RUST_CODE_SIZE': 131072})
+                      {'MOD_HEAP_MAX': 65536, 'MOD_CODE_MAXSIZE': 131072})
     shutil.copyfile(APPLET / 'AirShow.txt', vehicle.directory / 'trick72.txt')
     try:
         vehicle.start()
-        vehicle.text('Rust: AEROP build done')
-        vehicle.text('Rust: exited path.apmod')
+        vehicle.text('Module: AEROP build done')
+        vehicle.text('Module: exited path.apmod')
         vehicle.pump(0.5)
-        memory = [tuple(map(int, re.search(r'heap used (\d+) peak (\d+)', text).groups()))
-                  for text in vehicle.texts if re.search(r'heap used (\d+) peak (\d+)', text)]
+        memory = [tuple(map(int, re.search(r'heap \d+ used (\d+) peak (\d+)', text).groups()))
+                  for text in vehicle.texts if re.search(r'heap \d+ used (\d+) peak (\d+)', text)]
         assert memory[-1] == (0, composition_results['peak']), memory
     finally:
         vehicle.stop()

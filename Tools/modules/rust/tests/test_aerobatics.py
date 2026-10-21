@@ -25,7 +25,7 @@ def test_host_units(tmp_path):
     environment = build.sdk_environment()
     sdk = tmp_path / 'libap_rust_sdk.rlib'
     subprocess.run([rustc, '--edition=2021', '--crate-name', 'ap_rust_sdk', '--crate-type', 'rlib',
-                    str(ROOT / 'libraries/AP_Module/sdk/src/lib.rs'), '-o', str(sdk)], check=True, env=environment)
+                    str(ROOT / 'libraries/AP_Module/sdk/rust/src/lib.rs'), '-o', str(sdk)], check=True, env=environment)
     executable = tmp_path / 'aerobatics-tests'
     subprocess.run([rustc, '--edition=2021', '--test', '-A', 'dead_code',
                     str(ROOT / 'libraries/AP_Module/applets/aerobatics/tests.rs'),
@@ -39,7 +39,7 @@ def primitive_results(tmp_path_factory):
     if os.environ.get('AP_MODULE_TEST_NO_LUA'):
         pytest.skip('Golden oracle requires Lua')
     image = build.build(ROOT / 'libraries/AP_Module/tests/modules/aerobatics_primitives.rs',
-                        tmp_path / 'primitives.apmod', 'x86_64-unknown-linux-gnu', 8192)
+                        tmp_path / 'primitives.apmod', 'x86_64-unknown-linux-gnu', 8192, heap_size=32768)
     vehicle = Vehicle(tmp_path / 'vehicle', {'primitives.apmod': image.read_bytes()}, {
         'SCR_ENABLE': 1, 'SCR_HEAP_SIZE': 300000, 'SCR_VM_I_COUNT': 1000000,
         'LOG_BACKEND_TYPE': 1, 'LOG_DISARMED': 1, 'LOG_FILE_DSRMROT': 0, 'LOG_FILE_BUFSIZE': 128,
@@ -117,7 +117,7 @@ return golden, 2000
     try:
         vehicle.start()
         vehicle.text('AEROP Lua primitives done', timeout=30)
-        vehicle.text('Rust: AEROP primitives done', timeout=30)
+        vehicle.text('Module: AEROP primitives done', timeout=30)
         vehicle.pump(2)
         assert not any('panic' in text or 'returned -' in text for text in vehicle.texts)
     finally:

@@ -27,7 +27,7 @@ def test_sdk_math_unit(tmp_path):
     executable = tmp_path / 'sdk-math-tests'
     environment = build.sdk_environment()
     subprocess.run([os.environ.get('RUSTC', 'rustc'), '--edition=2021', '--test',
-                    str(ROOT / 'libraries/AP_Module/sdk/src/lib.rs'), '-o', str(executable)], check=True, env=environment)
+                    str(ROOT / 'libraries/AP_Module/sdk/rust/src/lib.rs'), '-o', str(executable)], check=True, env=environment)
     subprocess.run([str(executable)], check=True)
 
 
@@ -38,7 +38,7 @@ def test_frozen_host_dispatch(tmp_path):
     image = tmp_path / 'compat.apmod'
     image.write_bytes(bytes.fromhex((ROOT / 'libraries/AP_Module/tests/compat/x86_64.apmod.hex').read_text()))
     environment = dict(os.environ, AP_MODULE_TEST_COMPAT_MODULE=str(image))
-    subprocess.run([str(executable), '--gtest_filter=RustMathSDK.FrozenImageSurvives*'], env=environment, check=True)
+    subprocess.run([str(executable), '--gtest_filter=ModuleMathSDK.FrozenImageSurvives*'], env=environment, check=True)
 
 
 @pytest.mark.parametrize('lua', [False, True])
@@ -66,13 +66,13 @@ def test_sitl_math(tmp_path, lua, module):
         shutil.copyfile(ROOT / 'libraries/AP_Module/tests/modules/math.lua', scripts / 'math.lua')
     try:
         vehicle.start()
-        vehicle.text('Rust: MATH ok')
+        vehicle.text('Module: MATH ok')
         if lua:
             vehicle.text('LUA MATH ok')
         before = len(vehicle.texts)
-        vehicle.parameter('RUST_RESTART', 1)
-        vehicle.text('Rust: MATH ok', after=before)
-        assert not any(re.search(r'Rust: .* (panic|returned -)', line) for line in vehicle.texts)
+        vehicle.parameter('MOD_RESTART', 1)
+        vehicle.text('Module: MATH ok', after=before)
+        assert not any(re.search(r'Module: .* (panic|returned -)', line) for line in vehicle.texts)
     finally:
         vehicle.stop()
 
@@ -89,9 +89,9 @@ def chibios_probe(tmp_path, emulator, module, oracle=None, files=None, heap_limi
                   expected_code=65536, cycles=20, timeout_ms=5000):
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_BUILD_ROOT', ROOT / 'build'))
-    executable = build_root / board / 'examples/RustMath'
+    executable = build_root / board / 'examples/ModuleMath'
     if not executable.is_file():
-        pytest.skip('Build examples/RustMath with --enable-modules')
+        pytest.skip('Build examples/ModuleMath with --enable-modules')
     if not shutil.which('mcopy') or not shutil.which('mmd'):
         pytest.skip('Requires mtools')
     names = ['result', 'cycles', 'before', 'after', 'heap_peak', 'status', 'stack_used', 'stack_total',
@@ -101,24 +101,24 @@ def chibios_probe(tmp_path, emulator, module, oracle=None, files=None, heap_limi
         addresses = []
         for name in names:
             symbol = symbols.get_symbol_by_name(f'rust_math_test_{name}')
-            assert symbol, f'Missing rust_math_test_{name}: rebuild examples/RustMath'
+            assert symbol, f'Missing rust_math_test_{name}: rebuild examples/ModuleMath'
             addresses.append(symbol[0]['st_value'])
         error_symbol = symbols.get_symbol_by_name('rust_math_test_error')
-        assert error_symbol, 'Missing diagnostics: rebuild examples/RustMath with the matching hwdef'
+        assert error_symbol, 'Missing diagnostics: rebuild examples/ModuleMath with the matching hwdef'
         error_address = error_symbol[0]['st_value']
     print(f'Native ELF SHA256 {hashlib.sha256(executable.read_bytes()).hexdigest()} '
           f'mtime_ns={executable.stat().st_mtime_ns}', flush=True)
     generated = gen_board.generate(ROOT, board, tmp_path / 'generated', uart_port=0, state_dir=tmp_path)
     data = renode_data.ensure_mcu_data(generated['mcu_type'])
     sdcard = run.make_fat_image(tmp_path / 'sdcard.img', 16 * 1024 * 1024, fat_bits=16)
-    subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/rust'], check=True)
+    subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/modules'], check=True)
     if module == 'compat':
         image = tmp_path / 'math.apmod'
         image.write_bytes(bytes.fromhex((ROOT / 'libraries/AP_Module/tests/compat/thumbv7em.apmod.hex').read_text()))
     else:
         image = build.build(ROOT / f'libraries/AP_Module/tests/modules/{module}.rs', tmp_path / 'math.apmod',
                             'thumbv7em-none-eabihf', 8192)
-    subprocess.run(['mcopy', '-i', str(sdcard), str(image), '::/APM/rust/math.apmod'], check=True)
+    subprocess.run(['mcopy', '-i', str(sdcard), str(image), '::/APM/modules/math.apmod'], check=True)
     if module == 'strings':
         fixture = tmp_path / 'string-test.txt'
         fixture.write_bytes(b'123456789')
@@ -157,7 +157,7 @@ emulation RunFor "%s"
     print(f'{board} {module}: {result}', flush=True)
     if error:
         print(error.decode('utf-8', errors='replace'), flush=True)
-    assert result['heap_limit'] == expected_heap, 'Rebuild RustMath with the test-specific heap hwdef'
+    assert result['heap_limit'] == expected_heap, 'Rebuild ModuleMath with the test-specific heap hwdef'
     assert (result['code_limit'], result['cycle_limit'], result['timeout_ms']) == (expected_code, cycles, timeout_ms)
     assert result['result'] == 0x600DF00D and result['cycles'] == cycles, (result, error, output)
     assert result['before'] == result['after'] and result['status'] == 0, result

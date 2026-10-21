@@ -113,10 +113,10 @@ def controller_results(tmp_path_factory, request):
         if request.param != 'nominal':
             patch.setenv('AP_MODULE_AERO_CONTROLLER_VARIANT', request.param)
         image = build.build(ROOT / 'libraries/AP_Module/tests/modules/aerobatics_controller.rs',
-                            tmp_path / 'controller.apmod', 'x86_64-unknown-linux-gnu', 16384)
+                            tmp_path / 'controller.apmod', 'x86_64-unknown-linux-gnu', 16384, heap_size=32768)
     vehicle = Vehicle(tmp_path / 'vehicle', {'controller.apmod': image.read_bytes()}, {
         'SCR_ENABLE': 1, 'SCR_HEAP_SIZE': 500000, 'SCR_VM_I_COUNT': 1000000,
-        'RUST_HEAP_SIZE': 65536, 'RUST_CODE_SIZE': 131072,
+        'MOD_HEAP_MAX': 65536, 'MOD_CODE_MAXSIZE': 131072,
         'LOG_BACKEND_TYPE': 1, 'LOG_DISARMED': 1, 'LOG_FILE_DSRMROT': 0, 'LOG_FILE_BUFSIZE': 128,
         'AIRSPEED_MIN': 9, 'AIRSPEED_CRUISE': 18, 'SCALING_SPEED': 15,
     })
@@ -128,7 +128,7 @@ def controller_results(tmp_path_factory, request):
     try:
         vehicle.start()
         vehicle.text('AEROP Lua controller done', timeout=30)
-        vehicle.text('Rust: AEROP controller done', timeout=30)
+        vehicle.text('Module: AEROP controller done', timeout=30)
         vehicle.pump(2)
         assert not any('panic' in line or 'returned -' in line for line in vehicle.texts), vehicle.diagnostic()
     finally:

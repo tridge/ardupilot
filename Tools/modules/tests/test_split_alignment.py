@@ -41,7 +41,7 @@ fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
                     '-C', 'relocation-model=ropi-rwpi', '-C', f'link-arg=-T{HERE / "module.ld"}',
                     '-C', 'link-arg=--emit-relocs', '-C', 'link-arg=--defsym=MODULE_DATA_ALIGNMENT=4',
                     '-o', str(output)], check=True, capture_output=True)
-    manifest = dict(abi_version=1, cpu_profile=1, stack_size=4096, fingerprint=bytes(range(1, 17)).hex())
+    manifest = dict(abi_version=1, cpu_profile=1, stack_size=4096, heap_size=32768, fingerprint=bytes(range(1, 17)).hex())
     return pack.pack_elf(output.read_bytes(), manifest)
 
 
@@ -87,7 +87,7 @@ readonly:
     subprocess.run(['arm-none-eabi-gcc', '-mcpu=cortex-m4', '-mthumb', '-mfloat-abi=hard', '-mfpu=fpv4-sp-d16',
                     '-nostdlib', f'-Wl,-T{HERE / "module.ld"},--emit-relocs', str(source), '-o', str(output)],
                    check=True, capture_output=True)
-    manifest = dict(abi_version=1, cpu_profile=1, stack_size=4096, fingerprint=bytes(range(1, 17)).hex())
+    manifest = dict(abi_version=1, cpu_profile=1, stack_size=4096, heap_size=32768, fingerprint=bytes(range(1, 17)).hex())
     with pytest.raises(ValueError, match='ambiguous one-past RX pointer'):
         pack.pack_elf(output.read_bytes(), manifest)
 

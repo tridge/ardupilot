@@ -21,7 +21,7 @@ def test_printf_sitl(tmp_path, name):
     try:
         vehicle.start()
         if name == 'printf':
-            vehicle.text('Rust: MATH ok')
+            vehicle.text('Module: MATH ok')
         else:
             message = vehicle.until(lambda msg: msg.get_type() == 'STATUSTEXT' and
                                     re.fullmatch(r'Tick [0-9]+\.[0-9]', msg.text))
@@ -35,9 +35,9 @@ def test_printf_sitl(tmp_path, name):
 
 
 @pytest.mark.parametrize('mode,diagnostic', [
-    ('literal', 'Rust panic: P at '),
-    ('display', 'Rust panic: Rust panic (formatted message'),
-    ('stopped', 'Rust panic: stopped'),
+    ('literal', 'Module fatal: P at '),
+    ('display', 'Module fatal: Rust panic (formatted message'),
+    ('stopped', 'Module fatal: stopped'),
 ])
 def test_panic_printf_sitl(tmp_path, monkeypatch, mode, diagnostic):
     monkeypatch.setenv('AP_MODULE_PANIC_TEST', mode)
@@ -48,7 +48,7 @@ def test_panic_printf_sitl(tmp_path, monkeypatch, mode, diagnostic):
         vehicle.start()
         if mode == 'stopped':
             vehicle.text('panic test ready')
-            vehicle.parameter('RUST_RESTART', 1)
+            vehicle.parameter('MOD_RESTART', 1)
         vehicle.text('panic; reboot required')
         vehicle.text(diagnostic)
         assert not any('user Display must not run' in text for text in vehicle.texts)

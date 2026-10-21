@@ -21,9 +21,9 @@ import build
 
 def test_chibios_module_lifecycle(tmp_path, renode, monkeypatch):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
-    executable = ROOT / 'build' / board / 'examples/RustModule'
+    executable = ROOT / 'build' / board / 'examples/ModuleLoader'
     if not executable.is_file():
-        pytest.skip('Build examples/RustModule with the native runtime HAL options enabled')
+        pytest.skip('Build examples/ModuleLoader with the native runtime HAL options enabled')
     if not shutil.which('mcopy') or not shutil.which('mmd'):
         pytest.skip('Requires mtools for the SD image')
     names = ['rust_module_test_result', 'rust_module_test_cycles', 'rust_module_test_before',
@@ -35,13 +35,13 @@ def test_chibios_module_lifecycle(tmp_path, renode, monkeypatch):  # noqa: F811
     generated = gen_board.generate(ROOT, board, tmp_path / 'generated', uart_port=0, state_dir=tmp_path)
     data = renode_data.ensure_mcu_data(generated['mcu_type'])
     sdcard = run.make_fat_image(tmp_path / 'sdcard.img', 16 * 1024 * 1024, fat_bits=16)
-    subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/rust'], check=True)
+    subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/modules'], check=True)
     for mode in ('cleanup', 'panic'):
         monkeypatch.setenv('AP_MODULE_LIFECYCLE', mode)
         output = tmp_path / f'{mode}.apmod'
         build.build(ROOT / 'libraries/AP_Module/tests/modules/lifecycle.rs', output,
                     'thumbv7em-none-eabihf', 8192)
-        subprocess.run(['mcopy', '-i', str(sdcard), str(output), f'::/APM/rust/{mode}.apmod'], check=True)
+        subprocess.run(['mcopy', '-i', str(sdcard), str(output), f'::/APM/modules/{mode}.apmod'], check=True)
     output = renode('''
 $elf=@%s
 $mcu_svd=@%s

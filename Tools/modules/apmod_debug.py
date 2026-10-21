@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pack
 
+from elftools.dwarf.enums import ENUM_DW_LANG
 from elftools.elf.elffile import ELFFile
 
 
@@ -27,7 +28,7 @@ class ModuleSymbols:
         self.data = self.path.read_bytes()
         self.module = pack.unpack(self.data)
         if self.data[:8] != pack.RUNTIME_MAGIC:
-            raise ValueError('module debugging requires APRUST05')
+            raise ValueError('module debugging requires APMOD06')
         self.elf_path = self.path.with_suffix('.elf')
         self.elf_data = self.elf_path.read_bytes()
         if pack.pack_elf(self.elf_data, self.module['contract']) != self.data:
@@ -35,6 +36,10 @@ class ModuleSymbols:
         elf = ELFFile(io.BytesIO(self.elf_data))
         if elf.get_section_by_name('.debug_info') is None:
             raise ValueError('ELF has no DWARF; rebuild with --debug')
+        self.is_rust = any(
+            unit.get_top_DIE().attributes.get('DW_AT_language') is not None and
+            unit.get_top_DIE().attributes['DW_AT_language'].value == ENUM_DW_LANG['DW_LANG_Rust']
+            for unit in elf.get_dwarf_info(relocate_dwarf_sections=False).iter_CUs())
         self.sections = [(s.name, s['sh_addr'], s['sh_size']) for s in elf.iter_sections()
                          if s['sh_flags'] & 2 and s['sh_size']]
         self.base = min(address for _, address, _ in self.sections)

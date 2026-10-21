@@ -23,7 +23,7 @@ SECTIONS
         *(.data .data.*)
         *(.data.rel.ro .data.rel.ro.*)
         /* Do not KEEP these: unused wrappers and imports must be collected. */
-        *(.ap_rust_import_*)
+        *(.ap_module_import_*)
     }
     .got : { *(.got) }
     .bss (NOLOAD) : { *(.bss .bss.*) *(COMMON) }

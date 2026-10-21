@@ -55,14 +55,15 @@ def test_airshow_flight(tmp_path, engine):
     assert mavutil.mavlink.WIRE_PROTOCOL_VERSION == '2.0', 'Run with MAVLINK20=1 for RC channel 9 overrides'
     files = None
     if engine == 'rust':
-        module = build.build(APPLET / 'main.rs', tmp_path / 'aerobatics.apmod', 'x86_64-unknown-linux-gnu', 16384)
+        module = build.build(APPLET / 'main.rs', tmp_path / 'aerobatics.apmod', 'x86_64-unknown-linux-gnu',
+                             16384, heap_size=32768)
         assert b'AERO fault injected' not in module.read_bytes()
         assert b'AERO finish fault injected' not in module.read_bytes()
         files = {'airshow.apmod': module.read_bytes()}
     vehicle = AerobaticVehicle(tmp_path / 'vehicle', files, {
-        'RUST_ENABLE': int(engine == 'rust'), 'SCR_ENABLE': int(engine == 'lua'),
-        'RUST_HEAP_SIZE': 32768, 'RUST_CODE_SIZE': 131072,
-        'RUST_STACK_SIZE': 32768, 'SCR_DEBUG_OPTS': 72 if engine == 'lua' else 0,
+        'MOD_ENABLE': int(engine == 'rust'), 'SCR_ENABLE': int(engine == 'lua'),
+        'MOD_HEAP_MAX': 32768, 'MOD_CODE_MAXSIZE': 131072,
+        'MOD_STACK_MAX': 32768, 'SCR_DEBUG_OPTS': 72 if engine == 'lua' else 0,
         'LOG_BACKEND_TYPE': 1, 'LOG_DISARMED': 1, 'LOG_FILE_DSRMROT': 0,
         'LOG_FILE_BUFSIZE': 128, 'RC7_OPTION': 300, 'RC9_OPTION': 301,
         'RC_OVERRIDE_TIME': 3, 'FLTMODE_CH': 0,
@@ -151,7 +152,7 @@ def test_airshow_flight(tmp_path, engine):
             vehicle.pump(1)
             assert not any('Trick 1 started' in text for text in vehicle.texts[mark:]), vehicle.diagnostic()
             assert vehicle.parameter('TRIK1_ID') == 72
-            print('Rust post-flight reload RAM:', [t for t in vehicle.texts[mark:] if t.startswith('Rust RAM:')])
+            print('Rust post-flight reload RAM:', [t for t in vehicle.texts[mark:] if t.startswith('Module RAM:')])
         vehicle.arm(False, force=True)
     finally:
         vehicle.stop()

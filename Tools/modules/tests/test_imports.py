@@ -20,14 +20,14 @@ import build
 
 
 @pytest.mark.parametrize('target,sha256', [
-    ('thumbv7em', '63f44aa34990667067e4e5ae2c64c6e32de73430f15ca8de9eead5a36bc651f7'),
-    ('x86_64', 'f2864f920f8d59b3aac36ddc7da3321e740f8b6d31e5b00ff84eb1dfdb1b4574'),
+    ('thumbv7em', 'c4e56da5111ea5ceb3718c65009dc649ca720c88f549155e39b504cf4b6051e3'),
+    ('x86_64', '14b7350c67c967ce261c4be7f57d9a24cace5232e1775c6c9fa725577a0df7fb'),
 ])
 def test_frozen_probe_identity(target, sha256):
     root = Path(__file__).resolve().parents[3]
     data = bytes.fromhex((root / f'libraries/AP_Module/tests/compat/{target}.apmod.hex').read_text())
     assert hashlib.sha256(data).hexdigest() == sha256
-    assert len(pack.unpack(data)['imports']) == 1
+    assert {item[2] for item in pack.unpack(data)['imports']} == {'Vector3f.length', 'string.format_printf'}
 
 
 @pytest.fixture(params=list(build.TARGETS))
@@ -61,7 +61,7 @@ def test_apmod_info(one_import):
     binding_hash, offset, name = info['imports'][0]
     output = apmod_info.format_module(Path('one.apmod'), one_import)
     assert 'Module: one.apmod' in output
-    assert 'Format: APRUST05 (version 5)' in output
+    assert 'Format: APMOD06 (version 6)' in output
     assert f'Pointer width: {info["width"] * 8} bits' in output
     assert f'Initialized image: {len(info["image"])} bytes' in output
     assert f'Memory image: {info["memory_size"]} bytes' in output
@@ -85,8 +85,8 @@ fn run(_: &Context<'_>) -> Result { Ok(()) }
 
 
 def crc(data):
-    data[76:80] = bytes(4)
-    data[76:80] = struct.pack('<I', zlib.crc32(data))
+    data[80:84] = bytes(4)
+    data[80:84] = struct.pack('<I', zlib.crc32(data))
     return data
 
 
@@ -94,7 +94,7 @@ def test_invalid_import_metadata(one_import):
     info = pack.unpack(one_import)
     records = pack.RUNTIME_HEADER.size + len(info['image']) + len(info['fixups']) * pack.FIXUP.size
     _, slot, _ = info['imports'][0]
-    for field, value in [(56, 0), (56, 4097), (56, 0xffffffff),
+    for field, value in [(60, 0), (60, 4097), (60, 0xffffffff),
                          (records + 8, 0), (records + 8, slot + 1),
                          (records + 8, len(info['image'])), (records + 8, 0xfffffffc),
                          (records + 12, 1), (records + 12, 0xffffffff),

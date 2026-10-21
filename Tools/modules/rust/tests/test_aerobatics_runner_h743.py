@@ -29,12 +29,12 @@ def test_h743_runner(tmp_path, renode, mission):  # noqa: F811
     shutil.copyfile(os.environ.get('AP_MODULE_H743_BINARY', ROOT / 'build/MatekH743/bin/arduplane'), executable)
     defaults = tmp_path / 'runner.parm'
     defaults.write_text((ROOT / 'Tools/modules/aerobatics-oracle.parm').read_text()
-                        .replace('RUST_ENABLE 0', 'RUST_ENABLE 1')
+                        .replace('MOD_ENABLE 0', 'MOD_ENABLE 1')
                         .replace('SCR_HEAP_SIZE 350000', 'SCR_HEAP_SIZE 65536')
                         .replace('LOG_FILE_BUFSIZE 16', 'LOG_FILE_BUFSIZE 64') + '''
-RUST_HEAP_SIZE 32768
-RUST_CODE_SIZE 131072
-RUST_STACK_SIZE 32768
+MOD_HEAP_MAX 32768
+MOD_CODE_MAXSIZE 131072
+MOD_STACK_MAX 32768
 RC7_OPTION 300
 RC9_OPTION 301
 RC_OVERRIDE_TIME 120
@@ -55,7 +55,8 @@ INS_ACCSCAL_Z 1.001
 ''')
     subprocess.run(['python3', str(ROOT / 'Tools/scripts/apj_tool.py'), '--set-file', str(defaults),
                     str(executable)], check=True)
-    module = build.build(APPLET / 'main.rs', tmp_path / 'airshow.apmod', 'thumbv7em-none-eabihf', 16384)
+    module = build.build(APPLET / 'main.rs', tmp_path / 'airshow.apmod', 'thumbv7em-none-eabihf',
+                         16384, heap_size=32768)
     generated = gen_board.generate(ROOT, 'MatekH743', tmp_path / 'generated', uart_port=0, state_dir=tmp_path,
                                    num_imus=1, attachments=[
                                        {'device': 'ublox-gps', 'port': 'SERIAL3'},
@@ -64,8 +65,8 @@ INS_ACCSCAL_Z 1.001
                                    ])
     data = renode_data.ensure_mcu_data(generated['mcu_type'])
     sdcard = run.make_fat_image(tmp_path / 'sdcard.img', 16 * 1024 * 1024, fat_bits=16)
-    subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/rust', '::/APM/scripts'], check=True)
-    subprocess.run(['mcopy', '-i', str(sdcard), str(module), '::/APM/rust/airshow.apmod'], check=True)
+    subprocess.run(['mmd', '-i', str(sdcard), '::/APM', '::/APM/modules', '::/APM/scripts'], check=True)
+    subprocess.run(['mcopy', '-i', str(sdcard), str(module), '::/APM/modules/airshow.apmod'], check=True)
     subprocess.run(['mcopy', '-i', str(sdcard), str(APPLET / 'AirShow.txt'), '::/APM/scripts/trick72.txt'], check=True)
     driver = tmp_path / 'driver.lua'
     driver_source = '''
@@ -74,7 +75,7 @@ local function update()
  if stage == 0 then
   if param:get("TRIK_ENABLE") == nil then return update,100 end
   assert(param:set_and_save("TRIK_ENABLE",1))
-  assert(param:set("RUST_RESTART",1))
+  assert(param:set("MOD_RESTART",1))
  elseif stage == 1 then
   if param:get("TRIK1_ID") == nil then return update,100 end
   assert(param:set_and_save("TRIK1_ID",72))
@@ -90,7 +91,7 @@ local function update()
  elseif stage == 4 then
   assert(rc:run_aux_function(300,0))
  elseif stage == 5 then
-  assert(param:set("RUST_RESTART",2))
+  assert(param:set("MOD_RESTART",2))
  elseif stage == 6 then
   assert(param:get("TRIK1_ID") == 72)
   gcs:send_text(6,"H743 runner driver done")
@@ -183,7 +184,7 @@ emulation RunFor "90"
     print('H743 runner stacks:', stacks, 'updates:', len(updates), updates[:3], updates[-3:])
     print('H743 logger statistics:', dropped[-3:])
     assert 'H743 runner driver done' in texts
-    assert texts.count('Rust: loaded 1 modules') == 3
+    assert texts.count('Module: loaded 1 modules') == 3
     assert texts.count('Loaded plane_aerobatics Rust') == 3
     if mission:
         assert 'Starting Axial Roll!' in texts

@@ -45,8 +45,8 @@ def test_usb_module_debugging(tmp_path):
     state = tmp_path / 'state'
     image = fat_image.create_image(state / 'sdcard.img', 512 * 1024 * 1024, sectors_per_cluster=8)
     with fat_image.PyFatFS(str(image)) as fs:
-        fs.makedirs('/APM/rust', recreate=True)
-        with fs.openbin('/APM/rust/debug.apmod', 'w') as output:
+        fs.makedirs('/APM/modules', recreate=True)
+        with fs.openbin('/APM/modules/debug.apmod', 'w') as output:
             output.write(module.read_bytes())
     overlay = tmp_path / 'fpb.repl'
     overlay.write_text('fpb: Miscellaneous.AP_CortexM_FPB @ sysbus 0xE0002000\n    cpu: cpu\n')
@@ -65,8 +65,8 @@ def test_usb_module_debugging(tmp_path):
             usb = USB(usb_port)
             gcs = GCS(usb)
             gcs.recv('HEARTBEAT', 60)
-            gcs.m.param_set_send(1, 1, b'RUST_ENABLE', 1, 9)
-            while gcs.recv('PARAM_VALUE', 20).param_id != 'RUST_ENABLE':
+            gcs.m.param_set_send(1, 1, b'MOD_ENABLE', 1, 9)
+            while gcs.recv('PARAM_VALUE', 20).param_id != 'MOD_ENABLE':
                 pass
             gcs.m.command_long_send(1, 1, 246, 0, 1, 0, 0, 0, 0, 0, 0)
             deadline = time.monotonic() + 20
@@ -78,7 +78,7 @@ def test_usb_module_debugging(tmp_path):
             deadline = time.monotonic() + 60
             while True:
                 message = gcs.recv('STATUSTEXT', max(1, deadline - time.monotonic()))
-                if 'Rust: loaded 1 modules' in message.text:
+                if 'Module: loaded 1 modules' in message.text:
                     break
                 assert time.monotonic() < deadline, message
             usb.write(4, usb_debug.TRIGGER)

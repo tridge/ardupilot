@@ -271,12 +271,12 @@ def gdb_command(args):
         command.append('--batch')
     modules = getattr(args, 'apmod', [])
     if modules:
-        helper = Path(__file__).resolve().parents[1] / 'rust_modules/apmod_gdb.py'
+        helper = Path(__file__).resolve().parents[1] / 'modules/apmod_gdb.py'
         if any(c in str(helper) for c in '\r\n\x00'):
             raise DebugError('GDB helper path must not contain newlines or NUL')
         # Unlike add-symbol-file, source takes the entire filename literally,
         # including spaces: quotes would become part of the requested name.
-        command += ['-ex', f'source {helper}', '-ex', 'apmod printers',
+        command += ['-ex', f'source {helper}',
                     '-ex', 'apmod symbols ' + ' '.join(json.dumps(str(path.resolve())) for path in modules)]
     for expression in args.ex:
         command.extend(['-ex', expression])
@@ -292,7 +292,7 @@ def main(argv=None):
                           help='connect to an existing bridge (for example Windows USB with a WSL debugger)')
     parser.add_argument('--gdb', default='arm-none-eabi-gdb', help='GDB executable')
     parser.add_argument('--apmod', type=Path, action='append', default=[],
-                        help='load matching Rust module ELF and pretty-printers (repeatable; requires Python GDB)')
+                        help='load matching Native module ELF and pretty-printers (repeatable; requires Python GDB)')
     parser.add_argument('--timeout', type=float, default=30, help='monitor connection deadline in seconds')
     parser.add_argument('--no-break', action='store_true',
                         help='reattach to an existing debug session, interrupting if running')

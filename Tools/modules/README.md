@@ -1,6 +1,6 @@
-# Rust module tools
+# Native module tools
 
-These tools build, inspect and test ArduPilot's experimental native Rust
+These tools build, inspect and test ArduPilot's experimental Rust and C++ native
 modules. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
 configuration and installation, and the [design](../../libraries/AP_Module/DESIGN.md)
 for the container, ABI and resource-ownership contracts.
@@ -8,7 +8,7 @@ for the container, ABI and resource-ownership contracts.
 ## Prerequisites
 
 Install Python with `pyelftools` and Rust **1.98.1 or newer**. The minimum compiler
-version is shared by the builder and CI through `rust-toolchain-version`.
+version is shared by the builder and CI through `rust/rust-toolchain-version`.
 `RUSTC` selects a compiler other than the default `rustc`.
 
 ```sh
@@ -24,6 +24,12 @@ toolchain. Renode integration tests require `RENODE` to name an executable;
 SD-card tests also require mtools. Compiler-dependent tests fail if their
 compiler is missing or too old. Renode tests skip when their emulator or
 firmware fixture is unavailable.
+
+C++ builds need Clang 21+ and standalone LLD 21+, selected with `CXX` and `LLD`.
+They do not invoke Rust or require a Rust installation. The C++ SDK is
+freestanding C++17: local RAII and virtual dispatch work; exceptions, RTTI, TLS
+and global constructors/destructors are rejected. Only `-Os` is currently
+accepted for C++ modules, including with `--debug`.
 
 Debugger integration tests use a real GDB process. For SITL, set
 `AP_MODULE_SITL_BINARY` to a Plane ELF with C++ debug information and run
@@ -52,16 +58,20 @@ Run from the repository root:
 Tools/modules/build.py \
     libraries/AP_Module/applets/aerobatics/main.rs \
     build/modules/airshow.apmod \
-    --target thumbv7em-none-eabihf --stack-size 16384
+    --target thumbv7em-none-eabihf --stack-size 16384 --heap-size 32768
 Tools/modules/apmod_info.py build/modules/airshow.apmod
 Tools/modules/apmod_info.py --fixups build/modules/airshow.apmod
 ```
 
-`build.py` generates bindings below `build/modules/libraries/AP_Module/`,
-compiles the SDK and source with fat LTO, and packages the linked ELF. It also
-writes the intermediate `.elf` and `lib<name>_sdk.rlib` beside the output.
+`build.py` dispatches `.rs` to `rust/build.py` and `.cpp`/`.cc`/`.cxx` to
+`cpp/build.py`. Shared bindings are generated below
+`build/modules/libraries/AP_Module/`. Rust uses fat LTO; C++ uses Clang/LLD.
+Both package the linked ELF, retaining the companion `.elf` beside the output.
+Rust also retains `lib<name>_sdk.rlib`; C++ retains its intermediate `.o` files.
+`--heap-size` declares initial heap capacity (default 4096), checked against
+`MOD_HEAP_MAX` on load. Armed growth is permitted only up to that cap.
 `--stack-size` declares module stack use, not a measured bound. The firmware's
-`RUST_STACK_SIZE` must additionally cover the host-call margin: 4 KiB on Cortex-M
+`MOD_STACK_MAX` must additionally cover the host-call margin: 4 KiB on Cortex-M
 or 16 KiB on x86-64; backend overhead is additional.
 
 `apmod_info.py` validates the file and reports its target, ABI, code/data sizes,
@@ -150,21 +160,23 @@ Tools/debug/gdb_usb.py build/CubeOrangePlus/bin/arduplane --port /dev/serial/by-
     --apmod build/modules/simple_loop.apmod
 ```
 
-`--apmod` is repeatable and loads the helper and Rust pretty-printers. IDE and
+`--apmod` is repeatable and loads the helper. Rust pretty-printers are selected
+only for Rust DWARF; C++ debugging does not invoke Rust tools. IDE and
 `--serve` sessions can source the helper in their own GDB client instead.
 No USB protocol or module-format change is needed. Debugging stops the vehicle;
 use a disarmed bench setup, not an aircraft in flight.
 
 ## Tests
 
-Python tests live in `tests/`; generator tests live with the Rust generator.
+Shared Python tests live in `tests/`; language-specific tests live in
+`rust/tests/` and `cpp/tests/`. Generator tests live with the native generator.
 These toolchain/loader tests run without a vehicle firmware build:
 
 ```sh
-python3 -m pytest -q Tools/modules/tests/test_build.py \
+python3 -m pytest -q Tools/modules/rust/tests/test_build.py \
     Tools/modules/tests/test_config.py \
     Tools/modules/tests/test_modules.py \
-    Tools/modules/tests/test_sdk.py \
+    Tools/modules/rust/tests/test_sdk.py \
     Tools/modules/tests/test_imports.py \
     Tools/modules/tests/test_split_alignment.py
 python3 -m pytest -q libraries/AP_Module/generator
@@ -182,7 +194,7 @@ For the H743 SD runtime harness:
 ```sh
 ./waf configure --board MatekH743 \
     --extra-hwdef libraries/AP_Module/tests/enabled.hwdef
-./waf --targets examples/RustRuntime
+./waf --targets examples/ModuleRuntime
 RENODE=/path/to/renode python3 -m pytest -q Tools/modules/tests/test_manager.py
 ```
 
@@ -195,7 +207,7 @@ RENODE=/path/to/renode python3 -m pytest -q Tools/modules/tests/test_romfs_manag
 
 `OWNED_THREAD_BOARD` selects a compatible board fixture; `AP_MODULE_BUILD_ROOT`
 and `AP_MODULE_ROMFS_BUILD_ROOT` select existing example build roots. Tests for
-`OwnedThread`, `ExecutableMemory`, `RustHeap`, `RustModule`, `RustMath` and
+`OwnedThread`, `ExecutableMemory`, `RustHeap`, `ModuleLoader`, `ModuleMath` and
 `StackGuard` need the corresponding examples built first. H7 stack-guard tests
 require a Renode build with the Cortex-M stacking-fault fix; they do not establish
 real-hardware fault recovery or flight safety.
@@ -206,7 +218,7 @@ Renode described in [the USB debug guide](../renode/patches/README.md):
 
 ```sh
 ./waf configure --board CubeOrangePlus --enable-modules --enable-STACK_GUARD --enable-USB-debug --debug-symbols
-./waf --targets examples/StackGuard,examples/RustRuntime
+./waf --targets examples/StackGuard,examples/ModuleRuntime
 STACK_GUARD_BOARD=CubeOrangePlus RENODE=/path/to/renode \
     python3 -m pytest -q Tools/modules/tests/test_stack_guard.py
 AP_STACK_USB_ELF=build/CubeOrangePlus/examples/StackGuard RENODE=/path/to/renode \

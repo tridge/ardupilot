@@ -14,7 +14,7 @@ import pytest
 
 import build
 
-HERE = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parents[2]
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / 'Tools/renode/tests'))
 from test_peripherals import renode  # noqa: E402,F401
@@ -22,15 +22,15 @@ from test_peripherals import renode  # noqa: E402,F401
 
 @pytest.mark.parametrize('target', build.TARGETS)
 def test_sdk_rebases_identically(tmp_path, target):
-    first = build.build(HERE / 'sdk_probe.rs', tmp_path / 'first.apmod', target, 8192)
-    second = build.build(HERE / 'sdk_probe.rs', tmp_path / 'second.apmod', target, 8192, base=0x24123000)
+    first = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'first.apmod', target, 8192)
+    second = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'second.apmod', target, 8192, base=0x24123000)
     assert first.read_bytes() == second.read_bytes()
 
 
 @pytest.mark.parametrize('trait', ['Send', 'Sync'])
 @pytest.mark.parametrize('kind', ["Context<'static>", "Parameter<'static, 'static>"])
 def test_context_cannot_cross_threads(tmp_path, trait, kind):
-    output = build.build(HERE / 'sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
+    output = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
     source = tmp_path / 'negative.rs'
     source.write_text(f'''#![no_std]
 fn require<T: {trait}>() {{}}
@@ -60,7 +60,7 @@ pub fn share(context: &ap_rust_sdk::Context<'_>) {
 }''', 'between threads safely'),
 ])
 def test_parameter_lifetime_protections(tmp_path, body, diagnostic):
-    output = build.build(HERE / 'sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
+    output = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
     source = tmp_path / 'negative.rs'
     source.write_text('#![no_std]\n' + body + '\n')
     result = subprocess.run([os.environ.get('RUSTC', 'rustc'), '--edition=2021', '--crate-type=rlib',
@@ -72,7 +72,7 @@ def test_parameter_lifetime_protections(tmp_path, body, diagnostic):
 
 
 def test_enum_types_cannot_be_interchanged(tmp_path):
-    output = build.build(HERE / 'sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
+    output = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
     source = tmp_path / 'wrong_enum.rs'
     source.write_text('''#![no_std]
 pub fn check(context: &ap_rust_sdk::Context<'_>) {
@@ -92,7 +92,7 @@ pub fn check(context: &ap_rust_sdk::Context<'_>) {
     ('let channel: ap_rust_sdk::RcChannel = panic!(); channel.norm_input();', 'argument'),
 ])
 def test_rc_handle_requires_host_context(tmp_path, body, diagnostic):
-    output = build.build(HERE / 'sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
+    output = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
     source = tmp_path / 'bad_handle.rs'
     source.write_text('#![no_std]\npub fn check() { ' + body + ' }\n')
     result = subprocess.run([os.environ.get('RUSTC', 'rustc'), '--edition=2021', '--crate-type=rlib',
@@ -111,7 +111,7 @@ def test_rc_handle_requires_host_context(tmp_path, body, diagnostic):
     ('let mut v = ap_rust_sdk::Location::default(); v.get_distance(context, &mut v);', 'more than once'),
 ])
 def test_value_assignment_and_alias_protections(tmp_path, body, diagnostic):
-    output = build.build(HERE / 'sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
+    output = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'probe.apmod', 'x86_64-unknown-linux-gnu', 8192)
     source = tmp_path / 'bad_value.rs'
     source.write_text('#![no_std]\npub fn check(context: &ap_rust_sdk::Context<\'_>) { ' + body + ' }\n')
     result = subprocess.run([os.environ.get('RUSTC', 'rustc'), '--edition=2021', '--crate-type=rlib',
@@ -124,7 +124,7 @@ def test_value_assignment_and_alias_protections(tmp_path, body, diagnostic):
 
 @pytest.mark.parametrize(('cpu', 'ram'), [('cortex-m7', 0x24000000), ('cortex-m4', 0x20000000)])
 def test_sdk_renode(tmp_path, renode, cpu, ram):  # noqa: F811
-    module = build.build(HERE / 'sdk_probe.rs', tmp_path / 'sdk.apmod', 'thumbv7em-none-eabihf', 8192)
+    module = build.build(HERE / 'rust/sdk_probe.rs', tmp_path / 'sdk.apmod', 'thumbv7em-none-eabihf', 8192)
     info = pack.unpack(module.read_bytes())
     assert info['memory_size'] <= 0x6000
     platform = tmp_path / 'sdk.repl'
