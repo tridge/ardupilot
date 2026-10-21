@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pack
+import targets
 
 HERE = Path(__file__).resolve().parents[1]
 ROOT = HERE.parents[1]
@@ -18,7 +19,8 @@ GENERATED = ROOT / 'build/modules/libraries/AP_Module'
 
 
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096,
-          extra_objects=()):
+          extra_objects=(), cpu=None):
+    profile = targets.select(target, cpu)
     if opt_level != 's':
         raise ValueError('C++ modules currently require --opt-level=s; other relocation output is unaudited')
     compiler = os.environ.get('CXX', 'clang++')
@@ -31,9 +33,9 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
         match = re.search(pattern, version)
         if match is None or int(match[1]) < 21:
             raise ValueError(f'C++ modules require {name} 21 or newer; got {version.splitlines()[0]}')
-    arm = target == 'thumbv7em-none-eabihf'
+    arm = profile.machine == 40
     contract = json.loads((GENERATED / 'sdk/abi.json').read_text())
-    contract.update(cpu_profile=1 if arm else 2, stack_size=stack_size, heap_size=heap_size)
+    contract.update(cpu_profile=profile.id, stack_size=stack_size, heap_size=heap_size)
     output.parent.mkdir(parents=True, exist_ok=True)
     common = [compiler, '--target=arm-none-eabi' if arm else '--target=x86_64-unknown-linux-gnu',
               '-std=c++17', '-Os', '-ffreestanding', '-fno-builtin', '-fno-exceptions', '-fno-rtti',
@@ -41,7 +43,7 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
               '-fno-unwind-tables', '-fno-asynchronous-unwind-tables',
               '-I' + str(SDK), '-I' + str(GENERATED), '-I' + str(GENERATED / 'sdk/cpp')]
     if arm:
-        common += ['-mcpu=cortex-m4', '-mthumb', '-mfpu=fpv4-sp-d16', '-mfloat-abi=hard',
+        common += [f'-mcpu={profile.cpu}', '-mthumb', f'-mfpu={profile.fpu}', '-mfloat-abi=hard',
                    '-fropi', '-frwpi', '-fallow-unsupported']
     else:
         common += ['-fPIC', '-mno-red-zone']

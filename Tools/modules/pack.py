@@ -19,6 +19,7 @@ from pathlib import Path
 from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import RelocationSection
 from elftools.elf.sections import SymbolTableSection
+from targets import CPU_PROFILES
 
 MAGIC = b'APMOD01\0'
 HEADER = struct.Struct('<8s12I')
@@ -45,7 +46,8 @@ def require(condition, message):
 
 def validate_contract(machine, abi, profile, stack, fingerprint, heap):
     require(type(abi) is int and 0 < abi <= 0xFFFFFFFF, 'invalid ABI version')
-    require(type(profile) is int and (machine, profile) in ((40, 1), (62, 2)), 'invalid CPU profile')
+    require(type(profile) is int and profile in CPU_PROFILES and CPU_PROFILES[profile].machine == machine,
+            'invalid CPU profile')
     require(type(stack) is int and 256 <= stack <= MAX_IMAGE, 'invalid stack requirement')
     require(type(heap) is int and 256 <= heap <= MAX_IMAGE, 'invalid initial heap requirement')
     require(len(fingerprint) == 16 and fingerprint != bytes(16), 'invalid API fingerprint')

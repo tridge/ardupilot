@@ -16,15 +16,14 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pack  # noqa: E402
+import targets  # noqa: E402
+
+from targets import TARGETS  # noqa: E402
 
 HERE = Path(__file__).resolve().parents[1]
 MIN_RUST_VERSION = (HERE / 'rust/rust-toolchain-version').read_text().strip()
 SDK_ROOT = HERE.parents[1] / 'libraries/AP_Module'
 GENERATED_ROOT = HERE.parents[1] / 'build/modules/libraries/AP_Module'
-TARGETS = {
-    'thumbv7em-none-eabihf': (1, 'cortex-m4'),
-    'x86_64-unknown-linux-gnu': (2, 'x86-64'),
-}
 
 
 def parse_rust_version(output):
@@ -55,21 +54,22 @@ def sdk_environment():
     return dict(os.environ, AP_MODULE_SDK_GENERATED=str(generated / 'sdk/rust/src'))
 
 
-def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096):
+def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None):
+    profile = targets.select(target, cpu)
     compiler = os.environ.get('RUSTC', 'rustc')
     version = subprocess.check_output([compiler, '--version'], text=True)
     check_rust_version(version)
-    profile, cpu = TARGETS[target]
     environment = sdk_environment()
     contract = json.loads((GENERATED_ROOT / 'sdk/abi.json').read_text())
-    contract.update(cpu_profile=profile, stack_size=stack_size, heap_size=heap_size)
-    pack.validate_contract(40 if profile == 1 else 62, contract['abi_version'], profile,
+    contract.update(cpu_profile=profile.id, stack_size=stack_size, heap_size=heap_size)
+    pack.validate_contract(profile.machine, contract['abi_version'], profile.id,
                            stack_size, bytes.fromhex(contract['fingerprint']), heap_size)
     output.parent.mkdir(parents=True, exist_ok=True)
     library = output.with_name(f'lib{output.stem}_sdk.rlib')
     elf = output.with_suffix('.elf')
-    relocation = 'ropi-rwpi' if profile == 1 else 'pic'
-    common = [compiler, '--edition=2021', '--target', target, '-C', f'target-cpu={cpu}',
+    arm = profile.machine == 40
+    relocation = 'ropi-rwpi' if arm else 'pic'
+    common = [compiler, '--edition=2021', '--target', target, '-C', f'target-cpu={profile.cpu}',
               '-C', f'opt-level={opt_level}', '-C', 'panic=abort', '-C', f'relocation-model={relocation}',
               '-C', 'codegen-units=1']
     if debug:
@@ -84,20 +84,20 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     for option in cfg:
         command += ['--cfg', option]
     link_args = [f'-T{HERE / "module.ld"}', '--emit-relocs', f'--defsym=MODULE_BASE={base}']
-    if profile == 1:
+    if arm:
         link_args += ['--defsym=MODULE_DATA_ALIGNMENT=4']
-    if profile == 2:
+    if not arm:
         command += ['-C', 'link-arg=-nostdlib', '-C', 'link-arg=-static', '-C', 'link-arg=-no-pie']
         link_args = ['-Wl,' + arg for arg in link_args]
     for argument in link_args:
         command += ['-C', f'link-arg={argument}']
     subprocess.run(command, check=True, env=environment)
-    if profile == 1 and debug:
+    if arm and debug:
         # Debug builds can retain an unused EHABI personality symbol from
         # compiler-builtins. objcopy refuses this if a relocation needs it.
         subprocess.run([os.environ.get('ARM_OBJCOPY', 'arm-none-eabi-objcopy'),
                         '--strip-symbol=__aeabi_unwind_cpp_pr0', str(elf)], check=True, env=environment)
-    if profile == 2:
+    if not arm:
         # Some prebuilt compiler-builtins retain this undefined symbol after
         # their unwind sections are discarded. Strip it only if unreferenced;
         # objcopy and the packer still reject actual unresolved dependencies.
@@ -112,13 +112,15 @@ def main():
     parser.add_argument('source', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--target', choices=TARGETS, required=True)
+    parser.add_argument('--cpu', choices=('cortex-m4', 'cortex-m7', 'x86-64'),
+                        help='module CPU requirement (default depends on target)')
     parser.add_argument('--stack-size', type=int, required=True, help='declared module stack requirement in bytes')
     parser.add_argument('--heap-size', type=int, required=True, help='initial module heap in bytes, capped by MOD_HEAP_MAX')
     parser.add_argument('--debug', action='store_true', help='keep full DWARF in the host ELF and use frame pointers')
     parser.add_argument('--opt-level', choices=('0', '1', '2', '3', 's', 'z'), default='s', help='Rust optimisation level')
     args = parser.parse_args()
     build(args.source, args.output, args.target, args.stack_size, debug=args.debug,
-          opt_level=args.opt_level, heap_size=args.heap_size)
+          opt_level=args.opt_level, heap_size=args.heap_size, cpu=args.cpu)
 
 
 if __name__ == '__main__':

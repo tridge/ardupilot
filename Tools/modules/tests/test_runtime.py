@@ -333,6 +333,7 @@ def test_rounded_code_size(launch, images, budget):
     (12, 40, 'wrong target'),
     (44, 0, 'ABI version mismatch'),
     (48, 1, 'CPU profile mismatch'),
+    (48, 3, 'CPU profile mismatch'),
     (64, 0, 'API fingerprint'),
     (80, 0, 'image checksum mismatch'),
 ])

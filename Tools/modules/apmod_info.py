@@ -17,15 +17,11 @@ import pack
 
 from elftools.common.exceptions import ELFError
 from elftools.elf.elffile import ELFFile
+from targets import CPU_PROFILES
 
 MACHINES = {
     40: 'ARM',
     62: 'x86-64',
-}
-
-PROFILES = {
-    (40, 1): 'thumbv7em-none-eabihf',
-    (62, 2): 'x86_64-unknown-linux-gnu',
 }
 
 
@@ -124,8 +120,10 @@ def format_module(path, data, show_fixups=False, elf_data=None, elf_path=None):
     ]
     if contract is not None:
         profile = contract['cpu_profile']
+        cpu = CPU_PROFILES[profile]
         lines += [
-            f'Target profile: {PROFILES.get((machine, profile), "unknown")} ({profile})',
+            f'Target profile: {cpu.target} ({profile})',
+            f'CPU requirement: {cpu.cpu}' + (f' ({cpu.fpu}, hard float)' if cpu.fpu else ''),
             f'ABI version: {contract["abi_version"]}',
             f'API fingerprint: {contract["fingerprint"]}',
             f'Stack requirement: {contract["stack_size"]} bytes',

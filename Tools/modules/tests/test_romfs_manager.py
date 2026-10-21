@@ -51,7 +51,8 @@ def validate_prelinked_romfs(executable, build_directory, module_path):
 
 
 @pytest.mark.parametrize('sd_language', ['rust', 'cpp', 'fortran'])
-def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch, sd_language):  # noqa: F811
+@pytest.mark.parametrize('cpu', ['cortex-m4', 'cortex-m7'])
+def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch, sd_language, cpu):  # noqa: F811
     board = os.environ.get('OWNED_THREAD_BOARD', 'MatekH743')
     build_root = Path(os.environ.get('AP_MODULE_ROMFS_BUILD_ROOT', ROOT / 'build/romfs-runtime'))
     executable = build_root / board / 'examples/ModuleRuntime'
@@ -76,7 +77,7 @@ def test_chibios_romfs_runtime(tmp_path, renode, monkeypatch, sd_language):  # n
     if sd_language == 'fortran':
         monkeypatch.setenv('FC', os.environ.get('ARM_FC', 'arm-linux-gnueabihf-gfortran'))
     build.build(source, sd_module,
-                'thumbv7em-none-eabihf', 8193)
+                'thumbv7em-none-eabihf', 8193, cpu=cpu)
     expected_checksum = (zlib.crc32(embedded.read_bytes()) ^ zlib.crc32(sd_module.read_bytes())) & CHECKSUM_MASK
 
     generated = gen_board.generate(ROOT, board, tmp_path / 'generated', uart_port=0, state_dir=tmp_path)

@@ -18,7 +18,12 @@ python3 -m pip install pyelftools pytest
 ```
 
 Supported targets are `thumbv7em-none-eabihf` for STM32 and
-`x86_64-unknown-linux-gnu` for x86-64 SITL/Linux. Host builds need native
+`x86_64-unknown-linux-gnu` for x86-64 SITL/Linux. ARM defaults to the M4-compatible
+profile. Add `--cpu cortex-m7` for H743/H757-optimized code with FPv5 double
+precision, or select `--cpu cortex-m4` explicitly for F405 and H7 portability.
+H7 firmware accepts either; F405 rejects M7 modules before execution.
+The CPU option applies to all language backends; x86-64 only accepts `--cpu x86-64`.
+Host builds need native
 GCC/binutils; firmware builds and some tests also need the ArduPilot ARM
 toolchain. Renode integration tests require `RENODE` to name an executable;
 SD-card tests also require mtools. Compiler-dependent tests fail if their
@@ -58,7 +63,7 @@ Run from the repository root:
 Tools/modules/build.py \
     libraries/AP_Module/applets/aerobatics/main.rs \
     build/modules/airshow.apmod \
-    --target thumbv7em-none-eabihf --stack-size 16384 --heap-size 32768
+    --target thumbv7em-none-eabihf --cpu cortex-m7 --stack-size 16384 --heap-size 32768
 Tools/modules/apmod_info.py build/modules/airshow.apmod
 Tools/modules/apmod_info.py --fixups build/modules/airshow.apmod
 ```
@@ -75,7 +80,7 @@ Rust also retains `lib<name>_sdk.rlib`; C++ retains its intermediate `.o` files.
 or 16 KiB on x86-64; backend overhead is additional.
 
 `apmod_info.py` validates the file and reports its target, ABI, code/data sizes,
-alignments, stack requirement, initial heap, relocations and imported API names.
+alignments, CPU/FPU requirement, stack requirement, initial heap, relocations and imported API names.
 It does not check whether a particular firmware provides those APIs or has enough RAM.
 It automatically uses a companion `.elf` to split file size into code, read-only
 data, initialized RW data, alignment padding and container overhead. The ELF
@@ -143,7 +148,7 @@ helpers from its Cortex-M4 hard-float `libgcc.a`; `ARM_GCC` overrides that compi
 ```sh
 FC=arm-linux-gnueabihf-gfortran Tools/modules/build.py \
     libraries/AP_Module/examples/simple_loop.f90 build/modules/fortran_H7.apmod \
-    --target thumbv7em-none-eabihf --stack-size 8192 --heap-size 4096
+    --target thumbv7em-none-eabihf --cpu cortex-m7 --stack-size 8192 --heap-size 4096
 ```
 
 Copy `fortran_H7.apmod` to `/APM/modules/` on microSD and enable `MOD_ENABLE`.
@@ -290,6 +295,9 @@ The mixed ROMFS/SD harness uses a separate build directory:
 Tools/modules/build_romfs_runtime.py
 RENODE=/path/to/renode python3 -m pytest -q Tools/modules/tests/test_romfs_manager.py
 ```
+
+Add `--cpu cortex-m7` to the harness builder to embed an M7-profile ROMFS module.
+The SD/ROMFS test exercises M4 and M7 SD modules in all three languages on H743.
 
 `OWNED_THREAD_BOARD` selects a compatible board fixture; `AP_MODULE_BUILD_ROOT`
 and `AP_MODULE_ROMFS_BUILD_ROOT` select existing example build roots. Tests for

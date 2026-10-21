@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT / 'Tools/renode/tests'))
 from test_peripherals import renode  # noqa: E402,F401
 
 
-def build(tmp_path, target, base=0x10000, relocation=None):
+def build(tmp_path, target, base=0x10000, relocation=None, cpu=None):
     compiler = os.environ.get('RUSTC', 'rustc')
     version = subprocess.check_output([compiler, '--version'], text=True)
     check_rust_version(version)
@@ -37,6 +37,8 @@ def build(tmp_path, target, base=0x10000, relocation=None):
     command = [compiler, str(HERE / 'rust/probe.rs'), '--edition=2021', '--target', target,
                '-C', 'opt-level=s', '-C', 'panic=abort', '-C', 'lto=fat',
                '-C', f'relocation-model={relocation}', '-o', str(output)]
+    if cpu is not None:
+        command += ['-C', 'target-cpu=' + cpu]
     arguments = [f'-T{HERE / "module.ld"}', '--emit-relocs', f'--defsym=MODULE_BASE={base}']
     if target == 'x86_64-unknown-linux-gnu':
         command += ['-C', 'link-arg=-nostdlib', '-C', 'link-arg=-static', '-C', 'link-arg=-no-pie']
@@ -99,7 +101,7 @@ def test_runtime_contract(tmp_path, target):
     for length in (0, 55, 56, 75, len(data) - 1):
         with pytest.raises(ValueError):
             pack.unpack(data[:length])
-    for key, value in (('abi_version', True), ('cpu_profile', 3), ('stack_size', 0), ('stack_size', True),
+    for key, value in (('abi_version', True), ('cpu_profile', 4), ('stack_size', 0), ('stack_size', True),
                        ('stack_size', 255), ('stack_size', pack.MAX_IMAGE + 1), ('fingerprint', '00' * 16)):
         with pytest.raises(ValueError):
             pack.pack_elf(elf, {**manifest, key: value})
@@ -263,11 +265,18 @@ def test_native_execution_two_allocations(tmp_path):
             memory.close()
 
 
-@pytest.mark.parametrize(('cpu', 'ram'), [('cortex-m7', 0x24000000), ('cortex-m4', 0x20000000)])
-@pytest.mark.parametrize('loader', ['python', 'cpp', 'cpp_runtime'])
-def test_renode_two_bases(tmp_path, renode, cpu, ram, loader):  # noqa: F811
+@pytest.mark.parametrize('cpu,ram,loader,module_cpu', [
+    (cpu, ram, loader, 'cortex-m4')
+    for cpu, ram in [('cortex-m7', 0x24000000), ('cortex-m4', 0x20000000)]
+    for loader in ['python', 'cpp', 'cpp_runtime']
+] + [(cpu, ram, 'cpp_runtime', 'cortex-m7')
+     for cpu, ram in [('cortex-m7', 0x24000000), ('cortex-m4', 0x20000000)]])
+def test_renode_two_bases(tmp_path, renode, cpu, ram, loader, module_cpu):  # noqa: F811
     manifest = runtime_manifest('thumbv7em-none-eabihf') if loader == 'cpp_runtime' else None
-    data = pack.pack_elf(build(tmp_path, 'thumbv7em-none-eabihf'), manifest)
+    if manifest is not None and module_cpu == 'cortex-m7':
+        manifest['cpu_profile'] = 3
+    data = pack.pack_elf(build(tmp_path, 'thumbv7em-none-eabihf', cpu=module_cpu), manifest)
+    reject = module_cpu == 'cortex-m7' and cpu == 'cortex-m4'
     info = pack.unpack(data)
     first, second = ram + 0x4000, ram + 0xA000
     assert info['memory_size'] <= 0x6000
@@ -288,6 +297,15 @@ ram: Memory.MappedMemory @ sysbus 0x{ram:x}
                       '.text : { *(.text*) *(.rodata*) } }')
     source = tmp_path / 'harness.S'
     loader_setup = 'bl load_images\n cmp r0, #1\n bne fault' if loader != 'python' else ''
+    if reject:
+        # Stop after admission: a rejected module must never reach its entry.
+        loader_setup = f'''bl load_images
+ cmp r0, #0
+ bne fault
+ ldr r0, =0x{ram + 0x110:x}
+ ldr r1, =0x600df00d
+ str r1, [r0]
+ b .'''
     source.write_text(f'''
 .syntax unified
 .thumb
@@ -333,10 +351,10 @@ fault:
  b .
 .thumb_func
 output:
- cmp r1, #17
+ cmp r1, #19
  bne fault
  ldrb r0, [r0]
- cmp r0, #82
+ cmp r0, #78
  bne fault
  ldr r2, =0x{ram + 0x100:x}
  ldr r0, [r2, #8]
@@ -388,7 +406,8 @@ host:
     if loader != 'python':
         loader_source = tmp_path / 'loader.cpp'
         if loader == 'cpp_runtime':
-            contract = ('const AP_Module::Image::Compatibility expected{40, 1, 1, 8192, '
+            board_profile = 3 if cpu == 'cortex-m7' else 1
+            contract = (f'const AP_Module::Image::Compatibility expected{{40, 1, {board_profile}, 8192, '
                         '{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}};')
             parse = f'image.parse(reinterpret_cast<const uint8_t *>(0x08010000), {len(data)}, 0x6000, expected)'
             load_first = (f'image.load_split(reinterpret_cast<void *>({first}), {info["rx_size"]}, '
@@ -402,15 +421,18 @@ host:
             parse = f'image.parse_probe(reinterpret_cast<const uint8_t *>(0x08010000), {len(data)}, 0x6000, 40)'
             load_first = f'image.load(reinterpret_cast<void *>({first}), 0x6000)'
             load_second = f'image.load(reinterpret_cast<void *>({second}), 0x6000)'
+        loaded = f'return {parse} && {load_first} && {load_second};'
+        if reject:
+            loaded = (f'if ({parse}) {{ return 1; }}\n'
+                      '    return strcmp(image.parse_error(), "requires Cortex-M7 with double-precision FPU") != 0;')
         loader_source.write_text(f'''
 #include <AP_Module/Image.h>
+#include <string.h>
 extern "C" int load_images()
 {{
     AP_Module::Image image;
     {contract}
-    return {parse}
-        && {load_first}
-        && {load_second};
+    {loaded}
 }}
 ''')
         inputs += [str(loader_source), str(ROOT / 'libraries/AP_Module/Image.cpp'), str(ROOT / 'libraries/AP_Math/crc.cpp')]
@@ -435,4 +457,5 @@ extern "C" int load_images()
         commands += f'sysbus ReadDoubleWord 0x{ram + 0x100 + offset:x}\n'
     output = renode(commands)
     words = re.findall(r'^0x([0-9a-fA-F]{8})\s*$', output, re.M)
-    assert [int(word, 16) for word in words] == [31, 31, 2, 20, 0x600DF00D, 2, 2], output
+    expected = [0, 0, 0, 0, 0x600DF00D, 0, 0] if reject else [31, 31, 2, 20, 0x600DF00D, 2, 2]
+    assert [int(word, 16) for word in words] == expected, output

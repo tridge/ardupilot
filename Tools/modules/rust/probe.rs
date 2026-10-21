@@ -68,6 +68,9 @@ pub unsafe extern "C" fn start(host: &Host) -> u32 {
     let functions = core::hint::black_box(&FUNCTIONS);
     let value = functions[(n & 1) as usize](n);
     let float = core::hint::black_box(1.25_f32) * core::hint::black_box(8.0_f32);
+    // M7 builds exercise hardware double precision; M4 builds use compiler helpers.
+    let double = core::hint::black_box(1.25_f64) * core::hint::black_box(8.0_f64);
+    if double != 10.0 { return 0xbad2; }
     HOST.store(core::ptr::null_mut(), Ordering::Release);
     value + float as u32 + zero[0]
 }
