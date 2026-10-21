@@ -12,8 +12,8 @@ May 2017
 import os, re, struct, sys, zlib
 
 
-APMOD_MAGIC = b'APMOD06\0'
-APMOD_HEADER = struct.Struct('<8s14I16sI')
+APMOD_MAGIC = b'APMOD07\0'
+APMOD_HEADER = struct.Struct('<8s14I16s2I')
 APMOD_FIXUP = struct.Struct('<I')
 APMOD_IMPORT = struct.Struct('<QII')
 APMOD_HEADER_SIZE = APMOD_HEADER.size
@@ -35,14 +35,14 @@ def write_bytes(out, contents):
 
 
 def apmod_details(contents, embedded_name):
-    '''validate an APMOD06 module and return its machine and fixups'''
+    '''validate an APMOD07 module and return its machine and fixups'''
     if len(contents) < APMOD_HEADER_SIZE:
         raise ValueError("Invalid AP_Module module %s: truncated header" % embedded_name)
     fields = APMOD_HEADER.unpack_from(contents)
     (magic, version, machine, width, alignment, file_size, memory_size, rx_size,
-     entry, count, abi, profile, stack, heap, import_count, fingerprint, crc) = fields
-    if magic != APMOD_MAGIC or version != 6:
-        raise ValueError("Invalid AP_Module module %s: expected APMOD06" % embedded_name)
+     entry, count, abi, profile, stack, heap, import_count, fingerprint, priority, crc) = fields
+    if magic != APMOD_MAGIC or version != 7:
+        raise ValueError("Invalid AP_Module module %s: expected APMOD07" % embedded_name)
     if (machine, width) not in ((40, 4), (62, 8)):
         raise ValueError("Invalid AP_Module module %s: unsupported target" % embedded_name)
     rw_alignment, rx_alignment = alignment & 0xffff, alignment >> 16
@@ -58,7 +58,7 @@ def apmod_details(contents, embedded_name):
         raise ValueError("Invalid AP_Module module %s: ARM entry is not Thumb" % embedded_name)
     if (abi == 0 or (machine, profile) not in ((40, 1), (62, 2), (40, 3)) or
             stack < 256 or stack > APMOD_MAX_IMAGE or heap < 256 or heap > APMOD_MAX_IMAGE or
-            fingerprint == bytes(len(fingerprint))):
+            fingerprint == bytes(len(fingerprint)) or not 1 <= priority <= 254):
         raise ValueError("Invalid AP_Module module %s: invalid runtime contract" % embedded_name)
     fixup_start = APMOD_HEADER_SIZE + file_size
     fixup_end = fixup_start + count * APMOD_FIXUP.size
