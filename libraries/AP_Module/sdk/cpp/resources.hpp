@@ -24,6 +24,7 @@ public:
         result.context = &context;
         result.storage = context.allocate(n, a);
         if (result.storage == nullptr) { return {Error::NoMemory, Parameter()}; }
+        if (reinterpret_cast<uintptr_t>(result.storage) % a != 0) { return {Error::Host, Parameter()}; }
         const auto initialized = context.parameter_cache().init(result.address(), name);
         if (!initialized) { return {initialized.error, Parameter()}; }
         if (!initialized.value) { return {Error::Unavailable, Parameter()}; }

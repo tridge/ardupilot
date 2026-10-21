@@ -49,7 +49,7 @@ public:
         ROMFS,
     };
     // Firmware callback only, called on the module worker: must be thread-safe,
-    // must not retain message, throw, or hold a lock across a return to Rust.
+    // must not retain message, throw, or hold a lock across a return to module code.
     // context must outlive this Module. Budget at most 2 KiB of additional
     // stack for this callback on Cortex-M; queue text for formatting elsewhere.
     struct TextSink {

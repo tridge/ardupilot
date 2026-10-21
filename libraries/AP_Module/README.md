@@ -159,7 +159,7 @@ owned RX bytes. Allocator bookkeeping, loader scratch, manager storage and
 persistent firmware registrations are additional; heap usage is not total RAM.
 The manager requests a separate 4 KiB stack on ARM or 32 KiB on x86-64.
 
-`--heap-size` stores each module's initial heap request (default 4096). The loader
+The required `--heap-size` stores each module's initial heap request. The loader
 rejects requests over `MOD_HEAP_MAX`. Each worker receives its own declared stack
 plus the host-call margin, not the entire `MOD_STACK_MAX` budget.
 
@@ -172,12 +172,20 @@ Expanded capacity remains usable after disarm. Rebuild with a larger `--heap-siz
 to change initial capacity; raise `MOD_HEAP_MAX` if needed. Fragmentation can
 still prevent allocation. Capacity and arena-slot exhaustion are reported separately.
 
+The 32 KiB default retains the previous initial budget; it is not a demonstrated
+worst-case bound for every applet. The aerobatics regression fixtures use a
+32 KiB initial heap. Parameter-heavy applets such as `vtol_quicktune` and
+workload-dependent allocations in `net_webserver` need their own measurements;
+client count, directory size and aerobatics schedule length can change demand.
+Check peak/capacity reports with representative workloads before flight, and
+configure both the module's initial request and `MOD_HEAP_MAX` accordingly.
+
 This pre-alpha cutover intentionally rejects old `APRUST` modules: rebuild all
 modules and update install paths and parameter names. Parameter storage indices
 are unchanged, so old saved values carry over. In particular the former initial
 heap value now becomes a maximum; review limits before enabling modules.
 
-`MOD_DEBUG_OPTS` bit 4 disables Rust pre-arm checks. Bit 5 saves both current
+`MOD_DEBUG_OPTS` bit 4 disables module pre-arm checks. Bit 5 saves both current
 checksums and clears itself. Bit 6 disables heap expansion for the next module
 generation. Checksums are 23-bit-masked XORs of whole-file CRC32 values, not
 authentication; identical files can cancel. Normally returned modules stay in
@@ -187,14 +195,14 @@ the loaded checksum but leave the running checksum.
 
 Changing `MOD_RESTART` requests stop for all workers, joins them and reloads the
 files, including while armed. SDK sleeps return `Error::Stopped` promptly;
-propagate that result or poll `stop_requested()` and return normally so Rust
+propagate that result or poll `stop_requested()` and return normally so local
 destructors run. Restart does not itself disarm the vehicle.
 
 Workers are never forcibly cancelled. A ten-second stop timeout retains live
 code, stacks, heaps and handles and prevents a new generation. Late exits can be
 reaped, but another explicit restart request is needed to retry. Panic and
 infallible allocation failure park the worker until reboot, not a whole-firmware
-panic. Errors latch a Rust pre-arm failure until the next generation. Normal
+panic. Errors latch a module pre-arm failure until the next generation. Normal
 return and an empty directory are not errors. SYSTEM-check and force-arm bypasses
 follow Lua semantics.
 
@@ -215,10 +223,12 @@ are experimental, so rebuilding against the current tree may be necessary.
 
 Bindings use Lua-style namespaces: `context.ahrs().get_gyro()` or
 `context.vehicle().get_mode()`. Results use `Result` and optional outputs use
-`Option`; no flat compatibility aliases are generated. `Context` cannot be sent
-or shared across threads. Value types are copies, not shared Lua userdata;
+Rust's `Option` or C++'s `ap_module::Optional`; no flat compatibility aliases
+are generated. Contexts and resource owners must remain on their worker thread,
+and a context must outlive its proxies/owners. Rust enforces the cross-thread
+restriction; C++ callers must uphold it. Value types are copies, not shared Lua userdata;
 methods calling firmware require a live context. Binding locks block and are
-released before returning to Rust.
+released before returning to module code.
 
 The generated `generator/coverage.json` records supported methods and exclusions
 with reasons. Generated Rust docs describe bounds and side effects. Manual Lua
@@ -226,7 +236,8 @@ facilities have audited native adapters, not automatic translations. Native
 bindings can differ in encoding, ownership and validation: general input strings
 are UTF-8, at most 255 bytes, without NUL; parameter names are at most 16 bytes.
 
-Use `context.parameter("NAME")` for repeated parameter access. Dynamic parameter
+Use Rust's `context.parameter("NAME")` or C++'s `Parameter::create(context, "NAME")`
+for repeated parameter access. Dynamic parameter
 metadata/names are firmware-owned until reboot and share Lua's table limit.
 Identical registration reuses metadata and restores saved values; unsaved changes
 need not survive. Logger format registrations also persist until reboot. Keep

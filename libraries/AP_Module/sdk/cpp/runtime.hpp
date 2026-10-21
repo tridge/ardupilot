@@ -26,7 +26,9 @@ struct StringView {
     const char *data;
     size_t length;
     StringView(const char *s, size_t n) : data(s), length(n) {}
-    template<size_t N> StringView(const char (&s)[N]) : data(s), length(N - 1) {}
+    template<size_t N> StringView(const char (&s)[N]) : data(s), length(0) {
+        while (length < N && s[length] != 0) { length++; }
+    }
 };
 class ContextBase {
 public:

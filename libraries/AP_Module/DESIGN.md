@@ -77,9 +77,9 @@ values and handle ownership are still checked. Common codecs avoid C++ padding.
 Completely overwritten outputs are not pre-zeroed; absent/variable payloads are
 initialized where required for canonical output.
 
-Semaphore acquisition blocks. Locks are released before returning to Rust;
-firmware does not call back into module code. SDK proxies borrow a context that
-is neither `Send` nor `Sync`. Ordinary state changes retain Lua semantics and
+Semaphore acquisition blocks. Locks are released before returning to module code;
+firmware does not call back into module code. SDK proxies borrow a context; Rust
+proxies are neither `Send` nor `Sync`. Ordinary state changes retain Lua semantics and
 are not rolled back on exit. A stop request cannot interrupt an in-flight host
 call.
 
@@ -209,7 +209,7 @@ storage are additional, not a complete physical-memory total.
 
 Parameter definitions and logger formats are firmware-owned until reboot, outside
 module heaps. Identical parameter registration reuses metadata and restores saved
-values; unsaved values can reset. Lua/Rust share dynamic-table limits. Cached
+values; unsaved values can reset. Lua and native modules share dynamic-table limits. Cached
 `Parameter` queries host size/alignment once, placement-constructs the shared
 trivially-destructible helper in module-owned storage and frees it on drop.
 C++ layout is not part of the public wire contract.
@@ -225,7 +225,7 @@ bypasses. Errors latch until the next generation; empty directories/normal retur
 are not failures. Loaded/running requirements are 23-bit-masked XORs of canonical
 whole-file CRC32 values, reset each generation. Normally returned modules remain
 loaded but no longer running. Armed restart follows the same ownership rules;
-Rust errors never automatically disarm an already armed vehicle.
+Module errors never automatically disarm an already armed vehicle.
 
 ## Optional H7 stack-fault recovery
 
@@ -251,5 +251,5 @@ lock-free callback, releases owned mutexes with `chMtxUnlockAllS()` and exits wi
 Forced mutex release cannot roll back partially completed host operations; binary
 semaphores and non-mutex state are not reconstructed. A frame/write can skip the
 entire guard. Arbitrary pointers and all nested/critical-section faults are not
-contained. Recovery latches a Rust error without disarming. This narrow mechanism
+contained. Recovery latches a module error without disarming. This narrow mechanism
 does not replace stack measurement or provide general memory protection.

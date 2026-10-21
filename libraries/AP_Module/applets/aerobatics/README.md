@@ -22,7 +22,7 @@ Build Plane with `--enable-modules`. Development targets boards with
 ```sh
 RUSTC=/path/to/rustc-1.98.1 Tools/modules/build.py \
     libraries/AP_Module/applets/aerobatics/main.rs /tmp/airshow.apmod \
-    --target thumbv7em-none-eabihf --stack-size 16384
+    --target thumbv7em-none-eabihf --stack-size 16384 --heap-size 32768
 ```
 
 For SITL/Linux x86-64, build with `--target x86_64-unknown-linux-gnu` instead.
