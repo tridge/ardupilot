@@ -92,6 +92,17 @@ bool MultiHeap::available(void) const
     return heaps != nullptr && heaps[0].hp != nullptr;
 }
 
+uint32_t MultiHeap::get_free_size() const
+{
+    uint32_t free = 0;
+    for (uint8_t i = 0; heaps != nullptr && i < num_heaps; i++) {
+        if (heaps[i].hp != nullptr) {
+            free += heap_free_size(heaps[i].hp);
+        }
+    }
+    return free;
+}
+
 /*
   allocate memory from a heap
  */

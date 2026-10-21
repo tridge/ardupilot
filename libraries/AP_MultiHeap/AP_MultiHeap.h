@@ -44,6 +44,9 @@ public:
     }
     enum ExpansionFailure : uint8_t { Capacity = 1, Arenas = 2, Memory = 4 };
     uint8_t get_expansion_failures() const { return expansion_failures; }
+    uint32_t get_size() const { return sum_size; }
+    // Caller must exclude concurrent allocation, expansion and destruction.
+    uint32_t get_free_size() const;
 
 private:
     struct Heap {
@@ -83,4 +86,5 @@ private:
     // free some memory that was allocated by heap_allocate. The implementation must
     // be able to determine which heap the allocation was from using the pointer
     void heap_free(void *ptr);
+    uint32_t heap_free_size(void *heap) const;
 };
