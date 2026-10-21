@@ -28,19 +28,19 @@
 
 #ifdef HAL_HAVE_AP_ROMFS_PRELINKED_APMOD
 /*
-  Restore the canonical target offsets in a firmware-prelinked APMOD06
+  Restore the canonical target offsets in a firmware-prelinked APMOD07
   module. This lets ordinary ROMFS reads return the original file while
   find_uncompressed() exposes the physical execute-in-place image.
  */
 static bool canonicalise_apmod(const uint8_t *source, uint8_t *copy, uint32_t size)
 {
-    constexpr uint32_t header_size = 84;
+    constexpr uint32_t header_size = 88;
     constexpr uint32_t pointer_width = 4;
     const auto word = [](const uint8_t *p) {
         return uint32_t(p[0]) | uint32_t(p[1]) << 8 | uint32_t(p[2]) << 16 | uint32_t(p[3]) << 24;
     };
-    if (size < header_size || memcmp(source, "APMOD06\0", 8) != 0 ||
-        word(source + 8) != 6 || word(source + 12) != 40 || word(source + 16) != pointer_width) {
+    if (size < header_size || memcmp(source, "APMOD07\0", 8) != 0 ||
+        word(source + 8) != 7 || word(source + 12) != 40 || word(source + 16) != pointer_width) {
         return false;
     }
     const uint32_t file_size = word(source + 24);
