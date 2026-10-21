@@ -152,10 +152,12 @@ public:
     bool thread_create(AP_HAL::MemberProc, const char *name, uint32_t stack_size, priority_base base, int8_t priority) override;
 
 #if HAL_OWNED_THREADS_ENABLED
+    uint8_t thread_priority_min() const override;
+    uint8_t thread_priority_max() const override;
     OwnedThread *thread_create_owned(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
-                                    priority_base base, int8_t priority) override;
+                                    priority_base base, int16_t priority) override;
     OwnedThread *thread_create_owned_guarded(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
-                                            priority_base base, int8_t priority, StackFaultHandler handler) override;
+                                            priority_base base, int16_t priority, StackFaultHandler handler) override;
 #endif
 
     // pat the watchdog
@@ -203,7 +205,7 @@ private:
 #endif
 
     // calculates an integer to be used as the priority for a newly-created thread
-    uint8_t calculate_thread_priority(priority_base base, int8_t priority) const;
+    uint8_t calculate_thread_priority(priority_base base, int16_t priority) const;
 
     static void _timer_thread(void *arg);
     static void _rcout_thread(void *arg);

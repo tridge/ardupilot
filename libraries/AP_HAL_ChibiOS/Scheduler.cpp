@@ -693,8 +693,11 @@ void Scheduler::thread_create_trampoline(void *ctx)
 }
 
 // calculates an integer to be used as the priority for a newly-created thread
-uint8_t Scheduler::calculate_thread_priority(priority_base base, int8_t priority) const
+uint8_t Scheduler::calculate_thread_priority(priority_base base, int16_t priority) const
 {
+    if (base == PRIORITY_ABSOLUTE) {
+        return constrain_int16(priority, LOWPRIO, HIGHPRIO);
+    }
     uint8_t thread_priority = APM_IO_PRIORITY;
     static const struct {
         priority_base base;
@@ -717,7 +720,7 @@ uint8_t Scheduler::calculate_thread_priority(priority_base base, int8_t priority
     };
     for (uint8_t i=0; i<ARRAY_SIZE(priority_map); i++) {
         if (priority_map[i].base == base) {
-            thread_priority = constrain_int16(priority_map[i].p + priority, LOWPRIO, HIGHPRIO);
+            thread_priority = constrain_int32(int32_t(priority_map[i].p) + priority, LOWPRIO, HIGHPRIO);
             break;
         }
     }
@@ -864,9 +867,15 @@ private:
 };
 }
 
+uint8_t Scheduler::thread_priority_min() const { return LOWPRIO; }
+uint8_t Scheduler::thread_priority_max() const { return HIGHPRIO; }
+
 AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
-                                                             uint32_t stack_size, priority_base base, int8_t priority)
+                                                             uint32_t stack_size, priority_base base, int16_t priority)
 {
+    if (base == PRIORITY_ABSOLUTE && (priority < LOWPRIO || priority > HIGHPRIO)) {
+        return nullptr;
+    }
     if (!proc || stack_size == 0 || stack_size > 16U * 1024 * 1024) {
         return nullptr;
     }
@@ -880,8 +889,11 @@ AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberPro
 }
 
 AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned_guarded(AP_HAL::MemberProc proc, const char *name,
-    uint32_t stack_size, priority_base base, int8_t priority, StackFaultHandler handler)
+    uint32_t stack_size, priority_base base, int16_t priority, StackFaultHandler handler)
 {
+    if (base == PRIORITY_ABSOLUTE && (priority < LOWPRIO || priority > HIGHPRIO)) {
+        return nullptr;
+    }
 #if HAL_STACK_GUARD_ENABLED
     if (!proc || stack_size < 4096 || stack_size > 16U * 1024 * 1024) {
         return nullptr;
