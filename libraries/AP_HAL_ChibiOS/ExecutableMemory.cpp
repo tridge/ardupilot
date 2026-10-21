@@ -67,9 +67,14 @@ private:
 
 AP_HAL::ExecutableMemory::Target ChibiOS::Util::executable_memory_target() const
 {
-#if (defined(STM32H743xx) || defined(STM32H757xx) || defined(STM32F405xx)) && \
-    defined(__ARM_PCS_VFP) && defined(__ARM_ARCH_7EM__)
-    return AP_HAL::ExecutableMemory::Target::ThumbV7EMHardFloat;
+#if defined(__ARM_PCS_VFP) && defined(__ARM_ARCH_7EM__)
+#if (defined(STM32H743xx) || defined(STM32H757xx)) && __CORTEX_M == 7U
+    return AP_HAL::ExecutableMemory::Target::CortexM7HardFloat;
+#elif defined(STM32F405xx) && __CORTEX_M == 4U
+    return AP_HAL::ExecutableMemory::Target::CortexM4HardFloat;
+#else
+    return AP_HAL::ExecutableMemory::Target::Unsupported;
+#endif
 #else
     return AP_HAL::ExecutableMemory::Target::Unsupported;
 #endif
