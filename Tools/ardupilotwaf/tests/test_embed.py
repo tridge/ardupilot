@@ -20,7 +20,7 @@ embed = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(embed)
 
 
-def make_apmod(fixups=None, imports=(), alignment=4, rx_alignment=4, rx_size=4096):
+def make_apmod(fixups=None, imports=(), alignment=4, rx_alignment=4, rx_size=4096, profile=1):
     if fixups is None:
         fixups = ((4, 9), (rx_size, 0))
     file_size = rx_size + 4
@@ -37,7 +37,7 @@ def make_apmod(fixups=None, imports=(), alignment=4, rx_alignment=4, rx_size=409
         import_records.append(embed.APMOD_IMPORT.pack(binding_hash, destination, len(import_names)))
         import_names += name.encode("ascii") + b"\0"
     fields = (6, 40, 4, alignment | rx_alignment << 16, file_size, memory_size, rx_size, 1, len(fixups),
-              1, 1, 8192, 32768, len(imports), bytes.fromhex("00112233445566778899aabbccddeeff"))
+              1, profile, 8192, 32768, len(imports), bytes.fromhex("00112233445566778899aabbccddeeff"))
     body = bytes(image) + b"".join(destinations) + b"".join(import_records) + import_names
     header = embed.APMOD_HEADER.pack(embed.APMOD_MAGIC, *fields, 0)
     crc = zlib.crc32(header + body)
@@ -60,6 +60,21 @@ def test_compact_arm_rx_boundary(tmp_path, rx_size):
     module.write_bytes(contents)
     generated = generate(tmp_path, [('rust/compact.apmod', str(module))], prelink=True)
     assert 'ap_romfs_0' in generated and '.balign 4' in generated
+
+
+def test_m7_profile_can_be_prelinked(tmp_path):
+    contents = make_apmod(profile=3)
+    assert embed.apmod_details(contents, 'modules/m7.apmod')[0] == 40
+    module = tmp_path / 'm7.apmod'
+    module.write_bytes(contents)
+    generated = generate(tmp_path, [('modules/m7.apmod', str(module))], prelink=True)
+    assert 'ap_romfs_0' in generated
+
+
+@pytest.mark.parametrize('profile', [0, 2, 4])
+def test_prelink_rejects_invalid_arm_profiles(profile):
+    with pytest.raises(ValueError, match='invalid runtime contract'):
+        embed.apmod_details(make_apmod(profile=profile), 'modules/wrong-cpu.apmod')
 
 
 def test_x86_rx_boundary_still_requires_page_alignment():

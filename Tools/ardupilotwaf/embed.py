@@ -56,7 +56,7 @@ def apmod_details(contents, embedded_name):
         raise ValueError("Invalid AP_Module module %s: invalid RX image" % embedded_name)
     if machine == APMOD_MACHINE_ARM and (entry & 1) == 0:
         raise ValueError("Invalid AP_Module module %s: ARM entry is not Thumb" % embedded_name)
-    if (abi == 0 or (machine, profile) not in ((40, 1), (62, 2)) or
+    if (abi == 0 or (machine, profile) not in ((40, 1), (62, 2), (40, 3)) or
             stack < 256 or stack > APMOD_MAX_IMAGE or heap < 256 or heap > APMOD_MAX_IMAGE or
             fingerprint == bytes(len(fingerprint))):
         raise ValueError("Invalid AP_Module module %s: invalid runtime contract" % embedded_name)
