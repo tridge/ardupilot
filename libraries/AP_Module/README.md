@@ -2,7 +2,9 @@
 
 `AP_Module` loads trusted native modules from SD card or ROMFS. Each module
 has its own worker thread, heap and stack and uses generated bindings to call
-ArduPilot APIs. Rust and freestanding C++ share one loader and ABI. Lua can be
+ArduPilot APIs. Rust and freestanding C++ share one loader and ABI. A small
+[Fortran talk demo](../../Tools/modules/README.md#fortran-talk-demo-sitl-and-stm32h7)
+also uses that ABI on x86-64 Linux/SITL and STM32H7. Lua can be
 enabled independently or alongside native modules.
 
 See [DESIGN.md](DESIGN.md) for implementation contracts and the
