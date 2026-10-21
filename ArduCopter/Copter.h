@@ -143,7 +143,7 @@
 #endif
 #include <AP_RPM/AP_RPM.h>
 
-#if AP_SCRIPTING_ENABLED
+#if AP_SCRIPTING_LUA_ENABLED
 #include <AP_Scripting/AP_Scripting.h>
 #endif
 
