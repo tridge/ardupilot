@@ -77,7 +77,11 @@ class AP_EFI_Backend { public: bool handle_scripting(const EFI_State &); };
 class AP_EFI { public: static AP_EFI *get_singleton(); AP_EFI_Backend *get_backend(uint8_t);
     void get_state(EFI_State &); };
 ''',
-        'AP_EFI/AP_EFI_Scripting.h': '#pragma once\n',
+        'AP_EFI/AP_EFI_Scripting.h': '''#pragma once
+#if !AP_EFI_SCRIPTING_ENABLED
+#error "Disabled EFI backend must not be included"
+#endif
+''',
     }
     for name, content in headers.items():
         path = tmp_path / name

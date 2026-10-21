@@ -7,7 +7,9 @@
 #include "BindingSupport.h"
 #include <AP_Module/HostApi.h>
 #include <AP_EFI/AP_EFI.h>
+#if AP_EFI_SCRIPTING_ENABLED
 #include <AP_EFI/AP_EFI_Scripting.h>
+#endif
 
 namespace AP_Module
 {
