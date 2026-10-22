@@ -18,6 +18,9 @@ from test_threads import renode  # noqa: F401
 
 import build
 
+from elftools.dwarf.callframe import FDE
+from elftools.elf.elffile import ELFFile
+
 NATIVE = 'x86_64-unknown-linux-gnu'
 ARM = 'thumbv7em-none-eabihf'
 DEMO = ROOT / 'libraries/AP_Module/examples/simple_loop.adb'
@@ -94,6 +97,16 @@ def test_ada_rebases(tmp_path, monkeypatch, gnat, target, cpu, debug):
     assert image['contract']['heap_size'] == 4096
     assert {entry[2] for entry in image['imports']} == {'gcs.send_text'}
     assert not list(ROOT.glob('simple_loop.ali'))
+    if debug:
+        with first.with_suffix('.elf').open('rb') as stream:
+            elf = ELFFile(stream)
+            # C++ bridge CFI alone does not let GDB unwind the Ada caller.
+            entry = elf.get_section_by_name('.symtab').get_symbol_by_name('ap_module_ada_run')[0]
+            pc = entry['st_value'] & ~1 if target == ARM else entry['st_value']
+            frames = elf.get_dwarf_info(relocate_dwarf_sections=False).CFI_entries()
+            assert any(isinstance(frame, FDE) and frame['initial_location'] <= pc <
+                       frame['initial_location'] + frame['address_range'] for frame in frames)
+            assert not elf.get_section_by_name('.debug_frame')['sh_flags'] & 2
 
 
 @pytest.mark.parametrize('target', [NATIVE, ARM])

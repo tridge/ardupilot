@@ -179,7 +179,13 @@ class Apmod(gdb.Command):
                 except gdb.error as error:
                     raise ValueError('firmware ELF needs C++ debug information; rebuild with CXXFLAGS=-g') from error
                 for path in args[1:]:
-                    candidate = ModuleSymbols(path)
+                    try:
+                        candidate = ModuleSymbols(path)
+                    except (OSError, ValueError) as error:
+                        # A wildcard may include release or stale builds. One
+                        # unusable companion must not hide every other module.
+                        gdb.write(f'apmod: skipping {path}: {error}\n', gdb.STDERR)
+                        continue
                     if candidate.is_rust and self.printer is None:
                         try:
                             self.printers(os.environ.get('RUSTC', 'rustc'))

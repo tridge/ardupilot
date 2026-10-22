@@ -17,6 +17,33 @@ import build
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_gdb_symbols_skip_release_companion(tmp_path):
+    firmware = Path(os.environ.get('AP_MODULE_USB_ELF', ROOT / 'build/CubeOrangePlus/bin/arduplane'))
+    debugger = os.environ.get('AP_MODULE_ARM_GDB', 'arm-none-eabi-gdb')
+    if not firmware.is_file() or not shutil.which(debugger):
+        pytest.skip('requires debug ARM firmware and Python-enabled ARM GDB')
+    module = build.build(ROOT / 'libraries/AP_Module/tests/modules/debug.rs', tmp_path / 'debug.apmod',
+                         'thumbv7em-none-eabihf', 16384, debug=True, opt_level='1')
+    release = tmp_path / 'release.apmod'
+    shutil.copyfile(module, release)
+    subprocess.run([os.environ.get('ARM_OBJCOPY', 'arm-none-eabi-objcopy'), '--strip-debug',
+                    str(module.with_suffix('.elf')), str(release.with_suffix('.elf'))], check=True)
+    commands = [
+        'set pagination off', 'set confirm off', 'set debuginfod enabled off',
+        f'source {ROOT / "Tools/modules/apmod_gdb.py"}', f'apmod symbols {release} {module}',
+        'python assert len(gdb._apmod_helper.candidates) == 1',
+        'python assert len(gdb._apmod_helper.hooks) == 2', 'apmod clear',
+    ]
+    command = [debugger, '-nx', '--batch', str(firmware.resolve())]
+    for expression in commands:
+        command += ['-ex', expression]
+    result = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+    assert result.returncode == 0, result.stdout
+    assert f'apmod: skipping {release}: ELF has no DWARF' in result.stdout, result.stdout
+    assert 'apmod: waiting for matching module CRC=' in result.stdout, result.stdout
+    assert 'Traceback' not in result.stdout and 'Error' not in result.stdout, result.stdout
+
+
 @pytest.mark.parametrize('module_count', [1, 2, 12])
 def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     firmware = Path(os.environ.get('AP_MODULE_SITL_BINARY', ROOT / 'build/sitl/bin/arduplane'))
@@ -27,6 +54,10 @@ def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     modules.mkdir()
     module = build.build(ROOT / 'libraries/AP_Module/tests/modules/debug.rs', modules / 'debug.apmod',
                          'x86_64-unknown-linux-gnu', 16384, debug=True, opt_level='1')
+    release = tmp_path / 'release.apmod'
+    shutil.copyfile(module, release)
+    subprocess.run(['objcopy', '--strip-debug', str(module.with_suffix('.elf')),
+                    str(release.with_suffix('.elf'))], check=True)
     if module_count >= 2:
         shutil.copyfile(module, modules / 'second.apmod')
     for index in range(2, module_count):
@@ -35,7 +66,7 @@ def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
     params.write_text('MOD_ENABLE 1\nMOD_HEAP_MAX 4096\nMOD_STACK_MAX 32768\nLOG_BACKEND_TYPE 0\n')
     commands = [
         'set pagination off', 'set confirm off', 'set debuginfod enabled off', 'set breakpoint pending on',
-        f'source {ROOT / "Tools/modules/apmod_gdb.py"}', 'apmod printers', f'apmod symbols {module}',
+        f'source {ROOT / "Tools/modules/apmod_gdb.py"}', 'apmod printers', f'apmod symbols {release} {module}',
         'tbreak AP_Module::Runtime::poll_modules()', 'run',
         'python tick = gdb.Breakpoint("apmod_debug_tick"); '
         'tick.thread = next(t.num for t in gdb.selected_inferior().threads() if t.name == "debug.apmod")',
@@ -67,6 +98,7 @@ def test_gdb_sitl_symbols_and_reload(tmp_path, module_count):
             process.wait()
     output = log.read_text()
     assert process.returncode == 0, output
+    assert f'apmod: skipping {release}: ELF has no DWARF' in output, output
     assert output.count('apmod: debug.apmod RX=') == 2, output
     assert output.count('apmod: second.apmod RX=') == (2 if module_count >= 2 else 0), output
     for index in range(2, module_count):

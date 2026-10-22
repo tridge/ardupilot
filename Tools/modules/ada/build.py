@@ -62,6 +62,10 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
         command = [backend, '-filetype=obj', '-O2', '-function-sections', '-data-sections',
                    '-relocation-model=ropi-rwpi' if arm else '-relocation-model=pic',
                    '-exception-model=dwarf', f'-mcpu={profile.cpu}']
+        if debug:
+            # module.ld discards .eh_frame. Keep debugger-only CFI for Ada
+            # frames in the companion ELF, as the Rust backend does.
+            command += ['--force-dwarf-frame-section']
         if arm:
             command += ['-float-abi=hard']
         subprocess.run(command + [str(ir), '-o', str(obj)], check=True)
