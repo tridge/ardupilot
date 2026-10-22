@@ -58,6 +58,10 @@
 #error USB debug requires the ChibiOS thread registry
 #endif
 
+#if OSAL_ST_MODE != OSAL_ST_MODE_FREERUNNING
+#error USB debug requires the free-running system timer
+#endif
+
 #pragma GCC target ("general-regs-only")
 
 extern const AP_HAL::HAL& hal;
@@ -1859,6 +1863,14 @@ extern "C" void usb_debug_exception()
         fp_control = 3;
         return;
     }
+    // HAL timestamps and ChibiOS deadlines share this counter. Stop it while
+    // all application execution is suspended, rather than letting debugger
+    // dwell time expire sleeps or advance simulation/controller time. DWT
+    // remains running for USB polling, watchdog service and attach timeouts.
+    // PRIMASK is already set by the entry shim; no kernel state is touched.
+    const uint32_t timer_cr1 = STM32_ST_TIM->CR1;
+    STM32_ST_TIM->CR1 = timer_cr1 & ~TIM_CR1_CEN;
+    __DSB();
     usb_debug.stopped = true;
     usb_debug.startup_cycles = 0;
     usb_debug.last_cycle = DWT->CYCCNT;
@@ -1889,7 +1901,11 @@ extern "C" void usb_debug_exception()
     }
     remote_loop();
     usb_debug.watch_type = 0;
-    // No kernel calls or timekeeping updates are safe in this handler.
+    // Restore the original enable state on continue, step and detach. Leave
+    // pending timer alarms intact, including an alarm pending before entry.
+    STM32_ST_TIM->CR1 = timer_cr1;
+    __DSB();
+    // No kernel calls are safe in this handler.
     static_cast<ChibiOS::Scheduler *>(hal.scheduler)->usb_debug_resume();
     usb_debug.stopped = false;
     if (usb_debug.detach_requested) {
