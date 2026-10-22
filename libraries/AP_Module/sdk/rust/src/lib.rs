@@ -65,6 +65,8 @@ generated_module!(periph);
 generated_module!(rangefinder_proximity);
 generated_module!(serial);
 generated_module!(serialled);
+generated_module!(shared_state);
+pub use shared_state::SharedState;
 generated_module!(telemetry);
 generated_module!(values);
 pub use applet::{

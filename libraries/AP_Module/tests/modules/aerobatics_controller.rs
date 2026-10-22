@@ -168,6 +168,43 @@ fn run(c: &Context<'_>) -> Result {
                 L::Float(out.speed_log[5]),
             ],
         )?;
+        // Round-trip the portable snapshot, rebuilding all static path data periodically.
+        let mut words = [0u32; 512];
+        controller.save(&mut words[24..60]);
+        let mut cursor = 64;
+        path.save_cache(&mut words, &mut cursor)?;
+        let hash = words[..cursor]
+            .iter()
+            .flat_map(|w| w.to_le_bytes())
+            .fold(2166136261u32, |h, b| (h ^ b as u32).wrapping_mul(16777619));
+        c.logger().write(
+            "ARHS",
+            "Id,Lo,Hi,N",
+            None,
+            &[
+                L::Float(i as f32),
+                L::Float((hash & 65535) as f32),
+                L::Float((hash >> 16) as f32),
+                L::Float(cursor as f32),
+            ],
+        )?;
+        controller = Controller::restore(&words[24..60])?;
+        if i % 17 == 0 {
+            drop(path);
+            path = schedule.build(
+                c,
+                400.0,
+                path::Evaluation {
+                    announce: false,
+                    ..eval
+                },
+            )?;
+        }
+        let mut restored = 64;
+        path.restore_cache(&words[..cursor], &mut restored)?;
+        if restored != cursor {
+            return Err(Error::Invalid);
+        }
         if !cfg!(target_os = "none") {
             c.sleep_ms(5)?;
         }

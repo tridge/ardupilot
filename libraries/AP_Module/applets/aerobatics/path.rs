@@ -52,9 +52,9 @@ pub enum SpeedDependent {
 }
 
 pub fn barrel_bank(c: &Context<'_>, radius: f32, speed: f32) -> Result<f32> {
-    Ok(deg(
-        c.libm().atan2f((speed * speed) / (radius * 9.80665), 1.0)?
-    ))
+    Ok(deg(c
+        .libm()
+        .atan2f((speed * speed) / (radius * 9.80665), 1.0)?))
 }
 
 enum Kind {
@@ -80,6 +80,91 @@ struct Segment {
 }
 
 impl Path {
+    pub fn cache_words(&self) -> usize {
+        match &self.kind {
+            Kind::Composite { segments, .. } => {
+                4 + segments.iter().map(|s| s.path.cache_words()).sum::<usize>()
+            }
+            _ => 0,
+        }
+    }
+
+    // Preorder composite records: child count/flags, message cursor, child ordinal, barrel bank.
+    pub fn save_cache(&self, words: &mut [u32], cursor: &mut usize) -> Result {
+        if let Kind::Composite {
+            segments,
+            highest,
+            last_index,
+        } = &self.kind
+        {
+            if *cursor + 4 > words.len() {
+                return Err(Error::NoMemory);
+            }
+            let bank = if self.speed_dependent.is_some() {
+                match &segments[0].path.kind {
+                    Kind::Leaf {
+                        roll: Roll::EntryExit(a),
+                        ..
+                    } => -*a,
+                    _ => return Err(Error::Invalid),
+                }
+            } else {
+                0.0
+            };
+            words[*cursor..*cursor + 4].copy_from_slice(&[
+                segments.len() as u32 | (u32::from(self.speed_dependent.is_some()) << 16),
+                *highest as u32,
+                *last_index as u32,
+                bank.to_bits(),
+            ]);
+            *cursor += 4;
+            for segment in segments {
+                segment.path.save_cache(words, cursor)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn restore_cache(&mut self, words: &[u32], cursor: &mut usize) -> Result {
+        if let Kind::Composite {
+            segments,
+            highest,
+            last_index,
+        } = &mut self.kind
+        {
+            if *cursor + 4 > words.len() {
+                return Err(Error::Invalid);
+            }
+            let a = &words[*cursor..*cursor + 4];
+            if a[0] != segments.len() as u32 | (u32::from(self.speed_dependent.is_some()) << 16)
+                || a[1] as usize > segments.len()
+                || a[2] as usize >= segments.len()
+                || !f32::from_bits(a[3]).is_finite()
+            {
+                return Err(Error::Invalid);
+            }
+            *highest = a[1] as usize;
+            *last_index = a[2] as usize;
+            if self.speed_dependent.is_some() {
+                if segments.len() != 3 {
+                    return Err(Error::Invalid);
+                }
+                let bank = f32::from_bits(a[3]);
+                for (index, angle) in [(0, -bank), (2, bank)] {
+                    match &mut segments[index].path.kind {
+                        Kind::Leaf { roll, .. } => *roll = Roll::EntryExit(angle),
+                        _ => return Err(Error::Invalid),
+                    }
+                }
+            }
+            *cursor += 4;
+            for segment in segments {
+                segment.path.restore_cache(words, cursor)?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn restart(&mut self) {
         // Lua resets only the root message cursor; child cache misses perform
         // their normal re-entry refresh when the first segment is sampled.

@@ -39,6 +39,10 @@ package body Aerobatics is
    function Sgn (X : F) return F is
      (if X > 0.000001 then 1.0 elsif X < 0.000001 then -1.0 else 0.0);
    function Bits is new Ada.Unchecked_Conversion (F, Unsigned_32);
+   function From_Bits is new Ada.Unchecked_Conversion (Unsigned_32, F);
+   type Words is array (Natural range <>) of Unsigned_32;
+   subtype Snapshot is Words (0 .. 511);
+   subtype Controller_Words is Words (0 .. 35);
    function Finite (X : F) return Boolean is ((Bits (X) and 16#7F80_0000#) /= 16#7F80_0000#);
    function Finite (X : V) return Boolean is (Finite (X.X) and Finite (X.Y) and Finite (X.Z));
    function Is_Nan (X : F) return Boolean is
@@ -477,6 +481,43 @@ package body Aerobatics is
          Nodes (Last).Roll := (Kind => Entry_Exit_Roll, Angle => Bank, others => <>);
       end if;
    end Activate;
+   procedure Path_Cache (N : Node_Id; W : in out Snapshot; Cursor : in out Natural; Restoring : Boolean) is
+      Child, Last_Child : Node_Id;
+      Count, Last_Index : Natural := 0;
+      Found : Boolean := False;
+      Flags : Unsigned_32;
+      Bank : F := 0.0;
+   begin
+      if Fault /= OK or else N = 0 or else Nodes (N).Kind /= Composite_Path then return; end if;
+      if Cursor + 4 > W'Length then Invalid; return; end if;
+      Child := Nodes (N).First;
+      while Child /= 0 loop
+         if Child = Nodes (N).Last_Index then Last_Index := Count; Found := True; end if;
+         Count := Count + 1; Child := Nodes (Child).Next;
+      end loop;
+      Flags := Unsigned_32 (Count) + (if Nodes (N).Speed_Dependent then 65536 else 0);
+      if Restoring then
+         Bank := From_Bits (W (Cursor + 3));
+         if W (Cursor) /= Flags or else W (Cursor + 1) > Unsigned_32 (Count)
+           or else W (Cursor + 2) >= Unsigned_32 (Count) or else not Finite (Bank)
+         then Invalid; return; end if;
+         Nodes (N).Highest := Node_Id (W (Cursor + 1)); Child := Nodes (N).First;
+         for I in 1 .. Natural (W (Cursor + 2)) loop Child := Nodes (Child).Next; end loop;
+         Nodes (N).Last_Index := Child;
+         if Nodes (N).Speed_Dependent then
+            Nodes (Nodes (N).First).Roll.Angle := -Bank;
+            Last_Child := Nodes (N).Last; Nodes (Last_Child).Roll.Angle := Bank;
+         end if;
+      else
+         if not Found then Invalid; return; end if;
+         if Nodes (N).Speed_Dependent then Bank := -Nodes (Nodes (N).First).Roll.Angle; end if;
+         W (Cursor .. Cursor + 3) := (Flags, Unsigned_32 (Nodes (N).Highest), Unsigned_32 (Last_Index), Bits (Bank));
+      end if;
+      Cursor := Cursor + 4; Child := Nodes (N).First;
+      while Child /= 0 loop
+         Path_Cache (Child, W, Cursor, Restoring); Child := Nodes (Child).Next;
+      end loop;
+   end Path_Cache;
    procedure Segment (N : Node_Id; Time : F; E : Evaluation; Child : out Node_Id; Sub_T : out F) is
       Index : Node_Id := 1;
    begin
@@ -859,6 +900,97 @@ package body Aerobatics is
    end record;
    pragma Suppress_Initialization (Controller);
    State : Controller;
+   procedure Save_Controller (W : out Controller_Words) is
+   begin
+      W (0) := State.Count;
+      W (1) := Bits (State.Target_Speed);
+      W (2) := Bits (State.Length);
+      W (3) := Bits (State.Total_Time);
+      W (4) := Bits (State.Initial_Orientation.Q1);
+      W (5) := Bits (State.Initial_Orientation.Q2);
+      W (6) := Bits (State.Initial_Orientation.Q3);
+      W (7) := Bits (State.Initial_Orientation.Q4);
+      W (8) := Bits (State.Initial_Pos.X);
+      W (9) := Bits (State.Initial_Pos.Y);
+      W (10) := Bits (State.Initial_Pos.Z);
+      W (11) := Bits (State.Accumulated_Orientation.Q1);
+      W (12) := Bits (State.Accumulated_Orientation.Q2);
+      W (13) := Bits (State.Accumulated_Orientation.Q3);
+      W (14) := Bits (State.Accumulated_Orientation.Q4);
+      W (15) := Bits (State.Last_Time);
+      W (16) := Bits (State.Last_Rates.X);
+      W (17) := Bits (State.Last_Rates.Y);
+      W (18) := Bits (State.Last_Rates.Z);
+      W (19) := Bits (State.Path_T);
+      W (20) := Bits (State.Pos.X);
+      W (21) := Bits (State.Pos.Y);
+      W (22) := Bits (State.Pos.Z);
+      W (23) := Bits (State.Roll);
+      W (24) := Bits (State.Shift.X);
+      W (25) := Bits (State.Shift.Y);
+      W (26) := Bits (State.Shift.Z);
+      W (27) := (if State.Last_Shift_Xy then 1 else 0);
+      W (28) := Bits (State.Tangent.X);
+      W (29) := Bits (State.Tangent.Y);
+      W (30) := Bits (State.Tangent.Z);
+      W (31) := Bits (State.Spd_P);
+      W (32) := Bits (State.Spd_I);
+      W (33) := Bits (State.Integral);
+      W (34) := Bits (State.Total);
+      W (35) := Bits (State.Spd_Last_Time);
+   end Save_Controller;
+   procedure Restore_Controller (W : Controller_Words) is
+      Norm : F;
+   begin
+      for I in 1 .. 35 loop
+         if I /= 27 and then not Finite (From_Bits (W (I))) then Invalid; return; end if;
+      end loop;
+      if W (27) > 1 then Invalid; return; end if;
+      State.Count := W (0);
+      State.Target_Speed := From_Bits (W (1));
+      State.Length := From_Bits (W (2));
+      State.Total_Time := From_Bits (W (3));
+      State.Initial_Orientation.Q1 := From_Bits (W (4));
+      State.Initial_Orientation.Q2 := From_Bits (W (5));
+      State.Initial_Orientation.Q3 := From_Bits (W (6));
+      State.Initial_Orientation.Q4 := From_Bits (W (7));
+      State.Initial_Pos.X := From_Bits (W (8));
+      State.Initial_Pos.Y := From_Bits (W (9));
+      State.Initial_Pos.Z := From_Bits (W (10));
+      State.Accumulated_Orientation.Q1 := From_Bits (W (11));
+      State.Accumulated_Orientation.Q2 := From_Bits (W (12));
+      State.Accumulated_Orientation.Q3 := From_Bits (W (13));
+      State.Accumulated_Orientation.Q4 := From_Bits (W (14));
+      State.Last_Time := From_Bits (W (15));
+      State.Last_Rates.X := From_Bits (W (16));
+      State.Last_Rates.Y := From_Bits (W (17));
+      State.Last_Rates.Z := From_Bits (W (18));
+      State.Path_T := From_Bits (W (19));
+      State.Pos.X := From_Bits (W (20));
+      State.Pos.Y := From_Bits (W (21));
+      State.Pos.Z := From_Bits (W (22));
+      State.Roll := From_Bits (W (23));
+      State.Shift.X := From_Bits (W (24));
+      State.Shift.Y := From_Bits (W (25));
+      State.Shift.Z := From_Bits (W (26));
+      State.Last_Shift_Xy := W (27) /= 0;
+      State.Tangent.X := From_Bits (W (28));
+      State.Tangent.Y := From_Bits (W (29));
+      State.Tangent.Z := From_Bits (W (30));
+      State.Spd_P := From_Bits (W (31));
+      State.Spd_I := From_Bits (W (32));
+      State.Integral := From_Bits (W (33));
+      State.Total := From_Bits (W (34));
+      State.Spd_Last_Time := From_Bits (W (35));
+      if State.Target_Speed <= 0.0 or else State.Length <= 0.0 or else State.Total_Time <= 0.0
+      then Invalid; return; end if;
+      Norm := State.Initial_Orientation.Q1 ** 2 + State.Initial_Orientation.Q2 ** 2
+        + State.Initial_Orientation.Q3 ** 2 + State.Initial_Orientation.Q4 ** 2;
+      if abs (Norm - 1.0) > 0.01 then Invalid; return; end if;
+      Norm := State.Accumulated_Orientation.Q1 ** 2 + State.Accumulated_Orientation.Q2 ** 2
+        + State.Accumulated_Orientation.Q3 ** 2 + State.Accumulated_Orientation.Q4 ** 2;
+      if abs (Norm - 1.0) > 0.01 then Invalid; end if;
+   end Restore_Controller;
    procedure Increment (Value : in out Unsigned_32) is
    begin
       if Value /= Unsigned_32'Last then Value := Value + 1; end if;
@@ -1426,14 +1558,21 @@ package body Aerobatics is
          Schedule_Length := Schedule_Length + Count;
       end loop;
    end Read_File;
-   function Load (Id : Integer; Args : Args_Type; P : Configuration; X : Input; Width : F) return Node_Id is
+   Loaded_Evaluation : Evaluation := (1.0, 1.0, False);
+   Loaded_Width : F := 0.0;
+   Loaded_Hash : Unsigned_32 := 0;
+   function Load (Id : Integer; Args : Args_Type; P : Configuration; X : Input; Width : F;
+                  Resume : Boolean := False) return Node_Id is
       E : Evaluation;
       Cmd : constant Command := Builtin (Id);
       N : Node_Id;
    begin
       Used := 0;
       if Id < 1 or else Id > 255 then Invalid; return 0; end if;
-      E := (Target_Speed (X, P), P.Entry_Rate, True);
+      E := (if Resume then Loaded_Evaluation else (Target_Speed (X, P), P.Entry_Rate, True));
+      if not Finite (E.Speed) or else E.Speed <= 0.0 or else not Finite (E.Entry_Rate)
+        or else E.Entry_Rate <= 0.0 or else not Finite (Width) then Invalid; return 0; end if;
+      Loaded_Evaluation := E; Loaded_Width := Width; Loaded_Hash := 0;
       if Cmd /= Unknown then
          case Cmd is
             when Loop_C => Set_Name ("Loop");
@@ -1455,6 +1594,10 @@ package body Aerobatics is
          Filename : constant String := "trick" & Num.Data (Num.First .. 10) & ".txt";
       begin
          if Read_File ("APM/scripts/" & Filename) or else Read_File ("scripts/" & Filename) or else Read_File (Filename) then
+            Loaded_Hash := 2166136261;
+            for I in 1 .. Schedule_Length loop
+               Loaded_Hash := (Loaded_Hash xor Unsigned_32 (Byte_At (I))) * 16777619;
+            end loop;
             N := Parse_Schedule (Width, E); return N;
          end if;
       end;
@@ -1661,6 +1804,10 @@ package body Aerobatics is
       Loaded_Args : Args_Type := (others => 0.0);
       Active : Boolean := False;
       Language_Selected : Boolean := False;
+      Shared : T.SharedStateToken;
+      Shared_Revision : Unsigned_64 := 0;
+      Shared_Held : Boolean := False;
+      W : Snapshot := (others => 0);
       Channel : T.RC_ChannelToken;
       Last_Selection : Natural := 0;
       Last_Action : Integer := -1;
@@ -1750,6 +1897,100 @@ package body Aerobatics is
          R.Payload (16) := (if O.Path_Rate_Fallback then 1 else 0) + (if O.Lookahead_Fallback then 2 else 0);
          R.Payload_Len := 17; Code := B.Logger.Write (Aerobatics.Ctx, R);
       end Log_Runtime;
+      function Shared_Write return Boolean is
+         Bytes : T.Array_Uint8_T_2048;
+         Revision : Unsigned_64;
+      begin
+         if Fault /= OK then return False; end if;
+         for I in W'Range loop
+            for J in 0 .. 3 loop Bytes (4 * I + J) := Unsigned_8 (Shift_Right (W (I), 8 * J) and 255); end loop;
+         end loop;
+         Check (B.Shared_State.Write (Ctx, Shared, 0, 2048, Shared_Revision, Bytes, Revision));
+         if Fault /= OK then return False; end if;
+         if Revision = 0 then return False; end if;
+         Shared_Revision := Revision; return True;
+      end Shared_Write;
+      procedure Yield_State is
+         Cursor : Natural := 64;
+         function Marker (Value : Integer) return Unsigned_32 is
+           (if Value < 0 then Unsigned_32'Last else Unsigned_32 (Value));
+      begin
+         W := (others => 0); W (0) := 16#4145_524F#; W (1) := 1; W (3) := 1;
+         W (4) := (if Active then 1 else 0); W (5) := Owner_Kind'Pos (Owner);
+         W (6) := (if Owner = Rc_Owner then Unsigned_32 (Owner_Mode) else Unsigned_32 (Owner_Id));
+         W (7) := Unsigned_32 (Last_Command and 16#FFFF_FFFF#); W (8) := Unsigned_32 (Shift_Right (Last_Command, 32));
+         W (9) := Count; W (10) := Unsigned_32 (Last_Selection); W (11) := Marker (Last_Action);
+         W (12) := Marker (Last_Mission_Id); W (13) := Marker (Last_Preload);
+         if Active then
+            W (14) := Unsigned_32 (Loaded_Id);
+            for I in 1 .. 4 loop W (14 + I) := Bits (Loaded_Args (I)); end loop;
+            W (19) := Bits (Loaded_Evaluation.Speed); W (20) := Bits (Loaded_Evaluation.Entry_Rate);
+            W (21) := Bits (Loaded_Width); W (22) := Loaded_Hash;
+            Save_Controller (W (24 .. 59)); Path_Cache (Root, W, Cursor, False);
+            W (23) := Unsigned_32 ((Cursor - 64) / 4);
+         end if;
+         if not Shared_Write then
+            if Fault = OK then Invalid; end if;
+            return;
+         end if;
+         Shared_Held := False; Active := False; Owner := No_Owner; Root := 0; Loaded_Id := -1;
+      end Yield_State;
+      procedure Claim_State is
+         Bytes : T.SharedStateRead;
+         Cursor : Natural := 64;
+         Expected_Hash : Unsigned_32;
+         P : Configuration;
+         X : Input;
+         function Marker (Value : Unsigned_32) return Integer is
+           (if Value = Unsigned_32'Last then -1 else Integer (Value));
+      begin
+         Check (B.Shared_State.Read (Ctx, Shared, 0, 2048, Bytes));
+         if Fault /= OK then return; end if;
+         Shared_Revision := Bytes.Revision; W := (others => 0);
+         for I in W'Range loop
+            for J in 0 .. 3 loop W (I) := W (I) or Shift_Left (Unsigned_32 (Bytes.Data (4 * I + J)), 8 * J); end loop;
+         end loop;
+         if W (0) = 0 then
+            for Value of W loop if Value /= 0 then Invalid; return; end if; end loop;
+            W (0) := 16#4145_524F#; W (1) := 1;
+         end if;
+         if W (0) /= 16#4145_524F# or else W (1) /= 1 then Invalid; return; end if;
+         if W (2) /= 0 then return; end if;
+         W (2) := Shared.Value;
+         if not Shared_Write then return; end if;
+         Shared_Held := True;
+         if W (4) > 1 or else W (5) > 2 or else W (6) > 65535 or else W (10) > Unsigned_32 (Trick_Count)
+           or else (W (11) /= Unsigned_32'Last and then W (11) > 2)
+           or else (W (12) /= Unsigned_32'Last and then W (12) > 65535)
+           or else (W (13) /= Unsigned_32'Last and then W (13) > 65535) then Invalid; return; end if;
+         Count := W (9);
+         if W (3) /= 0 then
+            Last_Selection := Natural (W (10)); Last_Action := Marker (W (11));
+            Last_Mission_Id := Marker (W (12)); Last_Preload := Marker (W (13));
+         end if;
+         Last_Command := Unsigned_64 (W (7)) or Shift_Left (Unsigned_64 (W (8)), 32);
+         if W (4) = 0 then return; end if;
+         if Last_Command > Time_Us then Invalid; return; end if;
+         if Elapsed (Time_Us, Last_Command) > 1_000_000 then return; end if;
+         if W (5) = 0 or else (W (5) = 1 and then W (6) > 255) or else W (23) > 112
+           or else W (14) < 1 or else W (14) > 255 then Invalid; return; end if;
+         Loaded_Evaluation := (From_Bits (W (19)), From_Bits (W (20)), False);
+         for I in 1 .. 4 loop
+            Loaded_Args (I) := From_Bits (W (14 + I));
+            if not Finite (Loaded_Args (I)) then Invalid; return; end if;
+         end loop;
+         Expected_Hash := W (22); P := Read_Configuration;
+         Loaded_Id := Integer (W (14)); Root := Load (Loaded_Id, Loaded_Args, P, X, From_Bits (W (21)), True);
+         if Fault /= OK then return; end if;
+         if Loaded_Hash /= Expected_Hash then Invalid; return; end if;
+         Path_Cache (Root, W, Cursor, True);
+         if Cursor /= 64 + 4 * Natural (W (23)) then Invalid; return; end if;
+         Restore_Controller (W (24 .. 59));
+         if Fault /= OK then return; end if;
+         Owner := Owner_Kind'Val (W (5));
+         if Owner = Rc_Owner then Owner_Mode := Unsigned_8 (W (6)); else Owner_Id := Unsigned_16 (W (6)); end if;
+         Active := True;
+      end Claim_State;
       procedure Tick is
          Tick_Start, Start, Elapsed_Us : Unsigned_64;
          Current_Mode : Unsigned_8;
@@ -1772,7 +2013,16 @@ package body Aerobatics is
          if Fault /= OK then return; end if;
          Language := A (35);
          if Fault /= OK then return; end if;
-         if Language /= 1.0 then Language_Selected := False; return; end if;
+         if Language /= 1.0 then
+            if Shared_Held then Yield_State; end if;
+            Language_Selected := False; return;
+         end if;
+         if not Shared_Held then
+            Claim_State;
+            if Fault /= OK or else not Shared_Held then return; end if;
+            Language := A (35);
+            if Fault /= OK or else Language /= 1.0 then return; end if;
+         end if;
          if not Language_Selected then
             Message (6, "Aerobatics ADA selected");
             if Fault /= OK then return; end if;
@@ -1947,6 +2197,7 @@ package body Aerobatics is
    begin
       Aerobatics.Ctx := Ctx; Fault := OK; Used := 0; Trick_Count := 0;
       Aerom_Names := (others => (others => <>)); Trik_Names := (others => (others => <>));
+      Check (B.Shared_State.Open (Ctx, 16#4145_524F#, 2048, Shared));
       Parameters_Init;
       if Fault /= OK then
          Return_Code := Fault; Message (3, "Aerobatics parameters failed");
@@ -1990,6 +2241,7 @@ package body Aerobatics is
             end if;
          end if;
       end loop;
+      Return_Code := B.Shared_State.Close (Ctx, Shared);
       Aerobatics.Ctx := System.Null_Address; return Stopped;
    end Run;
 end Aerobatics;

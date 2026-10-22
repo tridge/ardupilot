@@ -30,6 +30,102 @@ module aerobatics_controller
         real(c_float) :: speed_p,speed_i,speed_integral,speed_total,speed_last_time
     end type
 contains
+    subroutine save_controller(state,words)
+        type(controller), intent(in) :: state
+        integer(c_int32_t), intent(out) :: words(0:35)
+        words(0)=int(state%count,c_int32_t)
+        words(1)=transfer(state%target_speed,0_c_int32_t)
+        words(2)=transfer(state%length,0_c_int32_t)
+        words(3)=transfer(state%total_time,0_c_int32_t)
+        words(4)=transfer(state%initial_orientation%q1,0_c_int32_t)
+        words(5)=transfer(state%initial_orientation%q2,0_c_int32_t)
+        words(6)=transfer(state%initial_orientation%q3,0_c_int32_t)
+        words(7)=transfer(state%initial_orientation%q4,0_c_int32_t)
+        words(8)=transfer(state%initial_pos%x,0_c_int32_t)
+        words(9)=transfer(state%initial_pos%y,0_c_int32_t)
+        words(10)=transfer(state%initial_pos%z,0_c_int32_t)
+        words(11)=transfer(state%accumulated_orientation%q1,0_c_int32_t)
+        words(12)=transfer(state%accumulated_orientation%q2,0_c_int32_t)
+        words(13)=transfer(state%accumulated_orientation%q3,0_c_int32_t)
+        words(14)=transfer(state%accumulated_orientation%q4,0_c_int32_t)
+        words(15)=transfer(state%last_time,0_c_int32_t)
+        words(16)=transfer(state%last_rates%x,0_c_int32_t)
+        words(17)=transfer(state%last_rates%y,0_c_int32_t)
+        words(18)=transfer(state%last_rates%z,0_c_int32_t)
+        words(19)=transfer(state%path_t,0_c_int32_t)
+        words(20)=transfer(state%pos%x,0_c_int32_t)
+        words(21)=transfer(state%pos%y,0_c_int32_t)
+        words(22)=transfer(state%pos%z,0_c_int32_t)
+        words(23)=transfer(state%roll,0_c_int32_t)
+        words(24)=transfer(state%shift%x,0_c_int32_t)
+        words(25)=transfer(state%shift%y,0_c_int32_t)
+        words(26)=transfer(state%shift%z,0_c_int32_t)
+        words(27)=merge(1,0,state%last_shift_xy)
+        words(28)=transfer(state%tangent%x,0_c_int32_t)
+        words(29)=transfer(state%tangent%y,0_c_int32_t)
+        words(30)=transfer(state%tangent%z,0_c_int32_t)
+        words(31)=transfer(state%speed_p,0_c_int32_t)
+        words(32)=transfer(state%speed_i,0_c_int32_t)
+        words(33)=transfer(state%speed_integral,0_c_int32_t)
+        words(34)=transfer(state%speed_total,0_c_int32_t)
+        words(35)=transfer(state%speed_last_time,0_c_int32_t)
+    end subroutine
+    subroutine restore_controller(rt,state,words)
+        type(runtime), intent(inout) :: rt
+        type(controller), intent(out) :: state
+        integer(c_int32_t), intent(in) :: words(0:35)
+        integer :: i
+        real(c_float) :: norm
+        do i=1,35
+            if (i==27) cycle
+            if (.not.finite(transfer(words(i),0.0_c_float))) call check(rt,module_invalid)
+        end do
+        if (words(27)<0.or.words(27)>1) call check(rt,module_invalid)
+        if (rt%error/=module_ok) return
+        state%count=iand(int(words(0),c_int64_t),4294967295_c_int64_t)
+        state%target_speed=transfer(words(1),0.0_c_float)
+        state%length=transfer(words(2),0.0_c_float)
+        state%total_time=transfer(words(3),0.0_c_float)
+        state%initial_orientation%q1=transfer(words(4),0.0_c_float)
+        state%initial_orientation%q2=transfer(words(5),0.0_c_float)
+        state%initial_orientation%q3=transfer(words(6),0.0_c_float)
+        state%initial_orientation%q4=transfer(words(7),0.0_c_float)
+        state%initial_pos%x=transfer(words(8),0.0_c_float)
+        state%initial_pos%y=transfer(words(9),0.0_c_float)
+        state%initial_pos%z=transfer(words(10),0.0_c_float)
+        state%accumulated_orientation%q1=transfer(words(11),0.0_c_float)
+        state%accumulated_orientation%q2=transfer(words(12),0.0_c_float)
+        state%accumulated_orientation%q3=transfer(words(13),0.0_c_float)
+        state%accumulated_orientation%q4=transfer(words(14),0.0_c_float)
+        state%last_time=transfer(words(15),0.0_c_float)
+        state%last_rates%x=transfer(words(16),0.0_c_float)
+        state%last_rates%y=transfer(words(17),0.0_c_float)
+        state%last_rates%z=transfer(words(18),0.0_c_float)
+        state%path_t=transfer(words(19),0.0_c_float)
+        state%pos%x=transfer(words(20),0.0_c_float)
+        state%pos%y=transfer(words(21),0.0_c_float)
+        state%pos%z=transfer(words(22),0.0_c_float)
+        state%roll=transfer(words(23),0.0_c_float)
+        state%shift%x=transfer(words(24),0.0_c_float)
+        state%shift%y=transfer(words(25),0.0_c_float)
+        state%shift%z=transfer(words(26),0.0_c_float)
+        state%last_shift_xy=words(27)/=0
+        state%tangent%x=transfer(words(28),0.0_c_float)
+        state%tangent%y=transfer(words(29),0.0_c_float)
+        state%tangent%z=transfer(words(30),0.0_c_float)
+        state%speed_p=transfer(words(31),0.0_c_float)
+        state%speed_i=transfer(words(32),0.0_c_float)
+        state%speed_integral=transfer(words(33),0.0_c_float)
+        state%speed_total=transfer(words(34),0.0_c_float)
+        state%speed_last_time=transfer(words(35),0.0_c_float)
+        if (state%target_speed<=0.0.or.state%length<=0.0.or.state%total_time<=0.0) call check(rt,module_invalid)
+        norm=state%initial_orientation%q1**2+state%initial_orientation%q2**2+ &
+            state%initial_orientation%q3**2+state%initial_orientation%q4**2
+        if (abs(norm-1.0)>0.01) call check(rt,module_invalid)
+        norm=state%accumulated_orientation%q1**2+state%accumulated_orientation%q2**2+ &
+            state%accumulated_orientation%q3**2+state%accumulated_orientation%q4**2
+        if (abs(norm-1.0)>0.01) call check(rt,module_invalid)
+    end subroutine
     subroutine validate_configuration(rt,p)
         type(runtime), intent(inout) :: rt
         type(configuration), intent(in) :: p

@@ -8,6 +8,10 @@
       O : Output;
       Kind : Step_Kind;
       Return_Code : Status;
+      W : Snapshot := (others => 0);
+      Cursor, Saved_Cursor : Natural;
+      Hash : Unsigned_32;
+      Initial_Eval : Evaluation;
       function From_Bits is new Ada.Unchecked_Conversion (Unsigned_32, F);
       function Observation_At (I : Natural) return Input is
          N : constant F := F (I);
@@ -71,7 +75,8 @@
       Used := 0;
       if not Read_File ("trick72.txt") then return S.UNAVAILABLE; end if;
       X := Observation_At (0);
-      N := Parse_Schedule (400.0, (Target_Speed (X, P), P.Entry_Rate, True));
+      Initial_Eval := (Target_Speed (X, P), P.Entry_Rate, True);
+      N := Parse_Schedule (400.0, Initial_Eval);
       if Fault /= OK then return Fault; end if;
       Start_Controller (N, X, P, 0.0, (if Variant = 2 then 200 else 0));
       for I in 1 .. 512 loop
@@ -90,6 +95,19 @@
                      O.Path_Rates.X, O.Path_Rates.Y, O.Path_Rates.Z, O.Roll_Error_Rate));
          Log_Write ("ADSP", "Id,Targ,Curr,P,I,Total,Add", "fffffff", (F (I), O.Speed_Log (1), O.Speed_Log (2),
                     O.Speed_Log (3), O.Speed_Log (4), O.Speed_Log (5), O.Speed_Log (6)));
+         W := (others => 0); Save_Controller (W (24 .. 59)); Cursor := 64;
+         Path_Cache (N, W, Cursor, False); Saved_Cursor := Cursor; Hash := 2166136261;
+         for Index in 0 .. Cursor - 1 loop
+            for Byte in 0 .. 3 loop
+               Hash := (Hash xor (Shift_Right (W (Index), 8 * Byte) and 255)) * 16777619;
+            end loop;
+         end loop;
+         Log_Write ("ADHS", "Id,Lo,Hi,N", "ffff", (F (I), F (Hash and 65535), F (Shift_Right (Hash, 16)), F (Cursor)));
+         Restore_Controller (W (24 .. 59));
+         if I mod 17 = 0 then
+            Used := 0; Initial_Eval.Announce := False; N := Parse_Schedule (400.0, Initial_Eval);
+         end if;
+         Cursor := 64; Path_Cache (N, W, Cursor, True); Assert_True (Cursor = Saved_Cursor);
          Check (Sleep_Ms (Ctx, 5));
       end loop;
       Controller_Step (N, X, P, Kind, O); Assert_True (Kind = Waiting);

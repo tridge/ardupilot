@@ -137,7 +137,9 @@ contains
         type(evaluation) :: eval
         character(len=48) :: name
         integer :: i,step,node
-        integer(c_int64_t) :: count
+        integer(c_int64_t) :: count,hash
+        integer(c_int32_t) :: words(0:511)
+        integer :: cursor,saved_cursor,j,k
         logical :: found
         rt=runtime(ctx,module_ok); code=sleep_ms(ctx,2000_c_int32_t); call check(rt,code)
         nullify(tree%nodes); tree%allocation=c_null_ptr
@@ -170,6 +172,24 @@ contains
                 out%track_attitude%q3,out%track_attitude%q4,out%correction_rates%x,out%correction_rates%y, &
                 out%correction_rates%z,out%path_rates%x,out%path_rates%y,out%path_rates%z,out%roll_error_rate])
             call trace(rt,'FASP','Id,Targ,Curr,P,I,Total,Add',i,out%speed_log)
+            words=0; call save_controller(state,words(24:59)); cursor=64
+            call path_cache(rt,tree,tree%root,words,cursor,.false.); saved_cursor=cursor
+            hash=2166136261_c_int64_t
+            do j=0,cursor-1
+                do k=0,3
+                    hash=iand(ieor(hash,int(iand(shiftr(words(j),8*k),255),c_int64_t))* &
+                        16777619_c_int64_t,4294967295_c_int64_t)
+                end do
+            end do
+            call trace(rt,'AFHS','Id,Lo,Hi,N',i,[real(iand(hash,65535_c_int64_t),c_float), &
+                real(shiftr(hash,16),c_float),real(cursor,c_float)])
+            call restore_controller(rt,state,words(24:59))
+            if (mod(i,17)==0) then
+                eval%announce=.false.
+                call load_schedule(rt,'trick72.txt',tree,400.0,eval,found,name)
+            end if
+            cursor=64; call path_cache(rt,tree,tree%root,words,cursor,.true.)
+            if (cursor/=saved_cursor) call check(rt,module_invalid)
             code=sleep_ms(ctx,5_c_int32_t); call check(rt,code)
         end do
         if (rt%error/=module_ok) goto 900

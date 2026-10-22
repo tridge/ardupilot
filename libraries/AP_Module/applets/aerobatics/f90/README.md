@@ -76,3 +76,8 @@ Executed validation:
 ARM packaging is not ARM execution. No physical-aircraft or Renode run has been
 performed for this translation. Timing and peak-memory observations are specific
 to these workloads and the toolchain used; they are not worst-case guarantees.
+
+Live `AEROM_LANG` changes transfer the full controller and path caches through the
+shared-memory binding, as described in the [parent guide](../README.md).
+The replay checks also compare canonical snapshot hashes with Rust at every
+observation and periodically rebuild the path before restoring the snapshot.

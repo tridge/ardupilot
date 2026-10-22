@@ -259,6 +259,28 @@ restriction; C++ callers must uphold it. Value types are copies, not shared Lua 
 methods calling firmware require a live context. Binding locks block and are
 released before returning to module code.
 
+Native modules can exchange bounded shared memory by ID. In Rust,
+`let block = context.shared_state(id, size)?` opens a context-owned reference;
+`block.read(offset, &mut bytes)?` returns the block revision and
+`block.write(offset, &bytes, expected_revision)?` copies under the same firmware
+mutex. A nonzero expected revision makes the write conditional: `None` means
+another writer changed the block and nothing was copied. Zero requests an
+unconditional write. Reads and writes are individually atomic; a read followed
+by a write requires this revision check to protect the whole transaction.
+C++, Ada and Fortran expose the generated `shared_state.open/read/write/close`
+family with a token, explicit byte arrays and a revision (zero on a stale write).
+
+All openers of an ID must request the same size, from 1 through 16384 bytes.
+Blocks start zeroed, are local to the running firmware, and are freed after the
+last close or joined worker cleanup. Limits are 8 blocks, 64 KiB total backing
+memory, 32 references globally and 4 per module context. Each copy is at most
+2048 bytes; larger blocks require multiple transactions. Tokens belong to their
+opening context and are never reused during a firmware boot. Memory is charged
+to this bounded firmware pool, separately from module heaps. No module pointer
+is retained and no raw shared pointer is exposed. Use a portable byte format
+when different languages exchange state. `AP_MODULE_SHARED_STATE_ENABLED=0`
+removes the service and its pool; its bindings then return `Unavailable`.
+
 The generated `generator/coverage.json` reports Rust, C++ and Ada separately, distinguishing
 host calls, local helpers, value fields, native operations, replacement-only APIs
 and unsupported declarations. A replacement is not the original named wrapper and

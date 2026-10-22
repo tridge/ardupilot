@@ -57,9 +57,25 @@ loaded together. Each checks the live selector every 25 ms and sleeps without
 updating control when it is not selected. Other values leave all three idle.
 On selection, the module sends `Aerobatics RUST selected`, `Aerobatics ADA
 selected`, or `Aerobatics F90 selected` once, including initial selection at startup.
-Changing the selector needs no reload. Select the language before starting a
-maneuver: sleeping does not pause Plane's existing one-second control watchdog
-or transfer a running controller's state between modules.
+Changing the selector during a running RC or AUTO schedule transfers the controller
+to the selected language. Install all three modules and use the same schedule file.
+The outgoing worker completes its current tick, writes a versioned snapshot to
+shared block `0x4145524f` (2048 bytes), yields ownership and sleeps. The incoming
+worker claims ownership with a conditional write, rebuilds the path using the
+original load speed/entry rate/box width, verifies the schedule fingerprint and
+restores the controller and path caches. Schedule position, origin, orientation,
+previous rates, XY shifts, throttle integrator and maneuver message cursors all
+continue from the outgoing worker. No language-specific object layout or pointer
+is shared. See [the snapshot format](handoff.md) for the wire layout.
+
+The block is reset when first opened after boot or a complete module restart;
+joining workers do not reset it. Starting a new schedule initializes a fresh
+controller. A snapshot older than Plane's one-second command deadline is not
+resumed. A changed schedule file, incompatible snapshot or failed restore aborts
+control through the existing watchdog. Selecting an invalid or unloaded language
+also lets that watchdog expire. A worker that fails before yielding cannot be
+replaced by another worker until `MOD_RESTART` restarts the modules; ownership
+is never stolen from a worker that could still issue commands.
 
 After the module registers its parameters, set `TRIK_ENABLE=1` and change
 `MOD_RESTART` to reload. Set `TRIK1_ID=72`, `RC7_OPTION=300` (action) and
@@ -100,7 +116,10 @@ startup, as in Lua.
 CrossBoxTopHat and TriangularLoop. The ten maneuvers, nested paths, alignment,
 roll references, orientation changes and throttle-boost attributes are compiled
 in Rust. The parser accepts at most 16 KiB and 256 commands; these input bounds
-do not guarantee that every accepted schedule fits the module heap.
+do not guarantee that every accepted schedule fits the module heap. Rust and
+Fortran reject schedules requiring more than 112 composite cache records before
+starting, so the running state always fits the handoff block. Ada also imposes
+its 128-node arena limit.
 
 Schedule numbers are finite decimal tokens of at most 255 bytes. Conversion
 uses firmware `strtof()` through a hashed binding rather than embedding Rust's
@@ -140,6 +159,9 @@ The tests live in `Tools/modules/rust/tests/`:
   on the same platform, including signed zero.
 - `test_aerobatics_parameters.py`: parameter defaults, dynamic table expansion,
   legacy repairs and saved values across engine changes.
+- `test_aerobatics_languages.py`: idle selection with individual/all workers,
+  and a complete AirShow with repeated live handoffs between every pair of languages,
+  checking maneuver order, continuous progress, control gaps and position error.
 - `test_aerobatics_flight.py`: sequential Lua/Rust SITL flights, maneuver order,
   path error, repeat/abort and restart while controlling.
 - `test_aerobatics_faults.py`: test-only Busy injection at read/delivery

@@ -52,7 +52,7 @@ def test_controller_matches_rust(tmp_path, monkeypatch, variant):
         assert not any('panic' in line or 'returned -' in line for line in vehicle.texts), vehicle.diagnostic()
     finally:
         vehicle.stop()
-    names = ('AFCT', 'ARCT', 'AFCS', 'ARCS', 'FASP', 'RASP')
+    names = ('AFCT', 'ARCT', 'AFCS', 'ARCS', 'FASP', 'RASP', 'AFHS', 'ARHS')
     rows = {name: {} for name in names}
     for file in sorted((vehicle.directory / 'logs').glob('*.BIN')):
         reader = DFReader.DFReader_binary(str(file))
@@ -60,7 +60,7 @@ def test_controller_matches_rust(tmp_path, monkeypatch, variant):
             if record.get_type() in rows:
                 rows[record.get_type()][record.Id] = record.to_dict()
     maximum = 0.0
-    for native_name, rust_name in [('AFCT', 'ARCT'), ('AFCS', 'ARCS'), ('FASP', 'RASP')]:
+    for native_name, rust_name in [('AFCT', 'ARCT'), ('AFCS', 'ARCS'), ('FASP', 'RASP'), ('AFHS', 'ARHS')]:
         assert len(rows[native_name]) == len(rows[rust_name]) == 512
         for index, record in rows[rust_name].items():
             for field, expected in record.items():

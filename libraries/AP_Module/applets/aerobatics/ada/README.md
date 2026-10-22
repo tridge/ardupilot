@@ -94,3 +94,8 @@ zero bytes used/peak. Flight metrics vary with simulation scheduling.
 These numerical, lifecycle and SITL flight checks do not establish hardware
 flight safety. Target packaging does not establish ARM numerical replay,
 worst-case timing or stack use.
+
+Live `AEROM_LANG` changes transfer the full controller and path caches through the
+shared-memory binding, as described in the [parent guide](../README.md).
+The replay checks also compare canonical snapshot hashes with Rust at every
+observation and periodically rebuild the path before restoring the snapshot.

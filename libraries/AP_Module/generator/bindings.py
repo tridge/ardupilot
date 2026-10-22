@@ -46,6 +46,7 @@ import printf_binding
 import rangefinder_proximity_binding
 import serial_binding
 import serialled_binding
+import shared_state_binding
 import singleton_binding
 import strtof_binding
 import telemetry_binding
@@ -403,6 +404,7 @@ def select(ir, selection, only=None):
     if old_parameter is not None:
         tail_last = old_parameter['methods'][-1]['id']
     printf = printf_binding.specification(tail_last + 1)
+    shared_state = shared_state_binding.specification(printf['id'] + 1)
     example_constants = example_constants_binding.select(ir)
     for owner in sorted(ir['userdata'], key=lambda o: o['name']):
         if only is None and owner['name'] in value_binding.TYPES:
@@ -735,7 +737,7 @@ def select(ir, selection, only=None):
                 periph=periph,
                 old_parameter=old_parameter,
                 motor_config=motor_config, serialled=serialled, onvif=onvif, applet=applet, crsf=crsf,
-                examples=examples,
+                examples=examples, shared_state=shared_state,
                 example_constants=example_constants, printf=printf,
                 i2c=i2c,
                 camera=camera,
@@ -758,7 +760,7 @@ def emit(contract):
            '#include <AP_Module/BindingSupport.h>', '#include <AP_Module/HostApi.h>',
            '#include <AP_Module/BindingParam.h>', '#include <AP_Module/BindingFile.h>',
            '#include <AP_Module/BindingLog.h>', '#include <AP_Module/BindingBattery.h>',
-           '#include <AP_Module/BindingPrintf.h>',
+           '#include <AP_Module/BindingPrintf.h>', '#include <AP_Module/BindingSharedState.h>',
            '#include <AP_Module/BindingDroneCAN.h>',
            '#include <AP_Scripting/AP_Scripting_config.h>', '#include <AP_Vehicle/AP_Vehicle_Type.h>',
            '#include <AP_Scheduler/AP_Scheduler.h>', '#include <stdlib.h>']
@@ -1058,6 +1060,10 @@ def emit(contract):
         for method, call in zip(analog_pwm, analog_pwm_calls):
             cpp += [f'    case {method["id"]}:',
                     f'        return binding_{call}(context, input, input_size, output, output_size);']
+    for method in contract['shared_state']['methods']:
+        call = method['name'].split('.')[1]
+        cpp += [f'    case {method["id"]}:',
+                f'        return binding_shared_state_{call}(context, input, input_size, output, output_size);']
     cpp += ['    default:', '        return binding_math_dispatch(id, input, input_size, output, output_size);',
             '    }', '}', '}', '#endif', '']
     binding_names = contracts.binding_names(contract)
@@ -1083,6 +1089,7 @@ def emit(contract):
         'sdk/rust/src/bindings.rs': rust_output,
         'sdk/rust/src/enums.rs': singleton_binding.rust_enums(contract['methods'], notice),
         'sdk/rust/src/format.rs': printf_binding.rust(contract['printf'], notice),
+        'sdk/rust/src/shared_state.rs': shared_state_binding.rust(contract['shared_state'], notice),
         'sdk/rust/src/borrowed.rs': borrowed_binding.rust(
             [m for m in contract['methods'] if m.get('receiver')], notice, singleton_binding.rust),
         'sdk/rust/src/values.rs': value_binding.rust(contract['methods'], notice, singleton_binding.rust),

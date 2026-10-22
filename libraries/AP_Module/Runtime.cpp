@@ -11,6 +11,7 @@
 #include "Bindings.h"
 #include "BindingDroneCAN.h"
 #include "BindingI2C.h"
+#include "BindingSharedState.h"
 #include "BindingMAVLink.h"
 #include "BindingNetwork.h"
 #include "BindingONVIF.h"
@@ -623,6 +624,7 @@ void Runtime::poll_modules()
         }
         binding_dronecan_cleanup(&slot);
         binding_i2c_cleanup(&slot);
+        binding_shared_state_cleanup(&slot);
         binding_can_cleanup(&slot);
         binding_crsf_cleanup(&slot);
         binding_custom_mode_cleanup(&slot);

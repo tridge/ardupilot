@@ -221,7 +221,7 @@ contains
         if (ncommands==0 .or. pending) call check(rt,module_invalid)
         if (build) call compose(rt,tree,root,width,eval)
     end subroutine
-    subroutine load_schedule(rt,filename,tree,width,eval,found,name)
+    subroutine load_schedule(rt,filename,tree,width,eval,found,name,fingerprint)
         type(runtime), intent(inout) :: rt
         character(len=*), intent(in) :: filename
         type(path_tree), intent(inout) :: tree
@@ -229,6 +229,8 @@ contains
         type(evaluation), intent(in) :: eval
         logical, intent(out) :: found
         character(len=*), intent(out) :: name
+        integer(c_int64_t), intent(out), optional :: fingerprint
+        integer(c_int64_t) :: hash
         type(c_ptr) :: memory
         character(len=max_bytes), pointer :: text
         type(array_uint8_t_256) :: path
@@ -236,6 +238,7 @@ contains
         integer(c_int32_t) :: code
         integer :: n,k,received,capacity
         found=.false.; name=''; n=0
+        if (present(fingerprint)) fingerprint=0
         if (rt%error/=module_ok) return
         memory=arena_allocate(int(max_bytes,c_size_t))
         if (.not.c_associated(memory)) then
@@ -263,6 +266,11 @@ contains
             n=n+received
         end do
         if (found .and. rt%error==module_ok) then
+            hash=2166136261_c_int64_t
+            do k=1,n
+                hash=iand(ieor(hash,int(iachar(text(k:k)),c_int64_t))*16777619_c_int64_t,4294967295_c_int64_t)
+            end do
+            if (present(fingerprint)) fingerprint=hash
             call parse_schedule(rt,text(1:n),tree,width,eval,.false.,name,capacity)
             if (rt%error==module_ok) call allocate_tree(rt,tree,capacity)
             if (rt%error==module_ok) call parse_schedule(rt,text(1:n),tree,width,eval,.true.,name,capacity)

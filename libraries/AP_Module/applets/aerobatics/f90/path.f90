@@ -36,6 +36,56 @@ module aerobatics_path
         integer :: used,capacity,root
     end type
 contains
+    recursive subroutine path_cache(rt,tree,node,words,cursor,restoring)
+        type(runtime), intent(inout) :: rt
+        type(path_tree), intent(inout) :: tree
+        integer, intent(in) :: node
+        integer(c_int32_t), intent(inout) :: words(0:511)
+        integer, intent(inout) :: cursor
+        logical, intent(in) :: restoring
+        integer :: child,n,index,last,flags
+        real(c_float) :: bank
+        if (rt%error/=module_ok.or.node==0) return
+        if (tree%nodes(node)%kind/=composite) return
+        if (cursor+4>512) then
+            call check(rt,module_invalid); return
+        end if
+        child=tree%nodes(node)%first; n=0; last=-1
+        do while(child/=0)
+            if (child==tree%nodes(node)%last_index) last=n
+            n=n+1; child=tree%nodes(child)%next
+        end do
+        flags=n+merge(65536,0,tree%nodes(node)%barrel)
+        if (restoring) then
+            bank=transfer(words(cursor+3),0.0_c_float)
+            if (words(cursor)/=flags.or.words(cursor+1)<0.or.words(cursor+1)>n.or. &
+                words(cursor+2)<0.or.words(cursor+2)>=n.or..not.finite(bank)) then
+                call check(rt,module_invalid); return
+            end if
+            tree%nodes(node)%highest=words(cursor+1)
+            child=tree%nodes(node)%first
+            do index=1,words(cursor+2)
+                child=tree%nodes(child)%next
+            end do
+            tree%nodes(node)%last_index=child
+            if (tree%nodes(node)%barrel) then
+                tree%nodes(tree%nodes(node)%first)%roll_value=-bank
+                tree%nodes(tree%nodes(node)%last)%roll_value=bank
+            end if
+        else
+            if (last<0) then
+                call check(rt,module_invalid); return
+            end if
+            bank=0.0
+            if (tree%nodes(node)%barrel) bank=-tree%nodes(tree%nodes(node)%first)%roll_value
+            words(cursor:cursor+3)=[flags,tree%nodes(node)%highest,last,transfer(bank,0_c_int32_t)]
+        end if
+        cursor=cursor+4; child=tree%nodes(node)%first
+        do while(child/=0)
+            call path_cache(rt,tree,child,words,cursor,restoring)
+            child=tree%nodes(child)%next
+        end do
+    end subroutine
     function empty_attributes() result(a)
         type(attributes) :: a
         a%have_roll=.false.; a%have_orient=.false.; a%have_boost=.false.

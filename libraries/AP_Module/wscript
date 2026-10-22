@@ -60,6 +60,7 @@ GENERATED = [
     'sdk/rust/src/periph.rs',
     'sdk/rust/src/rangefinder_proximity.rs',
     'sdk/rust/src/serial.rs',
+    'sdk/rust/src/shared_state.rs',
     'sdk/rust/src/serialled.rs',
     'sdk/rust/src/strtof.rs',
     'sdk/rust/src/telemetry.rs',

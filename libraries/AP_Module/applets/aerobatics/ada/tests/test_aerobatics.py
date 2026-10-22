@@ -78,14 +78,14 @@ def test_controller_replay(tmp_path, monkeypatch, gnat, variant):
         assert not any('panic' in text or 'returned -' in text for text in vehicle.texts), vehicle.diagnostic()
     finally:
         vehicle.stop()
-    rows = {name: {} for name in ('ADCT', 'ARCT', 'ADCS', 'ARCS', 'ADSP', 'RASP')}
+    rows = {name: {} for name in ('ADCT', 'ARCT', 'ADCS', 'ARCS', 'ADSP', 'RASP', 'ADHS', 'ARHS')}
     for file in sorted((vehicle.directory / 'logs').glob('*.BIN')):
         reader = DFReader.DFReader_binary(str(file))
         while (message := reader.recv_msg()) is not None:
             if message.get_type() in rows:
                 rows[message.get_type()][int(message.Id)] = message.to_dict()
     maximum = 0.0
-    for ada_name, rust_name in [('ADCT', 'ARCT'), ('ADCS', 'ARCS'), ('ADSP', 'RASP')]:
+    for ada_name, rust_name in [('ADCT', 'ARCT'), ('ADCS', 'ARCS'), ('ADSP', 'RASP'), ('ADHS', 'ARHS')]:
         assert len(rows[ada_name]) == len(rows[rust_name]) == 512
         for index, actual in rows[ada_name].items():
             expected = rows[rust_name][index]

@@ -13,6 +13,7 @@ const MAX_COMMANDS: usize = 256;
 
 pub struct Schedule {
     pub name: String,
+    pub fingerprint: u32,
     commands: Vec<Specification>,
 }
 
@@ -138,7 +139,13 @@ impl Schedule {
         if commands.is_empty() || pending {
             return Err(Error::Invalid);
         }
-        Ok(Self { name, commands })
+        Ok(Self {
+            name,
+            commands,
+            fingerprint: text
+                .bytes()
+                .fold(2166136261u32, |h, b| (h ^ b as u32).wrapping_mul(16777619)),
+        })
     }
 
     pub fn load(c: &Context<'_>, filename: &str) -> Result<Option<Self>> {

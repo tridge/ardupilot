@@ -198,6 +198,106 @@ pub struct Controller {
     speed_pi: SpeedPI,
 }
 
+impl Controller {
+    pub fn save(&self, words: &mut [u32]) {
+        words[..36].copy_from_slice(&[
+            self.count,
+            self.target_speed.to_bits(),
+            self.length.to_bits(),
+            self.total_time.to_bits(),
+            self.initial_orientation.q1.to_bits(),
+            self.initial_orientation.q2.to_bits(),
+            self.initial_orientation.q3.to_bits(),
+            self.initial_orientation.q4.to_bits(),
+            self.initial_pos.x.to_bits(),
+            self.initial_pos.y.to_bits(),
+            self.initial_pos.z.to_bits(),
+            self.accumulated_orientation.q1.to_bits(),
+            self.accumulated_orientation.q2.to_bits(),
+            self.accumulated_orientation.q3.to_bits(),
+            self.accumulated_orientation.q4.to_bits(),
+            self.last_time.to_bits(),
+            self.last_rates.x.to_bits(),
+            self.last_rates.y.to_bits(),
+            self.last_rates.z.to_bits(),
+            self.path_t.to_bits(),
+            self.pos.x.to_bits(),
+            self.pos.y.to_bits(),
+            self.pos.z.to_bits(),
+            self.roll.to_bits(),
+            self.shift.x.to_bits(),
+            self.shift.y.to_bits(),
+            self.shift.z.to_bits(),
+            u32::from(self.last_shift_xy),
+            self.tangent.x.to_bits(),
+            self.tangent.y.to_bits(),
+            self.tangent.z.to_bits(),
+            self.speed_pi.p.to_bits(),
+            self.speed_pi.i.to_bits(),
+            self.speed_pi.integral.to_bits(),
+            self.speed_pi.total.to_bits(),
+            self.speed_pi.last_time.to_bits(),
+        ]);
+    }
+
+    pub fn restore(words: &[u32]) -> Result<Self> {
+        if words.len() < 36
+            || words[27] > 1
+            || words[..36]
+                .iter()
+                .enumerate()
+                .any(|(i, v)| i != 0 && i != 27 && !f32::from_bits(*v).is_finite())
+        {
+            return Err(Error::Invalid);
+        }
+        let f = |i: usize| f32::from_bits(words[i]);
+        if f(1) <= 0.0 || f(2) <= 0.0 || f(3) <= 0.0 {
+            return Err(Error::Invalid);
+        }
+        let q = |i| Q {
+            q1: f(i),
+            q2: f(i + 1),
+            q3: f(i + 2),
+            q4: f(i + 3),
+        };
+        let v = |i| V {
+            x: f(i),
+            y: f(i + 1),
+            z: f(i + 2),
+        };
+        for i in [4, 11] {
+            let a = q(i);
+            if (a.q1 * a.q1 + a.q2 * a.q2 + a.q3 * a.q3 + a.q4 * a.q4 - 1.0).abs() > 0.01 {
+                return Err(Error::Invalid);
+            }
+        }
+        Ok(Self {
+            count: words[0],
+            target_speed: f(1),
+            length: f(2),
+            total_time: f(3),
+            initial_orientation: q(4),
+            initial_pos: v(8),
+            accumulated_orientation: q(11),
+            last_time: f(15),
+            last_rates: v(16),
+            path_t: f(19),
+            pos: v(20),
+            roll: f(23),
+            shift: v(24),
+            last_shift_xy: words[27] != 0,
+            tangent: v(28),
+            speed_pi: SpeedPI {
+                p: f(31),
+                i: f(32),
+                integral: f(33),
+                total: f(34),
+                last_time: f(35),
+            },
+        })
+    }
+}
+
 fn finite(v: V) -> bool {
     v.x.is_finite() && v.y.is_finite() && v.z.is_finite()
 }

@@ -7,6 +7,7 @@ mod controller;
 #[cfg(ap_rust_aerobatics_faults)]
 #[path = "../../tests/modules/aerobatics_faults.rs"]
 mod faults;
+mod handoff;
 mod logging;
 mod maneuvers;
 mod math;
@@ -33,6 +34,9 @@ struct Loaded {
     args: [f32; 4],
     name: String,
     path: Path,
+    eval: Evaluation,
+    width: f32,
+    fingerprint: u32,
 }
 
 fn observation(c: &Context<'_>) -> Result<Input> {
@@ -64,14 +68,31 @@ fn load(
     input: Input,
     width: f32,
 ) -> Result<Loaded> {
-    if !(1..=255).contains(&id) {
-        return Err(Error::Invalid);
-    }
     let eval = Evaluation {
         speed: controller::target_speed(c, input, p)?,
         entry_rate: p.entry_rate,
         announce: true,
     };
+    load_recipe(c, id, args, eval, width)
+}
+
+fn load_recipe(
+    c: &Context<'_>,
+    id: i32,
+    args: [f32; 4],
+    eval: Evaluation,
+    width: f32,
+) -> Result<Loaded> {
+    if !(1..=255).contains(&id)
+        || !eval.speed.is_finite()
+        || eval.speed <= 0.0
+        || !eval.entry_rate.is_finite()
+        || eval.entry_rate <= 0.0
+        || !width.is_finite()
+        || args.iter().any(|v| !v.is_finite())
+    {
+        return Err(Error::Invalid);
+    }
     if let Some((command, name)) = maneuvers::Command::builtin(id) {
         let mut text = String::new();
         text.try_reserve_exact(name.len())
@@ -82,6 +103,9 @@ fn load(
             args,
             name: text,
             path: maneuvers::build(c, command, args, width, eval)?,
+            eval,
+            width,
+            fingerprint: 0,
         });
     }
     let mut found = None;
@@ -95,11 +119,17 @@ fn load(
     let schedule = found.ok_or(Error::Unavailable)?;
     // As in Lua's PathTask, file schedules already contain their arguments.
     let path = schedule.build(c, width, eval)?;
+    if path.cache_words() > 448 {
+        return Err(Error::Invalid);
+    }
     Ok(Loaded {
         id,
         args,
         name: schedule.name,
         path,
+        eval,
+        width,
+        fingerprint: schedule.fingerprint,
     })
 }
 
@@ -134,6 +164,7 @@ fn run(c: &Context<'_>) -> Result {
     if params.trick_count > 0 {
         message(c, 6, format_args!("Enabled {} tricks", params.trick_count))?;
     }
+    let mut handoff = handoff::Handoff::new(c)?;
     let mut loaded: Option<Loaded> = None;
     let mut active: Option<Controller> = None;
     let mut channel = None;
@@ -169,8 +200,124 @@ fn run(c: &Context<'_>) -> Result {
         let result = (|| -> Result {
             c.sleep_ms(25)?;
             if params.a(35)? != 0.0 {
+                if handoff.held {
+                    let w = &mut handoff.words;
+                    w.fill(0);
+                    w[0] = handoff::MAGIC;
+                    w[1] = handoff::VERSION;
+                    w[3] = 1;
+                    w[4] = u32::from(active.is_some());
+                    (w[5], w[6]) = match owner {
+                        Some(Owner::Rc(mode)) => (1, mode as u32),
+                        Some(Owner::Mission(id)) => (2, id as u32),
+                        None => (0, 0),
+                    };
+                    w[7] = last_command as u32;
+                    w[8] = (last_command >> 32) as u32;
+                    w[9] = count;
+                    w[10] = last_selection.map(|i| i as u32).unwrap_or(0);
+                    w[11] = last_action.map(u32::from).unwrap_or(u32::MAX);
+                    w[12] = last_mission_id.map(u32::from).unwrap_or(u32::MAX);
+                    w[13] = last_preload.map(u32::from).unwrap_or(u32::MAX);
+                    if let Some(control) = &active {
+                        let task = loaded.as_ref().ok_or(Error::Invalid)?;
+                        w[14] = task.id as u32;
+                        for i in 0..4 {
+                            w[15 + i] = task.args[i].to_bits();
+                        }
+                        w[19] = task.eval.speed.to_bits();
+                        w[20] = task.eval.entry_rate.to_bits();
+                        w[21] = task.width.to_bits();
+                        w[22] = task.fingerprint;
+                        control.save(&mut w[24..60]);
+                        let mut cursor = 64;
+                        task.path.save_cache(w, &mut cursor)?;
+                        w[23] = ((cursor - 64) / 4) as u32;
+                    }
+                    handoff.yield_control()?;
+                    // The new worker inherits vehicle ownership. Never release it here.
+                    active = None;
+                    owner = None;
+                    loaded = None;
+                }
                 language_selected = false;
                 return Ok(());
+            }
+            if !handoff.held {
+                if !handoff.claim()? {
+                    return Ok(());
+                }
+                let w = &handoff.words;
+                if w[4] > 1
+                    || w[5] > 2
+                    || w[6] > 65535
+                    || w[10] > params.trick_count as u32
+                    || (w[11] != u32::MAX && w[11] > 2)
+                    || (w[12] != u32::MAX && w[12] > 65535)
+                    || (w[13] != u32::MAX && w[13] > 65535)
+                {
+                    return Err(Error::Invalid);
+                }
+                count = w[9];
+                // The all-zero startup snapshot has no captured RC/mission markers.
+                if w[3] != 0 {
+                    last_selection = if w[10] == 0 {
+                        None
+                    } else {
+                        Some(w[10] as usize)
+                    };
+                    last_action = if w[11] == u32::MAX {
+                        None
+                    } else {
+                        Some(w[11] as u8)
+                    };
+                    last_mission_id = if w[12] == u32::MAX {
+                        None
+                    } else {
+                        Some(w[12] as u16)
+                    };
+                    last_preload = if w[13] == u32::MAX {
+                        None
+                    } else {
+                        Some(w[13] as u16)
+                    };
+                }
+                last_command = u64::from(w[7]) | (u64::from(w[8]) << 32);
+                if w[4] != 0 && last_command > c.time_us() {
+                    return Err(Error::Invalid);
+                }
+                if w[4] != 0 && c.time_us().saturating_sub(last_command) <= 1000000 {
+                    if w[5] == 0 || (w[5] == 1 && w[6] > 255) || w[23] > 112 {
+                        return Err(Error::Invalid);
+                    }
+                    let eval = Evaluation {
+                        speed: f32::from_bits(w[19]),
+                        entry_rate: f32::from_bits(w[20]),
+                        announce: false,
+                    };
+                    let args = core::array::from_fn(|i| f32::from_bits(w[15 + i]));
+                    let mut task = load_recipe(c, w[14] as i32, args, eval, f32::from_bits(w[21]))?;
+                    if task.fingerprint != w[22] {
+                        return Err(Error::Invalid);
+                    }
+                    let mut cursor = 64;
+                    task.path
+                        .restore_cache(&w[..64 + w[23] as usize * 4], &mut cursor)?;
+                    if cursor != 64 + w[23] as usize * 4 {
+                        return Err(Error::Invalid);
+                    }
+                    active = Some(Controller::restore(&w[24..60])?);
+                    loaded = Some(task);
+                    owner = Some(if w[5] == 1 {
+                        Owner::Rc(w[6] as u8)
+                    } else {
+                        Owner::Mission(w[6] as u16)
+                    });
+                }
+                // Rebuilding a path can take time. Recheck selection and freshness before stepping.
+                if params.a(35)? != 0.0 {
+                    return Ok(());
+                }
             }
             if !language_selected {
                 message(c, 6, format_args!("Aerobatics RUST selected"))?;
@@ -234,7 +381,8 @@ fn run(c: &Context<'_>) -> Result {
                             loaded = None;
                             loaded = Some(load(c, command as i32, args, p, input, params.a(22)?)?);
                         }
-                        let course = math::deg(c.libm().atan2f(input.velocity.y, input.velocity.x)?);
+                        let course =
+                            math::deg(c.libm().atan2f(input.velocity.y, input.velocity.x)?);
                         let yaw = mission::heading(c, params.a(33)?, course)?;
                         let task = loaded.as_mut().unwrap();
                         let controller =
@@ -304,7 +452,8 @@ fn run(c: &Context<'_>) -> Result {
                 }
                 if channel.is_none() {
                     channel = retry(c, || {
-                        c.rc().find_channel_for_option(RcChannelAuxFunc(params.t(2)? as i32))
+                        c.rc()
+                            .find_channel_for_option(RcChannelAuxFunc(params.t(2)? as i32))
                     })?;
                 }
                 let selection = match channel.as_ref() {

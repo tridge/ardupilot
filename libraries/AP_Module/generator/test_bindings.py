@@ -422,6 +422,7 @@ private:
 #include "BindingFile.h"
 #include "BindingLog.h"
 #include "BindingPrintf.h"
+#include "BindingSharedState.h"
 #include "fixture.h"
 // Math cases have separate tests against real AP_Math, not stand-in math.
 int32_t AP_Module::binding_math_dispatch(BindingId, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -1; }
@@ -430,6 +431,11 @@ int32_t AP_Module::binding_file_read_at(const uint8_t *, uint32_t, uint8_t *, ui
 int32_t AP_Module::binding_log_write(const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
 // Typed printf is covered by HAL and real-module integration tests.
 int32_t AP_Module::binding_string_format_printf(const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
+// Shared copies and lifecycle are exercised against the real service separately.
+int32_t AP_Module::binding_shared_state_open(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
+int32_t AP_Module::binding_shared_state_read(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
+int32_t AP_Module::binding_shared_state_write(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
+int32_t AP_Module::binding_shared_state_close(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
 int32_t AP_Module::binding_dronecan_subscribe(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
 int32_t AP_Module::binding_dronecan_check_message(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }
 int32_t AP_Module::binding_dronecan_close(void *, const uint8_t *, uint32_t, uint8_t *, uint32_t) { return -3; }

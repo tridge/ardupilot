@@ -14,6 +14,11 @@ module aerobatics_runner
         real(c_float) :: loaded_args(4),last_named_float
         character(len=48) :: loaded_name
         logical :: active,starting,starting_mission,preloading,stepped,delivering,have_attempted_trick
+        type(sharedstatetoken) :: shared
+        integer(c_int64_t) :: shared_revision,loaded_hash
+        integer(c_int32_t) :: words(0:511)
+        real(c_float) :: loaded_speed,loaded_entry,loaded_width
+        logical :: shared_held
         logical :: language_selected
         integer :: attempted_trick
         integer(c_int64_t) :: count,last_error,last_command,tick_started
@@ -153,7 +158,7 @@ contains
         end select
         if (rt%error==module_ok) state%owner=0
     end subroutine
-    subroutine load_task(rt,state,id,args,p,input,width)
+    subroutine load_task(rt,state,id,args,p,input,width,saved_eval)
         type(runtime), intent(inout) :: rt
         type(runner_state), intent(inout) :: state
         integer, intent(in) :: id
@@ -161,19 +166,30 @@ contains
         type(configuration), intent(in) :: p
         type(observation), intent(in) :: input
         type(evaluation) :: eval
+        type(evaluation), intent(in), optional :: saved_eval
         character(len=48) :: name
         character(len=12) :: digits
         character(len=32) :: filename
         character(len=12), parameter :: directories(3)=[character(len=12) :: 'APM/scripts/','scripts/','']
         character(len=96) :: temp
         logical :: found
-        integer :: cmd,i,root
+        integer :: cmd,i,root,cache_count
         if (rt%error/=module_ok) return
         state%loaded_id=0; call free_tree(state%tree)
         if (id<1.or.id>255) then
             call check(rt,module_invalid); return
         end if
-        eval=evaluation(target_speed(rt,input,p),p%entry_rate,.true.); cmd=builtin(id,name)
+        if (present(saved_eval)) then
+            eval=saved_eval
+        else
+            eval=evaluation(target_speed(rt,input,p),p%entry_rate,.true.)
+        end if
+        if (.not.finite(eval%speed).or.eval%speed<=0.0.or..not.finite(eval%entry_rate).or. &
+            eval%entry_rate<=0.0.or..not.finite(width)) then
+            call check(rt,module_invalid); return
+        end if
+        state%loaded_speed=eval%speed; state%loaded_entry=eval%entry_rate; state%loaded_width=width
+        state%loaded_hash=0; cmd=builtin(id,name)
         if (cmd/=0) then
             call allocate_tree(rt,state%tree,command_nodes(cmd))
             root=build_maneuver(rt,state%tree,cmd,args,width,eval); state%tree%root=root
@@ -185,10 +201,17 @@ contains
                     integer :: n
                     n=text_length(filename); filename(n+1:n+4)='.txt'
                 end block i_filename
-                call load_schedule(rt,filename(1:text_length(filename)),state%tree,width,eval,found,name)
+                call load_schedule(rt,filename(1:text_length(filename)),state%tree,width,eval,found,name,state%loaded_hash)
                 if (found.or.rt%error/=module_ok) exit
             end do
             if (.not.found) call check(rt,module_unavailable)
+        end if
+        if (rt%error==module_ok) then
+            cache_count=0
+            do i=1,state%tree%used
+                if (state%tree%nodes(i)%kind==composite) cache_count=cache_count+1
+            end do
+            if (cache_count>112) call check(rt,module_invalid)
         end if
         if (rt%error/=module_ok) then
             call free_tree(state%tree); return
@@ -239,6 +262,125 @@ contains
             if (.not.retry_busy(rt,code,started)) exit
         end do
     end subroutine
+    logical function shared_write(rt,state) result(written)
+        type(runtime), intent(inout) :: rt
+        type(runner_state), intent(inout) :: state
+        type(array_uint8_t_2048) :: bytes
+        integer(c_int64_t) :: revision
+        integer(c_int32_t) :: code
+        integer :: i,j
+        written=.false.
+        if (rt%error/=module_ok) return
+        do i=0,511
+            do j=0,3
+                bytes%data(4*i+j)=int(iand(shiftr(state%words(i),8*j),255),c_int8_t)
+            end do
+        end do
+        code=shared_state_write(rt%ctx,state%shared,0_c_int32_t,2048_c_int16_t,state%shared_revision,bytes,revision)
+        call check(rt,code)
+        if (rt%error/=module_ok.or.revision==0) return
+        state%shared_revision=revision; written=.true.
+    end function
+    subroutine yield_state(rt,state)
+        type(runtime), intent(inout) :: rt
+        type(runner_state), intent(inout) :: state
+        integer :: cursor,i
+        state%words=0; state%words(0)=int(z'4145524f',c_int32_t); state%words(1)=1; state%words(3)=1
+        state%words(4)=merge(1,0,state%active); state%words(5)=state%owner; state%words(6)=state%owner_id
+        state%words(7)=int(state%last_command,c_int32_t); state%words(8)=int(shiftr(state%last_command,32),c_int32_t)
+        state%words(9)=int(state%count,c_int32_t); state%words(10)=state%last_selection
+        state%words(11)=state%last_action; state%words(12)=state%last_mission_id; state%words(13)=state%last_preload
+        if (state%active) then
+            state%words(14)=state%loaded_id
+            do i=1,4
+                state%words(14+i)=transfer(state%loaded_args(i),0_c_int32_t)
+            end do
+            state%words(19)=transfer(state%loaded_speed,0_c_int32_t)
+            state%words(20)=transfer(state%loaded_entry,0_c_int32_t)
+            state%words(21)=transfer(state%loaded_width,0_c_int32_t); state%words(22)=int(state%loaded_hash,c_int32_t)
+            call save_controller(state%control,state%words(24:59))
+            cursor=64; call path_cache(rt,state%tree,state%tree%root,state%words,cursor,.false.)
+            state%words(23)=(cursor-64)/4
+        end if
+        if (.not.shared_write(rt,state)) then
+            call check(rt,module_invalid); return
+        end if
+        state%shared_held=.false.; state%active=.false.; state%owner=0
+        state%loaded_id=0; call free_tree(state%tree)
+    end subroutine
+    subroutine claim_state(rt,state)
+        type(runtime), intent(inout) :: rt
+        type(runner_state), intent(inout) :: state
+        type(sharedstateread) :: bytes
+        type(evaluation) :: eval
+        type(configuration) :: p
+        type(observation) :: input
+        integer(c_int64_t) :: expected_hash
+        integer(c_int32_t) :: code
+        integer :: i,j,cursor
+        real(c_float) :: args(4),width
+        code=shared_state_read(rt%ctx,state%shared,0_c_int32_t,2048_c_int16_t,bytes); call check(rt,code)
+        if (rt%error/=module_ok) return
+        state%shared_revision=bytes%revision; state%words=0
+        do i=0,511
+            do j=0,3
+                state%words(i)=ior(state%words(i),shiftl(iand(int(bytes%data%data(4*i+j),c_int32_t),255),8*j))
+            end do
+        end do
+        if (state%words(0)==0) then
+            if (any(state%words/=0)) then
+                call check(rt,module_invalid); return
+            end if
+            state%words(0)=int(z'4145524f',c_int32_t); state%words(1)=1
+        end if
+        if (state%words(0)/=int(z'4145524f',c_int32_t).or.state%words(1)/=1) then
+            call check(rt,module_invalid); return
+        end if
+        if (state%words(2)/=0) return
+        state%words(2)=state%shared%value
+        if (.not.shared_write(rt,state)) return
+        state%shared_held=.true.
+        if (state%words(4)<0.or.state%words(4)>1.or.state%words(5)<0.or.state%words(5)>2.or. &
+            state%words(6)<0.or.state%words(6)>65535.or.state%words(10)<0.or. &
+            state%words(10)>state%params%trick_count.or.state%words(11)<-1.or.state%words(11)>2.or. &
+            state%words(12)<-1.or.state%words(12)>65535.or.state%words(13)<-1.or.state%words(13)>65535) then
+            call check(rt,module_invalid); return
+        end if
+        state%count=iand(int(state%words(9),c_int64_t),4294967295_c_int64_t)
+        if (state%words(3)/=0) then
+            state%last_selection=state%words(10); state%last_action=state%words(11)
+            state%last_mission_id=state%words(12); state%last_preload=state%words(13)
+        end if
+        state%last_command=ior(iand(int(state%words(7),c_int64_t),4294967295_c_int64_t), &
+            shiftl(int(state%words(8),c_int64_t),32))
+        if (state%words(4)==0) return
+        if (state%last_command<0.or.state%last_command>time_us(rt%ctx)) then
+            call check(rt,module_invalid); return
+        end if
+        if (time_us(rt%ctx)-state%last_command>1000000) return
+        if (state%words(5)==0.or.(state%words(5)==1.and.state%words(6)>255).or. &
+            state%words(23)<0.or.state%words(23)>112) then
+            call check(rt,module_invalid); return
+        end if
+        eval=evaluation(transfer(state%words(19),0.0_c_float),transfer(state%words(20),0.0_c_float),.false.)
+        width=transfer(state%words(21),0.0_c_float)
+        do i=1,4
+            args(i)=transfer(state%words(14+i),0.0_c_float)
+            if (.not.finite(args(i))) call check(rt,module_invalid)
+        end do
+        expected_hash=iand(int(state%words(22),c_int64_t),4294967295_c_int64_t)
+        p=get_configuration(rt,state%params); input%now=0.0
+        call load_task(rt,state,state%words(14),args,p,input,width,eval)
+        if (rt%error/=module_ok) return
+        if (state%loaded_hash/=expected_hash) then
+            call check(rt,module_invalid); return
+        end if
+        cursor=64; call path_cache(rt,state%tree,state%tree%root,state%words,cursor,.true.)
+        if (cursor/=64+4*state%words(23)) call check(rt,module_invalid)
+        call restore_controller(rt,state%control,state%words(24:59))
+        if (rt%error/=module_ok) return
+        state%owner=state%words(5); state%owner_id=state%words(6); state%active=.true.
+    end subroutine
     subroutine tick(rt,state)
         type(runtime), intent(inout) :: rt
         type(runner_state), intent(inout) :: state
@@ -261,7 +403,14 @@ contains
         value=read_parameter(rt,state%params%aerom(35))
         if (rt%error/=module_ok) return
         if (value/=2.0) then
+            if (state%shared_held) call yield_state(rt,state)
             state%language_selected=.false.; return
+        end if
+        if (.not.state%shared_held) then
+            call claim_state(rt,state)
+            if (rt%error/=module_ok.or..not.state%shared_held) return
+            value=read_parameter(rt,state%params%aerom(35))
+            if (rt%error/=module_ok.or.value/=2.0) return
         end if
         if (.not.state%language_selected) then
             call message(rt,6_c_int32_t,'Aerobatics F90 selected')
@@ -474,7 +623,12 @@ contains
         state%channel%value=0; state%owner=0; state%owner_id=0; state%last_selection=0; state%last_action=-1
         state%last_mission_id=-1; state%last_preload=-1; state%count=0; state%last_named_float=0.0
         state%last_error=0; state%last_command=0
-        state%language_selected=.false.
+        state%language_selected=.false.; state%shared_held=.false.; state%shared_revision=0
+        code_open: block
+            integer(c_int32_t) :: code
+            code=shared_state_open(ctx,int(z'4145524f',c_int32_t),2048_c_int32_t,state%shared)
+            call check(rt,code)
+        end block code_open
         call create_parameters(rt,state%params)
         if (rt%error/=module_ok) then
             errtext=error_name(rt%error)
@@ -522,5 +676,9 @@ contains
             if (rt%error==module_stopped) exit
         end do
         status=rt%error; call free_tree(state%tree)
+        close_shared: block
+            integer(c_int32_t) :: code
+            code=shared_state_close(ctx,state%shared)
+        end block close_shared
     end function
 end module aerobatics_runner

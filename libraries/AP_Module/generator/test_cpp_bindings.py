@@ -16,6 +16,10 @@ import pytest
 # Keep these independent of the C++ type-description parser.
 MANUAL_SIZES = '''
 Parameter.__layout 0 8
+shared_state.open 8 4
+shared_state.read 10 2056
+shared_state.write 2066 8
+shared_state.close 4 0
 file.read_at 262 259
 logger.write 358 0
 string.strtof 256 6
