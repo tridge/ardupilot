@@ -657,25 +657,23 @@ void Runtime::module_info(ExpandingString &str)
         const char *state = "?";
         switch (module->state()) {
         case Module::State::Prepared: state = "PREPARED"; break;
-        case Module::State::Running: state = "RUNNING"; break;
+        case Module::State::Running: state = "RUN"; break;
         case Module::State::Returned: state = "RETURNED"; break;
         case Module::State::Joined: state = "JOINED"; break;
         case Module::State::Panicked: state = "PANICKED"; break;
         }
         const auto stats = module->stats(true);
-        str.printf("%s STATE=%s SOURCE=%s PRI=%u RX=%u RW=%u STACK=%u "
-                   "HEAP=%u USED=%u FREE=%u ALLOC=%u PEAK=%u ALLOCS=%u LOAD=",
+        str.printf("%s STATE=%s SRC=%s PRI=%u RX=%u RW=%u STK=%u "
+                   "HEAP=%u/%u ALLOC=%u PEAK=%u ALLOCS=%u",
                    slot->file.name, state, slot->file.source == ModuleSource::ROMFS ? "ROMFS" : "FILE",
                    unsigned(module->thread_priority()), unsigned(stats.rx_reserved), unsigned(stats.rw_reserved),
-                   unsigned(stats.stack_reserved), unsigned(stats.heap.capacity),
-                   unsigned(stats.heap.capacity - stats.heap.free), unsigned(stats.heap.free),
+                   unsigned(stats.stack_reserved), unsigned(stats.heap.free), unsigned(stats.heap.capacity),
                    unsigned(stats.heap.used), unsigned(stats.heap.peak), unsigned(stats.heap.allocations));
         float load;
         if (module->cpu_load(load)) {
-            str.printf("%.1f%%\n", double(load));
-        } else {
-            str.printf("?\n");
+            str.printf(" LOAD=%.1f%%", double(load));
         }
+        str.printf("\n");
     }
 }
 

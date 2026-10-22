@@ -172,8 +172,9 @@ owned RX bytes. Allocator bookkeeping, loader scratch, manager storage and
 persistent firmware registrations are additional; heap usage is not total RAM.
 The manager requests a separate 4 KiB stack on ARM or 32 KiB on x86-64.
 Download `@SYS/modules.txt` over MAVFTP for per-module state, source, priority,
-image/stack reservations, heap capacity, used/free bytes and allocation peaks.
-CPU load is included where the HAL can measure it, otherwise shown as `?`.
+image/stack reservations, heap free/total bytes and allocation peaks.
+The fields use `STATE=RUN`, `SRC=FILE` or `SRC=ROMFS`, `STK=bytes` and
+`HEAP=free/total`. CPU load is included only where the HAL can measure it.
 Discovery filenames and address-stable callback records are heap allocated, not
 placed on the manager stack. Their storage is released only after the entire
 generation has stopped and all binding resources are cleaned up. `MOD_MAX_MOD`

@@ -279,23 +279,26 @@ static bool verify_module_report()
         }
         *end = '\0';
         const char *heap = strstr(line, " HEAP=");
-        const char *used = strstr(line, " USED=");
-        const char *free = strstr(line, " FREE=");
-        if (heap == nullptr || used == nullptr || free == nullptr || strstr(line, "STATE=RUNNING ") == nullptr) {
+        if (heap == nullptr || strstr(line, "STATE=RUN ") == nullptr ||
+            strstr(line, " SRC=") == nullptr || strstr(line, " STK=") == nullptr) {
             return false;
         }
-        const uint32_t capacity = strtoul(heap + 6, nullptr, 10);
-        const uint32_t used_bytes = strtoul(used + 6, nullptr, 10);
-        const uint32_t free_bytes = strtoul(free + 6, nullptr, 10);
-        if (capacity != 4096 || used_bytes > capacity || free_bytes > capacity || used_bytes + free_bytes != capacity) {
+        char *separator;
+        const uint32_t free_bytes = strtoul(heap + 6, &separator, 10);
+        if (*separator != '/') {
+            return false;
+        }
+        const uint32_t capacity = strtoul(separator + 1, nullptr, 10);
+        if (capacity != 4096 || free_bytes > capacity ||
+            strstr(line, " USED=") != nullptr || strstr(line, " FREE=") != nullptr) {
             return false;
         }
 #if HAL_ENABLE_THREAD_STATISTICS
-        if (strstr(line, "LOAD=?") != nullptr || strchr(line, '%') == nullptr) {
+        if (strstr(line, " LOAD=") == nullptr || strstr(line, "LOAD=?") != nullptr || strchr(line, '%') == nullptr) {
             return false;
         }
 #else
-        if (strstr(line, "LOAD=?") == nullptr) {
+        if (strstr(line, " LOAD=") != nullptr) {
             return false;
         }
 #endif
