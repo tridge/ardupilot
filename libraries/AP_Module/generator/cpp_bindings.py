@@ -29,6 +29,7 @@ class Types:
     def __init__(self):
         self.definitions = []
         self.records = {}
+        self.enum_values = {}
 
     def record(self, name, fields):
         name = identifier(name)
@@ -63,6 +64,7 @@ class Types:
             constants = (values if values is not None else
                          singleton_binding.mavlink_constants(singleton_binding.MAVLINK_COMMON, 'MAV_SEVERITY')
                          if name == 'MavSeverity' else {})
+            self.enum_values[name] = constants
             self.definitions += [f'enum class {name} : {scalar} {{' +
                                  ', '.join(f'{n} = {v}' for n, v in constants.items()) + '};']
         return name

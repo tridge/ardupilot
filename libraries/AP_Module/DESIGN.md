@@ -21,15 +21,25 @@ C++ builds require Clang/standalone LLD and do not invoke Rust tools.
 Thumb uses ROPI/RWPI; x86-64 uses PIC. Fat LTO applies that model to linked Rust
 bitcode, including core/alloc. Rust modules use `no_std`, panic-abort semantics
 and SDK memory helpers, without host libc or system startup imports. C++ uses a
-freestanding C++17 runtime. The limited Fortran demonstration uses `ISO_C_BINDING`
-and a C++ SDK bridge; it does not link libgfortran or have a complete generated
-binding catalogue.
+freestanding C++17 runtime. Fortran uses `ISO_C_BINDING` and generic templates for
+the same complete host-call catalogue, without linking libgfortran. Its local C
+bridge shares the staged field conversions and error/copyback rules with Ada,
+then delegates wire encoding to the existing C++ clients. Unsigned values cross
+this local boundary as same-width signed integer bit patterns; booleans use C
+`bool` and Fortran `logical(c_bool)`. Strings carry explicit byte lengths and
+arrays/optional values use fixed-size interoperable records, not descriptors.
+GCC's ARM PIC subset still excludes mutable Fortran static data; unsupported
+runtime operations and relocations fail linking or packing.
 
 The experimental Ada backend emits GNAT LLVM IR and uses LLVM's ROPI/RWPI or
-PIC backend. It shares the C++ entry runtime and a small host-API bridge, not
-the generated binding catalogue. There is no binder or linked Ada runtime:
+PIC backend. Generic templates emit Ada clients for the same complete host-call
+catalogue and a local typed C bridge to the existing C++ clients. C-compatible
+record layouts are explicit in Ada and checked in C++; firmware still receives
+the existing field-wise wire encoding, not compiler object layouts. Staging
+preserves mutable inputs on error, and generated outputs are initialized.
+There is no binder or linked Ada runtime:
 compile-time restrictions exclude tasking, allocation, finalization, secondary
-stacks, exception handlers and elaboration code. Static globals are supported.
+stacks, implicit executable trampolines, exception handlers and elaboration code. Static globals are supported.
 Runtime checks remain enabled and call non-returning module-panic helpers.
 Unimplemented runtime dependencies fail linking; they are not returning stubs.
 
@@ -37,7 +47,7 @@ Unimplemented runtime dependencies fail linking; they are not returning stubs.
 
 The Python Lua generator parses `bindings.desc` and exports versioned JSON IR.
 The native generator consumes this IR rather than duplicating the grammar. It
-generates firmware adapters, private dispatch IDs, Rust and C++ clients, manifests, contract
+generates firmware adapters, private dispatch IDs, Rust, C++, Ada and Fortran clients, manifests, contract
 catalogues and coverage reports. Outputs live under build directories. Waf
 tracks both generators' inputs; standalone and Cargo builds generate their own
 outputs.
@@ -186,7 +196,7 @@ ROMFS prelinking preserves both identities by normalizing patched RX slots.
 
 All old `APRUST` formats are rejected. `APMOD01` (NUL-padded) is a probe accepted
 only by the separate test parser with `AP_MODULE_LEGACY_PROBE_ENABLED`.
-Current SDK builds emit version 6; core ABI version 3 is separately versioned.
+Current SDK builds emit version 7; core ABI version 3 is separately versioned.
 These are not released compatibility promises. Frozen `tests/compat/` fixtures
 and catalogue checks detect unintended changes; do not routinely regenerate them.
 

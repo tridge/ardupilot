@@ -1,4 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
+with AP_Module.Bindings;
+with AP_Module.Types;
 package body Simple_Loop is
    use AP_Module;
    use type Status;
@@ -7,7 +9,7 @@ package body Simple_Loop is
       Result : Status;
    begin
       while not Stop_Requested (Ctx) loop
-         Result := Send_Text (Ctx, Info, "Ada tick");
+         Result := Bindings.Gcs.Send_Text (Ctx, Types.MavSeverity_INFO, "Ada tick");
          if Result /= OK then
             return Result;
          end if;

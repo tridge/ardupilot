@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Generate the C and Rust sides of the experimental host-call ABI."""
+"""Generate firmware and native clients for the experimental host-call ABI."""
 
 import argparse
 import hashlib
@@ -12,9 +12,11 @@ import tempfile
 
 from pathlib import Path
 
+import ada_bindings
 import bindings
 import contracts
 import cpp_bindings
+import fortran_bindings
 import language_coverage
 
 from native_templates import render
@@ -105,6 +107,8 @@ def generate(spec, binding_spec=None):
     outputs = {'HostApi.h': cpp, 'sdk/rust/src/api.rs': rust,
                'sdk/abi.json': json.dumps(contract, indent=2) + '\n'}
     outputs.update(cpp_bindings.emit(binding_spec, notice))
+    outputs.update(ada_bindings.emit(binding_spec, spec))
+    outputs.update(fortran_bindings.emit(binding_spec, spec))
     outputs.update(bindings.emit(binding_spec))
     outputs.update(contracts.emit(binding_spec, notice))
     binding_names = contracts.binding_names(binding_spec)

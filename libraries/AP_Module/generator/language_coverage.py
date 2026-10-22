@@ -68,6 +68,18 @@ def report(spec, outputs):
     cpp_calls = {plan[0] for plan in plans}
     if cpp_calls != catalog:
         raise ValueError('C++ coverage and contract catalogue disagree')
+    expected_ada = {'ap_module_ada_binding_' + naming.binding_name(name) for name in catalog}
+    ada_bridge = set(re.findall(r'extern "C" int32_t (ap_module_ada_binding_\w+)\(', outputs['sdk/ada/bridge.cpp']))
+    ada_source = outputs['sdk/ada/ap_module-bindings.adb']
+    ada_imports = set(re.findall(r'External_Name => "(ap_module_ada_binding_\w+)"', ada_source))
+    if ada_bridge != expected_ada or ada_imports != expected_ada:
+        raise ValueError('Ada coverage and generated clients disagree')
+    expected_f90 = {'ap_module_f90_binding_' + naming.binding_name(name) for name in catalog}
+    f90_bridge = set(re.findall(r'extern "C" int32_t (ap_module_f90_binding_\w+)\(', outputs['sdk/fortran/bridge.cpp']))
+    f90_imports = set(re.findall(r'bind\(C, name="(ap_module_f90_binding_\w+)"\)',
+                                 outputs['sdk/fortran/ap_module_bindings.f90']))
+    if f90_bridge != expected_f90 or f90_imports != expected_f90:
+        raise ValueError('Fortran coverage and generated clients disagree')
     lookup = {(m['owner'], m['method']): (m['api_name'],) for m in spec['methods']}
     for method in spec['methods']:
         lookup.update({(method['owner'], alias.rsplit('.', 1)[1]): (alias,) for alias in method['api_aliases']})
@@ -84,7 +96,7 @@ def report(spec, outputs):
         required = LOCAL[key][1] if key in LOCAL else REMOVED.get(key, ())
         if required and not set(required) <= catalog:
             row['languages'] = {language: dict(status='unsupported', reason='Required host API not selected.')
-                                for language in ('rust', 'cpp')}
+                                for language in ('rust', 'cpp', 'ada', 'fortran')}
             rows.append(row)
             continue
         if key == ('AP_Filesystem::stat_t', 'is_directory'):
@@ -124,6 +136,29 @@ def report(spec, outputs):
                 languages = {language: dict(status='unsupported', reason=entry['reason']) for language in ('rust', 'cpp')}
             else:
                 raise ValueError('unclassified language coverage: ' + '.'.join(key))
+        languages['ada'] = dict(languages['cpp'])
+        if entry.get('reason') == 'native-rust-integer-operation':
+            if entry['name'] == '__tostring':
+                languages['ada'] = (dict(status='replacement-only', calls=['string.format_printf'],
+                                         note="Ada 'Image may require runtime/secondary-stack support.")
+                                    if 'string.format_printf' in catalog else
+                                    dict(status='unsupported', reason='Firmware formatter not selected.'))
+            else:
+                languages['ada']['note'] = 'Use Interfaces modular integer arithmetic, shifts and numeric conversions.'
+        if languages['ada']['status'] == 'value-field':
+            languages['ada']['api'] = 'AP_Module.Types.' + languages['ada']['api']
+        languages['fortran'] = dict(languages['cpp'])
+        if entry.get('reason') == 'native-rust-integer-operation':
+            if entry['name'] == '__tostring':
+                languages['fortran'] = (dict(status='replacement-only', calls=['string.format_printf'],
+                                             note='Fortran formatted I/O requires the excluded libgfortran runtime.')
+                                        if 'string.format_printf' in catalog else
+                                        dict(status='unsupported', reason='Firmware formatter not selected.'))
+            else:
+                languages['fortran']['note'] = ('Use bit intrinsics and widened conversions: unsigned values are '
+                                                'same-width signed integer bit patterns, not signed arithmetic.')
+        if languages['fortran']['status'] == 'value-field':
+            languages['fortran']['api'] = 'ap_module_bindings.filesystem_statoutput%directory'
         row['languages'] = languages
         rows.append(row)
     return dict(
@@ -136,7 +171,7 @@ def report(spec, outputs):
             'native-operation': 'Language primitive operations, not named generated SDK methods.',
             'replacement-only': 'Building blocks exist, but the named convenience/deprecated API does not.',
             'unsupported': 'No audited implementation or replacement.'},
-        native_host_calls=dict(rust=len(catalog), cpp=len(cpp_calls)),
+        native_host_calls=dict(rust=len(catalog), cpp=len(cpp_calls), ada=len(ada_bridge), fortran=len(f90_bridge)),
         summary={language: dict(sorted(Counter(row['languages'][language]['status'] for row in rows).items()))
-                 for language in ('rust', 'cpp')}, entries=rows,
+                 for language in ('rust', 'cpp', 'ada', 'fortran')}, entries=rows,
     )

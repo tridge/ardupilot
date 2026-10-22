@@ -2,12 +2,12 @@
 
 `AP_Module` loads trusted native modules from SD card or ROMFS. Each module
 has its own worker thread, heap and stack and uses generated bindings to call
-ArduPilot APIs. Rust and freestanding C++ share one loader and ABI. A small
-[Fortran talk demo](../../Tools/modules/README.md#fortran-talk-demo-sitl-and-stm32h7)
-also uses that ABI on x86-64 Linux/SITL and STM32H7. Lua can be
+ArduPilot APIs. Rust, freestanding C++ and
+[Fortran](../../Tools/modules/fortran/README.md) share one loader and ABI on
+x86-64 Linux/SITL and STM32. Lua can be
 enabled independently or alongside native modules.
 An [experimental Ada backend](../../Tools/modules/ada/README.md) uses GNAT LLVM
-and a small runtime-free SDK with the same loader and ABI.
+and template-generated bindings with the same loader and ABI, without linking an Ada runtime.
 
 See [DESIGN.md](DESIGN.md) for implementation contracts and the
 [module tools guide](../../Tools/modules/README.md) for packaging and tests.
@@ -259,7 +259,7 @@ restriction; C++ callers must uphold it. Value types are copies, not shared Lua 
 methods calling firmware require a live context. Binding locks block and are
 released before returning to module code.
 
-The generated `generator/coverage.json` reports Rust and C++ separately, distinguishing
+The generated `generator/coverage.json` reports Rust, C++ and Ada separately, distinguishing
 host calls, local helpers, value fields, native operations, replacement-only APIs
 and unsupported declarations. A replacement is not the original named wrapper and
 can use different units. The report covers methods, aliases and audited firmware

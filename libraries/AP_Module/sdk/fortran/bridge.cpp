@@ -4,7 +4,6 @@
 using ap_module::Context;
 using ap_module::ContextBase;
 using ap_module::Error;
-using ap_module::MavSeverity;
 using ap_module::StringView;
 
 extern "C" int32_t ap_module_fortran_run(const void *context);
@@ -45,10 +44,17 @@ extern "C" int32_t ap_module_fortran_get_gyro(const Context *context, float *gyr
 
 extern "C" int32_t ap_module_fortran_text(const Context *context, int32_t severity, const char *message, int32_t length)
 {
-    if (severity < 0 || severity > 7 || length < 0) {
+    if (severity < 0 || severity > 7 || length < 0 || length > 255 ||
+        (message == nullptr && length != 0)) {
         return int32_t(Error::Invalid);
     }
-    return int32_t(context->gcs().send_text(MavSeverity(severity), StringView(message, size_t(length))).error);
+    for (int32_t i = 0; i < length; i++) {
+        if (message[i] == 0) {
+            return int32_t(Error::Invalid);
+        }
+    }
+    // Core diagnostics must also work in modules-only firmware without GCS.
+    return int32_t(context->text(uint8_t(severity), StringView(message, size_t(length))).error);
 }
 
 extern "C" int32_t ap_module_fortran_text_floats(const Context *context, int32_t severity, const char *format,

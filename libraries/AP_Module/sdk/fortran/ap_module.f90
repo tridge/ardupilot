@@ -1,5 +1,6 @@
 ! SPDX-License-Identifier: GPL-3.0-or-later
-! Small talk-demo API, not a complete generated Fortran binding catalogue.
+! Core context operations and formatting helpers. Generated host-call clients
+! and types are in ap_module_bindings, built from the shared binding plans.
 module ap_module
     use, intrinsic :: iso_c_binding
     implicit none
