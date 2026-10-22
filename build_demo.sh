@@ -36,6 +36,10 @@ start_build "aerobatics f90" python3 "$APPLET/f90/build.py" aerobatics_f90_H7.ap
     --target "$TARGET" --cpu cortex-m7 --debug \
     --stack-size 16384 --heap-size 32768 "$@"
 
+start_build "lua" python3 Tools/modules/lua/build.py lua-h7.apmod \
+    --target "$TARGET" --cpu cortex-m7 --debug \
+    --stack-size 24576 --heap-size 131072 "$@"
+
 for source in rust/sine.rs f90/sine.f90 ada/sine.adb; do
     language=${source%%/*}
     start_build "sine $language" python3 Tools/modules/build.py "$SINE/$source" "sine_${language}_H7.apmod" \
