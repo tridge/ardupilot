@@ -1,7 +1,7 @@
 # Native module tools
 
 These tools build, inspect and test ArduPilot's experimental Rust and C++ native
-modules, plus a small Fortran talk demo. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
+modules, plus small Ada and Fortran examples. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
 configuration and installation, and the [design](../../libraries/AP_Module/DESIGN.md)
 for the container, ABI and resource-ownership contracts.
 
@@ -73,9 +73,10 @@ Tools/modules/apmod_info.py --fixups build/modules/airshow.apmod
 ```
 
 `build.py` dispatches `.rs` to `rust/build.py`, `.cpp`/`.cc`/`.cxx` to
-`cpp/build.py`, and `.f90` to the demo `fortran/build.py`. Shared bindings are generated below
+`cpp/build.py`, `.adb` to the experimental `ada/build.py`, and `.f90` to the demo
+`fortran/build.py`. Shared bindings are generated below
 `build/modules/libraries/AP_Module/`. Rust uses fat LTO; C++ uses Clang/LLD.
-Both package the linked ELF, retaining the companion `.elf` beside the output.
+All backends package the linked ELF, retaining the companion `.elf` beside the output.
 Rust also retains `lib<name>_sdk.rlib`; C++ retains its intermediate `.o` files.
 `--heap-size` is required and declares initial heap capacity, checked against
 `MOD_HEAP_MAX` on load. Armed growth is permitted only up to that cap.
@@ -123,6 +124,15 @@ firmware together rather than relabelling an old header.
 Without a manifest, the converter emits a test-only relocation probe, not a
 vehicle-loadable module. Unsupported sections, unresolved symbols and unsupported
 instruction relocations are rejected rather than delegated to a firmware linker.
+
+## Experimental Ada (SITL and STM32)
+
+The [Ada backend guide](ada/README.md) describes the GNAT LLVM toolchain,
+supported runtime-free subset and tests. The small
+[loop example](../../libraries/AP_Module/examples/simple_loop.adb) sends `Ada tick`
+once per second. Its SDK currently exposes text, sleep and stop requests, not
+the generated binding catalogue. ARM uses full ROPI/RWPI, including mutable
+module-local globals. GCC-based GNAT cannot substitute for GNAT LLVM here.
 
 ## Fortran talk demo (SITL and STM32H7)
 
