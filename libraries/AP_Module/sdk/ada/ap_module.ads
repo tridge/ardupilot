@@ -1,5 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- Experimental small API, not a complete generated Ada binding catalogue.
+with Interfaces;
 with Interfaces.C;
 with System;
 
@@ -18,6 +19,8 @@ package AP_Module is
 
    function Send_Text (Ctx : Context; Level : Severity; Message : String) return Status;
    function Stop_Requested (Ctx : Context) return Boolean;
+   function Time_Us (Ctx : Context) return Interfaces.Unsigned_64
+     with Import, Convention => C, External_Name => "ap_module_ada_time_us";
    function Sleep_Ms (Ctx : Context; Milliseconds : Interfaces.C.unsigned) return Status
      with Import, Convention => C, External_Name => "ap_module_ada_sleep_ms";
 end AP_Module;

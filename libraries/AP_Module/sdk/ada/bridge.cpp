@@ -22,6 +22,11 @@ extern "C" int32_t ap_module_ada_stop_requested(const ContextBase *context)
     return context->stop_requested();
 }
 
+extern "C" uint64_t ap_module_ada_time_us(const ContextBase *context)
+{
+    return context->time_us();
+}
+
 extern "C" int32_t ap_module_ada_sleep_ms(const ContextBase *context, uint32_t milliseconds)
 {
     return int32_t(context->sleep_ms(milliseconds).error);
