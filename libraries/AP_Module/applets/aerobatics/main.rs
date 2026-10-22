@@ -154,6 +154,7 @@ fn run(c: &Context<'_>) -> Result {
     let mut last_named_float = 0.0;
     let mut last_error = 0;
     let mut last_command = 0;
+    let mut language_selected = false;
     #[cfg(ap_rust_aerobatics_faults)]
     let mut faults = faults::Faults::default();
     loop {
@@ -167,6 +168,14 @@ fn run(c: &Context<'_>) -> Result {
         let mut delivering = false;
         let result = (|| -> Result {
             c.sleep_ms(25)?;
+            if params.a(35)? != 0.0 {
+                language_selected = false;
+                return Ok(());
+            }
+            if !language_selected {
+                message(c, 6, format_args!("Aerobatics RUST selected"))?;
+                language_selected = true;
+            }
             let tick_started = c.time_us();
             if active.is_some() && tick_started.saturating_sub(last_command) > 1000000 {
                 message(c, 3, format_args!("Aerobatics: control timeout"))?;

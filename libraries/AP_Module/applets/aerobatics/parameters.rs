@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! Same dynamic parameter keys, indices, names and defaults as the Lua applet.
+//! Shared Lua parameter layout, with a native-module language selector.
 
 use super::{
     controller::Configuration,
@@ -38,6 +38,7 @@ const AEROM: &[(u8, &str, f32)] = &[
     (32, "TS_RATE", 4.0),
     (33, "MIS_ANGLE", 0.0),
     (34, "OPTIONS", 0.0),
+    (35, "LANG", 0.0),
 ];
 
 pub struct Parameters<'a, 'h> {

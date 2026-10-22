@@ -50,6 +50,17 @@ considering hardware use, not historical results from a different SDK/toolchain.
 
 ## RC and mission operation
 
+`AEROM_LANG` selects the native implementation: `0` runs Rust (default), `1`
+runs Ada, and `2` runs Fortran. It is a shared dynamic parameter at `AEROM_`
+index 35; existing parameter indices are unchanged. All three modules may be
+loaded together. Each checks the live selector every 25 ms and sleeps without
+updating control when it is not selected. Other values leave all three idle.
+On selection, the module sends `Aerobatics RUST selected`, `Aerobatics ADA
+selected`, or `Aerobatics F90 selected` once, including initial selection at startup.
+Changing the selector needs no reload. Select the language before starting a
+maneuver: sleeping does not pause Plane's existing one-second control watchdog
+or transfer a running controller's state between modules.
+
 After the module registers its parameters, set `TRIK_ENABLE=1` and change
 `MOD_RESTART` to reload. Set `TRIK1_ID=72`, `RC7_OPTION=300` (action) and
 `RC9_OPTION=301` (selection). Channel 9 low selects trick 1; channel 7 low
