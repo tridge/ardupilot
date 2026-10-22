@@ -57,8 +57,9 @@ def test_airshow_parameters(tmp_path):
     declarations = re.findall(r"bind_add_param\('([^']+)',\s*(\d+),\s*(-?[\d.]+)\)", lua)
     rust = (APPLET / 'parameters.rs').read_text().split('pub struct Parameters')[0]
     native = re.findall(r'\((\d+), "([^"]+)", (-?[\d.]+)\)', rust)
+    assert ('35', 'LANG', '0.0') in native
     assert {(name, int(index), float(default)) for name, index, default in declarations} == \
-        {(name, int(index), float(default)) for index, name, default in native}
+        {(name, int(index), float(default)) for index, name, default in native if name != 'LANG'}
     assert len(declarations) == 29
     module = build.build(APPLET / 'main.rs', tmp_path / 'airshow.apmod', 'x86_64-unknown-linux-gnu',
                          16384, heap_size=32768)
@@ -76,7 +77,10 @@ def test_airshow_parameters(tmp_path):
             vehicle.start()
             vehicle.text('Loaded plane_aerobatics')
             initial = table(vehicle)
-            assert set(initial) == {'AEROM_' + row[0] for row in declarations} | {'TRIK_ENABLE'}
+            selector = {'AEROM_LANG'} if engine == 'rust' else set()
+            assert set(initial) == {'AEROM_' + row[0] for row in declarations} | {'TRIK_ENABLE'} | selector
+            if engine == 'rust':
+                assert initial['AEROM_LANG'][1] == 0
             for name, _, default in declarations:
                 assert struct.pack('<f', initial['AEROM_' + name][1]) == struct.pack('<f', float(default))
             assert initial['TRIK_ENABLE'][1] == 0
@@ -89,7 +93,7 @@ def test_airshow_parameters(tmp_path):
             expected = {'AEROM_' + row[0] for row in declarations} | {
                 'TRIK_ENABLE', 'TRIK_SEL_FN', 'TRIK_ACT_FN', 'TRIK_COUNT'}
             expected |= {f'TRIK{i}_{suffix}' for i in range(1, 12) for suffix in ('ID', 'ARG1', 'ARG2', 'ARG3', 'ARG4')}
-            assert set(results[engine]) == expected
+            assert set(results[engine]) == expected | selector
             vehicle.parameter('AEROM_ANG_ACCEL', 50)
             vehicle.parameter('AEROM_ANG_TC', 2)
             vehicle.parameter('TRIK1_ID', 72)
@@ -106,11 +110,13 @@ def test_airshow_parameters(tmp_path):
             vehicle.start()
             vehicle.text('Loaded plane_aerobatics', after=mark)
             persisted = table(vehicle)
-            assert {k: v[1] for k, v in persisted.items()} == {k: v[1] for k, v in repaired.items()}
+            assert {k: v[1] for k, v in persisted.items() if k != 'AEROM_LANG'} == \
+                {k: v[1] for k, v in repaired.items() if k != 'AEROM_LANG'}
         finally:
             vehicle.stop()
     # Absolute MAVLink enumeration indices can change with enabled core groups;
     # storage indices above and the table-relative order must remain identical.
-    assert {k: v[1] for k, v in results['rust'].items()} == {k: v[1] for k, v in results['lua'].items()}
-    assert sorted(results['rust'], key=lambda k: results['rust'][k][0]) == \
+    common_rust = {k: v for k, v in results['rust'].items() if k != 'AEROM_LANG'}
+    assert {k: v[1] for k, v in common_rust.items()} == {k: v[1] for k, v in results['lua'].items()}
+    assert sorted(common_rust, key=lambda k: common_rust[k][0]) == \
         sorted(results['lua'], key=lambda k: results['lua'][k][0])
