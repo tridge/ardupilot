@@ -40,6 +40,12 @@ command processing pause until `continue`. Attachment and detach re-enumerate
 both interfaces, so the GCS must reconnect after those transitions. An attached
 hardware debugger prevents USB debugger attachment.
 
+During each debugger stop, the free-running system timer is paused. HAL
+`micros()`/`millis()` timestamps, their 16/64-bit variants and ChibiOS sleep
+deadlines exclude the time spent stopped. Continue, single-step and detach
+restore the timer's previous enable state. The separate CPU cycle counter
+keeps USB polling, watchdog service and debugger timeouts working.
+
 Native modules can be debugged in the same session using a Python-enabled
 ARM GDB and the matching module ELF. Build the module with
 `Tools/modules/build.py --debug`, then pass `--apmod path/to/module.apmod`

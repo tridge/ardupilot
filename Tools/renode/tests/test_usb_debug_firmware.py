@@ -189,6 +189,7 @@ def session():
     usb = USB(port)
     assert GCS(usb).recv('HEARTBEAT', 60)
     if os.environ.get('USB_DEBUG_MONITOR_PORT'):
+        assert monitor_read(0x40000c00) & 1  # TIM5 resumes after detach
         assert monitor_read(0xe000e010) & 7 == 5
         assert monitor_read(0xe000e014) == 0x54321
         assert monitor_read(0xe000ed08) == saved_vtor
@@ -230,6 +231,29 @@ def test_memory_assignment(stopped):
         assert read_memory(d, address, 2) == before
     assert d.packet(f'M{address:x},2:AbCd'.encode()) == b'OK'
     assert read_memory(d, address, 2) == b'\xab\xcd'
+
+
+def test_system_timer_pauses_at_debug_stops(stopped):
+    # CubeOrangePlus uses TIM5 for the free-running ChibiOS/HAL clock.
+    timer = 0x40000c00
+    assert monitor_read(timer) & 1 == 0
+    counter = monitor_read(timer + 0x24)
+    cycles = monitor_read(0xe0001004)
+    time.sleep(.3)
+    assert monitor_read(timer + 0x24) == counter
+    assert monitor_read(0xe0001004) != cycles  # debugger timeouts still run
+    # Resume a busy thread, then stop with Ctrl-C. Only running time counts.
+    write_memory(stopped.debug, stopped.scratch, bytes.fromhex('00bffde7'))
+    set_register(stopped.debug, 15, stopped.scratch)
+    interrupt_running(stopped.debug)
+    assert monitor_read(timer) & 1 == 0
+    assert monitor_read(timer + 0x24) != counter
+    counter = monitor_read(timer + 0x24)
+    stopped.debug.write(gdb.rsp_packet(b's'))
+    assert gdb.read_packet(stopped.debug, time.monotonic()+15).startswith(b'T05')
+    assert monitor_read(timer) & 1 == 0
+    # Sampling through the monitor takes much longer than the single step.
+    assert (monitor_read(timer + 0x24) - counter) & 0xffffffff < 10000
 
 
 def test_target_description(stopped):
@@ -456,7 +480,14 @@ def test_real_gdb_function_call(stopped):
                 f'target remote 127.0.0.1:{server.getsockname()[1]}',
                 'set $oldr4=$r4', 'set $r4=0x12345678', 'printf "R4=%x\\n", $r4', 'set $r4=$oldr4',
                 'set $oldd0=$d0', 'set $d0=3.5', 'printf "D0=%g\\n", $d0', 'set $d0=$oldd0',
-                'printf "MILLIS=%u\\n", AP_HAL::millis()', 'disconnect', 'quit']
+                'printf "MILLIS=%u\\n", AP_HAL::millis()']
+    clocks = [('micros', 'unsigned int', 100000), ('micros16', 'unsigned short', 10000),
+              ('micros64', 'unsigned long long', 100000), ('millis', 'unsigned int', 100),
+              ('millis16', 'unsigned short', 100), ('millis64', 'unsigned long long', 100)]
+    for name, cast, _ in clocks:
+        commands += [f'set $before = AP_HAL::{name}()', 'python import time; time.sleep(0.3)',
+                     f'printf "{name}_DELTA=%llu\\n", (unsigned long long)({cast})(AP_HAL::{name}() - $before)']
+    commands += ['disconnect', 'quit']
     args = ['arm-none-eabi-gdb', '-nx', '-batch', stopped.elf]
     for command in commands:
         args.extend(['-ex', command])
@@ -467,6 +498,9 @@ def test_real_gdb_function_call(stopped):
         assert 'R4=12345678' in output, output
         assert 'D0=3.5' in output, output
         assert re.search(r'MILLIS=\d+', output), output
+        for name, _, limit in clocks:
+            match = re.search(rf'{name}_DELTA=(\d+)', output)
+            assert match and int(match[1]) < limit, output
     finally:
         done.set()
         server.close()
