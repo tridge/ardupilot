@@ -6,6 +6,8 @@ ArduPilot APIs. Rust and freestanding C++ share one loader and ABI. A small
 [Fortran talk demo](../../Tools/modules/README.md#fortran-talk-demo-sitl-and-stm32h7)
 also uses that ABI on x86-64 Linux/SITL and STM32H7. Lua can be
 enabled independently or alongside native modules.
+An [experimental Ada backend](../../Tools/modules/ada/README.md) uses GNAT LLVM
+and a small runtime-free SDK with the same loader and ABI.
 
 See [DESIGN.md](DESIGN.md) for implementation contracts and the
 [module tools guide](../../Tools/modules/README.md) for packaging and tests.
@@ -87,7 +89,7 @@ Modules are target-specific. For ARM, `--cpu cortex-m4` is the portable default;
 `--cpu cortex-m7` for H743/H757, including their double-precision FPU. H7 boards
 accept either profile; F405 accepts only M4 modules. The loader rejects unsupported
 CPU requirements before allocating the image. This choice applies to Rust,
-C++ and Fortran. `apmod_info.py` shows each module's CPU/FPU requirement.
+C++, Ada and Fortran. `apmod_info.py` shows each module's CPU/FPU requirement.
 
 The stack declaration excludes the host-call margin, currently
 4 KiB on Cortex-M and 16 KiB on x86-64. The declaration plus margin must fit

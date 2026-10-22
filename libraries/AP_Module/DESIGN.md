@@ -25,6 +25,14 @@ freestanding C++17 runtime. The limited Fortran demonstration uses `ISO_C_BINDIN
 and a C++ SDK bridge; it does not link libgfortran or have a complete generated
 binding catalogue.
 
+The experimental Ada backend emits GNAT LLVM IR and uses LLVM's ROPI/RWPI or
+PIC backend. It shares the C++ entry runtime and a small host-API bridge, not
+the generated binding catalogue. There is no binder or linked Ada runtime:
+compile-time restrictions exclude tasking, allocation, finalization, secondary
+stacks, exception handlers and elaboration code. Static globals are supported.
+Runtime checks remain enabled and call non-returning module-panic helpers.
+Unimplemented runtime dependencies fail linking; they are not returning stubs.
+
 ## Binding generation and ABI
 
 The Python Lua generator parses `bindings.desc` and exports versioned JSON IR.
