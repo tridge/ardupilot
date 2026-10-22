@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Build a trusted native module from Rust, C++, experimental Ada or demo Fortran source."""
+"""Build a trusted native module from Rust, C++, experimental Ada or Fortran source."""
 
 import argparse
 import json

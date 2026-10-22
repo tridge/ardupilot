@@ -14,6 +14,7 @@ import targets
 from cpp import build as cpp
 
 SDK = Path(__file__).resolve().parents[3] / 'libraries/AP_Module/sdk/ada'
+GENERATED = cpp.GENERATED / 'sdk/ada'
 
 
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None,
@@ -38,13 +39,14 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     arm = profile.machine == 40
     common = [compiler, '-c', '-S', '-emit-llvm', '-Os', '-gnat2022', '-gnata', '-gnato',
               '-ffunction-sections', '-fdata-sections', f'--target={target}', f'-mcpu={profile.cpu}',
-              '-gnatec=' + str(SDK / 'gnat.adc'), '-I' + str(SDK), '-I' + str(source.resolve().parent)]
+              '-gnatec=' + str(SDK / 'gnat.adc'), '-I' + str(SDK), '-I' + str(GENERATED),
+              '-I' + str(source.resolve().parent)]
     if not arm:
         common += ['-mno-red-zone']
     if debug:
         common += ['-g']
     objects = []
-    for index, path in enumerate((SDK / 'ap_module.adb', source)):
+    for index, path in enumerate((SDK / 'ap_module.adb', GENERATED / 'ap_module-bindings.adb', source)):
         unit_dir = directory / str(index)
         unit_dir.mkdir(exist_ok=True)
         ir = unit_dir / (path.stem + '.ll')
@@ -78,4 +80,4 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     # unsupported runtime features. Missing dependencies are link-time errors.
     return cpp.build(SDK / 'bridge.cpp', output, target, stack_size, base=base, debug=debug,
                      opt_level=opt_level, heap_size=heap_size, extra_objects=objects, cpu=profile.cpu,
-                     thread_priority=thread_priority)
+                     thread_priority=thread_priority, extra_sources=(GENERATED / 'bridge.cpp',))

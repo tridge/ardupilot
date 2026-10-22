@@ -1,7 +1,7 @@
 # Native module tools
 
-These tools build, inspect and test ArduPilot's experimental Rust and C++ native
-modules, plus small Ada and Fortran examples. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
+These tools build, inspect and test ArduPilot's experimental Rust, C++, Ada and Fortran native
+modules. See the [runtime guide](../../libraries/AP_Module/README.md) for firmware
 configuration and installation, and the [design](../../libraries/AP_Module/DESIGN.md)
 for the container, ABI and resource-ownership contracts.
 
@@ -73,7 +73,7 @@ Tools/modules/apmod_info.py --fixups build/modules/airshow.apmod
 ```
 
 `build.py` dispatches `.rs` to `rust/build.py`, `.cpp`/`.cc`/`.cxx` to
-`cpp/build.py`, `.adb` to the experimental `ada/build.py`, and `.f90` to the demo
+`cpp/build.py`, `.adb` to the experimental `ada/build.py`, and `.f90` to
 `fortran/build.py`. Shared bindings are generated below
 `build/modules/libraries/AP_Module/`. Rust uses fat LTO; C++ uses Clang/LLD.
 All backends package the linked ELF, retaining the companion `.elf` beside the output.
@@ -130,18 +130,20 @@ instruction relocations are rejected rather than delegated to a firmware linker.
 The [Ada backend guide](ada/README.md) describes the GNAT LLVM toolchain,
 supported runtime-free subset and tests. The small
 [loop example](../../libraries/AP_Module/examples/simple_loop.adb) sends `Ada tick`
-once per second. Its SDK currently exposes text, sleep and stop requests, not
-the generated binding catalogue. ARM uses full ROPI/RWPI, including mutable
+once per second using generated `Gcs.Send_Text`. Ada has generated clients for
+the complete native host-call catalogue. ARM uses full ROPI/RWPI, including mutable
 module-local globals. GCC-based GNAT cannot substitute for GNAT LLVM here.
 
-## Fortran talk demo (SITL and STM32H7)
+## Fortran (SITL and STM32)
 
 The [Fortran simple loop](../../libraries/AP_Module/examples/simple_loop.f90)
 reads gyro values, computes their magnitude in Fortran, and sends
-`Fortran tick <seconds> gyro <magnitude>` once per second. The small SDK in
-`libraries/AP_Module/sdk/fortran/` uses `ISO_C_BINDING` and the generated C++
+`Fortran tick <seconds> gyro <magnitude>` once per second. Generic templates
+generate the complete 581-host-call catalogue as `ap_module_bindings`, using
+`ISO_C_BINDING` and the generated C++
 clients; formatted text uses the firmware formatter, not Fortran I/O. The loader,
-firmware, container and resource limits are identical for all three languages.
+firmware, container and resource limits are identical for all languages.
+See the [Fortran API guide](fortran/README.md) for types, naming and unsigned-value rules.
 
 Install GNU Fortran (tested with gfortran 15.2), Clang 21+ and standalone LLD 21+.
 `FC`, `CXX` and `LLD` select the compilers/linker. Rust is not needed to build or
@@ -163,10 +165,10 @@ Do not install modules in the repository's `modules/` submodule directory.
 
 For STM32H7, use an ARM GNU Fortran cross compiler (tested with 15.2), for example
 the `gfortran-arm-linux-gnueabihf` package. Although that compiler targets Linux
-by default, the builder explicitly selects Cortex-M4-compatible Thumb hard float,
+by default, the builder explicitly selects M4-compatible or M7 Thumb hard float,
 assembles with Clang and links without Linux startup, libc or libgfortran.
 The ArduPilot `arm-none-eabi-gcc` toolchain supplies only referenced compiler
-helpers from its Cortex-M4 hard-float `libgcc.a`; `ARM_GCC` overrides that compiler.
+helpers from the matching hard-float `libgcc.a`; `ARM_GCC` overrides that compiler.
 
 ```sh
 FC=arm-linux-gnueabihf-gfortran Tools/modules/build.py \
@@ -178,7 +180,8 @@ Copy `fortran_H7.apmod` to `/APM/modules/` on microSD and enable `MOD_ENABLE`.
 SITL and STM32 require separately compiled images. No firmware loader changes
 or additional runtime resolver are needed.
 
-This is a runtime-free demo subset, not a complete generated Fortran SDK.
+The generated bindings cover the full host-call catalogue, but this is still a
+runtime-free subset of the Fortran language, using Fortran 2008's C interoperability.
 Only `-Os` is accepted; `--debug` retains Fortran/C++ DWARF. Fixed-size storage
 and simple scalar/array arithmetic work. `PRINT`, `WRITE` (including internal
 formatted writes), runtime-dependent allocation/intrinsics, and other uses of
@@ -190,8 +193,8 @@ relocate safely. GCC reserves `r9` for the C++ bridge's RWPI static base; read-o
 Fortran constants and code use PC-relative addressing. These restrictions do not
 apply to the existing Rust/C++ backends. Flang 21 cannot lower ARM Fortran yet.
 
-Run the package/rebase checks for both profiles, known-value maths and status
-tests, and three-language SITL reload test with native and ARM GNU Fortran installed:
+Run all-binding package/rebase and native ABI checks, known-value maths and status
+tests, and the three-language SITL reload test with native and ARM GNU Fortran installed:
 
 ```sh
 AP_MODULE_SITL_BINARY=/path/to/sitl/bin/arduplane ARM_FC=arm-linux-gnueabihf-gfortran \
@@ -282,7 +285,7 @@ use a disarmed bench setup, not an aircraft in flight.
 ## Tests
 
 Shared Python tests live in `tests/`; language-specific tests live in
-`rust/tests/`, `cpp/tests/` and `fortran/tests/`. Generator tests live with the
+`rust/tests/`, `cpp/tests/`, `ada/tests/` and `fortran/tests/`. Generator tests live with the
 native generator.
 These toolchain/loader tests run without a vehicle firmware build:
 

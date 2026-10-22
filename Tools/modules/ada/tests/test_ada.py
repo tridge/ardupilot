@@ -22,13 +22,25 @@ NATIVE = 'x86_64-unknown-linux-gnu'
 ARM = 'thumbv7em-none-eabihf'
 DEMO = ROOT / 'libraries/AP_Module/examples/simple_loop.adb'
 MATH_DECLARATIONS = '''   Counter : Integer := 41;
+   pragma Volatile (Counter);
    F : Float := 3.5;
    D : Long_Float := 12.25;
    pragma Volatile (F);
-   pragma Volatile (D);'''
+   pragma Volatile (D);
+   type Callback is access function (Value : Interfaces.C.int) return Interfaces.C.int
+     with Convention => C;
+   function Add_One (Value : Interfaces.C.int) return Interfaces.C.int with Convention => C;
+   function Add_Two (Value : Interfaces.C.int) return Interfaces.C.int with Convention => C;
+   Callbacks : constant array (0 .. 1) of Callback := (Add_One'Access, Add_Two'Access);'''
+MATH_BODIES = '''   function Add_One (Value : Interfaces.C.int) return Interfaces.C.int is (Value + 1);
+   function Add_Two (Value : Interfaces.C.int) return Interfaces.C.int is (Value + 2);
+'''
 MATH_STATEMENTS = '''
       Counter := Counter + 1;
       if Counter /= 42 or else F * 2.0 /= 7.0 or else D * 4.0 /= 49.0 then
+         return -4;
+      end if;
+      if Callbacks (Counter mod 2) (Interfaces.C.int (Counter - 1)) /= 42 then
          return -4;
       end if;
       return Send_Text (Ctx, Info, "MATH ok");'''
@@ -46,9 +58,10 @@ def gnat(monkeypatch):
     return select
 
 
-def probe_source(directory, declarations, statements):
+def probe_source(directory, declarations, statements, bodies=''):
     source = directory / 'probe.adb'
     source.with_suffix('.ads').write_text('''with AP_Module;
+with Interfaces.C;
 package Probe is
 ''' + declarations + '''
    function Run (Ctx : AP_Module.Context) return AP_Module.Status
@@ -58,7 +71,7 @@ end Probe;
     source.write_text('''package body Probe is
    use AP_Module;
    use type Status;
-   function Run (Ctx : Context) return Status is
+''' + bodies + '''   function Run (Ctx : Context) return Status is
       Result : Status;
    begin
 ''' + statements + '''
@@ -79,19 +92,20 @@ def test_ada_rebases(tmp_path, monkeypatch, gnat, target, cpu, debug):
     image = pack.unpack(first.read_bytes())
     assert image['contract']['stack_size'] == 8192
     assert image['contract']['heap_size'] == 4096
-    assert image['imports'] == []  # The small demo only needs the host API.
+    assert {entry[2] for entry in image['imports']} == {'gcs.send_text'}
     assert not list(ROOT.glob('simple_loop.ali'))
 
 
 @pytest.mark.parametrize('target', [NATIVE, ARM])
 def test_mutable_globals_rebase(tmp_path, gnat, target):
     gnat(target)
-    source = probe_source(tmp_path, MATH_DECLARATIONS, MATH_STATEMENTS)
+    source = probe_source(tmp_path, MATH_DECLARATIONS, MATH_STATEMENTS, MATH_BODIES)
     first = build.build(source, tmp_path / 'first.apmod', target, 8192)
     second = build.build(source, tmp_path / 'second.apmod', target, 8192, base=0x24123000)
     assert first.read_bytes() == second.read_bytes()
     image = pack.unpack(first.read_bytes())
     assert image['memory_size'] - image['rx_size'] >= 4
+    assert len(image['fixups']) >= 2  # Retained read-only code-pointer table.
 
 
 @pytest.mark.parametrize('level', ['0', '1', '2', '3', 'z'])
@@ -139,6 +153,38 @@ def test_unsupported_runtime_rejected(tmp_path, capfd, gnat, declarations, state
     with pytest.raises(subprocess.CalledProcessError):
         build.build(source, output, NATIVE, 8192)
     assert 'restriction' in capfd.readouterr().err.lower()
+    assert not output.exists()
+
+
+def test_implicit_trampoline_rejected(tmp_path, capfd, gnat):
+    gnat(NATIVE)
+    source = probe_source(tmp_path, '', '''
+      declare
+         Value : Integer := 41;
+         function Nested return Integer with Convention => C;
+         function Nested return Integer is (Value);
+         type Callback is access function return Integer with Convention => C;
+         Fn : Callback := Nested'Access;
+      begin
+         Value := Fn.all;
+      end;
+      return OK;''')
+    with pytest.raises(subprocess.CalledProcessError):
+        build.build(source, tmp_path / 'bad.apmod', NATIVE, 8192)
+    assert 'No_Implicit_Dynamic_Code' in capfd.readouterr().err
+
+
+def test_unlinked_runtime_has_no_returning_stub(tmp_path, capfd, gnat):
+    gnat(NATIVE)
+    source = probe_source(tmp_path, '''
+   procedure Missing_Runtime
+     with Import, Convention => C, External_Name => "__gnat_missing_runtime_probe";''', '''
+      Missing_Runtime;
+      return OK;''')
+    output = tmp_path / 'bad.apmod'
+    with pytest.raises(subprocess.CalledProcessError):
+        build.build(source, output, NATIVE, 8192)
+    assert 'undefined symbol: __gnat_missing_runtime_probe' in capfd.readouterr().err
     assert not output.exists()
 
 
@@ -214,7 +260,7 @@ def test_ada_check_sitl(tmp_path, gnat, declarations, statements, check):
 @pytest.mark.parametrize('cpu', ['cortex-m4', 'cortex-m7'])
 def test_ada_globals_h7(tmp_path, renode, monkeypatch, gnat, cpu):  # noqa: F811
     gnat(ARM)
-    source = probe_source(tmp_path, MATH_DECLARATIONS, MATH_STATEMENTS)
+    source = probe_source(tmp_path, MATH_DECLARATIONS, MATH_STATEMENTS, MATH_BODIES)
     builder = build.build
 
     def image(unused, output, target, stack_size):

@@ -1,6 +1,6 @@
 # AP_FLAKE8_CLEAN
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Runtime-free GNU Fortran demo backend for x86-64 Linux/SITL and Thumb hard float."""
+"""Runtime-free GNU Fortran backend for x86-64 Linux/SITL and Thumb hard float."""
 
 import os
 import shutil
@@ -13,18 +13,19 @@ import targets
 from cpp import build as cpp
 
 SDK = Path(__file__).resolve().parents[3] / 'libraries/AP_Module/sdk/fortran'
+GENERATED = cpp.GENERATED / 'sdk/fortran'
 
 
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096, cpu=None,
           thread_priority=None):
     profile = targets.select(target, cpu)
     if opt_level != 's':
-        raise ValueError('Fortran demo modules currently require --opt-level=s')
+        raise ValueError('Fortran modules currently require --opt-level=s')
     arm = profile.machine == 40
     default = 'arm-linux-gnueabihf-gfortran' if arm else 'gfortran'
     compiler = shutil.which(os.environ.get('FC', default))
     if compiler is None:
-        raise ValueError(f'Fortran demo builds require GNU Fortran (set FC to {default})')
+        raise ValueError(f'Fortran builds require GNU Fortran (set FC to {default})')
     version = subprocess.check_output([compiler, '--version'], text=True)
     triple = subprocess.check_output([compiler, '-dumpmachine'], text=True).strip()
     compatible = triple.startswith(('arm-', 'thumb-')) and 'eabi' in triple if arm else \
@@ -52,7 +53,7 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
             # Clang's assembler does not accept GNU .loc "view" directives.
             common += ['-gno-variable-location-views', '-gdwarf-4']
     objects = []
-    for index, path in enumerate((SDK / 'ap_module.f90', source)):
+    for index, path in enumerate((SDK / 'ap_module.f90', GENERATED / 'ap_module_bindings.f90', source)):
         obj = module_dir / f'{index}.o'
         if arm:
             # Use the existing Clang assembler, not Linux-target binutils.
@@ -67,7 +68,7 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
         gcc = os.environ.get('ARM_GCC', 'arm-none-eabi-gcc')
         library = Path(subprocess.check_output([gcc, *arm_flags, '-print-libgcc-file-name'], text=True).strip())
         if not library.is_file() or library.suffix != '.a':
-            raise ValueError('ARM Fortran needs the Cortex-M4 hard-float libgcc.a (set ARM_GCC)')
+            raise ValueError(f'ARM Fortran needs {profile.cpu} hard-float libgcc.a (set ARM_GCC)')
         # Only referenced compiler helpers (e.g. integer/float conversion) are
         # extracted. Their sections/relocations undergo the same packer checks.
         objects.append(library)
@@ -75,4 +76,4 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     # Deliberately do not link libgfortran: runtime dependencies must fail here.
     return cpp.build(SDK / 'bridge.cpp', output, target, stack_size, base=base,
                      debug=debug, opt_level=opt_level, heap_size=heap_size, extra_objects=objects, cpu=profile.cpu,
-                     thread_priority=thread_priority)
+                     thread_priority=thread_priority, extra_sources=(GENERATED / 'bridge.cpp',))

@@ -19,7 +19,7 @@ GENERATED = ROOT / 'build/modules/libraries/AP_Module'
 
 
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096,
-          extra_objects=(), cpu=None, thread_priority=None):
+          extra_objects=(), cpu=None, thread_priority=None, extra_sources=()):
     profile = targets.select(target, cpu)
     if opt_level != 's':
         raise ValueError('C++ modules currently require --opt-level=s; other relocation output is unaudited')
@@ -53,7 +53,7 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     if debug:
         common += ['-g', '-fno-omit-frame-pointer']
     objects = []
-    for index, path in enumerate((source, SDK / 'runtime.cpp', GENERATED / 'sdk/cpp/imports.cpp')):
+    for index, path in enumerate((source, SDK / 'runtime.cpp', GENERATED / 'sdk/cpp/imports.cpp', *extra_sources)):
         obj = output.with_suffix(f'.{index}.o')
         subprocess.run(common + ['-c', str(path), '-o', str(obj)], check=True)
         objects.append(str(obj))
