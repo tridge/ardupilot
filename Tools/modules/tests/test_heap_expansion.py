@@ -25,8 +25,8 @@ def test_heap_expansion(tmp_path, disabled):
         listing = FTPReader(vehicle).read('@SYS/modules.txt')
         line = next(line for line in listing.splitlines() if line.startswith('expand.apmod '))
         fields = dict(field.split('=', 1) for field in line.split()[1:])
-        capacity, used, free = (int(fields[key]) for key in ('HEAP', 'USED', 'FREE'))
-        assert capacity == used + free and 4096 <= capacity <= 131072, listing
+        free, capacity = map(int, fields['HEAP'].split('/'))
+        assert 0 <= free <= capacity and 4096 <= capacity <= 131072, listing
         assert int(fields['ALLOC']) >= max(expected, 0), listing
 
     try:

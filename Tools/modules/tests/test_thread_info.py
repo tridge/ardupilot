@@ -125,19 +125,20 @@ def test_modules_over_ftp(tmp_path, images, count):  # noqa: F811
                 assert name in heaps and name not in rows, listing
                 values = dict(field.split('=', 1) for field in fields)
                 rows[name] = values
-                assert values['SOURCE'] == 'FILE' and int(values['PRI']) == 1, listing
-                capacity, used, free = (int(values[key]) for key in ('HEAP', 'USED', 'FREE'))
-                assert capacity == used + free and 0 <= free <= capacity, listing
-                if values['STATE'] == 'RUNNING':
+                assert values['SRC'] == 'FILE' and int(values['PRI']) == 1, listing
+                assert not {'SOURCE', 'STACK', 'USED', 'FREE'} & values.keys(), listing
+                free, capacity = map(int, values['HEAP'].split('/'))
+                assert 0 <= free <= capacity, listing
+                if values['STATE'] == 'RUN':
                     assert capacity == heaps[name] and int(values['ALLOC']) >= 512, listing
                     assert int(values['PEAK']) >= int(values['ALLOC']) and int(values['ALLOCS']) >= 1, listing
-                    assert int(values['STACK']) > 0 and int(values['RX']) > 0, listing
-                    if values['LOAD'] != '?' or sys.platform.startswith('linux'):
+                    assert int(values['STK']) > 0 and int(values['RX']) > 0, listing
+                    if 'LOAD' in values or sys.platform.startswith('linux'):
                         assert re.fullmatch(r'\d+(?:\.\d+)?%', values['LOAD']), listing
                         assert 0 <= float(values['LOAD'][:-1]) <= 100, listing
             if complete:
                 assert set(rows) == set(names), listing
-                assert all(row['STATE'] == 'RUNNING' for row in rows.values()), listing
+                assert all(row['STATE'] == 'RUN' for row in rows.values()), listing
             return listing
 
         snapshot(True)
@@ -166,7 +167,7 @@ def test_retained_module_diagnostics(tmp_path, images, mode):  # noqa: F811
             vehicle.text('panic; reboot required')
         reader = FTPReader(vehicle)
         listing = reader.read('@SYS/modules.txt')
-        assert 'retained.apmod STATE=' + ('PANICKED' if mode == 'panic' else 'RUNNING') in listing, listing
+        assert 'retained.apmod STATE=' + ('PANICKED' if mode == 'panic' else 'RUN') in listing, listing
         if mode == 'late_stop' and sys.platform.startswith('linux'):
             match = re.search(r'LOAD=(\d+(?:\.\d+)?)%', listing)
             assert match and float(match.group(1)) > 0, listing
