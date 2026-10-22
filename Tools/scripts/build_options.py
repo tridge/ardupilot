@@ -448,6 +448,8 @@ BUILD_OPTIONS = [
     Feature('Scripting', 'SCRIPTING', 'AP_SCRIPTING_LUA_ENABLED', 'Enable Lua Scripting', 0, None),
     Feature('Scripting', 'NATIVE_MODULES', 'AP_MODULE_ENABLED',
             'Enable experimental trusted native modules', 0, None),
+    Feature('Scripting', 'MODULE_SHARED_STATE', 'AP_MODULE_SHARED_STATE_ENABLED',
+            'Enable shared memory between native modules', 1, 'NATIVE_MODULES'),
     Feature('Scripting', 'SCRIPTING_SERIALDEVICE', 'AP_SCRIPTING_SERIALDEVICE_ENABLED', 'Enable Lua serial device simulation', 0, "SCRIPTING,SERIALDEVICE_REGISTER"), # noqa
     Feature('Scripting', 'SCRIPTING_BINDING_MOTORS', 'AP_SCRIPTING_BINDING_MOTORS_ENABLED', 'Enable bindings for AP_Motors', 0, "SCRIPTING"), # noqa
     Feature('Scripting', 'SCRIPTING_BINDING_VEHICLE', 'AP_SCRIPTING_BINDING_VEHICLE_ENABLED', 'Enable bindings for AP_Vehicle', 0, "SCRIPTING"), # noqa

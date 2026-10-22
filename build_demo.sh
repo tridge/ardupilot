@@ -26,7 +26,7 @@ start_build()
 
 start_build "aerobatics rust" python3 Tools/modules/build.py "$APPLET/main.rs" aerobatics_rust_H7.apmod \
     --target "$TARGET" --cpu cortex-m7 --debug --opt-level 1 \
-    --stack-size 6000 --heap-size 26000 "$@"
+    --stack-size 16384 --heap-size 26000 "$@"
 
 start_build "aerobatics ada" python3 "$APPLET/ada/build_airshow.py" aerobatics_ada_H7.apmod \
     --target "$TARGET" --cpu cortex-m7 --debug \

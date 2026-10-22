@@ -5,8 +5,12 @@
 import importlib.util
 import os
 import shutil
+import time
 
 import pytest
+
+from pymavlink import DFReader
+from pymavlink import mavutil
 
 from test_aerobatics_flight import AerobaticVehicle
 from test_aerobatics_path import APPLET
@@ -61,11 +65,14 @@ def test_language_selection(tmp_path, language_images, loaded):
         vehicle.start()
         assert vehicle.parameter('AEROM_LANG') == 0
         vehicle.parameter('TRIK_ENABLE', 1)
+        restart_mark = len(vehicle.texts)
         vehicle.restart(1, expected=len(files))
         vehicle.parameter('TRIK1_ID', 72)
         vehicle.mode('CRUISE')
         workers = {name: vehicle.worker(name) for name in files}
         assert all(worker is not None for worker in workers.values())
+        if 0 in loaded:
+            vehicle.text('Aerobatics RUST selected', after=restart_mark)
         previous_language = 0
         names = {0: 'RUST', 1: 'ADA', 2: 'F90'}
         for language in (3, 0, 0, 1, 1, 2, 2, -1, 2, 1, 0):
@@ -88,9 +95,156 @@ def test_language_selection(tmp_path, language_images, loaded):
             assert announcements == expected, (language, loaded, announcements, vehicle.diagnostic())
             previous_language = language
             assert all(vehicle.worker(name)[0] == worker[0] for name, worker in workers.items())
+        if len(loaded) == 3:
+            # Exercise selector changes faster than one worker's update period.
+            for i in range(90):
+                vehicle.link.mav.param_set_send(1, 1, b'AEROM_LANG', i % 3,
+                                                mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+                vehicle.pump(0.003)
+            vehicle.parameter('AEROM_LANG', 3)
+            vehicle.pump(0.2)
+            mark = len(vehicle.texts)
+            vehicle.parameter('AEROM_LANG', 2)
+            vehicle.text('Aerobatics F90 selected', after=mark)
         assert not any('panic' in text or 'returned -' in text or 'Aerobatics error' in text
                        for text in vehicle.texts), vehicle.diagnostic()
         vehicle.restart(2, expected=len(files))
-        assert vehicle.parameter('AEROM_LANG') == 0
+        assert vehicle.parameter('AEROM_LANG') == (2 if len(loaded) == 3 else 0)
+    finally:
+        vehicle.stop()
+
+
+def test_airshow_language_handoff(tmp_path, language_images):
+    """Keep the execute switch held while transferring every pair of languages."""
+    files = {path.name: path.read_bytes() for path in language_images.values()}
+    vehicle = AerobaticVehicle(tmp_path / 'vehicle', files, {
+        'SCR_ENABLE': 0, 'MOD_HEAP_MAX': 32768, 'MOD_CODE_MAXSIZE': 262144,
+        'MOD_STACK_MAX': 32768, 'RC7_OPTION': 300, 'RC9_OPTION': 301,
+        'RC_OVERRIDE_TIME': 3, 'FLTMODE_CH': 0,
+        'LOG_BACKEND_TYPE': 1, 'LOG_DISARMED': 1, 'LOG_FILE_DSRMROT': 0, 'LOG_FILE_BUFSIZE': 128,
+    })
+    scripts = vehicle.directory / 'scripts'
+    scripts.mkdir()
+    shutil.copyfile(APPLET / 'AirShow.txt', scripts / 'trick72.txt')
+    peak = 0
+    switches = 0
+    try:
+        vehicle.start()
+        vehicle.parameter('TRIK_ENABLE', 1)
+        vehicle.restart(1, expected=3)
+        vehicle.parameter('TRIK1_ID', 72)
+        vehicle.mode('TAKEOFF')
+        vehicle.arm()
+        vehicle.until(lambda m: m.get_type() == 'GLOBAL_POSITION_INT' and 30000 <= m.relative_alt <= 40000, 30)
+        vehicle.mode('CRUISE')
+        vehicle.rc(9, 1000)
+        vehicle.rc(7, 1500)
+        vehicle.text('Trick 1 selected (SuperAirShow)')
+        mark = len(vehicle.texts)
+        vehicle.rc(7, 2000)
+        vehicle.text('Trick 1 started (SuperAirShow)', after=mark)
+        sequence = (1, 2, 0, 2, 1, 0)
+        names = ('RUST', 'ADA', 'F90')
+        next_switch = time.monotonic() + 0.5
+        deadline = time.monotonic() + 240
+        while 'Finishing SuperAirShow!' not in vehicle.texts[mark:] and time.monotonic() < deadline:
+            message = vehicle.receive()
+            if message is not None and message.get_type() == 'NAMED_VALUE_FLOAT' and message.name == 'PERR':
+                peak = max(peak, message.value)
+                assert peak <= 15, (peak, vehicle.diagnostic())
+            assert not any('aborting' in text or 'panic' in text or 'Aerobatics error' in text
+                           or 'NavScript time out' in text for text in vehicle.texts[mark:]), vehicle.diagnostic()
+            if time.monotonic() >= next_switch:
+                language = sequence[switches % len(sequence)]
+                switch_mark = len(vehicle.texts)
+                vehicle.parameter('AEROM_LANG', language)
+                vehicle.text(f'Aerobatics {names[language]} selected', after=switch_mark)
+                switches += 1
+                next_switch = time.monotonic() + 0.5
+        assert switches >= 12 and peak > 0, (switches, peak, vehicle.diagnostic())
+        assert 'Finishing SuperAirShow!' in vehicle.texts[mark:], vehicle.diagnostic()
+        expected = [line.split(':', 1)[1].strip() for line in (APPLET / 'AirShow.txt').read_text().splitlines()
+                    if line.startswith('message:')]
+        assert [text for text in vehicle.texts[mark:] if text in expected] == expected, vehicle.diagnostic()
+        assert sum('Trick 1 started' in text for text in vehicle.texts[mark:]) == 1, vehicle.diagnostic()
+        print(f'AirShow: {switches} live language switches, peak PERR {peak:.3f}m')
+        vehicle.arm(False, force=True)
+    finally:
+        vehicle.stop()
+    progress = []
+    for file in sorted((vehicle.directory / 'logs').glob('*.BIN')):
+        reader = DFReader.DFReader_binary(str(file))
+        while (record := reader.recv_msg()) is not None:
+            if record.get_type() == 'AETM':
+                progress.append((record.T, record.Adt))
+    assert len(progress) > 1000
+    assert all(a[0] <= b[0] for a, b in zip(progress, progress[1:])), 'Schedule restarted during handoff'
+    assert max(dt for _, dt in progress) < 0.2, 'Handoff interrupted the control loop'
+
+
+def test_mission_language_handoff(tmp_path, language_images):
+    """A handoff must retain the mission owner without completing its item."""
+    files = {path.name: path.read_bytes() for path in language_images.values()}
+    vehicle = AerobaticVehicle(tmp_path / 'vehicle', files, {
+        'SCR_ENABLE': 1, 'MOD_HEAP_MAX': 32768, 'MOD_CODE_MAXSIZE': 262144,
+        'MOD_STACK_MAX': 32768, 'FLTMODE_CH': 0,
+    })
+    scripts = vehicle.directory / 'scripts'
+    scripts.mkdir()
+    (scripts / 'driver.lua').write_text('''local stage=0
+local function update()
+ if not param:get("AEROM_LANG") or not ahrs:get_relative_position_NED_origin() then return update,100 end
+ if stage==0 then
+  assert(param:set("AEROM_ALT_ABORT",1000))
+  assert(param:set("AEROM_MIS_ANGLE",90))
+  assert(mission:clear())
+  local m=mavlink_mission_item_int_t()
+  m:command(16); m:x(-353632610); m:y(1491652300); m:z(40); m:frame(3)
+  assert(mission:set_item(0,m))
+  m:command(42702); m:param1(7); m:param3(10000); m:param4(1); m:x(0); m:y(0)
+  assert(mission:set_item(1,m))
+  m:command(16); m:x(-353632610); m:y(1491652300)
+  assert(mission:set_item(2,m))
+ elseif stage==1 then
+  assert(vehicle:set_mode(10))
+ elseif stage==2 then
+  assert(mission:set_current_cmd(1))
+ end
+ stage=stage+1
+ return update,100
+end
+return update,100
+''')
+    try:
+        vehicle.start()
+        vehicle.text('Starting Axial Roll!', timeout=20)
+        mark = len(vehicle.texts)
+        for language in (1, 2, 0, 2, 1, 0):
+            switch_mark = len(vehicle.texts)
+            vehicle.parameter('AEROM_LANG', language)
+            vehicle.text(f'Aerobatics {("RUST", "ADA", "F90")[language]} selected', after=switch_mark)
+            vehicle.pump(0.3)
+            vehicle.until(lambda m: m.get_type() == 'MISSION_CURRENT' and m.seq == 1)
+        assert not any('Starting' in text or 'Finishing' in text or 'Aerobatics error' in text
+                       or 'aborting' in text or 'NavScript time out' in text
+                       for text in vehicle.texts[mark:]), vehicle.diagnostic()
+        vehicle.link.mav.mission_set_current_send(1, 1, 2)
+        vehicle.until(lambda m: m.get_type() == 'MISSION_CURRENT' and m.seq == 2)
+        vehicle.parameter('AEROM_LANG', 1)
+        vehicle.pump(1)
+        assert not any('Starting' in text for text in vehicle.texts[mark:]), vehicle.diagnostic()
+        # A complete restart clears the shared block and permits the same item again.
+        vehicle.restart(1, expected=3)
+        mark = len(vehicle.texts)
+        vehicle.link.mav.mission_set_current_send(1, 1, 1)
+        vehicle.text('Starting Axial Roll!', after=mark)
+        # Let the command deadline expire while no language is selected.
+        vehicle.parameter('AEROM_LANG', 3)
+        vehicle.text('NavScript time out', after=mark)
+        mark = len(vehicle.texts)
+        vehicle.parameter('AEROM_LANG', 2)
+        vehicle.pump(1)
+        assert not any('Starting' in text or 'Finishing' in text or 'Aerobatics error' in text
+                       for text in vehicle.texts[mark:]), vehicle.diagnostic()
     finally:
         vehicle.stop()
