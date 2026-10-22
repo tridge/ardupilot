@@ -155,8 +155,8 @@ def method(call, helper=None):
     values = [f'({naming.rust_identifier(f.type.buffer)}.len() as {kind(f.type.scalar)})'
               if isinstance(f.type, model.Length) else arguments_values[f.name] for f in call.inputs]
     if helper:
-        values = [(value + '.0' if f.type.external else f'({value} as {kind(f.type.scalar)})')
-                  if isinstance(f.type, model.Enum) else f'({value} as u8)' if f.type == model.BOOL else value
+        values = [(value + '.0' if f.type.external else f'{value} as {kind(f.type.scalar)}')
+                  if isinstance(f.type, model.Enum) else f'{value} as u8' if f.type == model.BOOL else value
                   for f, value in zip(call.inputs, values)]
         passed = ', '.join([context, slot] + values)
         body = '        let value = ' + helper + '(' + passed + ')?;\n'

@@ -9,7 +9,9 @@ use ap_rust_sdk::{Context, Error, Quaternion, Result, Vector3f};
 pub enum Roll {
     Angle(f32),
     EntryExit(f32),
+    #[allow(dead_code, reason = "Lua primitive oracle coverage")]
     Entry(f32),
+    #[allow(dead_code, reason = "Lua primitive oracle coverage")]
     Exit(f32),
     Sequence(SequenceRoll),
 }
@@ -112,6 +114,7 @@ impl Roll {
 #[derive(Clone, Copy, Debug)]
 pub enum Geometry {
     Straight(f32),
+    #[allow(dead_code, reason = "Lua primitive oracle coverage")]
     Reverse(f32),
     Vertical {
         radius: f32,
@@ -262,6 +265,7 @@ impl Geometry {
         })
     }
 
+    #[allow(dead_code, reason = "Lua primitive oracle coverage")]
     pub fn extents(&self, c: &Context<'_>) -> Result<(f32, f32)> {
         let x = self.position(c, 0.0)?.x;
         let (mut low, mut high) = (x, x);

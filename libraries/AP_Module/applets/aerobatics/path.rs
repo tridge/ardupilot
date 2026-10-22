@@ -225,6 +225,7 @@ impl Path {
     pub fn length(&self) -> f32 {
         self.length
     }
+    #[allow(dead_code, reason = "Path-composition oracle API")]
     pub fn final_orientation(&self) -> Quaternion {
         self.final_orientation
     }
@@ -398,6 +399,7 @@ impl Path {
         }
     }
 
+    #[allow(dead_code, reason = "Path-composition oracle API")]
     pub fn next_segment_start(&mut self, c: &Context<'_>, t: f32, eval: Evaluation) -> Result<f32> {
         match &mut self.kind {
             Kind::Composite {
