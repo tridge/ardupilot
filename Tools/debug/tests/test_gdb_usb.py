@@ -186,6 +186,8 @@ class USBLauncherTests(unittest.TestCase):
         helper = Path(gdb_usb.__file__).resolve().parents[1] / 'modules/apmod_gdb.py'
         self.assertIn(f'source {helper}', command)
         self.assertEqual(command[-2:], ['-ex', 'bt'])
+        args.apmod = [Path('/tmp/caf\u00e9.apmod')]
+        self.assertIn('apmod symbols "/tmp/caf\u00e9.apmod"', gdb_usb.gdb_command(args))
 
     def test_rust_helper_source_in_gdb(self):
         debugger = shutil.which(os.environ.get('AP_MODULE_ARM_GDB', 'gdb'))
@@ -220,6 +222,7 @@ class USBLauncherTests(unittest.TestCase):
                 (root / name).touch()
             modules = gdb_usb.expand_apmod_paths([root / '*.apmod', root / 'a.apmod'])
             self.assertEqual(modules, [(root / name).resolve() for name in ('a.apmod', 'b.apmod')])
+            self.assertEqual(gdb_usb.expand_apmod_paths([root / '*']), modules)
             literal = root / 'literal[1].apmod'
             literal.touch()
             self.assertEqual(gdb_usb.expand_apmod_paths([literal]), [literal.resolve()])

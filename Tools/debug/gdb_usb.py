@@ -286,7 +286,7 @@ def gdb_post_commands(args):
         # Unlike add-symbol-file, source takes the entire filename literally,
         # including spaces: quotes would become part of the requested name.
         commands += [f'source {helper}',
-                     'apmod symbols ' + ' '.join(json.dumps(str(path.resolve())) for path in modules)]
+                     'apmod symbols ' + ' '.join(json.dumps(str(path.resolve()), ensure_ascii=False) for path in modules)]
     return commands + args.ex
 
 
@@ -363,7 +363,8 @@ def expand_apmod_paths(patterns):
         if path.is_file() or not glob.has_magic(pattern):
             matches = [path]
         else:
-            matches = [Path(name) for name in sorted(glob.glob(pattern))]
+            matches = [Path(name) for name in sorted(glob.glob(pattern))
+                       if Path(name).suffix == '.apmod' and Path(name).is_file()]
             if not matches:
                 raise DebugError(f'--apmod pattern matched no files: {pattern}')
         for match in matches:
@@ -420,7 +421,8 @@ def main(argv=None):
                 raise DebugError('--apmod applies to GDB sessions; source Tools/modules/apmod_gdb.py in the IDE')
             args.apmod = expand_apmod_paths(args.apmod)
             for path in args.apmod:
-                if any(c in str(path) for c in '\r\n\x00') or not path.is_file() or not path.with_suffix('.elf').is_file():
+                if (any(c in str(path) for c in '\r\n\x00') or path.suffix != '.apmod' or
+                        not path.is_file() or not path.with_suffix('.elf').is_file()):
                     raise DebugError(f'--apmod needs a module and its matching companion .elf: {path}')
         if args.apmod or (args.seer and args.ex):
             result = subprocess.run([args.gdb, '-nx', '--batch', '-ex', 'python print("APMOD_PYTHON_OK")'],
