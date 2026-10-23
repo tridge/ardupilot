@@ -81,6 +81,15 @@ static Result<void> run(Context &c) {
     auto *a = new Aligned{1234};
     auto *b = new uint32_t[10];
     if (reinterpret_cast<uintptr_t>(a) % 64 != 0 || a->value != 1234) { return {Error::Host}; }
+    for (unsigned i = 0; i < 10; i++) {
+        if (b[i] != 0) { return {Error::Host}; }
+        b[i] = 0xabababab;
+    }
+    delete[] b;
+    b = new uint32_t[10];
+    for (unsigned i = 0; i < 10; i++) {
+        if (b[i] != 0) { return {Error::Host}; }
+    }
     b[9] = 5678;
     delete a; delete[] b;
     auto *large = new (std::nothrow) uint8_t[65536];
