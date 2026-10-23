@@ -405,8 +405,11 @@
 // The native runtime and its HAL services must agree even when HAL headers
 // are included before AP_Module_config.h. Explicit build overrides win.
 #ifndef AP_MODULE_ENABLED
+// Peripheral firmware does not link or initialize the native runtime.
+#if defined(HAL_BUILD_AP_PERIPH)
+#define AP_MODULE_ENABLED 0
 // WebAssembly cannot execute native module machine code.
-#if defined(__EMSCRIPTEN__) || (defined(AP_SCRIPTING_ENABLED) && !AP_SCRIPTING_ENABLED)
+#elif defined(__EMSCRIPTEN__) || (defined(AP_SCRIPTING_ENABLED) && !AP_SCRIPTING_ENABLED)
 #define AP_MODULE_ENABLED 0
 #else
 #define AP_MODULE_ENABLED (HAL_PROGRAM_SIZE_LIMIT_KB > 2048)
