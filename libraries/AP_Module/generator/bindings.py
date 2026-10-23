@@ -874,8 +874,9 @@ def emit(contract):
     cpp += [f'    case {contract["printf"]["id"]}:',
             '        return binding_string_format_printf(input, input_size, output, output_size);']
     for method in contract['methods']:
+        context = 'context, ' if method['owner'] == 'AP_ONVIF' else ''
         cpp += [f'    case {method["id"]}:',
-                f'        return binding_{method["id"]}(input, input_size, output, output_size);']
+                f'        return binding_{method["id"]}({context}input, input_size, output, output_size);']
     cpp += parameter_binding.cpp_cases(contract['parameter'])
     for method in contract['libm']:
         cpp += [f'    case {method["id"]}:',

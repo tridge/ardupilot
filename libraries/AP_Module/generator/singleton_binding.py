@@ -109,8 +109,11 @@ def cpp(method):
     # the shared HostApi ABI.
     lines = render_lines(
         'host_cpp/function.cpp', comment=f'// {method["owner"]}::{method["method"]}', binding_id=method['id'],
+        context='void *context, ' if method['owner'] == 'AP_ONVIF' else '',
         input='input' if ni else '', output='output' if no else '',
     )
+    if method['owner'] == 'AP_ONVIF':
+        lines.append('    (void)context;')
     if ni:
         lines.append('    (void)input;')
     if no:
@@ -126,6 +129,10 @@ def cpp(method):
             guards.append(policy['depends'])
     if guards:
         lines.append('#if ' + ' && '.join(f'({g})' for g in guards))
+    if method['owner'] == 'AP_ONVIF':
+        lines += ['    BindingLock onvif_lock(binding_onvif_semaphore());',
+                  '    const int32_t onvif_status = binding_onvif_check_owner(context);',
+                  '    if (onvif_status != AP_MODULE_STATUS_OK) {', '        return onvif_status;', '    }']
     if method.get('receiver'):
         lines += borrowed_binding.cpp_token(method['receiver'])
     access = '.' if method.get('reference') or method.get('value_receiver') else '->'

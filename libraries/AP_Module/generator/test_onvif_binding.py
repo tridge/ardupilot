@@ -35,6 +35,25 @@ def test_contract_records_persistent_restart_semantics():
     assert 'blocking-firmware-network-call' in method['policy']
 
 
+def test_generated_movement_passes_owner_context(tmp_path):
+    _write_common_headers(tmp_path, True)
+    contract = bindings.specification()
+    generated = bindings.emit(contract)['Bindings_generated.cpp']
+    marker = '    case BindingId::ONVIF_SET_ABSOLUTEMOVE:\n'
+    dispatch = generated.split(marker, 1)[1].splitlines()[0]
+    start = generated.index('// AP_ONVIF::set_absolutemove\n')
+    end = generated.index('\n}\n', start) + 3
+    source = tmp_path / 'movement.cpp'
+    source.write_text('#include <AP_ONVIF/AP_ONVIF.h>\n#include <AP_Module/HostApi.h>\n'
+                      '#include "BindingONVIF.h"\n#include "BindingSupport.h"\nnamespace AP_Module {\n' +
+                      generated[start:end] + '\n'
+                      'int invoke(void *context, const uint8_t *input, uint32_t input_size,\n'
+                      '           uint8_t *output, uint32_t output_size) {\n' + dispatch + '\n}\n}\n')
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-Werror',
+                    '-I' + str(tmp_path), '-I' + str(bindings.ROOT), '-c', str(source),
+                    '-o', str(tmp_path / 'movement.o')], check=True)
+
+
 def test_clients_share_the_string_model():
     spec = bindings.specification()
     call = onvif.client_model(spec['onvif']).calls[0]
@@ -247,6 +266,7 @@ class AP_ONVIF {
 public:
     static AP_ONVIF *get_singleton();
     bool start(const char *username, const char *password, const char *hostname);
+    bool set_absolutemove(float pan, float tilt, float zoom);
 };
 #endif
 ''',

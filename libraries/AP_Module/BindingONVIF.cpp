@@ -14,6 +14,22 @@ static constexpr uint16_t START_WIRE_SIZE = 3 * STRING_WIRE_SIZE;
 #if ENABLE_ONVIF == 1
 static HAL_Semaphore onvif_sem;
 static void *onvif_owner;
+
+AP_HAL::Semaphore &binding_onvif_semaphore()
+{
+    return onvif_sem;
+}
+
+int32_t binding_onvif_check_owner(void *context)
+{
+    if (context == nullptr) {
+        return AP_MODULE_STATUS_INVALID;
+    }
+    if (onvif_owner == nullptr) {
+        return AP_MODULE_STATUS_UNAVAILABLE;
+    }
+    return onvif_owner == context ? AP_MODULE_STATUS_OK : AP_MODULE_STATUS_BUSY;
+}
 #endif
 
 int32_t binding_onvif_start(void *context, const uint8_t *input, uint32_t input_size,
