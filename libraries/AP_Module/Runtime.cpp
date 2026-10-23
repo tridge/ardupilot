@@ -641,6 +641,18 @@ void Runtime::poll_modules()
     }
 }
 
+static const char *module_state_name(Module::State state)
+{
+    switch (state) {
+    case Module::State::Prepared: return "PREPARED";
+    case Module::State::Running: return "RUN";
+    case Module::State::Returned: return "RETURNED";
+    case Module::State::Joined: return "JOINED";
+    case Module::State::Panicked: return "PANICKED";
+    }
+    return "?";
+}
+
 void Runtime::module_info(ExpandingString &str)
 {
     str.printf("ModulesV1\n");
@@ -654,18 +666,11 @@ void Runtime::module_info(ExpandingString &str)
         if (module == nullptr) {
             continue;
         }
-        const char *state = "?";
-        switch (module->state()) {
-        case Module::State::Prepared: state = "PREPARED"; break;
-        case Module::State::Running: state = "RUN"; break;
-        case Module::State::Returned: state = "RETURNED"; break;
-        case Module::State::Joined: state = "JOINED"; break;
-        case Module::State::Panicked: state = "PANICKED"; break;
-        }
         const auto stats = module->stats(true);
         str.printf("%s STATE=%s SRC=%s PRI=%u RX=%u RW=%u STK=%u "
                    "HEAP=%u/%u ALLOC=%u PEAK=%u ALLOCS=%u",
-                   slot->file.name, state, slot->file.source == ModuleSource::ROMFS ? "ROMFS" : "FILE",
+                   slot->file.name, module_state_name(module->state()),
+                   slot->file.source == ModuleSource::ROMFS ? "ROMFS" : "FILE",
                    unsigned(module->thread_priority()), unsigned(stats.rx_reserved), unsigned(stats.rw_reserved),
                    unsigned(stats.stack_reserved), unsigned(stats.heap.free), unsigned(stats.heap.capacity),
                    unsigned(stats.heap.used), unsigned(stats.heap.peak), unsigned(stats.heap.allocations));

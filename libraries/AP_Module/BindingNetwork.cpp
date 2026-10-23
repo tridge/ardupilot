@@ -123,11 +123,14 @@ static int32_t find_or_create_entry(void *context, RegistryEntry *&entry)
     if (sockets == nullptr) {
         return AP_MODULE_STATUS_NO_MEMORY;
     }
-    entry = NEW_NOTHROW RegistryEntry{context, sockets, registry};
+    entry = NEW_NOTHROW RegistryEntry;
     if (entry == nullptr) {
         delete sockets;
         return AP_MODULE_STATUS_NO_MEMORY;
     }
+    entry->context = context;
+    entry->sockets = sockets;
+    entry->next = registry;
     registry = entry;
     return AP_MODULE_STATUS_OK;
 }
