@@ -18,6 +18,15 @@ SDK = ROOT / 'libraries/AP_Module/sdk/cpp'
 GENERATED = ROOT / 'build/modules/libraries/AP_Module'
 
 
+def compiler_helpers(profile):
+    flags = [f'-mcpu={profile.cpu}', '-mthumb', f'-mfpu={profile.fpu}', '-mfloat-abi=hard']
+    compiler = os.environ.get('ARM_GCC', 'arm-none-eabi-gcc')
+    library = Path(subprocess.check_output([compiler, *flags, '-print-libgcc-file-name'], text=True).strip())
+    if not library.is_file() or library.suffix != '.a':
+        raise ValueError(f'ARM modules need {profile.cpu} hard-float libgcc.a (set ARM_GCC)')
+    return library
+
+
 def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False, opt_level='s', heap_size=4096,
           extra_objects=(), cpu=None, thread_priority=None, extra_sources=()):
     profile = targets.select(target, cpu)
@@ -62,6 +71,7 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
                f'--defsym=MODULE_BASE={base}', '-o', str(elf)]
     if arm:
         command += ['--defsym=MODULE_DATA_ALIGNMENT=4']
-    subprocess.run(command + objects + [str(path) for path in extra_objects], check=True)
+    helpers = [str(compiler_helpers(profile))] if arm else []
+    subprocess.run(command + objects + [str(path) for path in extra_objects] + helpers, check=True)
     output.write_bytes(pack.pack_elf(elf.read_bytes(), contract))
     return output

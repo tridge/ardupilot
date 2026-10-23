@@ -35,6 +35,8 @@ compiler is missing or too old. Renode tests skip when their emulator or
 firmware fixture is unavailable.
 
 C++ builds need Clang 21+ and standalone LLD 21+, selected with `CXX` and `LLD`.
+ARM builds also need the matching hard-float `libgcc.a` from `arm-none-eabi-gcc`
+(`ARM_GCC` can select another compiler) for integer and floating-point helpers.
 They do not invoke Rust or require a Rust installation. The C++ SDK is
 freestanding C++17: local RAII and virtual dispatch work; exceptions, RTTI, TLS
 and global constructors/destructors are rejected. Only `-Os` is currently

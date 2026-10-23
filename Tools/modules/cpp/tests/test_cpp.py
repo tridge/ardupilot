@@ -111,6 +111,22 @@ AP_MODULE(run)
         vehicle.stop()
 
 
+@pytest.mark.parametrize('cpu', ['cortex-m4', 'cortex-m7'])
+def test_arm_integer_float_conversion(tmp_path, cpu):
+    source = tmp_path / 'conversion.cpp'
+    source.write_text('''#include <ap_module.hpp>
+volatile float timestamp;
+static ap_module::Result<void> run(ap_module::Context &c) {
+    timestamp = float(c.time_us());
+    return {ap_module::Error::Ok};
+}
+AP_MODULE(run)
+''')
+    image = build.build(source, tmp_path / 'conversion.apmod', 'thumbv7em-none-eabihf', 8192, cpu=cpu)
+    module = pack.unpack(image.read_bytes())
+    assert module['memory_size'] - module['rx_size'] >= 4
+
+
 @pytest.mark.parametrize('target', build.TARGETS)
 def test_all_cpp_bindings_pack(tmp_path, target):
     # The host sanitizer test checks wire sizes/bytes. Also retain every client
