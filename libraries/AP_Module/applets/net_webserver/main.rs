@@ -21,6 +21,14 @@ const MAIN_PAGE: &str = r#"<!doctype html>
 <h2>ArduPilot Web Server</h2><body>
 <div id="main"><ul><li><a href="mnt/">SDCard Access</a></li></ul></div>
 <h2>Controller Status</h2><div id="board_status"></div>
+<script>
+function update_status() {
+  fetch('/@DYNAMIC/board_status.shtml').then(r => r.text())
+    .then(text => { document.getElementById('board_status').innerHTML = text; })
+    .catch(() => {}).finally(() => setTimeout(update_status, 1000));
+}
+update_status();
+</script>
 </body></html>
 "#;
 
@@ -266,10 +274,14 @@ impl Client {
             } else {
                 let mut header = String::new();
                 write!(header,
-                       "HTTP/1.1 200 OK\r\nServer: {SERVER_VERSION}\r\nContent-Type: {}\r\nContent-Length: {}\r\n",
-                       content_type(&path), stat.size).map_err(|_| Error::NoMemory)?;
+                       "HTTP/1.1 200 OK\r\nServer: {SERVER_VERSION}\r\nContent-Type: {}\r\n",
+                       content_type(&path)).map_err(|_| Error::NoMemory)?;
+                let known_size = !path.starts_with('@');
+                if known_size {
+                    write!(header, "Content-Length: {}\r\n", stat.size).map_err(|_| Error::NoMemory)?;
+                }
                 self.response = header_as_bytes(header);
-                self.body = if sendfile_min > 0 && stat.size >= sendfile_min {
+                self.body = if known_size && sendfile_min > 0 && stat.size >= sendfile_min {
                     Body::Sendfile { path }
                 } else {
                     Body::File { path, offset: 0, pending: Vec::new(), sent: 0 }
