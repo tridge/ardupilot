@@ -40,7 +40,7 @@ static int32_t resolve(uint32_t token, ResolvedSerial &resolved)
         }
 #if AP_SERIALMANAGER_ENABLED
         resolved.stream = AP::serialmanager().find_serial(
-            AP_SerialManager::SerialProtocol_Scripting, uint8_t(token - 1U));
+            AP_SerialManager::SerialProtocol_Scripting, uint8_t(token - 1U), false);
         return resolved.stream == nullptr ? AP_MODULE_STATUS_UNAVAILABLE : AP_MODULE_STATUS_OK;
 #else
         return AP_MODULE_STATUS_UNAVAILABLE;

@@ -52,7 +52,7 @@ public:
 class AP_SerialManager {
 public:
     enum SerialProtocol { SerialProtocol_Scripting=28 };
-    AP_HAL::UARTDriver *find_serial(SerialProtocol, uint8_t instance);
+    AP_HAL::UARTDriver *find_serial(SerialProtocol, uint8_t instance, bool apply_options = true);
 };
 namespace AP { AP_SerialManager &serialmanager(); }
 ''',
@@ -101,7 +101,7 @@ ssize_t AP_HAL::UARTDriver::read(uint8_t *out, uint16_t count) {
 ssize_t AP_Scripting_SerialDevice::Port::device_read(uint8_t *out, uint16_t count) {
     const uint16_t n=count < 3 ? count : 3; memcpy(out, "dev", n); return n;
 }
-AP_HAL::UARTDriver *AP_SerialManager::find_serial(SerialProtocol, uint8_t instance) {
+AP_HAL::UARTDriver *AP_SerialManager::find_serial(SerialProtocol, uint8_t instance, bool) {
     return physical_present && instance == 2 ? &physical : nullptr;
 }
 AP_SerialManager &AP::serialmanager() { return manager; }
