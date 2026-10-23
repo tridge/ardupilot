@@ -6,7 +6,7 @@
 
 AP_HAL::ExecutableMemory::Target HALSITL::Util::executable_memory_target() const
 {
-#if defined(__x86_64__) && !defined(__ILP32__)
+#if defined(__x86_64__) && !defined(__ILP32__) && !defined(__CYGWIN__)
     return AP_HAL::ExecutableMemory::Target::X86_64Baseline;
 #else
     return AP_HAL::ExecutableMemory::Target::Unsupported;
