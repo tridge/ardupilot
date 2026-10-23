@@ -1989,15 +1989,18 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
             hal.util->persistent_data.last_mavlink_msgid = 0;
 
         }
-#if AP_SCRIPTING_LUA_ENABLED
         if (framing == MAVLINK_FRAMING_BAD_CRC) {
             // This may be a valid message that we don't know the crc extra for, pass it to scripting which might
+#if AP_SCRIPTING_LUA_ENABLED
             AP_Scripting *scripting = AP_Scripting::get_singleton();
             if (scripting != nullptr) {
                 scripting->handle_message(msg, chan);
             }
-        }
 #endif // AP_SCRIPTING_LUA_ENABLED
+#if AP_MODULE_ENABLED
+            AP_Module::binding_mavlink_handle_message(msg, chan);
+#endif
+        }
 
         if (parsed_packet || i % 100 == 0) {
             // make sure we don't spend too much time parsing mavlink messages
