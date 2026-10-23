@@ -1923,14 +1923,10 @@ AP_CRSF_Telem::ScriptedParameter* AP_CRSF_Telem::ScriptedMenu::add_parameter(uin
 {
     WITH_SEMAPHORE(AP::crsf_telem()->get_semaphore());
 
-    ScriptedParameter* new_params = (ScriptedParameter*)mem_realloc(params,
-        sizeof(ScriptedParameter) * num_params,
-        sizeof(ScriptedParameter) * (num_params+1));
-    if (new_params == nullptr) {
+    if (num_params >= MAX_SCRIPTED_MENU_SIZE) {
         return nullptr;
     }
     num_params++;
-    params = new_params;
     ScriptedParameter& param = params[num_params-1];
     param.id = id + num_params;
     param.parent_id = id;
@@ -2003,13 +1999,28 @@ AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* m
     for (; tail->next_menu != nullptr; tail = tail->next_menu) {
     }
 
+    uint16_t candidate = SCRIPTED_MENU_START_ID;
+    for (; candidate + MAX_SCRIPTED_MENU_SIZE <= UINT8_MAX; candidate += MAX_SCRIPTED_MENU_SIZE + 1U) {
+        bool used = false;
+        for (const ScriptedMenu* existing = AP::crsf_telem()->scripted_menus.next_menu;
+             existing != nullptr; existing = existing->next_menu) {
+            used |= existing->id == candidate;
+        }
+        if (!used) {
+            break;
+        }
+    }
+    if (candidate + MAX_SCRIPTED_MENU_SIZE > UINT8_MAX) {
+        return nullptr;
+    }
+
     ScriptedMenu* menu = NEW_NOTHROW ScriptedMenu(menu_name, size, parent_menu, menu_owner);
     if (menu == nullptr || menu->name == nullptr || menu->params == nullptr) {
         delete menu;
         return nullptr;
     }
 
-    menu->id = tail->id == 0 ? SCRIPTED_MENU_START_ID : tail->id + MAX_SCRIPTED_MENU_SIZE + 1;
+    menu->id = uint8_t(candidate);
     tail->next_menu = menu;
 
     // dummy parameter for a submenu
@@ -2039,7 +2050,10 @@ AP_CRSF_Telem::ScriptedMenu::ScriptedMenu(const char* menu_name, uint8_t size, u
     if (name != nullptr) {
         strncpy((char*)name, menu_name, MAX_SCRIPTED_MENU_NAME_LEN);
     }
-    params = (ScriptedParameter*)calloc(size, sizeof(ScriptedParameter));
+    // Queued events retain parameter pointers until the menu is removed.
+    // Keep those addresses stable while more parameters are added.
+    (void)size;
+    params = (ScriptedParameter*)calloc(MAX_SCRIPTED_MENU_SIZE, sizeof(ScriptedParameter));
 }
 
 bool AP_CRSF_Telem::process_scripted_param_write(ParameterSettingsWriteFrame* write_frame, uint8_t length)
