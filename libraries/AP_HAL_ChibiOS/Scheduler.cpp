@@ -872,10 +872,22 @@ private:
     {
         chSysLock();
         const bool finished = chThdTerminatedX(_thread);
-        chSysUnlock();
         if (!finished) {
+            chSysUnlock();
             return false;
         }
+#if CH_CFG_USE_REGISTRY == TRUE
+        if (_thread->refs != 1) {
+            chSysUnlock();
+            return false;
+        }
+        // Detach while we are the only reference, so a new registry reader
+        // cannot retain the TCB or its Module-owned name during the join.
+        REG_REMOVE(_thread);
+        // chThdWait's release can safely dequeue this isolated node again.
+        ch_queue_init(&_thread->rqueue);
+#endif
+        chSysUnlock();
         // chThdWait releases our dynamic thread reference and working area.
         // Never chThdRelease again after this call.
         chThdWait(_thread);
