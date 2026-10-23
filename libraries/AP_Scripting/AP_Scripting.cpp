@@ -263,6 +263,11 @@ void AP_Scripting::init(void) {
 
 #if AP_SCRIPTING_SERIALDEVICE_ENABLED
 void AP_Scripting::init_serialdevice_ports(void) {
+#if !AP_MODULE_ENABLED
+    if (_enable == 0) {
+        return;
+    }
+#endif
     _serialdevice.init();
 }
 #endif
