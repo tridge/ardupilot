@@ -108,6 +108,75 @@ class USBLauncherTests(unittest.TestCase):
             args.elf.resolve.return_value = 'firmware'
             self.assertIn('target remote COM12', gdb_usb.gdb_command(args))
 
+    def test_seer_arguments_and_deferred_setup(self):
+        with tempfile.TemporaryDirectory(prefix='seer setup $ with spaces ') as directory:
+            args = argparse.Namespace(port='/dev/ttyACM0', elf=Path('/tmp/firmware elf'), gdb='arm-gdb',
+                                      gdb_server=None, ex=['print "$literal"'],
+                                      apmod=[Path('/tmp/module symbols.apmod')])
+            with patch.object(gdb_usb.shutil, 'which', return_value='/usr/bin/arm-gdb'):
+                command = gdb_usb.seer_command(args, Path(directory))
+            self.assertEqual(command[0], 'seergdb')
+            self.assertIn('/usr/bin/arm-gdb', command)
+            self.assertEqual(command[command.index('--connect')+1], args.port)
+            self.assertIn('--interpreter=mi', command[command.index('--gdb-arguments')+1])
+            self.assertNotIn(directory, command[command.index('--gdb-arguments')+1])
+            startup = (Path(directory) / 'startup.gdb').read_text()
+            self.assertIn('set serial baud 115200', startup)
+            self.assertIn('gdb.events.new_objfile.connect', startup)
+            self.assertIn('gdb.events.stop.connect', startup)
+            self.assertIn('apmod symbols', startup)
+            self.assertIn('$literal', startup)
+            args.gdb_server = 'localhost:3333'
+            with patch.object(gdb_usb.shutil, 'which', return_value='/usr/bin/arm-gdb'):
+                command = gdb_usb.seer_command(args, Path(directory))
+            self.assertEqual(command[command.index('--connect')+1], args.gdb_server)
+
+    def test_seer_launch_lifetime(self):
+        startup = []
+
+        def launch(command, cwd=None):
+            startup.append(Path(cwd) / 'startup.gdb')
+            self.assertTrue(startup[-1].is_file())
+            self.assertEqual(command[0], 'seergdb')
+            child = unittest.mock.Mock()
+            child.wait.return_value = 0
+            return child
+
+        with patch.object(gdb_usb, 'validate_elf'), \
+                patch.object(gdb_usb.shutil, 'which', return_value='/tmp/gdb'), \
+                patch.object(gdb_usb.subprocess, 'Popen', side_effect=launch), \
+                patch.object(gdb_usb, 'connect') as connect:
+            self.assertEqual(gdb_usb.main(['firmware', '--port', '/dev/fake', '--seer', '--no-break']), 0)
+            connect.assert_called_once_with('/dev/fake', 30, trigger=False)
+        self.assertFalse(startup[0].exists())
+
+    def test_seer_startup_in_gdb(self):
+        debugger = shutil.which(os.environ.get('AP_MODULE_ARM_GDB', 'gdb'))
+        if debugger is None:
+            self.skipTest('Requires Python-enabled GDB')
+        probe = subprocess.run([debugger, '-nx', '--batch', '-ex', 'python print("PYTHON_OK")'],
+                               capture_output=True, text=True, timeout=15)
+        if probe.returncode != 0:
+            self.skipTest('Requires Python-enabled GDB')
+        with tempfile.TemporaryDirectory(prefix='seer startup with spaces ') as directory:
+            args = argparse.Namespace(port='/dev/fake', elf=Path('/tmp/firmware'), gdb=debugger,
+                                      gdb_server=None, ex=['print "$literal"'], apmod=[])
+            gdb_usb.seer_command(args, Path(directory))
+            result = subprocess.run([debugger, '-nx', '--batch', '-x', str(Path(directory) / 'startup.gdb'),
+                                     '-ex', 'python assert callable(_usb_seer_event)'],
+                                    capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_seer_preflight(self):
+        for arguments, diagnostic in [(['--batch'], '--batch cannot'), ([], 'Seer executable not found')]:
+            with self.subTest(arguments=arguments), patch.object(gdb_usb, 'validate_elf'), \
+                    patch.object(gdb_usb.shutil, 'which', side_effect=lambda name: None if name == 'seergdb' else name), \
+                    patch.object(gdb_usb, 'connect') as connect, \
+                    patch('sys.stderr', new_callable=io.StringIO) as stderr:
+                self.assertEqual(gdb_usb.main(['firmware', '--port', '/dev/fake', '--seer'] + arguments), 1)
+                self.assertIn(diagnostic, stderr.getvalue())
+                connect.assert_not_called()
+
     def test_rust_module_commands(self):
         args = argparse.Namespace(port='/dev/ttyACM0', elf=Path('/tmp/firmware'), gdb='python-arm-gdb',
                                   gdb_server=None, batch=False, ex=['bt'], apmod=[Path('/tmp/module symbols.apmod')])

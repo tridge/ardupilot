@@ -46,6 +46,17 @@ deadlines exclude the time spent stopped. Continue, single-step and detach
 restore the timer's previous enable state. The separate CPU cycle counter
 keeps USB polling, watchdog service and debugger timeouts working.
 
+Add `--seer` to launch the Seer GUI (`seergdb`) with the selected ARM GDB:
+
+```sh
+python3 Tools/debug/gdb_usb.py build/CubeOrangePlus/bin/arduplane \
+    --port /dev/serial/by-id/usb-CubePilot_CubeOrange+_<SERIAL>-if02 --seer
+```
+
+The option also works with `--gdb-server`, `--gdb`, `--no-break`, `--apmod` and
+`--ex`. Module symbols and extra commands load after Seer connects and loads
+the firmware ELF. Use Seer's pause/continue controls and detach when finished.
+
 Native modules can be debugged in the same session using a Python-enabled
 ARM GDB and the matching module ELF. Build the module with
 `Tools/modules/build.py --debug`, then pass `--apmod path/to/module.apmod`
