@@ -341,6 +341,16 @@ void *Scheduler::thread_create_trampoline(void *ctx)
 #endif
 
 #if HAL_OWNED_THREADS_ENABLED
+[[noreturn]] void Scheduler::thread_park()
+{
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t condition = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_lock(&mutex);
+    while (true) {
+        pthread_cond_wait(&condition, &mutex);
+    }
+}
+
 AP_HAL::Scheduler::OwnedThread *Scheduler::thread_create_owned(AP_HAL::MemberProc proc, const char *name,
                                                              uint32_t stack_size, priority_base base, int16_t priority)
 {

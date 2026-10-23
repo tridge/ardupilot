@@ -59,6 +59,7 @@ public:
                        uint32_t stack_size, priority_base base, int8_t priority) override;
 
 #if HAL_OWNED_THREADS_ENABLED
+    [[noreturn]] void thread_park() override;
     uint8_t thread_priority_min() const override { return 1; }
     uint8_t thread_priority_max() const override { return 20; }
     OwnedThread *thread_create_owned(AP_HAL::MemberProc proc, const char *name, uint32_t stack_size,
