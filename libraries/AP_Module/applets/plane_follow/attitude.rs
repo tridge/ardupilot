@@ -83,7 +83,7 @@ impl AttitudeReceiver {
             return Ok(None);
         };
         let bytes = message.bytes();
-        if !matches!(bytes[2], 0xfe | 0xfd) || bytes[3] < 28 {
+        if !matches!(bytes[2], 0xfe | 0xfd) || bytes[3] == 0 || (bytes[2] == 0xfe && bytes[3] < 28) {
             return Ok(None);
         }
         let sysid = u32::from_le_bytes(bytes[7..11].try_into().unwrap());
@@ -93,13 +93,16 @@ impl AttitudeReceiver {
             return Ok(None);
         }
 
-        let time_boot_ms = u32::from_le_bytes(bytes[15..19].try_into().unwrap());
-        let roll = f32::from_le_bytes(bytes[19..23].try_into().unwrap());
-        let pitch = f32::from_le_bytes(bytes[23..27].try_into().unwrap());
-        let yaw = f32::from_le_bytes(bytes[27..31].try_into().unwrap());
-        let rollspeed = f32::from_le_bytes(bytes[31..35].try_into().unwrap());
-        let pitchspeed = f32::from_le_bytes(bytes[35..39].try_into().unwrap());
-        let yawspeed = f32::from_le_bytes(bytes[39..43].try_into().unwrap());
+        let mut payload = [0u8; 28];
+        let length = usize::from(bytes[3]).min(payload.len());
+        payload[..length].copy_from_slice(&bytes[15..15 + length]);
+        let time_boot_ms = u32::from_le_bytes(payload[..4].try_into().unwrap());
+        let roll = f32::from_le_bytes(payload[4..8].try_into().unwrap());
+        let pitch = f32::from_le_bytes(payload[8..12].try_into().unwrap());
+        let yaw = f32::from_le_bytes(payload[12..16].try_into().unwrap());
+        let rollspeed = f32::from_le_bytes(payload[16..20].try_into().unwrap());
+        let pitchspeed = f32::from_le_bytes(payload[20..24].try_into().unwrap());
+        let yawspeed = f32::from_le_bytes(payload[24..28].try_into().unwrap());
 
         let timestamp_ms = self.jitter.correct(time_boot_ms, message.timestamp_ms);
         if timestamp_ms < self.last_timestamp_ms {
