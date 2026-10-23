@@ -12,6 +12,10 @@ void *allocate(size_t n, size_t alignment, bool may_fail)
         p = host->allocate(host_context, uint32_t(n == 0 ? 1 : n), uint32_t(alignment));
     }
     if (p == nullptr && !may_fail) { ap_module::fatal("C++ allocation failed"); }
+    if (p != nullptr) {
+        auto *bytes = static_cast<uint8_t *>(p);
+        for (size_t i = 0; i < n; i++) { bytes[i] = 0; }
+    }
     return p;
 }
 void deallocate(void *p) { if (p != nullptr) { host->deallocate(host_context, static_cast<uint8_t *>(p)); } }
