@@ -890,7 +890,7 @@ impl<'ctx, 'host> Applet<'ctx, 'host> {
     }
 
     fn slow_down(&mut self, context: &Context<'_>, error: f32) -> Result<f32> {
-        let new_speed = (self.airspeed_current + error).clamp(self.airspeed_min, self.airspeed_max);
+        let new_speed = (self.airspeed_current + error).max(self.airspeed_min).min(self.airspeed_max);
         if self.groundspeed_airbrake_limit != 0.0
             && !self.airbrake_on
             && error < self.groundspeed_airbrake_limit
