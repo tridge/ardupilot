@@ -362,6 +362,7 @@ impl Controller {
         let mut orientation = orient(c, 0.0, 0.0, yaw)?;
         normalize(c, &mut orientation)?;
         path.restart();
+        path.activate(c, speed)?;
         let mut state = Self {
             count: count.saturating_add(1),
             target_speed: speed,

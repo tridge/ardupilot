@@ -359,7 +359,7 @@ impl Path {
         Ok((segment, sub_t))
     }
 
-    fn activate(&mut self, c: &Context<'_>, speed: f32) -> Result {
+    pub fn activate(&mut self, c: &Context<'_>, speed: f32) -> Result {
         // Lua recreates function-backed paths on every single-slot cache miss.
         // AirShow's only speed-dependent construction is barrel-roll bank;
         // its geometry/length and final roll are speed independent. Refresh
