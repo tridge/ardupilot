@@ -248,6 +248,8 @@ class ExtractFeatures(BuildScriptBase):
             ('AP_RC_CHANNEL_AUX_FUNCTION_STRINGS_ENABLED', r'RC_Channel::lookuptable',),
             ('AP_SCRIPTING_LUA_ENABLED', r'AP_Scripting::init',),
             ('AP_MODULE_ENABLED', r'AP_Module::Runtime::init',),
+            # The shared-state entry points also exist as disabled stubs.
+            ('AP_MODULE_SHARED_STATE_ENABLED', r'AP_Module::blocks\b',),
             ('AP_SCRIPTING_SERIALDEVICE_ENABLED', r'AP_Scripting_SerialDevice::init',),
 
             ('AP_NOTIFY_TONEALARM_ENABLED', r'AP_ToneAlarm::init'),
