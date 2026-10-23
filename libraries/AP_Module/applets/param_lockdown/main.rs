@@ -13,6 +13,8 @@ ap_rust_sdk::module!(run);
 
 const PARAM_TABLE_KEY: u8 = 92;
 const PERMISSION_DENIED: u8 = 3;
+const VALUE_OUT_OF_RANGE: u8 = 2;
+const DOES_NOT_EXIST: u8 = 1;
 
 struct Text<const N: usize> {
     bytes: [u8; N],
@@ -103,17 +105,25 @@ fn handle_messages(context: &Context<'_>, active: bool) -> Result {
         let Some(set) = decode_param_set(message.bytes()) else {
             continue;
         };
-        if allowed(set.name) {
-            let _ = retry(context, || context.param().set_and_save(set.name, set.value))?;
-            text(context, 4, format_args!("param-lockdown: param set applied"))?;
-            continue;
-        }
+        let error = if allowed(set.name) {
+            match retry(context, || context.param().set_and_save(set.name, set.value)) {
+                Ok(true) => {
+                    text(context, 4, format_args!("param-lockdown: param set applied"))?;
+                    continue;
+                }
+                Ok(false) => DOES_NOT_EXIST,
+                Err(Error::Invalid) => VALUE_OUT_OF_RANGE,
+                Err(error) => return Err(error),
+            }
+        } else {
+            PERMISSION_DENIED
+        };
         text(
             context,
             4,
             format_args!("param-lockdown: param set denied ({})", set.name),
         )?;
-        let payload = param_error(set.source_component, set.name, PERMISSION_DENIED);
+        let payload = param_error(set.source_component, set.name, error);
         let _ = context.mavlink().send_chan(
             message.channel,
             PARAM_ERROR_ID,
