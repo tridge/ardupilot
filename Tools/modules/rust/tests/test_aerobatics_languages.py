@@ -11,7 +11,6 @@ import pytest
 
 from pymavlink import DFReader
 from pymavlink import mavutil
-
 from test_aerobatics_flight import AerobaticVehicle
 from test_aerobatics_path import APPLET
 

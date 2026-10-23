@@ -13,9 +13,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-import build as modules  # noqa: E402
 import targets  # noqa: E402
+
 from cpp import build as cpp  # noqa: E402
+
+import build as modules  # noqa: E402
 
 SOURCE = modules.SDK_ROOT / 'applets/lua'
 LUA = modules.SDK_ROOT.parent / 'AP_Scripting/lua/src'

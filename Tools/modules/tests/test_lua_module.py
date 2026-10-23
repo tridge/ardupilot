@@ -9,11 +9,16 @@ import shutil
 import subprocess
 
 from pathlib import Path
+
 import pack
 import pytest
 
-from test_runtime import ROOT, Vehicle
-from test_threads import gen_board, renode, renode_data, run  # noqa: F401
+from test_runtime import ROOT
+from test_runtime import Vehicle
+from test_threads import gen_board  # noqa: F401
+from test_threads import renode  # noqa: F401
+from test_threads import renode_data  # noqa: F401
+from test_threads import run  # noqa: F401
 
 spec = importlib.util.spec_from_file_location('lua_module_build', ROOT / 'Tools/modules/lua/build.py')
 lua_build = importlib.util.module_from_spec(spec)

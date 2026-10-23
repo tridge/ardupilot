@@ -10,6 +10,8 @@ import sys
 import pack
 import pytest
 
+from elftools.dwarf.callframe import FDE
+from elftools.elf.elffile import ELFFile
 from test_manager import test_chibios_runtime_manager as manager_probe
 from test_math_runtime import chibios_probe
 from test_runtime import ROOT
@@ -17,9 +19,6 @@ from test_runtime import Vehicle
 from test_threads import renode  # noqa: F401
 
 import build
-
-from elftools.dwarf.callframe import FDE
-from elftools.elf.elffile import ELFFile
 
 NATIVE = 'x86_64-unknown-linux-gnu'
 ARM = 'thumbv7em-none-eabihf'
