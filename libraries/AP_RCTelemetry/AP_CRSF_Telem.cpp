@@ -1762,6 +1762,28 @@ void AP_CRSF_Telem::process_param_write_frame(ParameterSettingsWriteFrame* write
 
 #if AP_CRSF_SCRIPTING_ENABLED
 
+bool AP_CRSF_Telem::select_scripted_event(ObjectBuffer<ScriptedParameterWrite>& queue,
+                                         const void* owner, ScriptedParameterWrite& request)
+{
+    const uint32_t count = queue.available();
+    for (uint32_t i = 0; i < count && queue.peek(request); i++) {
+        for (const ScriptedMenu* menu = scripted_menus.next_menu; menu != nullptr; menu = menu->next_menu) {
+            if (menu->owner != owner) {
+                continue;
+            }
+            for (uint8_t p = 0; p < menu->num_params; p++) {
+                if (&menu->params[p] == request.param) {
+                    return true;
+                }
+            }
+        }
+        if (!queue.pop(request) || !queue.push(request)) {
+            return false;
+        }
+    }
+    return false;
+}
+
 // get a menu event filtered by event type, this adds the event to the outbound queue for processing
 // called from lua
 uint8_t AP_CRSF_Telem::get_menu_event(uint8_t menu_events, uint8_t& param_id, ScriptedPayload& payload)
@@ -1770,7 +1792,7 @@ uint8_t AP_CRSF_Telem::get_menu_event(uint8_t menu_events, uint8_t& param_id, Sc
 
     uint8_t events = 0;
     ScriptedParameterWrite spw;
-    if (inbound_params.pop(spw)) {
+    if (select_scripted_event(inbound_params, nullptr, spw) && inbound_params.pop(spw)) {
         // not listening for the event, send a response directly
         if ((spw.type & menu_events) == 0) {
             ready_params.push(spw);
@@ -1805,7 +1827,7 @@ uint8_t AP_CRSF_Telem::peek_menu_event(uint8_t& param_id, ScriptedPayload& paylo
     WITH_SEMAPHORE(scr_sem);
 
     ScriptedParameterWrite spw;
-    if (!inbound_params.peek(spw)) {
+    if (!select_scripted_event(inbound_params, nullptr, spw)) {
         events = 0;
         param_id = 0;
         payload.payload_length = 0;
@@ -1834,10 +1856,11 @@ uint8_t AP_CRSF_Telem::peek_menu_event(uint8_t& param_id, ScriptedPayload& paylo
 // called from lua
 void AP_CRSF_Telem::pop_menu_event()
 {
+    WITH_SEMAPHORE(scr_sem);
     ScriptedParameterWrite spw;
     // Pop the event from the queue. We must check if it's empty in case of a race condition
     // where another script handled the event between our peek and pop.
-    if (inbound_params.pop(spw)) {
+    if (select_scripted_event(inbound_params, nullptr, spw) && inbound_params.pop(spw)) {
         debug("pop_menu_event(%u) -> %s", spw.param->id, spw.type == ScriptedParameterEvents::PARAMETER_WRITE ? "WRITE" : "READ");
         // respond with parameter entry
         outbound_params.push(spw);
@@ -1853,7 +1876,7 @@ bool AP_CRSF_Telem::send_write_response(uint8_t length, const char* data)
     WITH_SEMAPHORE(scr_sem);
 
     ScriptedParameterWrite spw;
-    if (!outbound_params.pop(spw)) {
+    if (!select_scripted_event(outbound_params, nullptr, spw) || !outbound_params.pop(spw)) {
         // another script might have handled it
         return false;
     }
@@ -1892,8 +1915,9 @@ bool AP_CRSF_Telem::send_write_response(uint8_t length, const char* data)
 // called from lua
 bool AP_CRSF_Telem::send_response()
 {
+    WITH_SEMAPHORE(scr_sem);
     ScriptedParameterWrite spw;
-    if (outbound_params.pop(spw)) {
+    if (select_scripted_event(outbound_params, nullptr, spw) && outbound_params.pop(spw)) {
         // Update the object in the queue with the new data
         ready_params.push(spw);
         return true;

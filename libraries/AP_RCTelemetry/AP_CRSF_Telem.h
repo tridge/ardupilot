@@ -252,6 +252,9 @@ public:
     HAL_Semaphore scr_sem; // semaphore guarding access to the inbound and outbound queues
     // access so that submenus can serialize access from scripting
     HAL_Semaphore& get_semaphore() { return scr_sem; }
+    // Caller holds scr_sem. Rotate other owners' requests without consuming them.
+    bool select_scripted_event(ObjectBuffer<ScriptedParameterWrite>& queue, const void* owner,
+                               ScriptedParameterWrite& request);
 
     // Remove menus belonging to one runtime. Lua menus have a null owner.
     // Queued requests referencing their parameters are discarded before free.
