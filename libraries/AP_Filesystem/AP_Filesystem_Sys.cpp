@@ -308,12 +308,13 @@ int AP_Filesystem_Sys::closedir(void *dirp)
 
 int AP_Filesystem_Sys::stat(const char *pathname, struct stat *stbuf)
 {
-    if (pathname == nullptr || stbuf == nullptr || (strlen(pathname) == 0)) {
+    if (pathname == nullptr || stbuf == nullptr) {
         errno = EINVAL;
         return -1;
     }
     memset(stbuf, 0, sizeof(*stbuf));
-    if (strlen(pathname) == 1 && pathname[0] == '/') {
+    if (pathname[0] == '\0' || strcmp(pathname, "/") == 0) {
+        stbuf->st_mode = S_IFDIR | 0555;
         stbuf->st_size = 0; // just a placeholder value
         return 0;
     }
