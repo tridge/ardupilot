@@ -9,6 +9,7 @@ import struct
 import subprocess
 
 from concurrent.futures import ThreadPoolExecutor
+
 import generate
 import pytest
 

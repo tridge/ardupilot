@@ -12,14 +12,13 @@ from pathlib import Path
 
 import pytest
 
+from build_airshow import build as build_ada
 from pymavlink import DFReader
 from test_aerobatics_flight import AerobaticVehicle
 from test_runtime import ROOT
 from test_runtime import Vehicle
 
 import build
-
-from build_airshow import build as build_ada
 
 ADA = Path(__file__).resolve().parents[1]
 APPLET = ADA.parent

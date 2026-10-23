@@ -13,9 +13,9 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[4]
 sys.path.insert(0, str(ROOT / 'Tools/modules'))
 
-import build as module_build  # noqa: E402
-
 from ada import build as ada_build  # noqa: E402
+
+import build as module_build  # noqa: E402
 
 
 def build(source, output, target, stack_size, **options):

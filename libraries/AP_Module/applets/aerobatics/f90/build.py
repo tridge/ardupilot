@@ -13,8 +13,9 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[4]
 sys.path.insert(0, str(ROOT / 'Tools/modules'))
 
-import build as module_build  # noqa: E402
 from fortran import build as backend  # noqa: E402
+
+import build as module_build  # noqa: E402
 
 SOURCES = ('support', 'path', 'schedule', 'controller', 'parameters', 'mission', 'logging', 'main')
 
