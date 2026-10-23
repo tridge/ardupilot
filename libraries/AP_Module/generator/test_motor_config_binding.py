@@ -17,6 +17,11 @@ import pytest
 def motor_host(tmp_path, request):
     headers = {
         'AP_HAL/AP_HAL_Boards.h': '',
+        'AP_Motors/AP_Motors_config.h': '''#pragma once
+#define AP_MOTORS_FRAME_DYNAMIC_SCRIPTING_MATRIX_ENABLED TEST_MOTOR_BUILD
+#define AP_MOTORS_FRAME_SCRIPTING_MATRIX_ENABLED TEST_MOTOR_BUILD
+#define AP_MOTORS_FRAME_6DOF_SCRIPTING_ENABLED TEST_COPTER_BUILD
+''',
         'AP_HAL/Semaphores.h': '''#pragma once
 #include <stdint.h>
 #define CLASS_NO_COPY(C) C(const C &) = delete; C &operator=(const C &) = delete

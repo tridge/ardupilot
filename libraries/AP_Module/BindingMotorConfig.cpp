@@ -8,17 +8,20 @@
 #include <AP_Module/HostApi.h>
 #include <AP_Scripting/AP_Scripting_config.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
+#include <AP_Motors/AP_Motors_config.h>
 
 #if AP_SCRIPTING_ENABLED && (APM_BUILD_TYPE(APM_BUILD_ArduPlane) || APM_BUILD_COPTER_OR_HELI)
 #define AP_MODULE_MOTOR_CONFIG_ENABLED 1
 #include <AP_Math/AP_Math.h>
 #include <AP_Motors/AP_MotorsMatrix.h>
+#if AP_MOTORS_FRAME_DYNAMIC_SCRIPTING_MATRIX_ENABLED
 #include <AP_Motors/AP_MotorsMatrix_Scripting_Dynamic.h>
+#endif
 #else
 #define AP_MODULE_MOTOR_CONFIG_ENABLED 0
 #endif
 
-#if AP_SCRIPTING_ENABLED && APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+#if AP_SCRIPTING_ENABLED && APM_BUILD_TYPE(APM_BUILD_ArduCopter) && AP_MOTORS_FRAME_6DOF_SCRIPTING_ENABLED
 #define AP_MODULE_MOTOR_6DOF_ENABLED 1
 #include <AP_Motors/AP_MotorsMatrix_6DoF_Scripting.h>
 #else
@@ -68,7 +71,7 @@ int32_t binding_motors_dynamic_init(const uint8_t *input, uint32_t input_size,
     if (valid != AP_MODULE_STATUS_OK) {
         return valid;
     }
-#if AP_MODULE_MOTOR_CONFIG_ENABLED
+#if AP_MODULE_MOTOR_CONFIG_ENABLED && AP_MOTORS_FRAME_DYNAMIC_SCRIPTING_MATRIX_ENABLED
     if (input[0] > AP_MOTORS_MAX_NUM_MOTORS) {
         return AP_MODULE_STATUS_INVALID;
     }
@@ -91,7 +94,7 @@ int32_t binding_motors_dynamic_add_motor(const uint8_t *input, uint32_t input_si
     if (valid != AP_MODULE_STATUS_OK) {
         return valid;
     }
-#if AP_MODULE_MOTOR_CONFIG_ENABLED
+#if AP_MODULE_MOTOR_CONFIG_ENABLED && AP_MOTORS_FRAME_DYNAMIC_SCRIPTING_MATRIX_ENABLED
     if (input[0] >= AP_MOTORS_MAX_NUM_MOTORS || input[1] > AP_MOTORS_MAX_NUM_MOTORS) {
         return AP_MODULE_STATUS_INVALID;
     }
@@ -116,7 +119,7 @@ int32_t binding_motors_dynamic_load_factors(const uint8_t *input,
         output != nullptr || output_size != 0) {
         return AP_MODULE_STATUS_INVALID;
     }
-#if AP_MODULE_MOTOR_CONFIG_ENABLED
+#if AP_MODULE_MOTOR_CONFIG_ENABLED && AP_MOTORS_FRAME_DYNAMIC_SCRIPTING_MATRIX_ENABLED
     AP_MotorsMatrix_Scripting_Dynamic::factor_table table {};
     constexpr uint32_t field_size = MOTOR_FACTOR_COUNT * sizeof(float);
     for (uint8_t field = 0; field < 4; field++) {
@@ -153,7 +156,7 @@ int32_t binding_motors_matrix_init(const uint8_t *input, uint32_t input_size,
     if (valid != AP_MODULE_STATUS_OK) {
         return valid;
     }
-#if AP_MODULE_MOTOR_CONFIG_ENABLED
+#if AP_MODULE_MOTOR_CONFIG_ENABLED && AP_MOTORS_FRAME_SCRIPTING_MATRIX_ENABLED
     if (input[0] > AP_MOTORS_MAX_NUM_MOTORS) {
         return AP_MODULE_STATUS_INVALID;
     }
@@ -177,7 +180,7 @@ int32_t binding_motors_matrix_add_motor_raw(const uint8_t *input,
     if (input == nullptr || input_size != 14 || output != nullptr || output_size != 0) {
         return AP_MODULE_STATUS_INVALID;
     }
-#if AP_MODULE_MOTOR_CONFIG_ENABLED
+#if AP_MODULE_MOTOR_CONFIG_ENABLED && AP_MOTORS_FRAME_SCRIPTING_MATRIX_ENABLED
     const float roll = BindingWire::read_float(input + 1);
     const float pitch = BindingWire::read_float(input + 5);
     const float yaw = BindingWire::read_float(input + 9);
@@ -206,7 +209,7 @@ int32_t binding_motors_matrix_set_throttle_factor(const uint8_t *input,
     if (valid != AP_MODULE_STATUS_OK) {
         return valid;
     }
-#if AP_MODULE_MOTOR_CONFIG_ENABLED
+#if AP_MODULE_MOTOR_CONFIG_ENABLED && AP_MOTORS_FRAME_SCRIPTING_MATRIX_ENABLED
     const float factor = BindingWire::read_float(input + 1);
     if (input[0] >= AP_MOTORS_MAX_NUM_MOTORS || !std::isfinite(factor) || factor < 0.0f) {
         return AP_MODULE_STATUS_INVALID;
