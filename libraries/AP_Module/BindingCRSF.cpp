@@ -344,7 +344,7 @@ int32_t binding_crsf_peek_menu_event(void *context, const uint8_t *input, uint32
     }
     BindingLock crsf_lock(crsf->get_semaphore());
     AP_CRSF_Telem::ScriptedParameterWrite request{};
-    if (!crsf->inbound_params.peek(request) || request.param == nullptr ||
+    if (!crsf->select_scripted_event(crsf->inbound_params, context, request) || request.param == nullptr ||
         !owns_parameter(context, request.param->id)) {
         return AP_MODULE_STATUS_OK;
     }
@@ -381,7 +381,7 @@ int32_t binding_crsf_pop_menu_event(void *context, const uint8_t *input, uint32_
     }
     BindingLock crsf_lock(crsf->get_semaphore());
     AP_CRSF_Telem::ScriptedParameterWrite request{};
-    if (!crsf->inbound_params.peek(request) || request.param == nullptr ||
+    if (!crsf->select_scripted_event(crsf->inbound_params, context, request) || request.param == nullptr ||
         !owns_parameter(context, request.param->id) || request.param->id != input[0] ||
         uint8_t(request.type) != input[1] || !crsf->inbound_params.pop(request)) {
         return AP_MODULE_STATUS_OK;
@@ -410,7 +410,7 @@ int32_t binding_crsf_send_write_response(void *context, const uint8_t *input, ui
     }
     BindingLock crsf_lock(crsf->get_semaphore());
     AP_CRSF_Telem::ScriptedParameterWrite request{};
-    if (!crsf->outbound_params.peek(request) || request.param == nullptr ||
+    if (!crsf->select_scripted_event(crsf->outbound_params, context, request) || request.param == nullptr ||
         !owns_parameter(context, request.param->id) || !crsf->outbound_params.pop(request)) {
         return AP_MODULE_STATUS_OK;
     }
@@ -458,7 +458,7 @@ int32_t binding_crsf_send_response(void *context, const uint8_t *input, uint32_t
     }
     BindingLock crsf_lock(crsf->get_semaphore());
     AP_CRSF_Telem::ScriptedParameterWrite request{};
-    if (!crsf->outbound_params.peek(request) || request.param == nullptr ||
+    if (!crsf->select_scripted_event(crsf->outbound_params, context, request) || request.param == nullptr ||
         !owns_parameter(context, request.param->id) || !crsf->outbound_params.pop(request)) {
         return AP_MODULE_STATUS_OK;
     }
@@ -486,7 +486,7 @@ int32_t binding_crsf_get_menu_event(void *context, const uint8_t *input, uint32_
     }
     BindingLock crsf_lock(crsf->get_semaphore());
     AP_CRSF_Telem::ScriptedParameterWrite request{};
-    if (!crsf->inbound_params.peek(request) || request.param == nullptr ||
+    if (!crsf->select_scripted_event(crsf->inbound_params, context, request) || request.param == nullptr ||
         !owns_parameter(context, request.param->id)) {
         return AP_MODULE_STATUS_OK;
     }

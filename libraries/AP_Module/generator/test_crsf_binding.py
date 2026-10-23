@@ -211,6 +211,18 @@ public:
     struct ScriptedParameterWrite { ScriptedParameterEvents type{}; uint8_t destination{}, origin{}, param_num{},
         param_chunk{}; ScriptedParameter *param{}; ScriptedPayload payload{}; };
     FakeQueue<ScriptedParameterWrite> inbound_params, outbound_params, ready_params;
+    bool select_scripted_event(FakeQueue<ScriptedParameterWrite> &queue, const void *owner,
+                                ScriptedParameterWrite &request) {
+        const unsigned count=queue.available();
+        for(unsigned i=0;i<count && queue.peek(request);i++) {
+            for(auto *menu=scripted_menus.next_menu;menu;menu=menu->next_menu) {
+                if(menu->owner!=owner) continue;
+                for(uint8_t p=0;p<menu->num_params;p++) if(&menu->params[p]==request.param) return true;
+            }
+            queue.pop(request); queue.push(request);
+        }
+        return false;
+    }
     HAL_Semaphore sem;
     HAL_Semaphore &get_semaphore() { return sem; }
     ScriptedMenu *add_menu(const char *, const void *);
