@@ -122,12 +122,12 @@ Runtime::Runtime()
     _singleton = this;
 }
 
-void Runtime::fail(const char *reason, bool preserve_error)
+void Runtime::fail(const char *reason, bool preserve_error, const char *prearm_reason)
 {
     {
         WITH_SEMAPHORE(_sem);
         if (!preserve_error || _error[0] == '\0') {
-            hal.util->snprintf(_error, sizeof(_error), "%s", reason);
+            hal.util->snprintf(_error, sizeof(_error), "%s", prearm_reason != nullptr ? prearm_reason : reason);
         }
     }
     GCS_SEND_TEXT(MAV_SEVERITY_ERROR, "Module: %s", reason);
@@ -307,7 +307,8 @@ Module *Runtime::load_bytes(const uint8_t *bytes, uint32_t length, const ModuleF
             hal.util->snprintf(reason, sizeof(reason), "%.31s load failed: %s", file.name,
                                error_detail != nullptr ? error_detail : Module::error_string(error));
         }
-        fail(reason);
+        fail(reason, false, error == Module::Error::Imports ? nullptr :
+             error_detail != nullptr ? error_detail : Module::error_string(error));
     }
     return module;
 }

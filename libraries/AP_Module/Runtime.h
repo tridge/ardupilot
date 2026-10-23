@@ -78,7 +78,7 @@ private:
     void poll_modules();
     bool all_released() const;
     void begin_stop(bool reload);
-    void fail(const char *reason, bool preserve_error = false);
+    void fail(const char *reason, bool preserve_error = false, const char *prearm_reason = nullptr);
     void report_memory(Module &module);
     void drain_messages();
     static void text(void *context, uint8_t severity, const char *message, uint32_t length);
