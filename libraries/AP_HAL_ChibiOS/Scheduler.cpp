@@ -783,7 +783,7 @@ public:
                 if (fast != (pass == 0)) {
                     continue;
                 }
-                _guard_allocation = chHeapAllocAligned(&heaps[i], size, HAL_STACK_GUARD_BYTES);
+                _guard_allocation = chHeapAllocAligned(i == 0 ? nullptr : &heaps[i], size, HAL_STACK_GUARD_BYTES);
                 if (_guard_allocation != nullptr) {
                     break;
                 }
