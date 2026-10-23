@@ -156,10 +156,11 @@ struct USBDebugState {
 
     // A snapshot is valid only until the stopped CPU resumes.
     uint32_t stopped_thread, selected_thread;
+    uint32_t live_stack_thread, scheduled_thread;
     uint32_t selected_registers[50];
     uint32_t register_address[50];
     uint64_t register_mask;
-    uint32_t thread_ids[64];
+    uint32_t thread_ids[65]; // 64 registered threads and an optional IRQ CPU context.
     uint8_t thread_count, thread_cursor;
 
     // USB reset advances the generation, cancelling any partially parsed packet.
@@ -876,32 +877,41 @@ static void snapshot_threads()
 {
     usb_debug.stopped_thread = 1;
     usb_debug.thread_count = 0;
-    // A zero-latency stop can catch a registry update or an interrupt context.
-    // In that case expose the real CPU frame only, not an inconsistent registry.
-    if ((usb_debug.registers[16] & 0x1ffU) == 0 && usb_debug.context[12] == 0) {
-        auto *header = REG_HEADER(currcore);
-        auto *node = header->next;
-        auto *previous = header;
-        while (node != header && usb_debug.thread_count < ARRAY_SIZE(usb_debug.thread_ids)) {
-            thread_t thread;
-            const uint32_t address = uint32_t(node) - offsetof(thread_t, rqueue);
-            if (!probe_copy(&thread, address, sizeof(thread)) || thread.rqueue.prev != previous) {
-                usb_debug.thread_count = 0;
-                break;
-            }
-            usb_debug.thread_ids[usb_debug.thread_count++] = address;
-            if (address == uint32_t(currcore->rlist.current)) {
-                usb_debug.stopped_thread = address;
-            }
-            previous = node;
-            node = thread.rqueue.next;
-        }
-        if (node != header || usb_debug.stopped_thread == 1) {
+    usb_debug.live_stack_thread = 0;
+    usb_debug.scheduled_thread = uint32_t(currcore->rlist.current);
+    const bool thread_mode = (usb_debug.registers[16] & 0x1ffU) == 0;
+    const uint32_t stack = thread_mode ? usb_debug.registers[13] : usb_debug.context[9];
+    // A kernel lock or IRQ does not itself invalidate the registry. Validate
+    // every link, including the header's backlink, before exposing the list.
+    auto *header = REG_HEADER(currcore);
+    auto *node = header->next;
+    auto *previous = header;
+    while (node != header && usb_debug.thread_count < ARRAY_SIZE(usb_debug.thread_ids)-1) {
+        thread_t thread;
+        const uint32_t address = uint32_t(node) - offsetof(thread_t, rqueue);
+        if (!probe_copy(&thread, address, sizeof(thread)) || thread.rqueue.prev != previous) {
             usb_debug.thread_count = 0;
-            usb_debug.stopped_thread = 1;
+            break;
         }
+        usb_debug.thread_ids[usb_debug.thread_count++] = address;
+        const uint32_t end = thread.wabase == &__main_thread_stack_base__ ?
+                             uint32_t(&__main_thread_stack_end__) : address;
+        if (uint32_t(thread.wabase) <= stack && stack <= end) {
+            usb_debug.live_stack_thread = address;
+        }
+        previous = node;
+        node = thread.rqueue.next;
     }
-    if (usb_debug.thread_count == 0) {
+    if (node != header || header->prev != previous) {
+        // The stop really caught a registry insertion/removal (or corruption).
+        usb_debug.thread_count = 0;
+        usb_debug.live_stack_thread = 0;
+    } else if (thread_mode && usb_debug.live_stack_thread != 0) {
+        // During a context switch rlist.current can already name the incoming
+        // thread. The live stack identifies whose registers we actually saved.
+        usb_debug.stopped_thread = usb_debug.live_stack_thread;
+    }
+    if (usb_debug.stopped_thread == 1) {
         usb_debug.thread_ids[usb_debug.thread_count++] = usb_debug.stopped_thread;
     }
     usb_debug.selected_thread = usb_debug.stopped_thread;
@@ -926,6 +936,13 @@ static void select_registers()
         return;
     }
     usb_debug.register_mask = 0;
+    // At an IRQ or a partly completed context switch, neither the live stack
+    // owner's old ctx.sp nor the scheduled thread's context is safe to expose.
+    // Keep their IDs, but do not invent registers or allow stale-frame writes.
+    if (usb_debug.selected_thread == usb_debug.live_stack_thread ||
+        usb_debug.selected_thread == usb_debug.scheduled_thread) {
+        return;
+    }
     thread_t thread;
     port_intctx context;
     if (!probe_copy(&thread, usb_debug.selected_thread, sizeof(thread)) ||
