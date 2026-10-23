@@ -18,6 +18,7 @@ struct CustomModeEntry {
     void *context;
     uint32_t token;
     AP_Vehicle::custom_mode_state *state;
+    uint8_t mode_number;
 };
 
 static CustomModeEntry registry[MAX_HANDLES];
@@ -82,12 +83,17 @@ int32_t binding_custom_mode_register(void *context, const uint8_t *input, uint32
         return AP_MODULE_STATUS_UNAVAILABLE;
     }
     BindingLock scheduler_lock(AP::scheduler().get_semaphore());
+    WITH_SEMAPHORE(registry_sem);
+    for (const auto &entry : registry) {
+        if (entry.state != nullptr && entry.mode_number == input[0] && entry.context != context) {
+            return AP_MODULE_STATUS_BUSY;
+        }
+    }
     auto *state = vehicle->register_custom_mode(input[0], reinterpret_cast<const char *>(input + 2),
                                                 reinterpret_cast<const char *>(input + 35));
     if (state == nullptr) {
         return AP_MODULE_STATUS_OK;
     }
-    WITH_SEMAPHORE(registry_sem);
     CustomModeEntry *free_entry = nullptr;
     for (auto &entry : registry) {
         if (entry.context == context && entry.state == state) {
@@ -104,7 +110,7 @@ int32_t binding_custom_mode_register(void *context, const uint8_t *input, uint32
         return AP_MODULE_STATUS_NO_MEMORY;
     }
     state->allow_entry = false;
-    *free_entry = {context, token, state};
+    *free_entry = {context, token, state, input[0]};
     BindingWire::write(output, token, 4);
     return AP_MODULE_STATUS_OK;
 #else
