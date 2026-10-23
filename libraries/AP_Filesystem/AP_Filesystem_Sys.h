@@ -50,7 +50,11 @@ private:
     };
 
     struct rfile {
-        enum class State : uint8_t { Closed, Opening, Open } state;
+        enum class State : uint8_t {
+            Closed,
+            Opening,
+            Open,
+        } state;
         uint32_t file_ofs;
         ExpandingString *str;
     } file[max_open_file];
