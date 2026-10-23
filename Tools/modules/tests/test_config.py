@@ -92,3 +92,16 @@ def test_umbrella_requires_a_runtime():
 def test_periph_defaults_and_rust_only(rust):
     result = compile_config({'AP_MODULE_ENABLED': rust}, 0, rust, rust, periph=True)
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize('rust', [None, 0, 1])
+@pytest.mark.parametrize('rust_first', [False, True])
+@pytest.mark.parametrize('periph', ['', 1])
+def test_periph_module_selection(rust, rust_first, periph):
+    defines = {'HAL_PROGRAM_SIZE_LIMIT_KB': 4096, 'HAL_BUILD_AP_PERIPH': periph,
+               'AP_SCRIPTING_LUA_ENABLED': 0}
+    if rust is not None:
+        defines['AP_MODULE_ENABLED'] = rust
+    expected = rust or 0
+    result = compile_config(defines, 0, expected, expected, rust_first)
+    assert result.returncode == 0, result.stderr
