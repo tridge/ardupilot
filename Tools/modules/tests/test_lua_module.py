@@ -77,6 +77,45 @@ def test_directory_with_lua_suffix_is_ignored(tmp_path, lua_image):
         instance.stop()
 
 
+@pytest.mark.parametrize('source', [
+    'assert(uint32_t(1000) > 1000/3); assert(uint32_t(3.75):toint() == 3)',
+    'assert(not param:set("LOG_DISARMED", 200)); assert(param:set("LOG_DISARMED", 1))',
+    'assert(string.match(string.rep("a", 24), string.rep("(a*)", 12)) ~= nil)',
+])
+def test_firmware_compatibility(tmp_path, lua_image, source):
+    instance = vehicle(tmp_path, lua_image, {'compat.lua': source + '; gcs:send_text(6,"Lua compatibility OK")'})
+    try:
+        instance.start()
+        instance.text('Lua compatibility OK')
+        assert not any('returned -' in text for text in instance.texts), instance.diagnostic()
+    finally:
+        instance.stop()
+
+
+def test_finalizer_gets_a_fresh_instruction_budget(tmp_path, lua_image):
+    instance = vehicle(tmp_path, lua_image, {'gc.lua': '''local finalized = 0
+local function work()
+    local total = 0
+    for i = 1, 2750 do total = total + i end
+    return total
+end
+local function collect() work(); finalized = finalized + 1 end
+local function update()
+    local garbage = setmetatable({}, {__gc = collect})
+    assert(work() > 0)
+    if finalized > 0 then gcs:send_text(6, "Lua finalizer OK") end
+    return update, 100
+end
+return update()
+'''})
+    try:
+        instance.start()
+        instance.text('Lua finalizer OK')
+        assert not any('returned -' in text for text in instance.texts), instance.diagnostic()
+    finally:
+        instance.stop()
+
+
 def test_oversized_script_reports_path_and_limit(tmp_path, lua_image):
     instance = vehicle(tmp_path, lua_image, {'too-big.lua': '--' + 'x' * 65535})
     try:

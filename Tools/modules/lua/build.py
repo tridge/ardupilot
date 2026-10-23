@@ -44,7 +44,7 @@ def build(output, target, stack_size=24576, heap_size=131072, cpu=None, base=0x1
     common = ['--target=arm-none-eabi' if arm else '--target=x86_64-unknown-linux-gnu',
               '-Os', '-ffreestanding', '-fno-builtin', '-ffunction-sections', '-fdata-sections',
               '-fno-unwind-tables', '-fno-asynchronous-unwind-tables',
-              '-DLUA_32BITS=1', '-DARDUPILOT_BUILD=1', '-DLUAI_MAXCCALLS=32', '-DMAXCCALLS=32',
+              '-DLUA_32BITS=1', '-DARDUPILOT_BUILD=1', '-DLUAI_MAXCCALLS=32', '-DMAXCCALLS=200',
               '-DLUA_MODULE_FINALIZER_HOOKS=1',
               '-I' + str(SOURCE / 'include'), '-I' + str(LUA)]
     if arm:
