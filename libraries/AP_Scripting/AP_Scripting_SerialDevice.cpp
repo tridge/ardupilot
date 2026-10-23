@@ -75,6 +75,8 @@ AP_Scripting_SerialDevice::Port *AP_Scripting_SerialDevice::find_port(int8_t pro
     }
     for (auto &port : ports) {
         if (port.state.protocol == protocol && instance-- == 0) {
+            WITH_SEMAPHORE(port.sem);
+            port._native_accessed = true;
             return &port;
         }
     }
@@ -99,6 +101,10 @@ void AP_Scripting_SerialDevice::Port::init(void)
 void AP_Scripting_SerialDevice::Port::clear(void)
 {
     WITH_SEMAPHORE(sem);
+    // Native selectors can outlive a Lua restart and have no close operation.
+    if (_native_accessed) {
+        return;
+    }
     if (readbuffer) {
         readbuffer->clear();
     }

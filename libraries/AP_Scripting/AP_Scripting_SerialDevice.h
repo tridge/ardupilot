@@ -63,6 +63,7 @@ public:
         ByteBuffer *writebuffer{};
         uint32_t last_size_tx{};
         uint32_t last_size_rx{};
+        bool _native_accessed{};
 
         HAL_Semaphore sem;
     };
