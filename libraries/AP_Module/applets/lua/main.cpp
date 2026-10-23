@@ -320,7 +320,7 @@ uint32_t uint_value(lua_State *L, int index)
         return uint32_t(lua_tointeger(L, index));
     }
     const double n = luaL_checknumber(L, index);
-    luaL_argcheck(L, n >= 0 && n <= UINT32_MAX && n == double(uint32_t(n)), index, "uint32 out of range");
+    luaL_argcheck(L, n >= 0 && n <= UINT32_MAX, index, "uint32 out of range");
     return uint32_t(n);
 }
 int push_uint(lua_State *L, uint32_t value)
@@ -389,7 +389,8 @@ int param_set(lua_State *L)
 {
     const auto name = string_arg(L, 2);
     const float value = luaL_checknumber(L, 3);
-    lua_pushboolean(L, checked(host->param().set(name, value)));
+    const auto result = host->param().set(name, value);
+    lua_pushboolean(L, result.error == Error::Invalid ? false : checked(result));
     return 1;
 }
 int param_add_table(lua_State *L)
@@ -738,6 +739,7 @@ int engine(lua_State *L)
                 fail("invalid callback result count");
             }
             lua_settop(L, top);
+            reset_hook(L);
             lua_gc(L, LUA_GCCOLLECT, 0);
         }
         if (!running) {
