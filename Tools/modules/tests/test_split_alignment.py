@@ -13,7 +13,7 @@ import pytest
 HERE = Path(__file__).resolve().parents[1]
 
 
-def arm_module(tmp_path, alignment, readonly=False):
+def arm_module(tmp_path, alignment, readonly=False, zero_data=False):
     source = tmp_path / 'aligned.rs'
     contents = '''#![no_std]
 #![no_main]
@@ -34,6 +34,8 @@ fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
         contents = contents.replace('static mut DATA', 'static DATA')
         contents = contents.replace('addr_of_mut!(DATA.0).cast::<u8>()',
                                     'core::ptr::addr_of!(DATA.0).cast::<u8>().cast_mut()')
+    if zero_data:
+        contents = contents.replace('Aligned([1, 2, 3, 4])', 'Aligned([0; 4])')
     source.write_text(contents)
     output = tmp_path / 'aligned.elf'
     subprocess.run([os.environ.get('RUSTC', 'rustc'), str(source), '--edition=2021',
@@ -66,6 +68,15 @@ def test_rw_alignment_and_odd_byte_pointer(tmp_path, alignment):
     assert int.from_bytes(loaded[pointer_offset:pointer_offset + 4], 'little') == pointer
     with pytest.raises(ValueError, match='unaligned RW'):
         pack.relocate(data, 0x08000000, rw_base + alignment // 2)
+
+
+def test_bss_alignment_after_word_data(tmp_path):
+    data = arm_module(tmp_path, 64, zero_data=True)
+    module = pack.unpack(data)
+    assert module['rw_alignment'] == 64
+    _, target = next((offset, target) for offset, target in module['fixups']
+                     if offset >= module['rx_size'] and target >= module['rx_size'])
+    assert (target - module['rx_size']) % 64 == 1
 
 
 def test_one_past_rx_pointer_at_rw_boundary_rejected(tmp_path):

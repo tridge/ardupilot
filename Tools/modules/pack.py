@@ -102,6 +102,7 @@ def pack_elf(data, manifest=None):
         offset = address - base
         if section['sh_flags'] & 1:
             require(not section['sh_flags'] & 4 and offset >= rx_size, 'writable executable section')
+            require((offset - rx_size) % max(1, section['sh_addralign']) == 0, 'misaligned RW section')
         else:
             require(offset + size <= rx_size, 'read-only section follows writable data')
         if section['sh_type'] != 'SHT_NOBITS':

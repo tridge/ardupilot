@@ -18,7 +18,8 @@ SECTIONS
     .ARM.exidx : { *(.ARM.exidx .ARM.exidx.*) }
     /* ARM split images need only word separation. Keep the default page
        boundary for POSIX permission changes and legacy relocation probes. */
-    . = ALIGN(DEFINED(MODULE_DATA_ALIGNMENT) ? MODULE_DATA_ALIGNMENT : 4096);
+    . = ALIGN(MAX(DEFINED(MODULE_DATA_ALIGNMENT) ? MODULE_DATA_ALIGNMENT : 4096,
+                  MAX(ALIGNOF(.data), MAX(ALIGNOF(.got), ALIGNOF(.bss)))));
     .data : {
         *(.data .data.*)
         *(.data.rel.ro .data.rel.ro.*)
