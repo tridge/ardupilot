@@ -274,11 +274,15 @@ def test_rx_fixup_to_rw_rejected_for_prelink(tmp_path, capsys):
     assert "invalid fixup target" in capsys.readouterr().out
 
 
-def test_zero_length_raw_file_rejected_cleanly(tmp_path, capsys):
+@pytest.mark.parametrize('uncompressed', [False, True])
+def test_zero_length_file_preserved(tmp_path, uncompressed):
     source = tmp_path / "empty.bin"
     source.write_bytes(b"")
-    assert not embed.create_embedded_h(tmp_path / "generated.h", [("empty.bin", str(source))], uncompressed=True)
-    assert "Zero-length ROMFS contents" in capsys.readouterr().out
+    output = tmp_path / "generated.h"
+    assert embed.create_embedded_h(output, [("empty.bin", str(source))], uncompressed=uncompressed)
+    generated = output.read_text()
+    assert 'empty.bin' in generated
+    assert '{,0}' not in generated
 
 
 def test_stored_size_flag_bits_are_reserved(tmp_path, capsys, monkeypatch):

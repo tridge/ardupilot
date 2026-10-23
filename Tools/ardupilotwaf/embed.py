@@ -176,9 +176,6 @@ def embed_file(out, f, idx, embedded_name, uncompressed, prelink_apmods=False):
             contents += bytes([0xff]*pad)
             print("Padded %u bytes for %s to %u" % (pad, embedded_name, len(contents)))
 
-    if len(contents) == 0:
-        raise ValueError("Zero-length ROMFS contents (%s) not permitted" % embedded_name)
-
     crc = crc32(contents)
     is_apmod = embedded_name.endswith('.apmod')
     raw = uncompressed or is_apmod
@@ -198,7 +195,7 @@ def embed_file(out, f, idx, embedded_name, uncompressed, prelink_apmods=False):
 
     if raw:
         # Terminate the physical array without changing the logical file size.
-        null_terminate = contents[-1] != 0
+        null_terminate = not contents or contents[-1] != 0
         b = contents
     else:
         # compress it (max level, max window size, raw stream, max mem usage)
@@ -208,11 +205,9 @@ def embed_file(out, f, idx, embedded_name, uncompressed, prelink_apmods=False):
         # decompressed data will be null terminated at runtime, nothing to do here
         null_terminate = False
 
-    if len(b) == 0:
-        raise ValueError(f"Zero-length ROMFS contents ({embedded_name}) not permitted")
     write_bytes(out, b)
     if null_terminate:
-        write_encode(out, ",0")
+        write_encode(out, ",0" if b else "0")
     write_encode(out, '};\n\n');
     return crc, len(contents), len(b), raw, False
 
