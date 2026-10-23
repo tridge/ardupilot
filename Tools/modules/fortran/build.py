@@ -35,7 +35,7 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
     output.parent.mkdir(parents=True, exist_ok=True)
     module_dir = output.with_suffix('.fortran')
     module_dir.mkdir(exist_ok=True)
-    common = [compiler, '-std=f2008', '-Os', '-fPIC', '-fno-stack-protector',
+    common = [compiler, '-std=f2008', '-Os', '-fPIC', '-frecursive', '-fno-stack-protector',
               '-ffunction-sections', '-fdata-sections', '-fno-unwind-tables', '-fno-asynchronous-unwind-tables',
               '-J' + str(module_dir), '-I' + str(module_dir)]
     arm_flags = [f'-mcpu={profile.cpu}', '-mthumb', f'-mfpu={profile.fpu}', '-mfloat-abi=hard'] if arm else []
@@ -64,11 +64,10 @@ def build(source, output, target, stack_size, base=0x10000, cfg=(), debug=False,
         else:
             subprocess.run(common + ['-c', str(path), '-o', str(obj)], check=True)
         objects.append(obj)
-    if arm:
-        gcc = os.environ.get('ARM_GCC', 'arm-none-eabi-gcc')
-        library = Path(subprocess.check_output([gcc, *arm_flags, '-print-libgcc-file-name'], text=True).strip())
+    if not arm:
+        library = Path(subprocess.check_output([compiler, '-print-libgcc-file-name'], text=True).strip())
         if not library.is_file() or library.suffix != '.a':
-            raise ValueError(f'ARM Fortran needs {profile.cpu} hard-float libgcc.a (set ARM_GCC)')
+            raise ValueError('Fortran needs a matching libgcc.a (set FC)')
         # Only referenced compiler helpers (e.g. integer/float conversion) are
         # extracted. Their sections/relocations undergo the same packer checks.
         objects.append(library)
