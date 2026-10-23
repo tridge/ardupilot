@@ -94,6 +94,9 @@ def build(bld):
     sources += [root.make_node('sdk/rust/src/compatibility.rs')]
     sources += lua_generator.ant_glob('*.py templates/*.tmpl description/bindings.desc')
     sources += [bld.srcnode.make_node('modules/mavlink/message_definitions/v1.0/common.xml')]
+    sources += [bld.srcnode.make_node('libraries/' + path) for path in (
+        'AP_GPS/AP_GPS.h', 'AP_GPS/AP_GPS_FixType.h', 'AP_Terrain/AP_Terrain.h', 'AP_Mission/AP_Mission.h',
+    )]
     bld(
         name='module_bindings',
         source=sources,
