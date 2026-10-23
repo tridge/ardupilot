@@ -218,7 +218,6 @@ int32_t binding_mavlink_send_chan(void *context, const uint8_t *input, uint32_t 
         return AP_MODULE_STATUS_INVALID;
     }
     memset(output, 0, output_size);
-    const uint8_t chan_number = input[0];
     const uint32_t msgid = BindingWire::read(input + 1, 4);
     const uint16_t packet_len = uint16_t(BindingWire::read(input + 5, 2));
     const uint8_t have_target = input[7];
@@ -233,6 +232,7 @@ int32_t binding_mavlink_send_chan(void *context, const uint8_t *input, uint32_t 
         }
     }
 #if HAL_GCS_ENABLED
+    const uint8_t chan_number = input[0];
     const mavlink_channel_t chan = mavlink_channel_t(chan_number);
     if (chan_number >= gcs().num_gcs()) {
         return AP_MODULE_STATUS_OK;
