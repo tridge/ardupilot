@@ -385,9 +385,9 @@ void Module::panic(void *context, const uint8_t *message, uint32_t length)
     module._panicked.store(true, std::memory_order_release);
     // This callback never returns. In particular it must not use sleep_ms(),
     // which returns immediately after a stop request. Keep module frames alive
-    // at its declared priority; only the delayed wakeup runs.
+    // at its declared priority, without polling the simulation clock on SITL.
     while (true) {
-        hal.scheduler->delay(1000);
+        hal.scheduler->thread_park();
     }
 }
 
