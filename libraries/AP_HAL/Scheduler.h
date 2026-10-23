@@ -132,6 +132,12 @@ public:
     // nominal Linux priorities but retains the host's SCHED_OTHER policy.
     virtual uint8_t thread_priority_min() const { return 0; }
     virtual uint8_t thread_priority_max() const { return 0; }
+    // Retain a failed worker's frames and resources without returning to it.
+    [[noreturn]] virtual void thread_park() {
+        while (true) {
+            delay(1000);
+        }
+    }
     // Single-owner handle. Only thread_reap may destroy it; never cancel a
     // running thread or release its callback's context before successful reap.
     class OwnedThread {
