@@ -112,9 +112,12 @@ automatic step-over is not supported. A literal BKPT instruction is skipped
 when resumed. Debugging is available while armed, including attachment and
 breakpoints in code that only runs in the armed state.
 
-`info threads` lists the ChibiOS registry when stopped in thread mode outside
-a kernel critical section. Otherwise, only the interrupted CPU context is
-exposed. A blocked thread provides its saved callee-saved registers, stack
+`info threads` lists the ChibiOS registry even during kernel critical sections
+and interrupts, provided its links form a consistent snapshot. An IRQ stop adds
+a separate CPU context; the interrupted thread keeps its ID but its unsaved
+registers are unavailable. A stop during an incomplete context switch also
+withholds unsafe saved contexts. A partially updated or invalid registry exposes
+only the CPU context. A blocked thread provides its saved callee-saved registers, stack
 pointer and return PC for stack unwinding. Its other registers are unavailable.
 Saved registers of a blocked thread can also be edited; unavailable registers
 and its descriptive stack pointer cannot. Resuming an individual blocked thread

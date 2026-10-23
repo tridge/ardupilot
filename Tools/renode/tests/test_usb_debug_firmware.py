@@ -30,6 +30,16 @@ def register(debug, number):
     return int.from_bytes(bytes.fromhex(debug.packet(f'p{number:x}'.encode()).decode()), 'little')
 
 
+def thread_ids(debug):
+    result = []
+    packet = debug.packet(b'qfThreadInfo')
+    while packet != b'l':
+        assert packet.startswith(b'm'), packet
+        result.extend(int(value, 16) for value in packet[1:].split(b','))
+        packet = debug.packet(b'qsThreadInfo')
+    return result
+
+
 def set_register(debug, number, value, size=4):
     assert debug.packet(f'P{number:x}={value.to_bytes(size, "little").hex()}'.encode()) == b'OK'
 
@@ -537,6 +547,8 @@ def test_guarded_mpu_write(stopped):
 def test_usb_interrupts_busy_thread(stopped, basepri):
     """Ctrl-C preempts a thread even with the ChibiOS kernel priority masked."""
     d, address = stopped.debug, stopped.scratch
+    before = set(thread_ids(d)) - {1}
+    current = int(d.packet(b'qC')[2:], 16)
     # movs r0,#mask; msr BASEPRI,r0; spin: nop; b spin;
     # clear: movs r0,#0; msr BASEPRI,r0; bkpt
     code = bytes([basepri, 0x20])+bytes.fromhex('80f3118800bffde7002080f3118800be')
@@ -545,9 +557,73 @@ def test_usb_interrupts_busy_thread(stopped, basepri):
     interrupt_running(d)
     assert register(d, 15) in (address+6, address+8)
     assert register(d, 25) & 0x1ff == 0
+    assert int(d.packet(b'qC')[2:], 16) == current
+    assert before <= set(thread_ids(d))
+    for thread in before:
+        assert d.packet(f'T{thread:x}'.encode()) == b'OK'
     # Restore BASEPRI by executing the cleanup, before restoring thread registers.
     set_register(d, 15, address+10)
     assert resume(d).startswith(b'T05')
+
+
+def test_context_switch_uses_live_stack_owner(stopped):
+    d = stopped.debug
+    before = set(thread_ids(d)) - {1}
+    main = int(d.packet(b'qC')[2:], 16)
+    symbols = subprocess.check_output(['arm-none-eabi-nm', '-C', stopped.elf], text=True)
+    switch = int(next(line.split()[0] for line in symbols.splitlines()
+                      if line.endswith(' T __port_switch')), 16)
+    anchor = int(next(line.split()[0] for line in symbols.splitlines()
+                      if line.endswith(' T Plane::one_second_loop()')), 16)
+    assert d.packet(f'Z1,{switch:x},2'.encode()) == b'OK'
+    try:
+        assert resume(d).startswith(b'T05')
+        assert register(d, 15) == switch
+        incoming, outgoing = register(d, 0), register(d, 1)
+        assert incoming != outgoing and {incoming, outgoing} <= set(thread_ids(d))
+        assert before <= set(thread_ids(d))
+        assert int(d.packet(b'qC')[2:], 16) == outgoing
+        assert d.packet(f'Hg{incoming:x}'.encode()) == b'OK'
+        assert d.packet(b'pf') == b'xxxxxxxx'
+        assert d.packet(b'P4=00000000') == b'E01'
+        assert d.packet(f'Hg{outgoing:x}'.encode()) == b'OK'
+    finally:
+        assert d.packet(f'z1,{switch:x},2'.encode()) == b'OK'
+        assert d.packet(f'Z1,{anchor:x},2'.encode()) == b'OK'
+        assert resume(d).startswith(b'T05')
+        assert register(d, 15) == anchor and int(d.packet(b'qC')[2:], 16) == main
+        assert d.packet(f'z1,{anchor:x},2'.encode()) == b'OK'
+
+
+def test_partial_registry_snapshot_is_rejected(stopped):
+    d, address = stopped.debug, stopped.scratch
+    before = set(thread_ids(d)) - {1}
+    output = subprocess.check_output(['arm-none-eabi-gdb', '-nx', '-batch', stopped.elf,
+                                      '-ex', 'p/x (unsigned long)&ch0.reglist.queue.prev'], text=True)
+    backlink = int(re.search(r'= 0x([0-9a-fA-F]+)', output)[1], 16)
+    original = read_memory(d, backlink, 4)
+    # Freeze application/kernel execution in a BASEPRI-masked spin before
+    # simulating the partially written header of a registry insertion/removal.
+    code = bytes.fromhex('102080f3118800bffde7002080f3118800be')
+    write_memory(d, address, code)
+    set_register(d, 15, address)
+    interrupt_running(d)
+    try:
+        assert before <= set(thread_ids(d))
+        write_memory(d, backlink, bytes(4))
+        interrupt_running(d)
+        assert thread_ids(d) == [1]
+        assert d.packet(b'qC') == b'QC1'
+        for thread in before:
+            assert d.packet(f'T{thread:x}'.encode()) == b'E01'
+        write_memory(d, backlink, original)
+        interrupt_running(d)
+        assert before <= set(thread_ids(d))
+        assert d.packet(b'qC') != b'QC1'
+    finally:
+        write_memory(d, backlink, original)
+        set_register(d, 15, address+10)  # clear BASEPRI before the final BKPT
+        assert resume(d).startswith(b'T05')
 
 
 def test_systick_runs_alongside_usb(stopped):
@@ -591,6 +667,8 @@ def test_systick_runs_alongside_usb(stopped):
 def test_usb_interrupts_irq_storm(stopped):
     """A self-pending priority-six ISR cannot starve the USB debugger."""
     d, address = stopped.debug, stopped.scratch
+    before = set(thread_ids(d)) - {1}
+    interrupted = int(d.packet(b'qC')[2:], 16)
     irq = 130  # otherwise unused in this CubeOrangePlus test instance
     vtor = monitor_read(0xe000ed08)
     old_vector = monitor_read(vtor+(16+irq)*4)
@@ -609,6 +687,15 @@ def test_usb_interrupts_irq_storm(stopped):
         interrupt_running(d)
         assert register(d, 25) & 0x1ff == 16+irq
         assert address+32 <= register(d, 15) < address+40
+        assert d.packet(b'qC') == b'QC1'
+        assert before <= set(thread_ids(d))
+        assert d.packet(f'Hg{interrupted:x}'.encode()) == b'OK'
+        assert d.packet(b'pf') == b'xxxxxxxx'
+        assert d.packet(b'P4=00000000') == b'E01'
+        other = next(thread for thread in before if thread != interrupted)
+        assert d.packet(f'Hg{other:x}'.encode()) == b'OK'
+        assert b'x' not in d.packet(b'pf')
+        assert d.packet(b'Hg1') == b'OK'
         # Remove the storm, then let the interrupted ISR return to the thread.
         monitor_write(0xe000e190, 4)
         monitor_write(0xe000e290, 4)
