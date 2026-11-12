@@ -22778,6 +22778,82 @@ RTL_ALT_M 111
         self.assert_parameter_value("RTL_ALT_M", 750)
         self.assert_parameter_value("DISARM_DELAY", 20)
 
+    def DynamicParamDefaults(self):
+        '''test that defaults files apply to parameters registered after boot'''
+        files = []
+        for content in ("SCR_ENABLE 1\nTST_A 7\nTST_B 8\n", "TST_A 9\n"):
+            f = tempfile.NamedTemporaryFile(mode='w', suffix='.parm', delete=False)
+            f.write(content)
+            f.close()
+            files.append(f.name)
+        script_content = """
+local KEY = 10
+assert(param:add_table(KEY, "TST_", 16), 'could not add param table')
+assert(param:add_param(KEY, 5, "A", 22), 'could not add TST_A')
+assert(param:add_param(KEY, 1, "B", 33), 'could not add TST_B')
+assert(param:add_param(KEY, 2, "C", 44), 'could not add TST_C')
+
+function update()
+  gcs:send_text(3, "test script running")
+  return update, 1000
+end
+
+return update, 1000
+"""
+        self.install_script_content_context("test.lua", script_content)
+        self.customise_SITL_commandline([], defaults_filepath=files, wipe=True)
+        self.wait_statustext('test script running')
+        # the last defaults file wins; unlisted names keep the coded default
+        self.assert_parameter_value('TST_A', 9)
+        self.assert_parameter_value('TST_B', 8)
+        self.assert_parameter_value('TST_C', 44)
+
+        self.start_subtest("Saved values take precedence over defaults files")
+        self.set_parameter('TST_B', 55)
+        self.reboot_sitl()
+        self.wait_statustext('test script running')
+        self.assert_parameter_value('TST_A', 9)
+        self.assert_parameter_value('TST_B', 55)
+
+    def NativeModuleControlBindings(self):
+        '''test native bindings for int32 parameters, fence, notify, mkdir, disarm methods and mode reasons'''
+        self.context_push()
+        self.install_rust_test_module_context('module_control.rs', install_name='module-control.apmod')
+        self.set_parameters({
+            'MOD_ENABLE': 1,
+            'MOD_HEAP_MAX': 32768,
+            'MOD_CODE_MAXSIZE': 131072,
+            'MOD_STACK_MAX': 32768,
+            'SCR_ENABLE': 0,
+        })
+        self.context_collect('STATUSTEXT')
+        self.install_message_hook_context(self.FailFastStatusText(self, ['MCT fail', 'Module fatal:']))
+        self.reboot_sitl()
+        try:
+            self.wait_text('MCT setup ok', check_context=True, timeout=60)
+            self.assert_parameter_value('MCT_I32', -7)
+            # four vertices plus the legacy return point and closing point
+            self.assert_parameter_value('FENCE_TOTAL', 6)
+            items = self.download_using_mission_protocol(mavutil.mavlink.MAV_MISSION_TYPE_FENCE)
+            if len(items) != 4 or any(
+                    item.command != mavutil.mavlink.MAV_CMD_NAV_FENCE_POLYGON_VERTEX_INCLUSION or item.param1 != 4
+                    for item in items):
+                raise NotAchievedException("Unexpected fence items %s" % str(items))
+
+            self.wait_ready_to_arm()
+            self.arm_vehicle()
+            self.wait_text('MCT disarmed', check_context=True)
+            self.wait_disarmed()
+            self.wait_text('MCT mode ok', check_context=True)
+            self.wait_mode('LAND')
+        finally:
+            directory = os.path.join('modules', 'mct_dir')
+            if os.path.isdir(directory):
+                os.rmdir(directory)
+            self.clear_fence()
+        self.context_pop()
+        self.reboot_sitl()
+
     def SerialPassthru(self):
         '''smoke test serial passthrough timeout and manual disable'''
         # SITL does not enforce UART thread ownership, so this cannot
@@ -24938,6 +25014,8 @@ return update, 1000
             self.PAUSE_CONTINUE,
             self.MAV_CMD_AIRFRAME_CONFIGURATION,
             self.DefaultsCommaList,
+            self.DynamicParamDefaults,
+            self.NativeModuleControlBindings,
             self.FenceRelativeToHomeMinAlt,
             self.FenceRelativeToAMSLMinAlt,
             self.MotorVibration,
