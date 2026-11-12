@@ -2393,6 +2393,32 @@ function param:add_table(table_key, prefix, num_params) end
 ---@return boolean
 function param:add_param(table_key, param_num, name, default_value) end
 
+-- Add an integer parameter to a dynamic parameter table. The default must be exactly representable as a float.
+-- A name already registered with another type is rejected.
+---@param table_key integer
+---@param param_num integer
+---@param name string
+---@param default_value integer
+---@return boolean
+function param:add_param_int32(table_key, param_num, name, default_value) end
+
+-- Get an integer parameter value without float conversion
+---@param name string -- parameter name
+---@return integer|nil -- nil if the parameter was not found or is not an integer parameter
+function param:get_int32(name) end
+
+-- Set an integer parameter without float conversion. Fails for float parameters and out of range values.
+---@param name string -- parameter name
+---@param value integer
+---@return boolean -- true if the parameter was set
+function param:set_int32(name, value) end
+
+-- Set and save an integer parameter without float conversion. Fails for float parameters and out of range values.
+---@param name string -- parameter name
+---@param value integer
+---@return boolean -- true if the parameter was set
+function param:set_and_save_int32(name, value) end
+
 -- desc
 ---@class (exact) ESCTelemetryData_ud
 local ESCTelemetryData_ud = {}
@@ -2879,6 +2905,12 @@ function vehicle:get_mode() end
 ---@param mode_number integer -- mode number values for each vehcile type can be found here: https://mavlink.io/en/messages/ardupilotmega.html#PLANE_MODE
 ---@return boolean -- success
 function vehicle:set_mode(mode_number) end
+
+-- Attempts to change vehicle mode, recording the given reason. Only the reasons SCRIPTING (32), FENCE_BREACHED (10) and EKF_FAILSAFE (6) are accepted.
+---@param mode_number integer -- mode number
+---@param reason integer -- ModeReason value
+---@return boolean -- success
+function vehicle:set_mode_reason(mode_number, reason) end
 
 -- desc
 ---@param param1 Vector2f_ud
@@ -3779,6 +3811,16 @@ function arming:pre_arm_checks() end
 ---@return boolean -- true if disarmed successfully, false if already disarmed.
 function arming:disarm() end
 
+-- Disarms the vehicle recording the given method. Only the methods SCRIPTING (4), FENCEBREACH (15) and EKFFAILSAFE (24) are accepted.
+---@param method integer -- AP_Arming::Method value
+---@param do_checks boolean -- run disarm checks
+---@return boolean -- true if disarmed successfully
+function arming:disarm_method(method, do_checks) end
+
+-- Returns the method used for the most recent disarm
+---@return integer -- AP_Arming::Method value
+function arming:last_disarm_method() end
+
 
 -- The ahrs library represents the Attitude Heading Reference System computed by the autopilot. 
 -- It provides estimates for the vehicles attitude, and position.
@@ -4136,6 +4178,10 @@ function fence:get_breach_time() end
 -- Returns the time at which the current margin breach started
 ---@return uint32_t_ud system_time milliseconds
 function fence:get_margin_breach_time() end
+
+-- Returns the number of fence breaches since boot
+---@return integer
+function fence:get_breach_count() end
 
 -- Returns the type bitmask of any breached fences
 ---@return integer fence_type bitmask

@@ -93,6 +93,9 @@ singleton AP_Arming method is_armed boolean
 singleton AP_Arming method pre_arm_checks boolean false'literal
 singleton AP_Arming method arm boolean AP_Arming::Method::SCRIPTING'literal
 singleton AP_Arming method arm_force boolean AP_Arming::Method::SCRIPTING'literal
+singleton AP_Arming method disarm_with_method boolean AP_Arming::Method'enum AP_Arming::Method::SCRIPTING AP_Arming::Method::EKFFAILSAFE boolean
+singleton AP_Arming method disarm_with_method rename disarm_method
+singleton AP_Arming method last_disarm_method AP_Arming::Method'enum
 singleton AP_Arming method get_aux_auth_id boolean uint8_t'Null
 singleton AP_Arming method set_aux_auth_passed void uint8_t'skip_check
 singleton AP_Arming method set_aux_auth_failed void uint8_t'skip_check string
@@ -368,6 +371,8 @@ singleton AP_Vehicle depends AP_SCRIPTING_BINDING_VEHICLE_ENABLED
 singleton AP_Vehicle rename vehicle
 singleton AP_Vehicle scheduler-semaphore
 singleton AP_Vehicle method set_mode boolean uint8_t'skip_check ModeReason::SCRIPTING'literal
+singleton AP_Vehicle method set_mode_with_reason boolean uint8_t'skip_check ModeReason'enum ModeReason::EKF_FAILSAFE ModeReason::SCRIPTING
+singleton AP_Vehicle method set_mode_with_reason rename set_mode_reason
 singleton AP_Vehicle method get_mode uint8_t
 singleton AP_Vehicle method get_control_mode_reason uint8_t
 singleton AP_Vehicle method get_likely_flying boolean
@@ -533,6 +538,13 @@ singleton AP_Param method add_table boolean uint8_t 0 200 string uint8_t 1 63
 singleton AP_Param method add_table depends AP_PARAM_DYNAMIC_ENABLED
 singleton AP_Param method add_param boolean uint8_t 0 200 uint8_t 1 63 string float'skip_check
 singleton AP_Param method add_param depends AP_PARAM_DYNAMIC_ENABLED
+singleton AP_Param method add_param_int32 boolean uint8_t 0 200 uint8_t 1 63 string int32_t'skip_check
+singleton AP_Param method add_param_int32 depends AP_PARAM_DYNAMIC_ENABLED
+singleton AP_Param method get_int32 boolean string int32_t'Null
+singleton AP_Param method set_int32_by_name boolean string int32_t'skip_check
+singleton AP_Param method set_int32_by_name rename set_int32
+singleton AP_Param method set_and_save_int32_by_name boolean string int32_t'skip_check
+singleton AP_Param method set_and_save_int32_by_name rename set_and_save_int32
 
 include AP_Scripting/AP_Scripting_helpers.h
 userdata Parameter creation lua_new_Parameter 0
@@ -1086,6 +1098,7 @@ singleton AC_Fence method get_breaches uint8_t
 singleton AC_Fence method get_breach_time uint32_t
 singleton AC_Fence method get_margin_breaches uint8_t
 singleton AC_Fence method get_margin_breach_time uint32_t
+singleton AC_Fence method get_breach_count uint16_t
 singleton AC_Fence method get_breach_distance float uint8_t'skip_check
 singleton AC_Fence method get_breach_direction_NED boolean uint8_t'skip_check Vector3f'Null Location'Null
 singleton AC_Fence method get_safe_alt_min_m_and_frame void float'Ref uint8_t'Ref
