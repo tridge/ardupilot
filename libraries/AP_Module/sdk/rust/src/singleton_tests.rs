@@ -49,10 +49,11 @@ unsafe extern "C" fn call(
             assert_eq!(input, &[44, 1, 0, 0]);
             output.copy_from_slice(&[host.presence, 2]);
         }
-        (1, 1) => {
-            assert_eq!(input, &[5]);
-            output[0] = host.boolean;
-        }
+        (1, 1) => match input[0] {
+            5 => output[0] = host.boolean,
+            7 => output[0] = 0xff,
+            _ => panic!("unexpected one-byte call"),
+        },
         (260, 0) => {
             assert_eq!(&input[..4], &6i32.to_le_bytes());
             let message = &input[4..];
@@ -116,7 +117,7 @@ fn singleton_categories_and_invalid_outputs() {
     assert_eq!(context.vehicle().nav_script_time_done(0x1234), Ok(()));
     assert_eq!(
         context.mount().get_mode(7),
-        Ok(crate::enums::MavMountMode(i32::MIN))
+        Ok(0xff)
     );
     assert_eq!(
         context.rc().get_aux_cached(crate::enums::RcChannelAuxFunc(300)),

@@ -21,14 +21,14 @@ def generated():
 def test_languages_count_helpers_and_replacements_separately(generated):
     _, outputs = generated
     report = json.loads(outputs['generator/coverage.json'])
-    assert report['schema'] == 2 and len(report['entries']) == 560
-    assert report['native_host_calls'] == dict(rust=592, cpp=592, ada=592, fortran=592)
+    assert report['schema'] == 2 and len(report['entries']) == 568
+    assert report['native_host_calls'] == dict(rust=603, cpp=603, ada=603, fortran=603)
     assert report['summary']['rust'] == {
-        'host-call': 533, 'local-helper': 10, 'native-operation': 8, 'replacement-only': 8, 'value-field': 1}
+        'host-call': 541, 'local-helper': 10, 'native-operation': 8, 'replacement-only': 8, 'value-field': 1}
     assert report['summary']['cpp'] == {
-        'host-call': 533, 'native-operation': 8, 'replacement-only': 18, 'value-field': 1}
+        'host-call': 541, 'native-operation': 8, 'replacement-only': 18, 'value-field': 1}
     assert report['summary']['ada'] == {
-        'host-call': 533, 'native-operation': 6, 'replacement-only': 20, 'value-field': 1}
+        'host-call': 541, 'native-operation': 6, 'replacement-only': 20, 'value-field': 1}
     assert report['summary']['fortran'] == report['summary']['ada']
     rows = {(r['owner'], r['name']): r['languages'] for r in report['entries']}
     assert rows['AP_AHRS', 'get_roll']['rust']['status'] == 'replacement-only'
