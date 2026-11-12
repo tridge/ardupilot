@@ -29,6 +29,8 @@ pub struct Show {
     pub takeoff_position_mm: Vec3,
     pub circular: bool,
     pub modified_for_landing: bool,
+    /// GCS light control setup block (pixel grid), if any
+    pub light_control: Option<Vec<u8>>,
 }
 
 impl Show {
@@ -66,6 +68,9 @@ pub fn load(c: &Context<'_>, cfg: &LoadConfig) -> Result<Option<Show>> {
     let Ok(mut controller) = Controller::from_show_bytes(&data) else {
         return Ok(None);
     };
+    let light_control = crate::show::binary::ShowFile::parse(&data)
+        .ok()
+        .and_then(|f| f.find_first(crate::show::binary::BLOCK_LIGHT_CONTROL).ok().map(|b| b.to_vec()));
     drop(data);
     let Some(scene) = controller.screenplay_mut().scenes.get_mut(0) else {
         return Ok(None);
@@ -108,6 +113,7 @@ pub fn load(c: &Context<'_>, cfg: &LoadConfig) -> Result<Option<Show>> {
         takeoff_time_sec: takeoff,
         landing_time_sec: landing,
         modified_for_landing: false,
+        light_control,
     }))
 }
 

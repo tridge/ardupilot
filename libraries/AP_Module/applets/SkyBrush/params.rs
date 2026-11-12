@@ -222,6 +222,10 @@ impl<'a, 'h> Params<'a, 'h> {
         self.write(p, v, None, false)
     }
 
+    pub fn set_and_save(&mut self, p: P, v: f32) -> Result {
+        self.write(p, v, None, true)
+    }
+
     pub fn set_i32(&mut self, p: P, v: i32) -> Result {
         self.write(p, v as f32, Some(v), false)
     }

@@ -91,6 +91,9 @@ pub struct App<'a, 'h> {
     ekf_disarm: bool,
     start_time_pending: bool,
     switch_to_show_pending: bool,
+    rc_switch_high: bool,
+    rc_blocked_until_ms: u32,
+    start_from_rc: bool,
     last_status_ms: u32,
     last_fence_log_ms: u32,
 }
@@ -155,6 +158,9 @@ impl<'a, 'h> App<'a, 'h> {
             ekf_disarm: false,
             start_time_pending: false,
             switch_to_show_pending: false,
+            rc_switch_high: false,
+            rc_blocked_until_ms: 0,
+            start_from_rc: false,
             last_status_ms: 0,
             last_fence_log_ms: 0,
         };
@@ -190,6 +196,8 @@ impl<'a, 'h> App<'a, 'h> {
     pub fn reload_show(&mut self) -> Result<bool> {
         let cfg = self.load_config()?;
         self.show = loader::load(self.c, &cfg)?;
+        let block = self.show.as_ref().and_then(|s| s.light_control.as_deref());
+        self.lights.pixel.load_block(block);
         self.publish_arming_ready()?;
         Ok(self.show.is_some())
     }
@@ -368,6 +376,125 @@ impl<'a, 'h> App<'a, 'h> {
         self.calibration_done = false;
         self.home_set = false;
         self.param_changes()
+    }
+
+    /// MAV_CMD_USER_2 param1=0: set origin, orientation and AMSL at full precision.
+    pub fn configure_coordinate_system(&mut self, lat: i32, lng: i32, amsl_mm: i32, orientation: f32) -> Result<bool> {
+        const LARGEST_VALID_AMSL: i32 = 10000000;
+        if !(-900000000..=900000000).contains(&lat) || !(-1800000000..=1800000000).contains(&lng) {
+            return Ok(false);
+        }
+        if amsl_mm >= LARGEST_VALID_AMSL {
+            return Ok(false);
+        }
+        self.params.set_and_save_i32(P::OriginLat, lat)?;
+        self.params.set_and_save_i32(P::OriginLng, lng)?;
+        self.params.set_and_save_i32(P::OriginAmsl, amsl_mm)?;
+        self.params.set_and_save(P::Orientation, orientation)?;
+        self.update_frame();
+        self.publish_arming_ready()?;
+        Ok(true)
+    }
+
+    /// MAV_CMD_USER_1 param1=3: run a command if it is addressed to our group.
+    /// y = (group + 1) << 16 | command, z = its param1.
+    pub fn group_command(&mut self, cmd: &mav::CommandInt) -> Result<u8> {
+        if cmd.y < 0 {
+            return Ok(mav::MAV_RESULT_UNSUPPORTED);
+        }
+        let group_plus_one = cmd.y >> 16;
+        if group_plus_one > 0 && group_plus_one - 1 != self.params.get_i32(P::Group) {
+            return Ok(mav::MAV_RESULT_ACCEPTED);
+        }
+        let params = ap_rust_sdk::CommandIntParams {
+            p1: cmd.z,
+            p2: cmd.param2,
+            p3: cmd.param3,
+            p4: cmd.param4,
+            x: cmd.x,
+            y: 0,
+            z: 0.0,
+            frame: cmd.frame,
+        };
+        let r = self.c.gcs().run_command_int((cmd.y & 0xFFFF) as u16, &params)?;
+        Ok(r.0.clamp(0, 255) as u8)
+    }
+
+    /// schedule_delayed_start_after(): only while waiting for the start time.
+    fn schedule_delayed_start(&mut self, delay_ms: u32) -> Result<bool> {
+        if self.stage != Stage::WaitForStartTime {
+            return Ok(false);
+        }
+        if self.clock.use_gps {
+            if !self.gps_time_ok()? {
+                return Ok(false);
+            }
+            let gps = self.c.gps();
+            let start = gps_value(gps.time_week_ms(gps.primary_sensor()?))?.wrapping_add(delay_ms);
+            self.params.set_i32(P::StartTime, ((start / 1000) % timing::GPS_WEEK_SEC as u32) as i32)?;
+            self.params.set(P::StartMsec, (start % 1000) as f32)?;
+            self.update_start_time()?;
+            self.calibration_done = false;
+            self.home_set = false;
+        } else {
+            self.clock.start_internal_usec = self.c.time_us() + delay_ms as u64 * 1000;
+        }
+        Ok(true)
+    }
+
+    /// RC aux 248: start the show 10 s after the switch goes high (show mode only).
+    fn check_rc_start_switch(&mut self) -> Result {
+        const AUX_DRONE_SHOW_START: i32 = 248;
+        let now = now_ms(self.c);
+        if self.c.notify().get_flags()? & ap_rust_sdk::NotifyFlags::FAILSAFE_RADIO != 0 {
+            self.rc_blocked_until_ms = now.wrapping_add(1000);
+        }
+        let Some(ch) = self
+            .c
+            .rc()
+            .find_channel_for_option(ap_rust_sdk::enums::RcChannelAuxFunc(AUX_DRONE_SHOW_START))?
+        else {
+            return Ok(());
+        };
+        let high = ch.get_aux_switch_pos(self.c)? == 2;
+        let rising = high && !self.rc_switch_high;
+        self.rc_switch_high = high;
+        let blocked = (self.rc_blocked_until_ms.wrapping_sub(now) as i32) > 0;
+        if rising && self.in_mode && now > 5000 && !blocked && self.schedule_delayed_start(10000)? {
+            self.start_from_rc = true;
+        }
+        Ok(())
+    }
+
+    /// A start time set by the RC switch does not survive leaving or re-entering show mode.
+    fn clear_rc_start(&mut self) -> Result {
+        if self.start_from_rc {
+            self.start_from_rc = false;
+            self.params.set_i32(P::StartTime, -1)?;
+            self.params.set(P::StartMsec, 0.0)?;
+            self.clock.start_unix_usec = 0;
+            self.clock.start_internal_usec = 0;
+        }
+        Ok(())
+    }
+
+    /// Default stream rates of the selected telemetry profile, as the fork sets at boot.
+    pub fn apply_telemetry_profile(&self) -> Result {
+        let streams: &[(u32, i32)] = if self.params.get_i32(P::TelProfile) == 1 {
+            &[(telemetry::MSG_SYS_STATUS, 1000000)]
+        } else {
+            &[
+                (telemetry::MSG_GLOBAL_POSITION_INT, 500000),
+                (telemetry::MSG_SYS_STATUS, 1000000),
+                (telemetry::MSG_GPS_RAW_INT, 1000000),
+            ]
+        };
+        for chan in 0..8u8 {
+            for (msgid, interval) in streams {
+                let _ = self.c.gcs().set_message_interval(chan, *msgid, *interval);
+            }
+        }
+        Ok(())
     }
 
     pub fn handle_geofence(&mut self, g: &mav::GeofenceSetup<'_>) -> Result<bool> {
@@ -890,6 +1017,7 @@ impl<'a, 'h> App<'a, 'h> {
 
     /// Called once when entering the mode, and on module start if already in it.
     fn mode_entered(&mut self) -> Result {
+        self.clear_rc_start()?;
         self.led.configure(self.c, &self.params)?;
         self.set_stage(Stage::Off);
         self.initialization_start()
@@ -1245,6 +1373,7 @@ impl<'a, 'h> App<'a, 'h> {
             if self.tick % 50 == 0 {
                 crate::report(c, "show mode", self.switch_to_show_mode())?;
             }
+            crate::report(c, "rc switch", self.check_rc_start_switch())?;
             let ekf = c
                 .parameter("FS_EKF_ACTION")?
                 .and_then(|p| p.get().ok().flatten())
@@ -1262,6 +1391,7 @@ impl<'a, 'h> App<'a, 'h> {
         } else if !in_mode && self.in_mode {
             self.in_mode = false;
             self.set_stage(Stage::Off);
+            self.clear_rc_start()?;
             crate::report(c, "led", self.led.configure(c, &self.params))?;
         }
         if self.in_mode {

@@ -69,6 +69,15 @@ fn handle_command(app: &mut App<'_, '_>, c: &Context<'_>, msg: &mav::Received, c
             }
         }
         (mav::MAV_CMD_USER_1, 4) => app.handle_light_source(cmd.param2, cmd.param3, cmd.x),
+        (mav::MAV_CMD_USER_1, 3) => app.group_command(cmd)?,
+        (mav::MAV_CMD_USER_2, 0) => {
+            if app.configure_coordinate_system(cmd.x, cmd.y, cmd.z as i32, cmd.param4)? {
+                mav::MAV_RESULT_ACCEPTED
+            } else {
+                mav::MAV_RESULT_FAILED
+            }
+        }
+        (mav::MAV_CMD_USER_2, 1) => mav::MAV_RESULT_FAILED,
         _ => mav::MAV_RESULT_UNSUPPORTED,
     };
     send_ack(c, msg, cmd, result)
@@ -141,6 +150,7 @@ fn run(c: &Context<'_>) -> Result {
         0
     };
     let mut boot_mode_next = 0u64;
+    report(c, "telemetry", app.apply_telemetry_profile())?;
     report(c, "supervision", vehicle::start_supervision(c, app.mode()))?;
     c.gcs().send_text(MavSeverity::INFO, "SkyBrush: module started")?;
     let mut next = c.time_us() + TICK_US;
