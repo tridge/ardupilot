@@ -194,6 +194,15 @@ void Copter::failsafe_ekf_event()
         return;
     }
 
+#if MODE_GUIDED_ENABLED && AP_EXTERNAL_BINDING_ENABLED
+    const ModeGuidedCustom *custom = active_custom_mode();
+    if (custom != nullptr && custom->ekf_failsafe_disarm()) {
+        arming.disarm(AP_Arming::Method::EKFFAILSAFE, false);
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "EKF Failsafe: forced disarm");
+        return;
+    }
+#endif
+
     // take action based on fs_ekf_action parameter
     switch ((FS_EKF_Action)g.fs_ekf_action) {
         case FS_EKF_Action::REPORT_ONLY:

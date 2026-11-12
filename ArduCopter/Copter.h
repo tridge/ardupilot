@@ -213,6 +213,7 @@ public:
     friend class ModeFlowHold;
     friend class ModeFollow;
     friend class ModeGuided;
+    friend class ModeGuidedCustom;
     friend class ModeLand;
     friend class ModeLoiter;
     friend class ModePosHold;
@@ -667,8 +668,12 @@ private:
                              uint8_t &task_count,
                              uint32_t &log_bit) override;
 #if MODE_GUIDED_ENABLED
-    // guided controller driven by the current mode, nullptr if not in a guided mode
-    ModeGuided *guided_target_mode();
+    // guided controller driven by the current mode, nullptr if not in a guided
+    // mode or it does not accept targets, external for GCS and external control
+    ModeGuided *guided_target_mode(bool external = false);
+#if AP_EXTERNAL_BINDING_ENABLED
+    ModeGuidedCustom *active_custom_mode();
+#endif
 #endif
 #if AP_EXTERNAL_BINDING_ENABLED || AP_EXTERNAL_CONTROL_ENABLED
 #if MODE_GUIDED_ENABLED
