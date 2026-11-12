@@ -20268,6 +20268,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             self.MissionRTLYawBehaviour,
             self.MAV_CMD_MISSION_START_p1_p2,
             self.ScriptingFlipMode,
+            self.ScriptingCustomModeTakeoff,
             self.UTMGlobalPosition,
         ])
         return ret
@@ -22866,6 +22867,52 @@ RTL_ALT_M 111
 
         # Test done
         self.land_and_disarm()
+
+    def ScriptingCustomModeTakeoff(self):
+        '''scripting takeoff and position targets act on the running custom guided mode'''
+        self.set_parameters({
+            "SCR_ENABLE": 1,
+        })
+        self.install_script_content_context("custom_takeoff.lua", """
+local mode = assert(vehicle:register_custom_mode(101, "LuaGuided", "LGUI"))
+mode:allow_entry(true)
+local stage = 0
+local target
+function update()
+    if vehicle:get_mode() ~= 101 or not arming:is_armed() then
+        return update, 100
+    end
+    local pos = ahrs:get_relative_position_NED_origin()
+    if stage == 0 and vehicle:start_takeoff(10) then
+        gcs:send_text(6, "LCM: takeoff started")
+        stage = 1
+    elseif stage == 1 and vehicle:is_taking_off() then
+        gcs:send_text(6, "LCM: taking off")
+        stage = 2
+    elseif stage == 2 and pos and pos:z() < -9 and not vehicle:is_taking_off() then
+        target = pos:copy()
+        target:x(target:x() + 10)
+        gcs:send_text(6, "LCM: PVA")
+        stage = 3
+    elseif stage == 3 then
+        if not vehicle:set_target_posvelaccel_NED(target, Vector3f(), Vector3f(), false, 0, false, 0, false) then
+            gcs:send_text(6, "LCM: PVA rejected")
+        end
+    end
+    return update, 100
+end
+return update, 100
+""")
+        self.reboot_sitl()
+        self.wait_ready_to_arm()
+        self.change_mode(101)
+        self.context_collect('STATUSTEXT')
+        self.arm_vehicle()
+        self.wait_statustext("LCM: taking off", timeout=10, check_context=True)
+        self.wait_statustext("LCM: PVA", timeout=60, check_context=True)
+        self.wait_distance(10, accuracy=1.5, timeout=30)
+        self.change_mode("LAND")
+        self.wait_disarmed()
 
     def ScriptingFlyVelocity(self):
         '''test flying a velocity vector using scripting'''
