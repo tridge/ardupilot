@@ -270,6 +270,36 @@ public:
     struct custom_mode_state {
         bool allow_entry;
         const void *owner;
+
+        // controller request from the owner, applied on the main thread
+        enum class Request : uint8_t {
+            GUIDED,
+            TAKEOFF,    // climb takeoff_alt_m above the current altitude
+            LAND,
+            RTL,        // no disarm on landing
+            LOITER,
+        };
+        enum Option : uint8_t {
+            NO_EXTERNAL_GUIDED = (1U << 0), // reject GCS guided targets, NAV_TAKEOFF sets takeoff_event
+            EKF_FS_DISARM      = (1U << 1), // EKF failsafe disarms
+            ARMING_GATED       = (1U << 2), // only MAVLink arming unless arming_ready
+        };
+        Request request;
+        uint16_t generation;        // incremented per request, 0 if none
+        float takeoff_alt_m;
+        uint8_t options;
+        bool arming_ready;
+        uint16_t supervision_ms;    // owner keepalive timeout, 0 disables supervision
+        uint32_t keepalive_ms;
+        bool owner_loss_event;      // owner cleanup, handled on the main thread
+        bool takeoff_event;         // GCS takeoff, cleared by the owner
+
+        // status, written on the main thread
+        uint16_t applied_generation;
+        bool init_ok;
+        bool complete;              // latched until the next request
+        bool active;
+        bool owner_lost;            // latched until re-registered while disarmed
     };
     virtual custom_mode_state* register_custom_mode(const uint8_t number, const char* full_name, const char* short_name,
                                                   const void *owner = nullptr) { return nullptr; }
