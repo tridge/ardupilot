@@ -375,6 +375,14 @@ public:
     static bool set_and_save_by_name(const char *name, float value);
     static bool set_and_save_by_name_ifchanged(const char *name, float value);
 
+#if AP_EXTERNAL_BINDING_ENABLED
+    // exact access to integer parameters by name. These fail for float
+    // parameters and for values outside the parameter's type
+    static bool get_int32(const char *name, int32_t &value);
+    static bool set_int32_by_name(const char *name, int32_t value);
+    static bool set_and_save_int32_by_name(const char *name, int32_t value);
+#endif
+
     /// Find a variable by index.
     ///
     ///
@@ -635,12 +643,18 @@ public:
     // registrations. This does not lock general parameter reads or writes.
     static bool add_table_persistent(uint8_t key, const char *prefix, uint8_t num_params);
     static bool add_param(uint8_t key, uint8_t param_num, const char *pname, float default_value);
+    // as add_param() but the parameter is an AP_Int32. The default must
+    // be exact as a float. A registered name cannot change type.
+    static bool add_param_int32(uint8_t key, uint8_t param_num, const char *pname, int32_t default_value);
     static bool load_int32(uint16_t key, uint32_t group_element, int32_t &value);
 #endif
 
     static bool load_defaults_file(const char *filename, bool last_pass);
 
 protected:
+#if AP_EXTERNAL_BINDING_ENABLED
+    static bool set_int32_by_name_internal(const char *name, int32_t value, bool save);
+#endif
 
     // store default value in linked list
     static void add_default(AP_Param *ap, float v);
@@ -854,6 +868,8 @@ private:
     static bool add_table_internal(uint8_t key, const char *prefix, uint8_t num_params, bool persistent);
     static bool add_table_locked(uint8_t key, const char *prefix, uint8_t num_params, bool persistent,
                                  AP_Param *&crc_param);
+    static bool add_param_typed(uint8_t key, uint8_t param_num, const char *pname, ap_var_type type,
+                                float default_value);
     // find a defaults-file value for a parameter registered after boot
     static bool find_dynamic_default(const char *name, float &value);
 #if AP_PARAM_DEFAULTS_FILE_PARSING_ENABLED
