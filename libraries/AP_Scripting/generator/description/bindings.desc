@@ -332,6 +332,8 @@ singleton AP_Relay method off void uint8_t 0 AP_RELAY_NUM_RELAYS
 singleton AP_Relay method enabled boolean uint8_t 0 AP_RELAY_NUM_RELAYS
 singleton AP_Relay method toggle void uint8_t 0 AP_RELAY_NUM_RELAYS
 singleton AP_Relay method get uint8_t uint8_t 0 AP_RELAY_NUM_RELAYS
+singleton AP_Relay method on_for_ms void uint8_t 0 AP_RELAY_NUM_RELAYS uint16_t'skip_check
+singleton AP_Relay method on_for_ms depends AP_RELAY_TIMEOUT_ENABLED
 
 include GCS_MAVLink/GCS.h
 singleton GCS depends (HAL_GCS_ENABLED && !defined(HAL_BUILD_AP_PERIPH))

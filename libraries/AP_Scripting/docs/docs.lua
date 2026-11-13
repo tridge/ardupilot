@@ -3180,6 +3180,11 @@ function relay:off(instance) end
 ---@param instance integer -- relay instance
 function relay:on(instance) end
 
+-- Turns the requested relay on, and off again after timeout_ms unless renewed. Any other change of the relay cancels the timeout.
+---@param instance integer -- relay instance
+---@param timeout_ms integer -- uint16_t milliseconds
+function relay:on_for_ms(instance, timeout_ms) end
+
 
 -- The terrain library provides access to checking heights against a terrain database.
 terrain = {}
