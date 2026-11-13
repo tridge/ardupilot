@@ -1,5 +1,5 @@
 use core::num::{NonZeroU16, NonZeroU32};
-use crate::{result, Context, Error, Result};
+use crate::{result, Context, Error, Result, Vector3f};
 
 pub const CUSTOM_MODE_FULL_NAME_MAX: usize = ${full_name_max};
 pub const CUSTOM_MODE_SHORT_NAME_MAX: usize = ${short_name_max};
@@ -161,6 +161,43 @@ impl CustomMode {
     pub fn ack_takeoff_event(&self, context: &Context<'_>) -> Result<bool> {
         let mut output = [0u8; 1];
         self.control(context, crate::imports::BINDING_${ack_takeoff_event_id}.slot(), &[], &mut output)?;
+        match output[0] { 0 => Ok(false), 1 => Ok(true), _ => Err(Error::Host) }
+    }
+
+    /// Ask the vehicle main thread to arm with scripting authority; arming checks
+    /// apply. False if the mode is not active or the owner was lost. Poll
+    /// `arming().is_armed()` for the outcome.
+    pub fn request_arm(&self, context: &Context<'_>) -> Result<bool> {
+        let mut output = [0u8; 1];
+        self.control(context, crate::imports::BINDING_${request_arm_id}.slot(), &[], &mut output)?;
+        match output[0] { 0 => Ok(false), 1 => Ok(true), _ => Err(Error::Host) }
+    }
+
+    /// Guided NED position, velocity and acceleration target, as
+    /// `vehicle().set_target_posvelaccel_ned()` but only accepted while this mode
+    /// is the current mode and accepts targets.
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_target_posvelaccel(&self, context: &Context<'_>, pos_m: &Vector3f, vel_ms: &Vector3f,
+                                  acc_mss: &Vector3f, use_yaw: bool, yaw_deg: f32, use_yaw_rate: bool,
+                                  yaw_rate_degs: f32, yaw_relative: bool) -> Result<bool> {
+        let values = [pos_m.x, pos_m.y, pos_m.z, vel_ms.x, vel_ms.y, vel_ms.z, acc_mss.x, acc_mss.y, acc_mss.z];
+        if values.iter().any(|v| !v.is_finite()) || !yaw_deg.is_finite() || !yaw_rate_degs.is_finite() {
+            return Err(Error::Invalid);
+        }
+        let mut input = [0u8; 51];
+        input[..4].copy_from_slice(&self.token.get().to_le_bytes());
+        for (i, v) in values.iter().enumerate() {
+            input[4 + 4 * i..8 + 4 * i].copy_from_slice(&v.to_le_bytes());
+        }
+        input[40] = use_yaw as u8;
+        input[41..45].copy_from_slice(&yaw_deg.to_le_bytes());
+        input[45] = use_yaw_rate as u8;
+        input[46..50].copy_from_slice(&yaw_rate_degs.to_le_bytes());
+        input[50] = yaw_relative as u8;
+        let mut output = [0u8; 1];
+        result(unsafe { context.api.binding_call.unwrap()(context.raw,
+            crate::imports::BINDING_${set_target_posvelaccel_id}.slot(), input.as_ptr(), input.len() as u32,
+            output.as_mut_ptr(), output.len() as u32) })?;
         match output[0] { 0 => Ok(false), 1 => Ok(true), _ => Err(Error::Host) }
     }
 }

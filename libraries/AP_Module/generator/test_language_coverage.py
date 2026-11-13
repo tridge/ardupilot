@@ -22,7 +22,7 @@ def test_languages_count_helpers_and_replacements_separately(generated):
     _, outputs = generated
     report = json.loads(outputs['generator/coverage.json'])
     assert report['schema'] == 2 and len(report["entries"]) == 572
-    assert report['native_host_calls'] == dict(rust=608, cpp=608, ada=608, fortran=608)
+    assert report['native_host_calls'] == dict(rust=610, cpp=610, ada=610, fortran=610)
     assert report['summary']['rust'] == {
         'host-call': 545, 'local-helper': 10, 'native-operation': 8, 'replacement-only': 8, 'value-field': 1}
     assert report['summary']['cpp'] == {

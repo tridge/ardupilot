@@ -75,6 +75,13 @@ def controls():
         ('set_supervision', [dict(type='u16-le', name='timeout_ms')], 'void'),
         ('keepalive', [], 'void'),
         ('ack_takeoff_event', [], 'bool-u8'),
+        ('request_arm', [], 'bool-u8'),
+        ('set_target_posvelaccel',
+         [dict(type='f32-le', name=name) for name in ('pos_n_m', 'pos_e_m', 'pos_d_m', 'vel_n_ms', 'vel_e_ms',
+                                                       'vel_d_ms', 'acc_n_mss', 'acc_e_mss', 'acc_d_mss')] +
+         [dict(type='bool-u8', name='use_yaw'), dict(type='f32-le', name='yaw_deg'),
+          dict(type='bool-u8', name='use_yaw_rate'), dict(type='f32-le', name='yaw_rate_degs'),
+          dict(type='bool-u8', name='yaw_relative')], 'bool-u8'),
     ]
 
 

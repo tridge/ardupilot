@@ -163,6 +163,8 @@ CustomMode.set_arming_ready 5 0
 CustomMode.set_supervision 6 0
 CustomMode.keepalive 4 0
 CustomMode.ack_takeoff_event 4 1
+CustomMode.request_arm 4 1
+CustomMode.set_target_posvelaccel 51 1
 analog.channel 0 4
 AnalogSource.set_pin 5 1
 AnalogSource.voltage_average 4 4

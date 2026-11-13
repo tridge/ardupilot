@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-use crate::{api, Context, CustomModeRequest, Error, CUSTOM_MODE_ARMING_GATED, CUSTOM_MODE_EKF_FS_DISARM};
+use crate::{api, Context, CustomModeRequest, Error, Vector3f, CUSTOM_MODE_ARMING_GATED, CUSTOM_MODE_EKF_FS_DISARM};
 use core::{ffi::c_void, marker::PhantomData, num::NonZeroU16};
 use core::sync::atomic::{AtomicU8, Ordering};
 
@@ -34,6 +34,18 @@ unsafe extern "C" fn call(
             (7, 4, 0) => {}
             (8, 4, 1) => output[0] = 1,
             (9, 4, 10) => output.copy_from_slice(&[9, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            (10, 4, 1) => output[0] = 1,
+            (11, 51, 1) => {
+                for (i, v) in [1.0f32, 2.0, -3.0, 0.5, 0.25, 0.0, 0.0, 0.0, 0.1].iter().enumerate() {
+                    assert_eq!(&input[4 + 4 * i..8 + 4 * i], &v.to_le_bytes());
+                }
+                assert_eq!(input[40], 1);
+                assert_eq!(&input[41..45], &90.0f32.to_le_bytes());
+                assert_eq!(input[45], 1);
+                assert_eq!(&input[46..50], &5.0f32.to_le_bytes());
+                assert_eq!(input[50], 0);
+                output[0] = 0;
+            }
             _ => panic!("unexpected custom mode control wire shape"),
         }
         return api::STATUS_OK;
@@ -119,5 +131,13 @@ fn custom_mode_uses_bounded_names_and_opaque_handles() {
     assert_eq!(mode.ack_takeoff_event(&context), Ok(true));
     expect(9);
     assert_eq!(mode.status(&context), Err(Error::Host));
+    expect(10);
+    assert_eq!(mode.request_arm(&context), Ok(true));
+    expect(11);
+    let v = |x, y, z| Vector3f { x, y, z };
+    let (pos, vel, acc) = (v(1.0, 2.0, -3.0), v(0.5, 0.25, 0.0), v(0.0, 0.0, 0.1));
+    assert_eq!(mode.set_target_posvelaccel(&context, &pos, &vel, &acc, true, 90.0, true, 5.0, false), Ok(false));
+    assert_eq!(mode.set_target_posvelaccel(&context, &v(f32::NAN, 0.0, 0.0), &vel, &acc, true, 90.0, true, 5.0, false),
+               Err(Error::Invalid));
     expect(0);
 }

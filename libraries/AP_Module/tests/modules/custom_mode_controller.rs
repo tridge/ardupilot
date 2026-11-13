@@ -27,6 +27,8 @@ const CMD_SUPERVISION: u8 = 8; // timeout = CMT_ARG ms
 const CMD_HANG: u8 = 9; // stop keepalives
 const CMD_EXIT: u8 = 10; // return, cleaning up the module
 const CMD_EARLY_PVA: u8 = 11; // GUIDED request then an immediate target, only accepted once applied
+const CMD_ARM: u8 = 12; // arm through the mode, applied on the main thread
+const CMD_OWNED_PVA: u8 = 13; // hold position with a target only our mode accepts
 
 struct Message {
     bytes: [u8; 100],
@@ -126,6 +128,26 @@ fn run(context: &Context<'_>) -> Result {
                         context.sleep_ms(20)?;
                     }
                     say(context, format_args!("CMT: early PVA rejected {} inconsistent {}", rejected, inconsistent))?;
+                }
+                CMD_ARM => {
+                    let requested = mode.request_arm(context)?;
+                    let mut armed = false;
+                    for _ in 0..150 {
+                        mode.keepalive(context)?;
+                        armed = context.arming().is_armed()?;
+                        if armed {
+                            break;
+                        }
+                        context.sleep_ms(20)?;
+                    }
+                    say(context, format_args!("CMT: arm request {} armed {}", requested as u8, armed as u8))?;
+                }
+                CMD_OWNED_PVA => {
+                    let position = context.ahrs().get_relative_position_ned_origin()?.ok_or(Error::Host)?;
+                    let zero = Vector3f::default();
+                    let accepted = mode.set_target_posvelaccel(context, &position, &zero, &zero, false, 0.0, false,
+                                                               0.0, false)?;
+                    say(context, format_args!("CMT: owned PVA {}", accepted as u8))?;
                 }
                 _ => say(context, format_args!("CMT: unknown command"))?,
             }

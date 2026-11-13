@@ -311,6 +311,65 @@ int32_t binding_custom_mode_ack_takeoff_event(void *context, const uint8_t *inpu
     return AP_MODULE_STATUS_OK;
 }
 
+// arming can delay while the log opens, so it is done on the main thread
+int32_t binding_custom_mode_request_arm(void *context, const uint8_t *input, uint32_t input_size,
+                                        uint8_t *output, uint32_t output_size)
+{
+    if (output == nullptr || output_size != 1 || input_size != 4) {
+        return AP_MODULE_STATUS_INVALID;
+    }
+    output[0] = 0;
+    BindingLock lock(AP::scheduler().get_semaphore());
+    auto *state = owned(context, input, input_size);
+    if (state == nullptr) {
+        return AP_MODULE_STATUS_INVALID;
+    }
+    const bool ok = state->active && !state->owner_lost;
+    state->arm_request |= ok;
+    output[0] = ok;
+    return AP_MODULE_STATUS_OK;
+}
+
+// handle, NED pos/vel/accel, use_yaw, yaw_deg, use_yaw_rate, yaw_rate_degs, yaw_relative
+int32_t binding_custom_mode_set_target_posvelaccel(void *context, const uint8_t *input, uint32_t input_size,
+                                                   uint8_t *output, uint32_t output_size)
+{
+    if (input == nullptr || input_size != 51 || output == nullptr || output_size != 1 ||
+        input[40] > 1 || input[45] > 1 || input[50] > 1) {
+        return AP_MODULE_STATUS_INVALID;
+    }
+    float v[11];
+    for (uint8_t i = 0; i < 9; i++) {
+        v[i] = BindingWire::read_float(input + 4 + 4*i);
+    }
+    v[9] = BindingWire::read_float(input + 41);
+    v[10] = BindingWire::read_float(input + 46);
+    for (const float f : v) {
+        if (!isfinite(f)) {
+            return AP_MODULE_STATUS_INVALID;
+        }
+    }
+    output[0] = 0;
+#if AP_SCRIPTING_BINDING_VEHICLE_ENABLED
+    auto *vehicle = AP_Vehicle::get_singleton();
+    if (vehicle == nullptr) {
+        return AP_MODULE_STATUS_UNAVAILABLE;
+    }
+    BindingLock lock(AP::scheduler().get_semaphore());
+    const auto *state = owned(context, input, input_size);
+    if (state == nullptr) {
+        return AP_MODULE_STATUS_INVALID;
+    }
+    output[0] = !state->owner_lost &&
+                vehicle->custom_mode_set_target_posvelaccel_NED(state, Vector3f(v[0], v[1], v[2]), Vector3f(v[3], v[4], v[5]),
+                                                                Vector3f(v[6], v[7], v[8]), input[40] != 0, v[9],
+                                                                input[45] != 0, v[10], input[50] != 0);
+    return AP_MODULE_STATUS_OK;
+#else
+    return AP_MODULE_STATUS_UNAVAILABLE;
+#endif
+}
+
 void binding_custom_mode_cleanup(void *context)
 {
     if (context == nullptr) {

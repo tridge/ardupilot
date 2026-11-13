@@ -1091,7 +1091,8 @@ def emit(contract):
     if contract['custom_mode'] is not None:
         custom_mode = contract['custom_mode']['methods']
         custom_calls = ['register', 'get_allow_entry', 'set_allow_entry', 'set_request', 'status',
-                        'set_options', 'set_arming_ready', 'set_supervision', 'keepalive', 'ack_takeoff_event']
+                        'set_options', 'set_arming_ready', 'set_supervision', 'keepalive', 'ack_takeoff_event',
+                        'request_arm', 'set_target_posvelaccel']
         for method, call in zip(custom_mode, custom_calls):
             cpp += [f'    case {method["id"]}:',
                     f'        return binding_custom_mode_{call}(context, input, input_size, output, output_size);']
