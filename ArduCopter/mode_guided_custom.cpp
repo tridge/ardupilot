@@ -20,6 +20,17 @@ ModeGuidedCustom *Copter::active_custom_mode()
     return nullptr;
 }
 
+// guided target for the custom mode owning state, only while it is the
+// current mode, so a mode change cannot redirect the target
+bool Copter::custom_mode_set_target_posvelaccel_NED(const custom_mode_state *state, const Vector3f& target_pos_ned_m, const Vector3f& target_vel_ned_ms, const Vector3f& target_accel_ned_mss, bool use_yaw, float yaw_deg, bool use_yaw_rate, float yaw_rate_degs, bool yaw_relative)
+{
+    ModeGuidedCustom *custom = active_custom_mode();
+    if (custom == nullptr || &custom->state != state || !custom->accepts_targets(false)) {
+        return false;
+    }
+    return custom->set_pos_vel_accel_NED_m(target_pos_ned_m.topostype(), target_vel_ned_ms, target_accel_ned_mss, use_yaw, radians(yaw_deg), use_yaw_rate, radians(yaw_rate_degs), yaw_relative);
+}
+
 // a live owner asked for EKF failsafe disarm, applied in every flight mode
 bool Copter::custom_mode_ekf_failsafe_disarm() const
 {
@@ -66,6 +77,7 @@ void ModeGuidedCustom::exit()
     state.init_ok = false;
     state.complete = false;
     state.takeoff_event = false;
+    state.arm_request = false;
     controller = Request::GUIDED;
 }
 
@@ -82,6 +94,7 @@ void ModeGuidedCustom::registered()
     state.arming_ready = false;
     state.supervision_ms = 0;
     state.takeoff_event = false;
+    state.arm_request = false;
 }
 
 bool ModeGuidedCustom::owner_expired() const
@@ -99,6 +112,7 @@ void ModeGuidedCustom::supervise()
     }
     state.owner_lost = true;
     state.takeoff_event = false;
+    state.arm_request = false;
     state.applied_generation = state.generation;
     state.complete = false;
     if (!motors->armed()) {
@@ -117,6 +131,14 @@ void ModeGuidedCustom::supervise()
 void ModeGuidedCustom::run()
 {
     supervise();
+
+    // arm on the main thread: arming may delay while the log opens
+    if (state.arm_request) {
+        state.arm_request = false;
+        if (!motors->armed() && !state.owner_lost) {
+            AP::arming().arm(AP_Arming::Method::SCRIPTING);
+        }
+    }
 
     if (state.generation != state.applied_generation) {
         state.applied_generation = state.generation;
