@@ -155,7 +155,7 @@ Geofence setup:
   - start time, RGB565 colour and flags
   - GPS health
   - boot count (`STAT_BOOTCNT`)
-  - ESC error rate (fork API) and RTCM counts per link (fork API)
+  - ESC error rate flag and RTCM message counts on TELEM1/TELEM2 over 5 s
   - position, velocity, heading, hdop and vdop
 - Default stream intervals depend on the profile: standard adds
   GLOBAL_POSITION_INT 2 Hz, SYS_STATUS 1 Hz and GPS_RAW 1 Hz. **T**
@@ -176,7 +176,8 @@ Geofence setup:
   effects, optional group filter.
 - `TUNNEL` with payload type 42421: pixel-grid frames.
 
-**Capability bit** `0x4000000`. **P**
+**Capability bit** `0x4000000`, set when the module starts, so a GCS that asks
+for AUTOPILOT_VERSION during the first seconds of boot does not see it. **P**
 
 ## 5. Fences and failsafes — T
 
@@ -228,8 +229,7 @@ Backends (`SHOW_LED0_TYPE`):
 - WGDrones UART
 - AP_Notify `handle_rgb`
 
-Compass-cal result flashes depend on a patched AP_Notify backend that latches
-the events.
+Compass-cal result flashes use the AP_Notify event counters.
 
 ## 7. Pyro — P (the tester rejects pyro shows)
 
@@ -293,9 +293,9 @@ Other parameters:
 |---|---|---|
 | GCS: `ap_message` 101/102, custom default intervals, protected `set_ap_message_interval` | status streams | the module sends its own packets; stream rates set with `set_message_interval` |
 | GCS: `inject_command_int_packet` | group commands | existing `run_command_int` binding |
-| GCS/AP_GPS: per-link RTCM `MessageCounter`, RTCM functions take a channel | RTCM counters in status | deferred; sent as "never" |
-| `AP_ESC_Telem::has_high_error_rate` | status flag | deferred; flag 0 |
+| GCS/AP_GPS: per-link RTCM `MessageCounter`, RTCM functions take a channel | RTCM counters in status | `gps:rtcm_message_count()` per channel; the module keeps the 5 s window |
+| `AP_ESC_Telem::has_high_error_rate` | status flag | `esc_telem:get_raw_rpm_and_error_rate()`; the module keeps each ESC's last rate |
 | `AP_Relay::get_index_mask` | relay pyro | module reads `RELAYn_FUNCTION` |
-| AP_Notify `DroneShowNotificationBackend`, OreoLED `rgb_control` | compass-cal flashes, OreoLED | deferred |
+| AP_Notify `DroneShowNotificationBackend`, OreoLED `rgb_control` | compass-cal flashes, OreoLED | `notify.get_event_counts()`; OreoLED not supported |
 | AP_Logger static SHOW/FNCS/SBEV/SBSP/CRTH, LogEvent 248 | logs | dynamic `logger.write` |
 | AP_Common FWVersion not PACKED on SITL | macOS link | n/a |

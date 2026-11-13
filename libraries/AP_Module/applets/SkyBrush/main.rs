@@ -15,6 +15,7 @@ mod lights_out;
 mod loader;
 mod logging;
 mod mavlink;
+mod monitors;
 mod params;
 #[allow(dead_code)]
 mod show;
@@ -145,6 +146,11 @@ pub fn report<T>(c: &Context<'_>, what: &str, r: Result<T>) -> Result<T> {
 }
 
 fn run(c: &Context<'_>) -> Result {
+    // first, so GCSes asking for AUTOPILOT_VERSION on connect see it
+    match c.gcs().set_extra_capabilities(monitors::SKYBRUSH_CAPABILITY) {
+        Err(Error::Unavailable) => {}
+        r => report(c, "capabilities", r)?,
+    }
     let params = report(c, "params", params::Params::register(c))?;
     let mode = report(c, "mode", vehicle::register(c, app::MODE_NUMBER))?;
     report(c, "mavlink", setup_mavlink(c))?;

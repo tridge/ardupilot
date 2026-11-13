@@ -344,7 +344,7 @@ impl Lights {
         };
     }
 
-    /// Compass calibration saved (needs a latched AP_Notify event source).
+    /// Compass calibration saved.
     pub fn flash_success(&mut self, now_ms: u32) {
         self.flash(GREEN, 3, Priority::Internal, false, now_ms);
     }

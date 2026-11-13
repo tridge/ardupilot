@@ -10,7 +10,7 @@ use crate::{
     lights_out::{self as lo, LightInputs, Lights},
     loader,
     loader::{LoadConfig, Show},
-    logging, mavlink as mav,
+    logging, mavlink as mav, monitors,
     params::{changed, Params, P},
     show::{controller::secs_to_msec, fmath::hypotf, Vec3},
     telemetry, timing,
@@ -101,6 +101,9 @@ pub struct App<'a, 'h> {
     last_status_ms: u32,
     last_fence_log_ms: u32,
     pyro: pyro::Pyro,
+    rtcm: [monitors::RtcmRate; 2],
+    esc: monitors::EscErrors,
+    cal: monitors::CalEvents,
 }
 
 fn now_ms(c: &Context<'_>) -> u32 {
@@ -169,6 +172,9 @@ impl<'a, 'h> App<'a, 'h> {
             last_status_ms: 0,
             last_fence_log_ms: 0,
             pyro: pyro::Pyro::default(),
+            rtcm: Default::default(),
+            esc: Default::default(),
+            cal: Default::default(),
         };
         app.clock.use_gps = app.params.get_i32(P::SyncMode) != 0;
         app.update_frame();
@@ -1275,6 +1281,33 @@ impl<'a, 'h> App<'a, 'h> {
         self.led.write(c, frame, &self.params)
     }
 
+    /// Compass calibration result flashes and RTCM rate sampling
+    fn check_events(&mut self) -> Result {
+        let c = self.c;
+        let now = now_ms(c);
+        match c.notify().get_event_counts() {
+            Ok(counts) => {
+                let r = self.cal.update(counts);
+                if r.failed {
+                    self.lights.flash_failure(now);
+                } else if r.saved {
+                    self.lights.flash_success(now);
+                }
+            }
+            Err(ap_rust_sdk::Error::Unavailable) => {}
+            Err(e) => return Err(e),
+        }
+        // the status reports MAVLink channels 1 and 2 (TELEM1 and TELEM2)
+        for (i, rate) in self.rtcm.iter_mut().enumerate() {
+            match c.gps().rtcm_message_count(i as u8 + 1) {
+                Ok(total) => rate.update(total, now),
+                Err(ap_rust_sdk::Error::Unavailable) => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
+
     pub fn handle_led_control(&mut self, payload: &[u8]) -> bool {
         let group = self.params.get_i32(P::Group).clamp(0, 255) as u8;
         self.lights.handle_led_control(payload, payload[0], group, now_ms(self.c))
@@ -1327,10 +1360,10 @@ impl<'a, 'h> App<'a, 'h> {
             num_sats: gps_value(gps.num_sats(i))?,
             boot_count: self.boot_count,
             auth_scope: self.auth(),
-            esc_error: false,
+            esc_error: self.esc.high(self.params.get(P::MaxEscErr)),
             off_position,
             elapsed_sec,
-            rtcm_counts: [-1, -1],
+            rtcm_counts: [self.rtcm[0].count(now_ms(self.c)), self.rtcm[1].count(now_ms(self.c))],
         })
     }
 
@@ -1342,6 +1375,9 @@ impl<'a, 'h> App<'a, 'h> {
             return Ok(());
         }
         self.last_status_ms = now;
+        if self.params.get(P::MaxEscErr) >= 0.0 {
+            crate::report(self.c, "esc errors", self.esc.update(self.c))?;
+        }
         let basic = crate::report(self.c, "status_basic", self.status_basic())?;
         let mut data = [0u8; 48];
         let (msgid, payload): (u32, &[u8]) = if compact {
@@ -1477,6 +1513,7 @@ impl<'a, 'h> App<'a, 'h> {
         if even {
             crate::report(c, "fences", self.fence_checks())?;
             crate::report(c, "pyro", self.update_pyro())?;
+            crate::report(c, "events", self.check_events())?;
             crate::report(c, "lights", self.update_lights())?;
             crate::report(c, "logs", self.write_logs())?;
         } else {
