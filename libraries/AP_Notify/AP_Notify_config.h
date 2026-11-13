@@ -9,6 +9,10 @@
 #include <AP_SerialLED/AP_SerialLED_config.h>
 #include <AP_Scripting/AP_Scripting_config.h>
 
+#ifndef AP_NOTIFY_EVENT_COUNTS_ENABLED
+#define AP_NOTIFY_EVENT_COUNTS_ENABLED (HAL_PROGRAM_SIZE_LIMIT_KB > 1024)
+#endif
+
 #ifndef AP_NOTIFY_DISCRETE_RGB_ENABLED
 #define AP_NOTIFY_DISCRETE_RGB_ENABLED 0
 #endif

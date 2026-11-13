@@ -177,6 +177,11 @@ public:
     static struct notify_flags_and_values_type flags;
     static struct notify_events_type events;
 
+#if AP_NOTIFY_EVENT_COUNTS_ENABLED
+    // wrapping count of each event, indexed by bit position in notify_events_type
+    static uint8_t event_counts[32];
+#endif
+
     // initialisation
     void init(void);
 
