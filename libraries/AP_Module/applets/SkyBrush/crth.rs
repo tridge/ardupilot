@@ -90,10 +90,10 @@ fn cover_trajectory(show: &Show, scene: &mut Scene, initial_rate: f32, final_rat
 
 fn crth_scene(show: &Show, plan: &RthPlan, rth_start: f32, wait_or_takeoff: bool) -> Option<(Scene, CrthTrigger)> {
     let mut entry = plan.evaluate_at(rth_start).ok()?;
-    let start = if show.controller.current_scene().is_some() {
-        // the fork clones the current scene's player; the main show trajectory
-        // gives the same answer there and stays right when a CRTH is resent
-        let traj = show.main_scene.trajectory.as_ref()?;
+    let start = if let Some(i) = show.controller.current_scene() {
+        // as the fork, evaluate the active scene's trajectory, which is the
+        // previous CRTH trajectory when a CRTH is resent
+        let traj = show.controller.screenplay().scenes.get(i)?.trajectory.as_ref()?;
         Player::new(traj).position_at(traj, rth_start)
     } else if wait_or_takeoff {
         entry = RthPlan::default_entry(Some(plan), 0.0);
