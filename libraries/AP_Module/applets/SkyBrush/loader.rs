@@ -2,7 +2,7 @@
 //! Show file loading and trajectory properties, as AC_DroneShowManager_Loader.
 
 use crate::show::{
-    controller::{Controller, SCENE_FLAG_DYNAMIC_DURATION},
+    controller::{Controller, Scene, SCENE_FLAG_DYNAMIC_DURATION},
     stats::{Stats, StatsCalculator},
     Vec3,
 };
@@ -19,7 +19,10 @@ pub const SHOW_FILE: &str = "collmot/show.skyb";
 pub const SHOW_FILE: &str = "/COLLMOT/show.skyb";
 
 const CIRCULAR_THRESHOLD_MM: f32 = 500.0;
-const SCENE_TAG_MAIN_SHOW: u8 = 1;
+pub const SCENE_TAG_MAIN_SHOW: u8 = 1;
+pub const SCENE_TAG_CRTH: u8 = 2;
+/// 0xFFFF is never a valid TIME_AXIS_CONFIG sequence number
+pub const NO_SEQ: u16 = 0xFFFF;
 
 pub struct Show {
     pub controller: Controller,
@@ -29,6 +32,9 @@ pub struct Show {
     pub takeoff_position_mm: Vec3,
     pub circular: bool,
     pub modified_for_landing: bool,
+    /// contents of the main show scene, for TIME_AXIS_CONFIG
+    pub main_scene: Scene,
+    pub last_seq: u16,
     /// GCS light control setup block (pixel grid), if any
     pub light_control: Option<Vec<u8>>,
 }
@@ -104,8 +110,11 @@ pub fn load(c: &Context<'_>, cfg: &LoadConfig) -> Result<Option<Show>> {
             ev.adjust_timestamps_by_type(crate::show::events::EVENT_TYPE_PYRO, -cfg.pyro_tcomp_msec);
         }
     }
+    let main_scene = scene.clone();
     controller.reset_players();
     Ok(Some(Show {
+        main_scene,
+        last_seq: NO_SEQ,
         circular: ok && stats.start_to_end_distance_xy <= CIRCULAR_THRESHOLD_MM,
         takeoff_position_mm: if ok { stats.initial_pos } else { Vec3::ZERO },
         controller,
@@ -122,21 +131,29 @@ pub fn correct_landing(show: &mut Show, end: Vec3, land_speed_mm_s: f32) -> bool
     if !show.circular || show.modified_for_landing {
         return false;
     }
-    let Some(scene) = show.controller.screenplay_mut().scenes.get_mut(0) else {
+    let Some(traj) = show.main_scene.trajectory.as_mut() else {
         return false;
     };
-    let Some(traj) = scene.trajectory.as_mut() else {
-        return false;
-    };
+    let old = traj.clone();
     if traj
         .replace_end_to_land_at(&mut show.stats, end, land_speed_mm_s, land_speed_mm_s)
         .is_err()
     {
         return false;
     }
-    if scene.has_flag(SCENE_FLAG_DYNAMIC_DURATION) {
-        let d = scene.time_axis.reverse_map(show.stats.duration_sec);
-        scene.duration_msec = if d <= 0 { 1 } else { d as u32 };
+    // scenes share the main show trajectory in the fork; update every copy
+    let new = traj.clone();
+    let scenes = &mut show.controller.screenplay_mut().scenes;
+    let last = scenes.len().wrapping_sub(1);
+    for (i, scene) in scenes.iter_mut().enumerate() {
+        if scene.trajectory.as_ref() != Some(&old) {
+            continue;
+        }
+        scene.trajectory = Some(new.clone());
+        if i == last && scene.has_flag(SCENE_FLAG_DYNAMIC_DURATION) {
+            let d = scene.time_axis.reverse_map(show.stats.duration_sec);
+            scene.duration_msec = if d <= 0 { 1 } else { d as u32 };
+        }
     }
     show.controller.notify_trajectory_changed();
     show.modified_for_landing = true;

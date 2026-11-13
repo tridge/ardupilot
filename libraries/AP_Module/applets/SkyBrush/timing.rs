@@ -15,6 +15,16 @@ pub fn gps_to_unix_ms(week: u16, tow_ms: u32) -> u64 {
     UNIX_OFFSET_MSEC + week as u64 * MSEC_PER_WEEK + tow_ms as u64
 }
 
+/// UNIX epoch ms to (GPS time of week s, ms offset), as the fork's
+/// TIME_AXIS_CONFIG handler; tow is -1 for 0 (unset).
+pub fn unix_ms_to_tow(unix_ms: u64) -> (i32, i32) {
+    if unix_ms == 0 {
+        return (-1, 0);
+    }
+    let since = unix_ms.wrapping_sub(UNIX_OFFSET_MSEC);
+    (((since / 1000) % GPS_WEEK_SEC as u64) as i32, (since % 1000) as i32)
+}
+
 /// Pick the GPS week that puts a time-of-week start nearest to now.
 pub fn resolve_start_unix_usec(start_tow_ms: i64, now_week: u16, now_tow_ms: u32) -> u64 {
     let half_week = GPS_WEEK_SEC * 1000 / 2;

@@ -3,6 +3,7 @@
 
 use crate::{
     coords::ShowFrame,
+    crth,
     fences::{self, BubbleFence, BubbleParams, HardFence, HardFenceParams, HardMsg, RateLimit},
     geofence,
     lights_backends::Led,
@@ -243,6 +244,10 @@ impl<'a, 'h> App<'a, 'h> {
     }
 
     fn set_stage(&mut self, s: Stage) {
+        if s == Stage::Takeoff && self.stage != Stage::Takeoff {
+            // the first time axis config usually arrives before arming; log it here
+            self.log_screenplay();
+        }
         self.stage = s;
         self.stage_started_ms = now_ms(self.c);
         self.altitude_locked = s == Stage::Performing;
@@ -507,6 +512,59 @@ impl<'a, 'h> App<'a, 'h> {
         geofence::configure(self.c, self.tentative.as_ref(), g)
     }
 
+    /// TIME_AXIS_CONFIG: new screenplay (time warping, collective RTH scenes).
+    pub fn handle_time_axis_config(&mut self, d: &[u8]) -> Result<bool> {
+        let Some(h) = crth::header(d) else {
+            return Ok(false);
+        };
+        let allowed = self.start_time_change_allowed();
+        let wait_or_takeoff = matches!(self.stage, Stage::WaitForStartTime | Stage::Takeoff);
+        let (use_gps, start_usec) = (self.clock.use_gps, self.clock.start_unix_usec);
+        let Some(show) = self.show.as_mut() else {
+            return Ok(false);
+        };
+        if !crth::accept_seq(&mut show.last_seq, h.seq) {
+            return Ok(true);
+        }
+        if use_gps && !crth::start_time_move_allowed(&h, start_usec, allowed) {
+            return Ok(false);
+        }
+        if use_gps {
+            let (tow, msec) = timing::unix_ms_to_tow(h.start_time_msec);
+            self.params.set_i32(P::StartTime, tow)?;
+            self.params.set(P::StartMsec, msec as f32)?;
+            self.param_changes()?;
+        }
+        let Some(show) = self.show.as_mut() else {
+            return Ok(false);
+        };
+        let Some((sp, triggers)) = crth::build(show, d, &h, wait_or_takeoff) else {
+            return Ok(false);
+        };
+        show.controller.replace_screenplay(sp);
+        let clock_ms = timing::elapsed_msec(self.elapsed_usec()?);
+        for t in &triggers {
+            let p = t.start;
+            logging::crth(self.c, clock_ms, t.rth_start_sec, [p.x / 1000.0, p.y / 1000.0, p.z / 1000.0])?;
+        }
+        if !triggers.is_empty() {
+            text(self.c, MavSeverity::INFO, "Collective RTH triggered");
+        }
+        self.log_screenplay();
+        Ok(true)
+    }
+
+    fn log_screenplay(&self) {
+        if let Some(show) = self.show.as_ref() {
+            let _ = logging::screenplay(self.c, crth::log_seq(show), show.controller.screenplay());
+        }
+    }
+
+    /// is_collective_rth_triggered(): the GCS added a scene after the main show.
+    fn crth_triggered(&self) -> bool {
+        self.show.as_ref().is_some_and(|s| s.controller.screenplay().scenes.len() > 1)
+    }
+
     fn is_disarmed_or_landed(&self) -> Result<bool> {
         Ok(!self.c.arming().is_armed()? || !self.c.vehicle().get_likely_flying()?)
     }
@@ -523,7 +581,9 @@ impl<'a, 'h> App<'a, 'h> {
 
     fn time_until_takeoff_sec(&mut self) -> Result<f32> {
         let t = match &self.show {
-            Some(s) if s.plausible() => s.takeoff_time_sec,
+            Some(s) if s.plausible() => {
+                s.controller.screenplay().time_sec_for_tag_and_warped_time(loader::SCENE_TAG_MAIN_SHOW, s.takeoff_time_sec)
+            }
             _ => f32::INFINITY,
         };
         let elapsed = self.elapsed_usec()?;
@@ -628,6 +688,9 @@ impl<'a, 'h> App<'a, 'h> {
     }
 
     fn wait_run(&mut self) -> Result {
+        if self.crth_triggered() {
+            return self.landing_start();
+        }
         let until = self.time_until_takeoff_sec()?;
         let since = -until;
         if since > LATEST_TAKEOFF_ATTEMPT_SEC + 1.0 {
@@ -723,6 +786,9 @@ impl<'a, 'h> App<'a, 'h> {
     }
 
     fn takeoff_run(&mut self) -> Result {
+        if self.crth_triggered() {
+            return self.landing_start();
+        }
         if !self.c.arming().is_armed()? {
             text(self.c, MavSeverity::CRITICAL, "Motors disarmed during takeoff");
             return self.error_start();
@@ -891,6 +957,9 @@ impl<'a, 'h> App<'a, 'h> {
     }
 
     fn end_of_show_action(&mut self) -> Result<i32> {
+        if self.crth_triggered() {
+            return Ok(POST_LAND);
+        }
         let mut threshold = 1.0;
         let takeoff = self.params.get(P::TakeoffAlt);
         if takeoff > 0.0 {

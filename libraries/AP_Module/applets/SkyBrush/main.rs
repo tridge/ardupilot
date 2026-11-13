@@ -7,6 +7,7 @@ extern crate alloc;
 
 mod app;
 mod coords;
+mod crth;
 mod fences;
 mod geofence;
 mod lights_backends;
@@ -115,6 +116,9 @@ fn handle_message(app: &mut App<'_, '_>, c: &Context<'_>, msg: &mav::Received) -
             if let Some(sc) = mav::decode_start_config(body) {
                 app.handle_start_config(&sc)?;
             }
+        }
+        mav::TIME_AXIS_CONFIG => {
+            app.handle_time_axis_config(body)?;
         }
         mav::SIMPLE_GEOFENCE_SETUP => {
             if let Some(g) = mav::decode_geofence_setup(body) {

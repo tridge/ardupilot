@@ -87,3 +87,44 @@ pub fn event(c: &Context<'_>, clock_ms: i32, scene: u8, scene_ms: i32, kind: u8,
         ],
     )
 }
+
+/// SBSP: one row per time axis segment; Origin only on a scene's first row.
+pub fn screenplay(c: &Context<'_>, seq: u8, sp: &crate::show::controller::Screenplay) -> Result {
+    for (i, scene) in sp.scenes.iter().enumerate().take(256) {
+        let mut origin = scene.time_axis.origin_msec() as u64;
+        for (j, seg) in scene.time_axis.segments().iter().enumerate().take(256) {
+            write(
+                c,
+                "SBSP",
+                "Seq,Scene,Index,Origin,Duration,IR,FR",
+                &[
+                    L::U8(seq),
+                    L::U8(i as u8),
+                    L::U8(j as u8),
+                    L::U64(origin),
+                    L::U32(seg.duration_msec),
+                    L::Float(seg.initial_rate),
+                    L::Float(seg.final_rate),
+                ],
+            )?;
+            origin = 0;
+        }
+    }
+    Ok(())
+}
+
+/// CRTH: collective RTH scene created; start in show frame metres.
+pub fn crth(c: &Context<'_>, clock_ms: i32, rth_start_sec: f32, start_m: [f32; 3]) -> Result {
+    write(
+        c,
+        "CRTH",
+        "ClockMS,StartMS,StartX,StartY,StartZ",
+        &[
+            L::I32(clock_ms),
+            L::U32((rth_start_sec * 1000.0) as u32),
+            L::Float(start_m[0]),
+            L::Float(start_m[1]),
+            L::Float(start_m[2]),
+        ],
+    )
+}
