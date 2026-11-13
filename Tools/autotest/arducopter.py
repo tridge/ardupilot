@@ -24277,11 +24277,12 @@ return update()
 
     def RustCustomModeController(self):
         '''exercise native custom mode controller requests, options and owner supervision'''
+        # limits also admit a module built into ROMFS with --module
         self.set_parameters({
             'MOD_ENABLE': 1,
-            'MOD_HEAP_MAX': 65536,
-            'MOD_CODE_MAXSIZE': 131072,
-            'MOD_STACK_MAX': 32768,
+            'MOD_HEAP_MAX': 262144,
+            'MOD_CODE_MAXSIZE': 262144,
+            'MOD_STACK_MAX': 65536,
         })
         self.context_push()
         self.install_rust_test_module_context('custom_mode_controller.rs', install_name='custom-mode-controller.apmod')
@@ -24380,6 +24381,18 @@ return update()
         self.arm_vehicle()  # MAVLink arming always allowed
         self.disarm_vehicle()
         command(6, arg=0)
+
+        self.start_subtest('arm request and owned targets')
+        command(12, text='CMT: arm request 1 armed 1')
+        takeoff(10)
+        command(2, arg=0, text='CMT: guided applied, PVA start')
+        command(13, text='CMT: owned PVA 1')
+        # ordinary GUIDED must not take the owner's targets
+        self.change_mode('GUIDED')
+        command(13, text='CMT: owned PVA 0')
+        self.change_mode('LAND')
+        self.wait_disarmed(timeout=90)
+        self.change_mode(mode)
 
         self.start_subtest('EKF_FS_DISARM')
         self.arm_vehicle()
