@@ -1273,6 +1273,15 @@ impl<'a, 'h> App<'a, 'h> {
     fn update_lights(&mut self) -> Result {
         let c = self.c;
         let elapsed_sec = timing::elapsed_sec(self.elapsed_usec()?);
+        // as the fork, advance the controller at the light rate so lights-only
+        // runs play and colours do not wait for the next setpoint
+        let show_colour = match self.show.as_mut() {
+            Some(s) if elapsed_sec >= 0.0 => match s.controller.update_time_msec(secs_to_msec(elapsed_sec)) {
+                Ok(()) => s.controller.output().color,
+                Err(_) => None,
+            },
+            _ => None,
+        };
         let i = LightInputs {
             stage: self.stage as u8,
             mode: c.vehicle().get_mode()?,
@@ -1286,7 +1295,7 @@ impl<'a, 'h> App<'a, 'h> {
             start_scheduled: self.has_start_time(),
             time_to_takeoff_sec: self.time_until_takeoff_sec()?,
             elapsed_sec,
-            show_colour: self.show.as_ref().and_then(|s| s.controller.output().color),
+            show_colour,
             gps_ms: self.lights_gps_ms()?,
             now_ms: now_ms(c),
             pre_lights: self.params.get_i32(P::PreLights),
