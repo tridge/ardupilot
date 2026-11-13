@@ -539,7 +539,10 @@ impl<'a, 'h> App<'a, 'h> {
             let (tow, msec) = timing::unix_ms_to_tow(h.start_time_msec);
             self.params.set_i32(P::StartTime, tow)?;
             self.params.set(P::StartMsec, msec as f32)?;
-            self.param_changes()?;
+            // the writes update the param cache, so param_changes() would not see them
+            self.update_start_time()?;
+            self.calibration_done = false;
+            self.home_set = false;
         }
         let Some(show) = self.show.as_mut() else {
             return Ok(false);
