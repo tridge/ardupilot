@@ -102,15 +102,22 @@ pub fn keepalive(c: &Context<'_>, m: &Mode) -> Result {
     m.handle.keepalive(c)
 }
 
+/// Guided target, only accepted while our mode is the current mode.
 pub fn set_target_pva(
     c: &Context<'_>,
-    pos: &mut Vector3f,
-    vel: &mut Vector3f,
-    acc: &mut Vector3f,
+    m: &Mode,
+    pos: &Vector3f,
+    vel: &Vector3f,
+    acc: &Vector3f,
     yaw_deg: f32,
     yaw_rate_dps: f32,
 ) -> Result<bool> {
-    c.vehicle().set_target_posvelaccel_ned(pos, vel, acc, true, yaw_deg, true, yaw_rate_dps, false)
+    m.handle.set_target_posvelaccel(c, pos, vel, acc, true, yaw_deg, true, yaw_rate_dps, false)
+}
+
+/// Ask the main thread to arm, as arming may delay while the log opens.
+pub fn request_arm(c: &Context<'_>, m: &Mode) -> Result<bool> {
+    m.handle.request_arm(c)
 }
 
 /// Disarm in flight without arming checks.

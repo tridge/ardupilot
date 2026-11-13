@@ -679,10 +679,8 @@ impl<'a, 'h> App<'a, 'h> {
         if (self.prevent_arming_until_ms.wrapping_sub(now) as i32) > 0 {
             return Ok(false);
         }
-        if self.c.arming().arm()? {
-            self.note_armed(true)?;
-            return Ok(true);
-        }
+        // armed on the main thread; a failed attempt is retried a second later
+        vehicle::request_arm(self.c, &self.mode)?;
         self.prevent_arming_until_ms = now.wrapping_add(1000);
         Ok(false)
     }
@@ -933,12 +931,12 @@ impl<'a, 'h> App<'a, 'h> {
         let Some(neu) = loc.get_vector_from_origin_neu_m(self.c)? else {
             return Ok(false);
         };
-        let mut pos = Vector3f { x: neu.x, y: neu.y, z: -neu.z };
+        let pos = Vector3f { x: neu.x, y: neu.y, z: -neu.z };
         if !(pos.x.is_finite() && pos.y.is_finite() && pos.z.is_finite()) {
             text(self.c, MavSeverity::WARNING, "Invalid position command");
             return Ok(false);
         }
-        if !vehicle::set_target_pva(self.c, &mut pos, &mut vel, &mut acc, yaw, yaw_rate)? {
+        if !vehicle::set_target_pva(self.c, &self.mode, &pos, &vel, &acc, yaw, yaw_rate)? {
             return Ok(false);
         }
         self.last_setpoint_ned = Some(pos);
