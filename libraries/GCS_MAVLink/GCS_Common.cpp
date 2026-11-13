@@ -7727,6 +7727,8 @@ uint64_t GCS_MAVLINK::capabilities() const
     }
 #endif
 
+    ret |= gcs().get_extra_capabilities();
+
     return ret;
 }
 
