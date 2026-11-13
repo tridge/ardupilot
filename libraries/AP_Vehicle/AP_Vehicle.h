@@ -285,7 +285,7 @@ public:
         };
         enum Option : uint8_t {
             NO_EXTERNAL_GUIDED = (1U << 0), // reject GCS guided targets, NAV_TAKEOFF sets takeoff_event
-            EKF_FS_DISARM      = (1U << 1), // EKF failsafe disarms
+            EKF_FS_DISARM      = (1U << 1), // EKF failsafe disarms in any mode while the owner is live
             ARMING_GATED       = (1U << 2), // only MAVLink arming unless arming_ready
         };
         Request request;
