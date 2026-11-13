@@ -22819,19 +22819,22 @@ return update, 1000
         '''test native bindings for int32 parameters, fence, notify, mkdir, disarm methods and mode reasons'''
         self.context_push()
         self.install_rust_test_module_context('module_control.rs', install_name='module-control.apmod')
-        self.set_parameters({
-            'MOD_ENABLE': 1,
-            'MOD_HEAP_MAX': 32768,
-            'MOD_CODE_MAXSIZE': 131072,
-            'MOD_STACK_MAX': 32768,
-            'SCR_ENABLE': 0,
-        })
+        # defaults for parameters the module registers after boot
+        defaults = tempfile.NamedTemporaryFile(mode='w', suffix='.parm', delete=False)
+        # limits also admit a module built into ROMFS with --module
+        defaults.write("MOD_ENABLE 1\nMOD_HEAP_MAX 262144\nMOD_CODE_MAXSIZE 262144\nMOD_STACK_MAX 65536\n"
+                       "SCR_ENABLE 0\nMCD_I32 1491234567\nMCD_BIG 2147483648\nMCD_RO 3 @READONLY\n")
+        defaults.close()
         self.context_collect('STATUSTEXT')
         self.install_message_hook_context(self.FailFastStatusText(self, ['MCT fail', 'Module fatal:']))
-        self.reboot_sitl()
+        self.customise_SITL_commandline([], defaults_filepath=[defaults.name], wipe=True)
         try:
             self.wait_text('MCT setup ok', check_context=True, timeout=60)
             self.assert_parameter_value('MCT_I32', -7)
+            self.assert_parameter_value('MCD_RO', 3)
+            self.mav.mav.param_set_send(self.sysid_thismav(), 1, b'MCD_RO', 4, mavutil.mavlink.MAV_PARAM_TYPE_REAL32)
+            self.delay_sim_time(2, reason='read-only parameter set ignored')
+            self.assert_parameter_value('MCD_RO', 3)
             # four vertices plus the legacy return point and closing point
             self.assert_parameter_value('FENCE_TOTAL', 6)
             items = self.download_using_mission_protocol(mavutil.mavlink.MAV_MISSION_TYPE_FENCE)
