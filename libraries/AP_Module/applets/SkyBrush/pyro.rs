@@ -320,7 +320,8 @@ impl Pyro {
                     return Ok(RESULT_FAILURE);
                 }
             }
-            Device::Relay { idx, .. } => c.relay().on(idx[ch as usize])?,
+            // the host turns the relay off if the module stops renewing it
+            Device::Relay { idx, .. } => c.relay().on_for_ms(idx[ch as usize], Self::backstop_ms(itime, 0) as u16)?,
         }
         Ok(RESULT_SUCCESS)
     }
@@ -393,12 +394,17 @@ impl Pyro {
                 self.off(c, ch)?;
                 continue;
             }
-            // keep the override alive for ignitions longer than its 65 s limit
+            // renew the host timeout so a stalled module cannot leave the
+            // output on, and outputs last longer than the 65 s timeout limit
             if now.wrapping_sub(self.backstop_ms[ch as usize]) >= BACKSTOP_REFRESH_MS {
                 self.backstop_ms[ch as usize] = now;
                 let s = match &self.device {
                     Some(Device::SingleServo(s)) if self.single_owner == Some(ch) => *s,
                     Some(Device::MultipleServos { servos, .. }) => servos[ch as usize],
+                    Some(Device::Relay { idx, .. }) => {
+                        c.relay().on_for_ms(idx[ch as usize], Self::backstop_ms(itime, elapsed) as u16)?;
+                        continue;
+                    }
                     _ => continue,
                 };
                 let pwm = self.fire_pwm(ch, &s);
