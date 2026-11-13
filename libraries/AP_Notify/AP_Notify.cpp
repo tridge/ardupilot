@@ -225,7 +225,7 @@ AP_Notify::AP_Notify()
 struct AP_Notify::notify_flags_and_values_type AP_Notify::flags;
 struct AP_Notify::notify_events_type AP_Notify::events;
 #if AP_NOTIFY_EVENT_COUNTS_ENABLED
-uint8_t AP_Notify::event_counts[32];
+std::atomic<uint8_t> AP_Notify::event_counts[32];
 #endif
 
 NotifyDevice *AP_Notify::_devices[CONFIG_NOTIFY_DEVICES_MAX];
@@ -432,7 +432,8 @@ void AP_Notify::update(void)
     static_assert(sizeof(events) == sizeof(bits), "events must fit in 32 bits");
     memcpy(&bits, &events, sizeof(bits));
     while (bits != 0) {
-        event_counts[__builtin_ctz(bits)]++;
+        auto &count = event_counts[__builtin_ctz(bits)];
+        count.store(count.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
         bits &= bits - 1;
     }
 #endif
