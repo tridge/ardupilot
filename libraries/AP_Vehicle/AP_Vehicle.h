@@ -297,6 +297,7 @@ public:
         uint32_t keepalive_ms;
         bool owner_loss_event;      // owner cleanup, handled on the main thread
         bool takeoff_event;         // GCS takeoff, cleared by the owner
+        bool arm_request;           // owner asks to arm, applied on the main thread
 
         // status, written on the main thread
         uint16_t applied_generation;
@@ -307,6 +308,10 @@ public:
     };
     virtual custom_mode_state* register_custom_mode(const uint8_t number, const char* full_name, const char* short_name,
                                                   const void *owner = nullptr) { return nullptr; }
+
+    // as set_target_posvelaccel_NED() but only while the custom mode of state
+    // is the current mode and accepts targets; caller holds the scheduler lock
+    virtual bool custom_mode_set_target_posvelaccel_NED(const custom_mode_state *state, const Vector3f& target_pos_ned_m, const Vector3f& target_vel_ned_ms, const Vector3f& target_accel_ned_mss, bool use_yaw, float yaw_deg, bool use_yaw_rate, float yaw_rate_degs, bool yaw_relative) { return false; }
 
 #endif // AP_EXTERNAL_BINDING_ENABLED
 
