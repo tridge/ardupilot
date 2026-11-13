@@ -359,7 +359,7 @@ public:
     bool is_armed() { return true; }
     bool arm(Method m) { if (scheduler_sem.depth != 0) { __builtin_trap(); } return m == Method::SCRIPTING; }
     bool disarm_with_method(Method m, bool checks) {
-        if (scheduler_sem.depth != 0) { __builtin_trap(); }
+        if (scheduler_sem.depth != 1) { __builtin_trap(); }
         last = m; return checks;
     }
     Method last_disarm_method() { if (scheduler_sem.depth != 0) { __builtin_trap(); } return last; }
@@ -654,7 +654,7 @@ def test_dispatch_values_and_locks(dispatcher):
     assert lib.call(ids['vehicle_get_mode'], None, 0, output, 1) == 0
     assert output.raw[0] == 10
     # Arming can wait for the logger, so it runs without the scheduler lock;
-    # reasoned mode changes are serialized with the main loop.
+    # disarming and reasoned mode changes are serialized with the main loop.
     assert lib.call(ids['arming_arm'], None, 0, output, 1) == 0 and output.raw[0] == 1
     assert lib.call(ids['arming_disarm_method'], struct.pack('<iB', 15, 1), 5, output, 1) == 0
     assert output.raw[0] == 1
