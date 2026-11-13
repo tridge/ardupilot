@@ -1245,9 +1245,12 @@ void AP_GPS::update_primary(void)
 
 void AP_GPS::note_rtcm_message(mavlink_channel_t chan)
 {
+#if AP_GPS_RTCM_COUNT_ENABLED
     if (unsigned(chan) < ARRAY_SIZE(rtcm_message_count)) {
-        rtcm_message_count[chan]++;
+        auto &count = rtcm_message_count[chan];
+        count.store(count.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
     }
+#endif
 }
 
 #if HAL_GCS_ENABLED
