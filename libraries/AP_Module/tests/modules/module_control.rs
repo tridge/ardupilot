@@ -39,6 +39,14 @@ fn run(context: &Context<'_>) -> Result {
     require(!param.set_int32("FENCE_ENABLE", 300)?, "MCT fail int8 range", context)?;
     require(param.set_and_save_int32("MCT_I32", -7)?, "MCT fail save", context)?;
     require(param.get_int32("MCT_I32")? == Some(-7), "MCT fail saved value", context)?;
+    // the autotest's defaults file sets MCD_I32 1491234567, MCD_BIG 2147483648
+    // (out of range, ignored) and MCD_RO 3 @READONLY
+    require(param.add_table(196, "MCD_", 3)?, "MCT fail defaults table", context)?;
+    require(param.add_param_int32(196, 1, "I32", 0)?, "MCT fail defaults int32", context)?;
+    require(param.add_param_int32(196, 2, "BIG", 5)?, "MCT fail defaults big", context)?;
+    require(param.add_param(196, 3, "RO", 0.0)?, "MCT fail defaults ro", context)?;
+    require(param.get_int32("MCD_I32")? == Some(1491234567), "MCT fail exact default", context)?;
+    require(param.get_int32("MCD_BIG")? == Some(5), "MCT fail default range", context)?;
 
     let fs = context.fs();
     let created = fs.mkdir("modules/mct_dir")?;
