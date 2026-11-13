@@ -98,6 +98,7 @@ public:
         uint32_t rest : 19;
     };
     static inline uint8_t event_counts[32];
+    static uint8_t get_event_count(uint8_t bit) { return event_counts[bit]; }
 };
 ''')
     lines = ['#include "stubs.h"', '#include <AP_Module/HostApi.h>', '#include <AP_Module/BindingSupport.h>',

@@ -76,11 +76,11 @@ def events_cpp(spec):
              'static __attribute__((noinline)) int32_t binding_notify_get_event_counts(',
              '    const uint8_t *, uint32_t, uint8_t *output, uint32_t)', '{',
              f'#if {condition}']
-    # event_counts is indexed by the event's bit position in notify_events_type
+    # counts are indexed by the event's bit position in notify_events_type
     for byte, name in enumerate(EVENTS):
         lines += ['    {', '        AP_Notify::notify_events_type event {};', f'        event.{name} = 1;',
                   '        uint32_t bits;', '        memcpy(&bits, &event, sizeof(bits));',
-                  f'        output[{byte}] = AP_Notify::event_counts[__builtin_ctz(bits)];', '    }']
+                  f'        output[{byte}] = AP_Notify::get_event_count(__builtin_ctz(bits));', '    }']
     lines += ['    return AP_MODULE_STATUS_OK;',
               '#else', '    memset(output, 0, 8);', '    return AP_MODULE_STATUS_UNAVAILABLE;', '#endif']
     return lines + ['}', '']
