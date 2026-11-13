@@ -195,8 +195,7 @@ void Copter::failsafe_ekf_event()
     }
 
 #if MODE_GUIDED_ENABLED && AP_EXTERNAL_BINDING_ENABLED
-    const ModeGuidedCustom *custom = active_custom_mode();
-    if (custom != nullptr && custom->ekf_failsafe_disarm()) {
+    if (custom_mode_ekf_failsafe_disarm()) {
         arming.disarm(AP_Arming::Method::EKFFAILSAFE, false);
         gcs().send_text(MAV_SEVERITY_CRITICAL, "EKF Failsafe: forced disarm");
         return;

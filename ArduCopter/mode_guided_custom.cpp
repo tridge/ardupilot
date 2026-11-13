@@ -20,6 +20,17 @@ ModeGuidedCustom *Copter::active_custom_mode()
     return nullptr;
 }
 
+// a live owner asked for EKF failsafe disarm, applied in every flight mode
+bool Copter::custom_mode_ekf_failsafe_disarm() const
+{
+    for (const auto *custom : mode_guided_custom) {
+        if (custom != nullptr && custom->ekf_failsafe_disarm()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool ModeGuidedCustom::init(bool ignore_checks)
 {
     // Stript can block entry

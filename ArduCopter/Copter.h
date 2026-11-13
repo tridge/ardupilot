@@ -673,6 +673,7 @@ private:
     ModeGuided *guided_target_mode(bool external = false);
 #if AP_EXTERNAL_BINDING_ENABLED
     ModeGuidedCustom *active_custom_mode();
+    bool custom_mode_ekf_failsafe_disarm() const;
 #endif
 #endif
 #if AP_EXTERNAL_BINDING_ENABLED || AP_EXTERNAL_CONTROL_ENABLED

@@ -1285,8 +1285,10 @@ public:
     // handle a GCS takeoff command, false if not handled as a takeoff event
     bool gcs_takeoff(MAV_RESULT &result);
 
-    // true if an EKF failsafe should disarm
-    bool ekf_failsafe_disarm() const { return option_set(Option::EKF_FS_DISARM); }
+    // true if an EKF failsafe should disarm, in any mode while the owner is live
+    bool ekf_failsafe_disarm() const {
+        return state.owner != nullptr && !state.owner_lost && option_set(Option::EKF_FS_DISARM);
+    }
 
     // reset owner settings on registration
     void registered();
