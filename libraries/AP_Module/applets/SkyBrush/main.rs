@@ -69,6 +69,7 @@ fn handle_command(app: &mut App<'_, '_>, c: &Context<'_>, msg: &mav::Received, c
                 mav::MAV_RESULT_ACCEPTED
             }
         }
+        (mav::MAV_CMD_USER_1, 2) => app.handle_pyro_test(cmd.param2, cmd.param3, cmd.param4)?,
         (mav::MAV_CMD_USER_1, 4) => app.handle_light_source(cmd.param2, cmd.param3, cmd.x),
         (mav::MAV_CMD_USER_1, 3) => app.group_command(cmd)?,
         (mav::MAV_CMD_USER_2, 0) => {

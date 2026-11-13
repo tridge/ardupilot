@@ -18,6 +18,9 @@ use crate::{
 };
 use ap_rust_sdk::{enums::MavSeverity, Context, Location, Result, Vector3f};
 
+#[path = "pyro.rs"]
+mod pyro;
+
 pub const MODE_NUMBER: u8 = 127;
 const MODE_RTL: u8 = 6;
 const MODE_LAND: u8 = 9;
@@ -96,6 +99,7 @@ pub struct App<'a, 'h> {
     start_from_rc: bool,
     last_status_ms: u32,
     last_fence_log_ms: u32,
+    pyro: pyro::Pyro,
 }
 
 fn now_ms(c: &Context<'_>) -> u32 {
@@ -163,11 +167,13 @@ impl<'a, 'h> App<'a, 'h> {
             start_from_rc: false,
             last_status_ms: 0,
             last_fence_log_ms: 0,
+            pyro: pyro::Pyro::default(),
         };
         app.clock.use_gps = app.params.get_i32(P::SyncMode) != 0;
         app.update_frame();
         app.reload_show()?;
         crate::report(c, "led", app.led.configure(c, &app.params))?;
+        crate::report(c, "pyro", app.update_pyro_instance())?;
         Ok(app)
     }
 
@@ -1019,6 +1025,7 @@ impl<'a, 'h> App<'a, 'h> {
     fn mode_entered(&mut self) -> Result {
         self.clear_rc_start()?;
         self.led.configure(self.c, &self.params)?;
+        self.update_pyro_instance()?;
         self.set_stage(Stage::Off);
         self.initialization_start()
     }
@@ -1393,12 +1400,14 @@ impl<'a, 'h> App<'a, 'h> {
             self.set_stage(Stage::Off);
             self.clear_rc_start()?;
             crate::report(c, "led", self.led.configure(c, &self.params))?;
+            crate::report(c, "pyro", self.update_pyro_instance())?;
         }
         if self.in_mode {
             crate::report(c, "stage", self.run_stage())?;
         }
         if even {
             crate::report(c, "fences", self.fence_checks())?;
+            crate::report(c, "pyro", self.update_pyro())?;
             crate::report(c, "lights", self.update_lights())?;
             crate::report(c, "logs", self.write_logs())?;
         } else {
