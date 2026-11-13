@@ -50,7 +50,8 @@ fn setup_mavlink(c: &Context<'_>) -> Result {
 }
 
 fn send_ack(c: &Context<'_>, msg: &mav::Received, cmd: &mav::CommandInt, result: u8) -> Result {
-    let p = mav::command_ack(cmd.command, result, msg.sysid as u8, msg.compid);
+    // target_system is filled in by the host from the full (possibly 32-bit) target
+    let p = mav::command_ack(cmd.command, result, 0, msg.compid);
     c.mavlink().send_chan(msg.channel, mav::MSG_COMMAND_ACK, &p, Some(msg.sysid))?;
     Ok(())
 }
