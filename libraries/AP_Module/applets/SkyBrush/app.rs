@@ -1092,11 +1092,13 @@ impl<'a, 'h> App<'a, 'h> {
             return Ok(());
         }
         if st.takeoff_event && vehicle::ack_takeoff_event(self.c, &self.mode)? {
-            // GCS test takeoff: climb to SHOW_TAKEOFF_ALT then loiter
-            self.set_stage(Stage::Takeoff);
-            self.next_after_takeoff = Stage::Loiter;
-            let alt = self.params.get(P::TakeoffAlt);
-            return self.request(Request::Takeoff, alt);
+            // GCS test takeoff: the show takeoff checks apply, then climb to
+            // SHOW_TAKEOFF_ALT and loiter, as the fork's do_user_takeoff_start
+            self.takeoff_start()?;
+            if self.stage == Stage::Takeoff {
+                self.next_after_takeoff = Stage::Loiter;
+            }
+            return Ok(());
         }
         match self.stage {
             Stage::Off | Stage::Init => self.initialization_start(),
