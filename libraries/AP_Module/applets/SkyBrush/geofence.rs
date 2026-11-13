@@ -26,6 +26,22 @@ fn set_param(c: &Context<'_>, name: &str, value: f32) -> Result<bool> {
 
 /// Returns true if the fences were configured.
 pub fn configure(c: &Context<'_>, frame: Option<&ShowFrame>, g: &GeofenceSetup<'_>) -> Result<bool> {
+    let action = g.flags & 0x0f;
+    if !ACCEPTED_ACTIONS.contains(&action) {
+        return error(c, "Unsupported fence action");
+    }
+    // validate and convert the polygon before changing anything
+    let mut points = Vec::new();
+    if g.num_points > 0 {
+        let Some(frame) = frame else {
+            return error(c, "Show coordinate system is not valid");
+        };
+        points.reserve(g.num_points);
+        for i in 0..g.num_points {
+            let (x, y) = g.point(i);
+            points.push(frame.to_global(c, [x as f32 * 100.0, y as f32 * 100.0, 0.0])?);
+        }
+    }
     let mut mask = 0u8;
     if g.max_altitude_dm > 0 {
         if !set_param(c, "FENCE_ALT_MAX", g.max_altitude_dm as f32 / 10.0)? {
@@ -39,34 +55,22 @@ pub fn configure(c: &Context<'_>, frame: Option<&ShowFrame>, g: &GeofenceSetup<'
         }
         mask |= FENCE_TYPE_CIRCLE;
     }
-    let action = g.flags & 0x0f;
-    if !ACCEPTED_ACTIONS.contains(&action) {
-        return error(c, "Unsupported fence action");
-    }
     if !set_param(c, "FENCE_ACTION", action as f32)? {
         return error(c, "FENCE_ACTION parameter cannot be set");
     }
-    if g.num_points > 0 {
-        mask |= FENCE_TYPE_POLYGON;
-    }
-    // the fork writes the type mask into FENCE_ENABLE
-    if !set_param(c, "FENCE_ENABLE", mask as f32)? {
-        return error(c, "FENCE_ENABLE parameter cannot be set");
-    }
-    // polygon last so the caller's ack follows it immediately: SITL reports
-    // "Fence Indexed OK" from the write and GCSes expect it after the ack
-    if g.num_points > 0 {
-        let Some(frame) = frame else {
-            return error(c, "Show coordinate system is not valid");
-        };
-        let mut points = Vec::with_capacity(g.num_points);
-        for i in 0..g.num_points {
-            let (x, y) = g.point(i);
-            points.push(frame.to_global(c, [x as f32 * 100.0, y as f32 * 100.0, 0.0])?);
-        }
+    if !points.is_empty() {
         if !vehicle::write_inclusion_polygon(c, &points)? {
             return error(c, "Failed to write polygon fence");
         }
+        mask |= FENCE_TYPE_POLYGON;
+    }
+    // the fork writes the type mask into FENCE_ENABLE, which is only an
+    // on/off switch here: select the types, then enable once all are in place
+    if mask != 0 && !set_param(c, "FENCE_TYPE", mask as f32)? {
+        return error(c, "FENCE_TYPE parameter cannot be set");
+    }
+    if !set_param(c, "FENCE_ENABLE", if mask != 0 { 1.0 } else { 0.0 })? {
+        return error(c, "FENCE_ENABLE parameter cannot be set");
     }
     Ok(true)
 }
