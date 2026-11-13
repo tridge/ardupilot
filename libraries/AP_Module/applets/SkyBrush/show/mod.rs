@@ -11,6 +11,7 @@ pub mod events;
 pub mod fmath;
 pub mod lights;
 pub mod poly;
+pub mod rth_plan;
 pub mod stats;
 pub mod time_axis;
 pub mod trajectory;

@@ -8,17 +8,18 @@ Writes, next to this script:
   <show>_dNN.player.txt    "t x y z" (mm) sampled with the tester's Python player
   synth_NN.skyb            random trajectories (degree 0/1/3/7) and light programs
   hdr_*.skyb               container edge cases (v1, no CRC, bad CRC)
+  rth_NN.skyb              trajectories with a collective RTH plan (block 4)
+
+`python gen_fixtures.py rth` writes only the rth_NN.skyb files.
 """
 
 import asyncio
 import random
 import struct
+import sys
 from pathlib import Path
 
-from skybrush_sitl_tester.show.skyc import load_skyc
-
 OUT = Path(__file__).resolve().parent
-FIXTURES = Path(__import__("skybrush_sitl_tester.fixtures", fromlist=["x"]).__file__).parent
 MAX_DRONES = 4
 
 
@@ -57,7 +58,10 @@ def sample_times(end: float):
 
 
 async def export_tester_fixtures():
-    for skyc in sorted(FIXTURES.glob("*.skyc")):
+    from skybrush_sitl_tester.show.skyc import load_skyc
+
+    fixtures = Path(__import__("skybrush_sitl_tester.fixtures", fromlist=["x"]).__file__).parent
+    for skyc in sorted(fixtures.glob("*.skyc")):
         drones = load_skyc(skyc)
         step = max(1, len(drones) // MAX_DRONES)
         for drone in drones[::step][:MAX_DRONES]:
@@ -184,6 +188,58 @@ def export_synthetic():
     (OUT / "hdr_empty_traj.skyb").write_bytes(container([(1, empty)]))
 
 
+def rth_plan(rnd: random.Random, corrupt=None) -> bytes:
+    """RTH plan block in the libskybrush layout (rth_plan.c), not the older
+    skybrush-server encoder layout."""
+    scale = rnd.choice([1, 1, 2, 10, 0x81])
+    lim = 32767
+    points = [(rnd.randint(-lim, lim), rnd.randint(-lim, lim)) for _ in range(rnd.randint(1, 6))]
+    entries = []
+    for i in range(rnd.randint(1, 12)):
+        flags = 0 if i and rnd.random() < 0.2 else rnd.randrange(64)
+        e = bytearray([flags]) + varuint(rnd.choice([0, 1, 5, 10, 30, 200]))
+        if flags & 1:
+            e += struct.pack("<h", rnd.randint(-3000, 8000)) + varuint(rnd.choice([0, 1, 3, 10]))
+        if flags & 2:
+            e += varuint(rnd.randrange(len(points)))
+        if flags & 4:
+            e += struct.pack("<h", rnd.randint(-2000, 30000))
+        if flags & 6:
+            e += varuint(rnd.choice([0, 1, 7, 25, 90]))
+        if flags & 8:
+            e += struct.pack("<h", rnd.randint(-500, 3000))
+        if flags & 16:
+            e += varuint(rnd.choice([0, 2, 15]))
+        if flags & 32:
+            e += varuint(rnd.choice([0, 1, 4]))
+        entries.append(bytes(e))
+    if corrupt == "bad_point":
+        entries.append(bytes([2, 1]) + varuint(len(points) + 3) + varuint(5))
+    elif corrupt == "big_duration":
+        entries.append(bytes([16, 1]) + varuint(16777217))
+    elif corrupt == "no_entries":
+        entries = None
+    out = bytearray(struct.pack("<BBHHhH", rnd.randrange(256), scale, rnd.choice([0, 0, 500, 2000]),
+                                rnd.choice([0, 0, 700, 1500]), rnd.randint(-200, 2000), len(points)))
+    for p in points:
+        out += struct.pack("<hh", *p)
+    if entries is not None:
+        out += struct.pack("<H", len(entries)) + b"".join(entries)
+    if corrupt == "truncated":
+        out = out[:-1]
+    return bytes(out)
+
+
+def export_rth():
+    rnd = random.Random(99)
+    corrupt = {12: "bad_point", 13: "truncated", 14: "big_duration", 15: "no_entries"}
+    for i in range(16):
+        blocks = [(1, rand_traj(rnd)), (2, rand_lights(rnd)), (4, rth_plan(rnd, corrupt.get(i)))]
+        (OUT / f"rth_{i:02d}.skyb").write_bytes(container(blocks))
+
+
 if __name__ == "__main__":
-    asyncio.run(export_tester_fixtures())
-    export_synthetic()
+    if sys.argv[1:] != ["rth"]:
+        asyncio.run(export_tester_fixtures())
+        export_synthetic()
+    export_rth()

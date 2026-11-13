@@ -223,6 +223,100 @@ static void run_touches(FILE* f)
     }
 }
 
+static void pr_entry(FILE* f, const sb_rth_plan_entry_t* e)
+{
+    fprintf(f, " %.9g %.9g %d %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g", e->time_sec,
+        e->duration_sec, (int)e->flags, e->landing_target.x, e->landing_target.y, e->arrival_altitude,
+        e->pre_delay_sec, e->post_delay_sec, e->pre_neck, e->pre_neck_duration_sec, e->max_acceleration,
+        e->landing_velocity, e->landing_altitude);
+}
+
+/* RTL line: tag, return code, start, trajectory bytes */
+static void rth_traj(FILE* f, const char* tag, const sb_rth_plan_entry_t* e, sb_vector3_t start)
+{
+    sb_trajectory_t traj;
+    sb_trajectory_init(&traj);
+    int ret = sb_trajectory_update_from_rth_plan_entry(&traj, e, start);
+    fprintf(f, "%s %d %.9g %.9g %.9g", tag, ret, start.x, start.y, start.z);
+    pr_entry(f, e);
+    fprintf(f, " ");
+    if (ret == 0) {
+        for (size_t k = 0; k < sb_buffer_size(&traj.buffer); k++) {
+            fprintf(f, "%02x", SB_BUFFER(traj.buffer)[k]);
+        }
+    }
+    fprintf(f, "\n");
+    SB_DECREF_STATIC(&traj);
+}
+
+static void run_rth(FILE* f, uint8_t* buf, size_t len)
+{
+    sb_rth_plan_t plan;
+    sb_rth_plan_init(&plan);
+    int ret = sb_rth_plan_update_from_binary_file_in_memory(&plan, buf, len);
+    fprintf(f, "RP %d", ret);
+    if (ret != 0) {
+        fprintf(f, "\n");
+        SB_DECREF_STATIC(&plan);
+        return;
+    }
+    size_t np = sb_rth_plan_get_num_points(&plan);
+    fprintf(f, " %zu %zu %.9g %.9g %.9g\n", np, sb_rth_plan_get_num_entries(&plan),
+        sb_rth_plan_get_default_acceleration_limit(&plan), sb_rth_plan_get_default_landing_velocity(&plan),
+        sb_rth_plan_get_default_landing_altitude(&plan));
+    for (size_t i = 0; i < np; i++) {
+        sb_vector2_t p;
+        sb_rth_plan_get_point(&plan, i, &p);
+        fprintf(f, "RPT %.9g %.9g\n", p.x, p.y);
+    }
+    float times[64];
+    int n = 0;
+    times[n++] = -1.0f;
+    times[n++] = 0.0f;
+    for (int i = 0; i < 20; i++) {
+        times[n++] = i * 13.0f + 0.5f;
+    }
+    for (int i = 0; i < 20; i++) {
+        times[n++] = (float)(lcg() % 1200);
+    }
+    for (int i = 0; i < 6; i++) {
+        times[n++] = frand(0.0f, 1500.0f);
+    }
+    times[n++] = 1e9f;
+    for (int i = 0; i < n; i++) {
+        sb_rth_plan_entry_t e;
+        memset(&e, 0, sizeof(e));
+        ret = sb_rth_plan_evaluate_at(&plan, times[i], &e);
+        fprintf(f, "RE %.9g %d", times[i], ret);
+        if (ret == 0) {
+            pr_entry(f, &e);
+        }
+        fprintf(f, "\n");
+        if (ret == 0) {
+            sb_vector3_t start = { frand(-20000, 20000), frand(-20000, 20000), frand(0, 40000) };
+            rth_traj(f, "RT", &e, start);
+            e.time_sec = 0.0f;
+            rth_traj(f, "RT0", &e, start);
+        }
+    }
+    {
+        sb_rth_plan_entry_t e;
+        sb_vector3_t start = { 1234.5f, -876.25f, 0.0f };
+        sb_rth_plan_entry_clear(&e, &plan, 0.0f);
+        rth_traj(f, "RTC", &e, start);
+        sb_rth_plan_entry_clear(&e, NULL, 0.0f);
+        rth_traj(f, "RTC", &e, start);
+        /* forced overflow and invalid inputs */
+        start.x = 5e6f;
+        rth_traj(f, "RTC", &e, start);
+        start.x = 0.0f;
+        e.pre_delay_sec = NAN;
+        e.time_sec = NAN;
+        rth_traj(f, "RTC", &e, start);
+    }
+    SB_DECREF_STATIC(&plan);
+}
+
 int main(int argc, char** argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--touches")) {
@@ -272,6 +366,7 @@ int main(int argc, char** argv)
     }
     SB_DECREF_STATIC(&traj);
     run_lights(f, buf, len, dur);
+    run_rth(f, buf, len);
     sb_binary_file_parser_destroy(&parser);
     return 0;
 }

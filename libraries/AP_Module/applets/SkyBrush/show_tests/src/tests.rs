@@ -16,6 +16,7 @@ use crate::show::events::{EventList, EventPlayer, EVENT_TYPE_PYRO};
 use crate::show::fmath;
 use crate::show::lights::{LightPlayer, LightProgram, Rgb, RgbwConversion};
 use crate::show::poly::Poly;
+use crate::show::rth_plan::{trajectory_from_entry, RthPlan, RthPlanEntry, ENTRY_HAS_TARGET_XY, ENTRY_HAS_TARGET_Z};
 use crate::show::stats::{Stats, StatsCalculator};
 use crate::show::time_axis::{TimeAxis, TimeSegment};
 use crate::show::trajectory::{Player, Trajectory};
@@ -649,4 +650,179 @@ fn events_yaw_time_axis() {
     assert_eq!(c.output().position, None);
     assert_eq!(c.output_time().time_in_scene_msec, 1000);
     assert!(!c.has_reached_end());
+}
+
+fn entry_fields(e: &RthPlanEntry) -> [f32; 13] {
+    [
+        e.time_sec,
+        e.duration_sec,
+        e.flags as f32,
+        e.landing_target.0,
+        e.landing_target.1,
+        e.arrival_altitude,
+        e.pre_delay_sec,
+        e.post_delay_sec,
+        e.pre_neck,
+        e.pre_neck_duration_sec,
+        e.max_acceleration,
+        e.landing_velocity,
+        e.landing_altitude,
+    ]
+}
+
+fn parse_entry(l: &[String]) -> RthPlanEntry {
+    let v: Vec<f32> = l[..13].iter().map(|s| f(s)).collect();
+    RthPlanEntry {
+        time_sec: v[0],
+        duration_sec: v[1],
+        flags: v[2] as u8,
+        landing_target: (v[3], v[4]),
+        arrival_altitude: v[5],
+        pre_delay_sec: v[6],
+        post_delay_sec: v[7],
+        pre_neck: v[8],
+        pre_neck_duration_sec: v[9],
+        max_acceleration: v[10],
+        landing_velocity: v[11],
+        landing_altitude: v[12],
+    }
+}
+
+fn same(a: f32, b: f32) -> bool {
+    a == b || a.is_nan() && b.is_nan()
+}
+
+#[test]
+fn rth_plan_matches_c() {
+    let mut files = 0;
+    let (mut n_eval, mut n_traj) = (0, 0);
+    for path in skyb_files().iter().filter(|p| p.to_string_lossy().contains("rth_")) {
+        let data = fs::read(path).unwrap();
+        let Some(o) = oracle(path) else { continue };
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let file = ShowFile::parse(&data).unwrap();
+        let plan = RthPlan::from_show(&file);
+        let rp = o.iter().find(|l| l[0] == "RP").unwrap();
+        assert_eq!(err_code(&plan), rp[1].parse::<i32>().unwrap(), "{name}");
+        // the screenplay fails to load with a corrupted RTH plan, as in C
+        assert_eq!(Screenplay::from_show_bytes(&data).is_ok(), plan.is_ok(), "{name}");
+        files += 1;
+        let Ok(plan) = plan else { continue };
+        assert_eq!(plan.num_points(), rp[2].parse::<usize>().unwrap(), "{name}");
+        assert_eq!(plan.num_entries(), rp[3].parse::<usize>().unwrap(), "{name}");
+        assert!(same(plan.default_acceleration_limit(), f(&rp[4])), "{name}");
+        assert!(same(plan.default_landing_velocity(), f(&rp[5])), "{name}");
+        assert!(same(plan.default_landing_altitude(), f(&rp[6])), "{name}");
+        for (i, l) in o.iter().filter(|l| l[0] == "RPT").enumerate() {
+            assert_eq!(plan.point(i).unwrap(), (f(&l[1]), f(&l[2])), "{name} point {i}");
+        }
+        for l in o.iter() {
+            match l[0].as_str() {
+                "RE" => {
+                    let t = f(&l[1]);
+                    let r = plan.evaluate_at(t);
+                    assert_eq!(err_code(&r), l[2].parse::<i32>().unwrap(), "{name} t={t}");
+                    if let Ok(e) = r {
+                        let want = parse_entry(&l[3..]);
+                        let (g, w) = (entry_fields(&e), entry_fields(&want));
+                        assert!(g.iter().zip(w.iter()).all(|(a, b)| same(*a, *b)), "{name} t={t}: {e:?} != {want:?}");
+                        n_eval += 1;
+                    }
+                }
+                "RT" | "RT0" | "RTC" => {
+                    let start = Vec3::new(f(&l[2]), f(&l[3]), f(&l[4]));
+                    let e = parse_entry(&l[5..]);
+                    let r = trajectory_from_entry(&e, start);
+                    assert_eq!(err_code(&r), l[1].parse::<i32>().unwrap(), "{name} {}: {e:?}", l[0]);
+                    if let Ok(traj) = r {
+                        assert_eq!(hex(traj.bytes()), l[18], "{name} {}: {e:?} from {start:?}", l[0]);
+                        n_traj += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    if files == 0 {
+        return skipped("rth_plan_matches_c");
+    }
+    println!("{files} RTH fixtures, {n_eval} evaluations, {n_traj} trajectories identical to C");
+    assert!(n_eval > 100 && n_traj > 100);
+}
+
+#[test]
+fn rth_plan_land_in_place() {
+    // default entry without a plan: hold, no descent (no landing velocity)
+    let e = RthPlan::default_entry(None, 2.0);
+    let traj = trajectory_from_entry(&e, Vec3::new(1000.0, 2000.0, 5000.0)).unwrap();
+    assert_eq!(traj.total_duration_msec(), 2000);
+    assert_eq!(traj.end_position(), Vec3::new(1000.0, 2000.0, 5000.0));
+    // with a target, a landing velocity and an acceleration limit
+    let e = RthPlanEntry {
+        flags: e.flags | ENTRY_HAS_TARGET_XY | ENTRY_HAS_TARGET_Z,
+        landing_target: (-3000.0, 4000.0),
+        arrival_altitude: 6000.0,
+        duration_sec: 10.0,
+        landing_velocity: 1000.0,
+        landing_altitude: 0.0,
+        max_acceleration: 2000.0,
+        time_sec: 0.0,
+        ..e
+    };
+    let traj = trajectory_from_entry(&e, Vec3::new(1000.0, 2000.0, 5000.0)).unwrap();
+    assert_eq!(traj.total_duration_msec(), 16000);
+    assert_eq!(traj.end_position(), Vec3::new(-3000.0, 4000.0, 0.0));
+    let mut p = Player::new(&traj);
+    let m = p.position_at(&traj, 10.0);
+    assert!((m.x + 3000.0).abs() < 1.0 && (m.z - 6000.0).abs() < 1.0, "{m:?}");
+}
+
+#[test]
+fn screenplay_scene_tags_and_replacement() {
+    let data = fs::read(fixtures().join("first_d00.skyb")).unwrap();
+    let mut sp = Screenplay::from_show_bytes(&data).unwrap();
+    assert!(sp.rth_plan.is_none());
+    sp.scenes[0].tag = 1;
+    // realtime: show clock == warped time
+    assert_eq!(sp.time_sec_for_tag_and_warped_time(1, 12.5), 12.5);
+    assert_eq!(sp.time_sec_for_tag_and_warped_time(2, 1.0), f32::INFINITY);
+    // half speed from the origin: warped 10 s is reached at 20 s
+    let ax = &mut sp.scenes[0].time_axis;
+    ax.push(TimeSegment::new(u32::MAX, 0.5, 0.5)).unwrap();
+    assert_eq!(sp.time_sec_for_tag_and_warped_time(1, 10.0), 20.0);
+    assert_eq!(sp.time_sec_for_tag_and_warped_time(1, f32::NAN), f32::INFINITY);
+    // a scene limited to 15 s does not reach warped 10 s
+    sp.scenes[0].duration_msec = 15000;
+    assert_eq!(sp.time_sec_for_tag_and_warped_time(1, 10.0), f32::INFINITY);
+    // an earlier scene covering that time hides the tagged one
+    sp.scenes[0].duration_msec = u32::MAX;
+    let mut first = Scene { duration_msec: 30000, ..Default::default() };
+    first.tag = 2;
+    sp.scenes.insert(0, first);
+    assert_eq!(sp.time_sec_for_tag_and_warped_time(1, 10.0), f32::INFINITY);
+
+    // dynamic scene coverage
+    let mut s = Screenplay::from_show_bytes(&data).unwrap().scenes.remove(0);
+    let total = s.trajectory.as_ref().unwrap().total_duration_sec();
+    assert_eq!(s.uncovered_trajectory_duration_sec(), Ok(total));
+    s.time_axis.push(TimeSegment::new(4000, 1.0, 0.0)).unwrap();
+    assert_eq!(s.uncovered_trajectory_duration_sec(), Ok(total - 2.0));
+    s.time_axis.push(TimeSegment::new(u32::MAX, 0.0, 0.0)).unwrap();
+    assert_eq!(s.uncovered_trajectory_duration_sec(), Ok(0.0));
+
+    // replacing the screenplay keeps the player of an unchanged current scene
+    let base = Screenplay::from_show_bytes(&data).unwrap();
+    let mut c = Controller::new(base.clone());
+    c.update_time_msec(3000).unwrap();
+    let before = *c.output();
+    c.replace_screenplay(base.clone());
+    assert!(!c.is_output_valid());
+    c.update_time_msec(3000).unwrap();
+    assert_eq!(*c.output(), before);
+    let mut other = base.clone();
+    let traj = TrajectoryBuilder::new(1).unwrap().into_trajectory().unwrap();
+    other.scenes[0].trajectory = Some(traj);
+    c.replace_screenplay(other);
+    c.update_time_msec(3000).unwrap();
+    assert_eq!(c.output().position, Some(Vec3::ZERO));
 }

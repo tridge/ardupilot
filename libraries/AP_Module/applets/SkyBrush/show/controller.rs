@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 use super::binary::ShowFile;
 use super::events::{Event, EventList, EventPlayer};
 use super::lights::{LightPlayer, LightProgram, Rgb};
+use super::rth_plan::RthPlan;
 use super::time_axis::TimeAxis;
 use super::trajectory::{Player, Trajectory};
 use super::yaw::{YawControl, YawPlayer};
@@ -80,21 +81,65 @@ impl Scene {
     pub fn has_flag(&self, flag: u8) -> bool {
         self.flags & flag != 0
     }
+
+    /// Trajectory duration (s) not yet covered by the time axis segments.
+    pub fn uncovered_trajectory_duration_sec(&self) -> Result<f32> {
+        let warped = self.time_axis.total_warped_duration_sec();
+        if !warped.is_finite() {
+            if warped.is_nan() || warped < 0.0 {
+                return Err(Error::Inval);
+            }
+            return Ok(0.0);
+        }
+        Ok(self.trajectory.as_ref().map_or(0.0, |t| t.total_duration_sec() - warped))
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Screenplay {
     pub scenes: Vec<Scene>,
+    pub rth_plan: Option<RthPlan>,
 }
 
 impl Screenplay {
-    /// One scene from a .skyb file (RTH plan not handled yet).
+    /// One scene and the optional RTH plan from a .skyb file.
     pub fn from_show_bytes(data: &[u8]) -> Result<Self> {
         if data.is_empty() {
             return Ok(Screenplay::default());
         }
         let file = ShowFile::parse(data)?;
-        Ok(Screenplay { scenes: alloc::vec![Scene::from_show(&file)?] })
+        Ok(Screenplay { scenes: alloc::vec![Scene::from_show(&file)?], rth_plan: optional(RthPlan::from_show(&file))? })
+    }
+
+    /// Show clock ms at which the first scene with `tag` reaches warped time
+    /// `warped` (s); u32::MAX if never, or if an earlier scene is active then.
+    pub fn time_msec_for_tag_and_warped_time(&self, tag: u8, warped: f32) -> u32 {
+        let Some(idx) = self.find_scene_with_tag(tag) else {
+            return u32::MAX;
+        };
+        if warped.is_nan() {
+            return u32::MAX;
+        }
+        let scene = &self.scenes[idx];
+        let origin = scene.origin_msec();
+        let t = scene.time_axis.reverse_map(warped);
+        if t < origin || t == i32::MAX {
+            return u32::MAX;
+        }
+        if scene.duration_msec != u32::MAX && (t.wrapping_sub(origin) as u32) > scene.duration_msec {
+            return u32::MAX;
+        }
+        if self.scenes[..idx].iter().any(|s| s.contains_time_msec(t as u32)) {
+            return u32::MAX;
+        }
+        t as u32
+    }
+
+    pub fn time_sec_for_tag_and_warped_time(&self, tag: u8, warped: f32) -> f32 {
+        match self.time_msec_for_tag_and_warped_time(tag, warped) {
+            u32::MAX => f32::INFINITY,
+            t => t as f32 / 1000.0,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -191,6 +236,36 @@ impl Controller {
         if self.current_scene.is_some_and(|i| i >= self.screenplay.scenes.len()) {
             self.current_scene = None;
         }
+        self.invalidate_output();
+    }
+
+    /// Swaps in a new screenplay. Players of the current scene are kept for
+    /// the components that the scene at the same index still plays, so its
+    /// events do not fire again.
+    pub fn replace_screenplay(&mut self, new: Screenplay) {
+        if let Some(i) = self.current_scene {
+            match (self.screenplay.scenes.get(i), new.scenes.get(i)) {
+                (Some(old), Some(n)) => {
+                    if old.trajectory != n.trajectory {
+                        self.traj_player = None;
+                    }
+                    if old.lights != n.lights {
+                        self.light_player = None;
+                    }
+                    if old.yaw != n.yaw {
+                        self.yaw_player = None;
+                    }
+                    if old.events != n.events {
+                        self.event_player = None;
+                    }
+                }
+                _ => {
+                    self.destroy_players();
+                    self.current_scene = None;
+                }
+            }
+        }
+        self.screenplay = new;
         self.invalidate_output();
     }
 

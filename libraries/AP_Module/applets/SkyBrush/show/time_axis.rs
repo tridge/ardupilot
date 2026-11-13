@@ -115,6 +115,10 @@ impl TimeAxis {
         total
     }
 
+    pub fn total_warped_duration_sec(&self) -> f32 {
+        self.segments.iter().fold(0.0, |acc, s| acc + s.warped_duration_sec())
+    }
+
     /// Warped time (s) and rate at wall clock time `wall_msec`.
     pub fn map(&self, wall_msec: i32) -> (f32, f32) {
         if wall_msec < self.origin_msec || self.segments.is_empty() {
