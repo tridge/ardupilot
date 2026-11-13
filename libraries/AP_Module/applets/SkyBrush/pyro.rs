@@ -202,10 +202,34 @@ impl Pyro {
             _ => None,
         };
         if n > 0 && matches!(dev, Some(Device::SingleServo(_)) | Some(Device::MultipleServos { .. })) {
-            let rev = indexed_param(c, format_args!("SERVO{}_REVERSED", servos[0].chan + 1))?.unwrap_or(0.0) != 0.0;
+            // one scaled baseline drives every pyro output, so it is only the
+            // off state if all of them share the same reversal
+            let Some(rev) = Self::common_reversal(c)? else {
+                text(c, MavSeverity::ERROR, "Pyro servos have mixed SERVOn_REVERSED");
+                return Ok(None);
+            };
             self.baseline = if rev { 4500.0 } else { -4500.0 };
         }
         Ok(dev)
+    }
+
+    /// Reversal shared by all pyro function outputs, None if they differ.
+    fn common_reversal(c: &Context<'_>) -> Result<Option<bool>> {
+        let mut common = None;
+        for ch in 0..MAX_SERVOS {
+            match indexed_param(c, format_args!("SERVO{}_FUNCTION", ch + 1))? {
+                Some(f) if f as i32 == FN_PYRO.0 => {
+                    let rev = indexed_param(c, format_args!("SERVO{}_REVERSED", ch + 1))?.unwrap_or(0.0) != 0.0;
+                    if common.is_some_and(|r| r != rev) {
+                        return Ok(None);
+                    }
+                    common = Some(rev);
+                }
+                Some(_) => {}
+                None => break,
+            }
+        }
+        Ok(Some(common.unwrap_or(false)))
     }
 
     /// Rebuild the device if SHOW_PYRO_TYPE changed; outputs of the old one are turned off.
