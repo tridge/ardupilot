@@ -76,7 +76,9 @@ pub struct App<'a, 'h> {
     calibration_done: bool,
     home_set: bool,
     next_after_takeoff: Stage,
+    /// heading at arming, as Copter's initial_armed_bearing
     default_yaw_deg: f32,
+    was_armed: bool,
     altitude_locked: bool,
     request_gen: u16,
     next_setpoint_ms: u32,
@@ -148,6 +150,7 @@ impl<'a, 'h> App<'a, 'h> {
             home_set: false,
             next_after_takeoff: Stage::Performing,
             default_yaw_deg: 0.0,
+            was_armed: false,
             altitude_locked: false,
             request_gen: 0,
             next_setpoint_ms: 0,
@@ -669,11 +672,20 @@ impl<'a, 'h> App<'a, 'h> {
             return Ok(false);
         }
         if self.c.arming().arm()? {
-            self.default_yaw_deg = self.c.ahrs().get_yaw_rad()?.to_degrees();
+            self.note_armed(true)?;
             return Ok(true);
         }
         self.prevent_arming_until_ms = now.wrapping_add(1000);
         Ok(false)
+    }
+
+    /// Capture the heading on any disarmed to armed transition, whoever armed.
+    fn note_armed(&mut self, armed: bool) -> Result {
+        if armed && !self.was_armed {
+            self.default_yaw_deg = self.c.ahrs().get_yaw_rad()?.to_degrees();
+        }
+        self.was_armed = armed;
+        Ok(())
     }
 
     fn stop_motors_if_started(&mut self) -> Result {
@@ -1499,6 +1511,8 @@ impl<'a, 'h> App<'a, 'h> {
                 vehicle::set_ekf_disarm(c, &self.mode, ekf)?;
             }
         }
+        let armed = crate::report(c, "is_armed", c.arming().is_armed())?;
+        crate::report(c, "yaw", self.note_armed(armed))?;
         let in_mode = crate::report(c, "get_mode", c.vehicle().get_mode())? == MODE_NUMBER;
         if in_mode && !self.in_mode {
             self.in_mode = true;
