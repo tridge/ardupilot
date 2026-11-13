@@ -1100,6 +1100,20 @@ impl<'a, 'h> App<'a, 'h> {
             }
             return Ok(());
         }
+        if st.applied && !st.init_ok {
+            // the host keeps the previous controller when a request fails
+            match self.stage {
+                Stage::Performing | Stage::Rtl | Stage::Loiter => {
+                    text(self.c, MavSeverity::CRITICAL, "SkyBrush: controller failed, landing");
+                    return self.landing_start();
+                }
+                Stage::Takeoff => {
+                    text(self.c, MavSeverity::CRITICAL, "SkyBrush: takeoff failed");
+                    return self.error_start();
+                }
+                _ => {}
+            }
+        }
         match self.stage {
             Stage::Off | Stage::Init => self.initialization_start(),
             Stage::WaitForStartTime => self.wait_run(),
