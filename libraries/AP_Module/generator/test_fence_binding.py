@@ -80,9 +80,24 @@ def host(tmp_path_factory):
     (tmp_path / 'AP_HAL').mkdir()
     (tmp_path / 'AP_HAL/Semaphores.h').write_text('#include "../stubs.h"\n')
     (tmp_path / 'stubs.h').write_text(STUBS + notify_fields() + '''
+#define AP_NOTIFY_EVENT_COUNTS_ENABLED 1
 class AP_Notify {
 public:
     static inline NotifyFlags flags;
+    // deliberately not in contract order
+    struct notify_events_type {
+        uint32_t arming_failed : 1;
+        uint32_t padding : 5;
+        uint32_t temp_cal_failed : 1;
+        uint32_t temp_cal_saved : 1;
+        uint32_t initiated_temp_cal : 1;
+        uint32_t compass_cal_canceled : 1;
+        uint32_t compass_cal_failed : 1;
+        uint32_t compass_cal_saved : 1;
+        uint32_t initiated_compass_cal : 1;
+        uint32_t rest : 19;
+    };
+    static inline uint8_t event_counts[32];
 };
 ''')
     lines = ['#include "stubs.h"', '#include <AP_Module/HostApi.h>', '#include <AP_Module/BindingSupport.h>',
@@ -95,6 +110,9 @@ public:
               'extern "C" int notify_call(void *out) {',
               ' return AP_Module::binding_notify_get_flags(nullptr, 0, (uint8_t *)out, 4); }',
               'extern "C" void set_flag(unsigned bit, bool value) { ((bool *)&AP_Notify::flags)[bit] = value; }',
+              'extern "C" int events_call(void *out) {',
+              ' return AP_Module::binding_notify_get_event_counts(nullptr, 0, (uint8_t *)out, 8); }',
+              'extern "C" void set_event_count(unsigned bit, unsigned count) { AP_Notify::event_counts[bit] = count; }',
               'extern "C" unsigned calls() { return write_calls; }',
               'extern "C" unsigned locked() { return locked_writes; }',
               'extern "C" unsigned held() { return scheduler_sem.depth; }',
@@ -112,6 +130,8 @@ public:
     lib.fence_call.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
     lib.notify_call.argtypes = [ctypes.c_void_p]
     lib.notify_call.restype = ctypes.c_int
+    lib.events_call.argtypes = [ctypes.c_void_p]
+    lib.events_call.restype = ctypes.c_int
     return lib
 
 
@@ -175,3 +195,20 @@ def test_notify_flag_bits_follow_contract_order(host):
     rust = notify.rust(notify.specification(9), '')
     for bit, name in enumerate(notify.FLAGS):
         assert f'pub const {name.upper()}: u32 = 1 << {bit};' in rust
+
+
+def test_notify_event_counts_follow_contract_order(host):
+    out = ctypes.create_string_buffer(8)
+    assert host.events_call(out) == 0 and out.raw == bytes(8)
+    # bit positions of the stub's notify_events_type
+    bits = dict(arming_failed=0, temp_cal_failed=6, temp_cal_saved=7, initiated_temp_cal=8,
+                compass_cal_canceled=9, compass_cal_failed=10, compass_cal_saved=11, initiated_compass_cal=12)
+    for byte, name in enumerate(notify.EVENTS):
+        host.set_event_count(bits[name], 200 + byte)
+        assert host.events_call(out) == 0
+        assert out.raw == bytes(byte) + bytes([200 + byte]) + bytes(7 - byte)
+        host.set_event_count(bits[name], 0)
+    assert len(set(notify.EVENTS)) == len(notify.EVENTS) == 8
+    rust = notify.rust(notify.specification(9), '')
+    for byte, name in enumerate(notify.EVENTS):
+        assert f'pub const {name.upper()}: u32 = {8 * byte};' in rust

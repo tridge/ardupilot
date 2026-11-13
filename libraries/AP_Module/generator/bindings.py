@@ -1025,9 +1025,11 @@ def emit(contract):
         cpp += [f'    case {method["id"]}:',
                 '        return binding_fence_write_inclusion_polygon(input, input_size, output, output_size);']
     if contract['notify'] is not None:
-        method = contract['notify']['methods'][0]
-        cpp += [f'    case {method["id"]}:',
-                '        return binding_notify_get_flags(input, input_size, output, output_size);']
+        flags, events = contract['notify']['methods']
+        cpp += [f'    case {flags["id"]}:',
+                '        return binding_notify_get_flags(input, input_size, output, output_size);',
+                f'    case {events["id"]}:',
+                '        return binding_notify_get_event_counts(input, input_size, output, output_size);']
     if contract['old_parameter'] is not None:
         method = contract['old_parameter']['methods'][0]
         cpp += [f'    case {method["id"]}:',

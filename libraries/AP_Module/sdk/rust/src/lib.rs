@@ -114,7 +114,7 @@ pub use motor_config::{MotorFactorTable, MOTOR_FACTOR_COUNT, MOTOR_FRAME_STRING_
 pub use network::{
     Ipv4Address, Ipv4Endpoint, Socket, SocketReceive, SOCKET_POLL_TIMEOUT_MAX_MS, SOCKET_TRANSFER_MAX,
 };
-pub use notify::NotifyFlags;
+pub use notify::{NotifyEvents, NotifyFlags};
 pub use onvif::ONVIF_STRING_MAX;
 pub use old_parameter::OldParameterType;
 pub use parameter::Parameter;

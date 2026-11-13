@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 use crate::enums::{ApArmingMethod, ModeReason};
-use crate::{api, Context, Error, Location, NotifyFlags};
+use crate::{api, Context, Error, Location, NotifyEvents, NotifyFlags};
 use core::{ffi::c_void, marker::PhantomData};
 
 struct Host {
@@ -124,6 +124,18 @@ fn notify_flags_are_a_u32_bitmask() {
     assert_eq!(context.notify().get_flags(), Ok(flags));
     assert_eq!(host.sizes, (0, 4));
     assert_eq!((NotifyFlags::ARMED, NotifyFlags::FLYING, NotifyFlags::PRE_ARM_GPS_CHECK), (1, 2, 1 << 11));
+}
+
+#[test]
+fn notify_event_counts_are_bytes_of_a_u64() {
+    let mut host = host();
+    let context = context(&mut host);
+    host.reply[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+    let counts = context.notify().get_event_counts().unwrap();
+    assert_eq!(host.sizes, (0, 8));
+    assert_eq!((counts >> NotifyEvents::COMPASS_CAL_SAVED) as u8, 2);
+    assert_eq!((counts >> NotifyEvents::COMPASS_CAL_FAILED) as u8, 3);
+    assert_eq!((counts >> NotifyEvents::ARMING_FAILED) as u8, 8);
 }
 
 #[test]
