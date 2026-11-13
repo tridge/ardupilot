@@ -586,8 +586,13 @@ public:
         _force_disable_gps_yaw = disable;
     }
 
-    // handle possibly fragmented RTCM injection data
-    void handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_t len);
+    // handle possibly fragmented RTCM injection data, true when a complete message was injected
+    bool handle_gps_rtcm_fragment(uint8_t flags, const uint8_t *data, uint8_t len);
+
+    // number of complete RTCM messages received on a MAVLink channel since boot
+    uint32_t get_rtcm_message_count(uint8_t chan) const {
+        return chan < ARRAY_SIZE(rtcm_message_count) ? rtcm_message_count[chan] : 0;
+    }
 
     // get configured type by instance
     GPS_Type get_type(uint8_t instance) const {
@@ -773,7 +778,9 @@ private:
 
     // re-assemble GPS_RTCM_DATA message
     void handle_gps_rtcm_data(mavlink_channel_t chan, const mavlink_message_t &msg);
-    void handle_gps_inject(const mavlink_message_t &msg);
+    void handle_gps_inject(mavlink_channel_t chan, const mavlink_message_t &msg);
+    void note_rtcm_message(mavlink_channel_t chan);
+    uint32_t rtcm_message_count[MAVLINK_COMM_NUM_BUFFERS];
 
     //Inject a packet of raw binary to a GPS
     void inject_data(uint8_t instance, const uint8_t *data, uint16_t len);
