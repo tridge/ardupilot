@@ -2494,6 +2494,12 @@ function esc_telem:get_temperature(instance) end
 ---@return number|nil
 function esc_telem:get_rpm(instance) end
 
+-- Get the raw RPM and the error rate of an ESC's RPM telemetry
+---@param instance integer -- esc instance 0 indexed
+---@return number|nil -- raw RPM
+---@return number|nil -- error rate in percent
+function esc_telem:get_raw_rpm_and_error_rate(instance) end
+
 -- update RPM for an ESC
 ---@param esc_index integer -- esc instance 0 indexed
 ---@param rpm number -- RPM
@@ -3139,6 +3145,10 @@ function gcs:get_allow_param_set() end
 ---@param new_allow_value boolean
 function gcs:set_allow_param_set(new_allow_value) end
 
+-- Set additional MAV_PROTOCOL_CAPABILITY bits to report in AUTOPILOT_VERSION
+---@param bits uint32_t_ud|integer|number -- capability bits
+function gcs:set_extra_capabilities(bits) end
+
 -- call a MAVLink MAV_CMD_xxx command via command_int interface
 ---@param command integer -- MAV_CMD_xxx
 ---@param params table -- parameters of p1, p2, p3, p4, x, y and z and frame. Any not specified taken as zero
@@ -3512,6 +3522,11 @@ gps.NO_GPS = enum_integer
 ---@param instance integer -- instance number
 ---@return uint64_t_ud -- unix time microseconds
 function gps:time_epoch_usec(instance) end
+
+-- Get the number of complete RTCM messages received on a MAVLink channel since boot
+---@param chan integer -- MAVLink channel number
+---@return uint32_t_ud -- message count
+function gps:rtcm_message_count(chan) end
 
 -- get yaw from GPS in degrees
 ---@param instance integer -- instance number

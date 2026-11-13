@@ -164,6 +164,8 @@ singleton AP_GPS method get_antenna_offset Vector3f uint8_t 0 ud->num_sensors()
 singleton AP_GPS method first_unconfigured_gps boolean uint8_t'Null
 singleton AP_GPS method gps_yaw_deg boolean uint8_t 0 ud->num_sensors() float'Null float'Null uint32_t'Null
 singleton AP_GPS method time_epoch_usec uint64_t uint8_t 0 ud->num_sensors()
+singleton AP_GPS method get_rtcm_message_count uint32_t uint8_t'skip_check
+singleton AP_GPS method get_rtcm_message_count rename rtcm_message_count
 singleton AP_GPS manual inject_data lua_gps_inject_data 1 0
 
 include AP_Math/AP_Math.h
@@ -355,6 +357,8 @@ singleton GCS manual run_command_int lua_GCS_command_int 2 1
 singleton GCS method get_allow_param_set boolean
 singleton GCS method set_allow_param_set void boolean
 
+singleton GCS method set_extra_capabilities void uint32_t'skip_check
+
 include AP_ONVIF/AP_ONVIF.h depends ENABLE_ONVIF == 1
 singleton AP_ONVIF depends ENABLE_ONVIF == 1
 singleton AP_ONVIF rename onvif
@@ -514,6 +518,7 @@ userdata AP_ESC_Telem_Backend::TelemetryData field power_percentage depends AP_E
 singleton AP_ESC_Telem depends HAL_WITH_ESC_TELEM == 1
 singleton AP_ESC_Telem rename esc_telem
 singleton AP_ESC_Telem method get_rpm boolean uint8_t'skip_check float'Null
+singleton AP_ESC_Telem method get_raw_rpm_and_error_rate boolean uint8_t'skip_check float'Null float'Null
 singleton AP_ESC_Telem method get_temperature boolean uint8_t'skip_check int16_t'Null
 singleton AP_ESC_Telem method get_motor_temperature boolean uint8_t'skip_check int16_t'Null
 singleton AP_ESC_Telem method get_current boolean uint8_t'skip_check float'Null
