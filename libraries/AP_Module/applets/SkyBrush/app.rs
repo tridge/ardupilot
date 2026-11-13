@@ -267,15 +267,27 @@ impl<'a, 'h> App<'a, 'h> {
         now_ms(self.c).wrapping_sub(self.stage_started_ms)
     }
 
-    fn elapsed_usec(&mut self) -> Result<Option<i64>> {
+    /// GPS time as UNIX epoch usec, 0 if unknown. Week and time of week are
+    /// derived from this one host call so they are consistent.
+    fn gps_epoch_usec(&self) -> Result<u64> {
         let gps = self.c.gps();
-        let raw = gps_value(gps.time_epoch_usec(gps.primary_sensor()?))?;
+        gps_value(gps.time_epoch_usec(gps.primary_sensor()?))
+    }
+
+    /// (GPS week, time of week ms) now
+    fn gps_week_tow_ms(&self) -> Result<Option<(u16, u32)>> {
+        let usec = self.gps_epoch_usec()?;
+        Ok((usec != 0).then(|| timing::unix_ms_to_week_tow_ms(usec / 1000)))
+    }
+
+    fn elapsed_usec(&mut self) -> Result<Option<i64>> {
+        let raw = self.gps_epoch_usec()?;
         Ok(self.clock.elapsed_usec(raw, self.c.time_us()))
     }
 
     fn gps_time_ok(&self) -> Result<bool> {
-        let gps = self.c.gps();
-        Ok(gps_value(gps.time_week(gps.primary_sensor()?))? > 0)
+        // time_epoch_usec() is 0 until the GPS week is known
+        Ok(self.gps_epoch_usec()? != 0)
     }
 
     /// Recompute the start time from SHOW_START_TIME/MSEC (GPS mode); it stays
@@ -299,15 +311,12 @@ impl<'a, 'h> App<'a, 'h> {
             self.start_time_pending = false;
             return Ok(());
         }
-        if !self.gps_time_ok()? {
+        let Some((week, tow_ms)) = self.gps_week_tow_ms()? else {
             return Ok(());
-        }
+        };
         self.start_time_pending = false;
-        let gps = self.c.gps();
-        let i = gps.primary_sensor()?;
         let start_ms = tow as i64 * 1000 + self.params.get_i32(P::StartMsec) as i64;
-        self.clock.start_unix_usec =
-            timing::resolve_start_unix_usec(start_ms, gps.time_week(i)?, gps.time_week_ms(i)?);
+        self.clock.start_unix_usec = timing::resolve_start_unix_usec(start_ms, week, tow_ms);
         Ok(())
     }
 
@@ -446,11 +455,10 @@ impl<'a, 'h> App<'a, 'h> {
             return Ok(false);
         }
         if self.clock.use_gps {
-            if !self.gps_time_ok()? {
+            let Some((_, tow_ms)) = self.gps_week_tow_ms()? else {
                 return Ok(false);
-            }
-            let gps = self.c.gps();
-            let start = gps_value(gps.time_week_ms(gps.primary_sensor()?))?.wrapping_add(delay_ms);
+            };
+            let start = tow_ms.wrapping_add(delay_ms);
             self.params.set_i32(P::StartTime, ((start / 1000) % timing::GPS_WEEK_SEC as u32) as i32)?;
             self.params.set(P::StartMsec, (start % 1000) as f32)?;
             self.update_start_time()?;
@@ -1279,11 +1287,10 @@ impl<'a, 'h> App<'a, 'h> {
     }
 
     fn lights_gps_ms(&self) -> Result<u32> {
-        if self.gps_time_ok()? {
-            let gps = self.c.gps();
-            return Ok((gps_value(gps.time_epoch_usec(gps.primary_sensor()?))? / 1000) as u32);
+        match self.gps_epoch_usec()? {
+            0 => Ok(now_ms(self.c)),
+            usec => Ok((usec / 1000) as u32),
         }
-        Ok(now_ms(self.c))
     }
 
     fn update_lights(&mut self) -> Result {
