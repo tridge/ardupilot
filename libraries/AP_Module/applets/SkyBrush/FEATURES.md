@@ -140,9 +140,13 @@ Tags: **T** = exercised by the SITL tester, **P** = needed for parity only.
 | 5 | TIME_AXIS_CONFIG | seq, start ms, scenes and segments; CRTH scenes `0xC000\|t` | P |
 
 Geofence setup:
-- Writes `FENCE_ALT_MAX/RADIUS/ACTION/ENABLE` with save and PARM logging.
+- Validates the polygon first, then writes `FENCE_ALT_MAX/RADIUS/ACTION` with
+  save and PARM logging.
 - Writes a POLYGON_INCLUSION polyfence. AC_PolyFence then reports "Fence
   indexed OK".
+- Writes the type mask to `FENCE_TYPE`, then `FENCE_ENABLE` 1 (0 if no types).
+  The fork writes the mask into `FENCE_ENABLE`, which is only an on/off switch
+  here.
 - Replies with DATA16 `type 0x5D` `[4, token(2), MAV_RESULT]`.
 
 **Drone→GCS**:
@@ -198,7 +202,9 @@ for AUTOPILOT_VERSION during the first seconds of boot does not see it. **P**
     - 4 Land: "…, landing"
     - 5 forced disarm with method FENCEBREACH: "…, disarming"
 - **`FS_EKF_ACTION=42`**: a forced disarm with method EKFFAILSAFE and the text
-  "EKF Failsafe: forced disarm". This is a fork-only vehicle change.
+  "EKF Failsafe: forced disarm". This is a fork-only vehicle change; here the
+  module sets a custom mode option that applies in every flight mode while
+  the module runs.
 - **Forced disarm** = `arming.disarm(method, false)`, falling back to
   `motors->armed(false)`.
 
@@ -243,9 +249,11 @@ Compass-cal result flashes use the AP_Notify event counters.
 - Backends (`SHOW_PYRO_TYPE`):
   - debug
   - single servo: function 105 (scripting12), 85%/100%
-  - multiple servos
+  - multiple servos. All function 105 outputs must share `SERVOn_REVERSED`,
+    as one scaled value holds them off.
   - Cobra 6M on a UART, which takes over SERIALx_PROTOCOL 14 (Volz)
-  - relays
+  - relays, switched on with a host timeout renewed every second, so they
+    turn off if the module stops
 
 ## 8. Logging — T (SHOW, FNCS)
 
