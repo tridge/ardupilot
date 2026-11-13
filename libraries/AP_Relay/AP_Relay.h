@@ -50,6 +50,15 @@ public:
     // de-activate the relay
     void        off(uint8_t instance) { set(instance, false); }
 
+#if AP_RELAY_TIMEOUT_ENABLED
+    // activate the relay, turning it off after timeout_ms unless renewed;
+    // any other set of the instance cancels the timeout
+    void        on_for_ms(uint8_t instance, uint16_t timeout_ms);
+
+    // turn off relays whose timeout expired
+    void        update();
+#endif
+
     // get state of relay
     bool        get(uint8_t instance) const;
     
@@ -78,6 +87,9 @@ public:
     bool get_pin_by_instance(uint8_t instance, uint8_t &pin) const;
 
 private:
+#if AP_RELAY_TIMEOUT_ENABLED
+    uint32_t _off_at_ms[AP_RELAY_NUM_RELAYS];  // 0 for no timeout
+#endif
     static AP_Relay *singleton;
 
     AP_Relay_Params _params[AP_RELAY_NUM_RELAYS];

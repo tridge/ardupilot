@@ -477,8 +477,34 @@ void AP_Relay::set(const uint8_t instance, const bool value)
         return;
     }
 
+#if AP_RELAY_TIMEOUT_ENABLED
+    _off_at_ms[instance] = 0;
+#endif
     set_instance_state(instance, value);
 }
+
+#if AP_RELAY_TIMEOUT_ENABLED
+void AP_Relay::on_for_ms(uint8_t instance, uint16_t timeout_ms)
+{
+    if (instance >= ARRAY_SIZE(_params) || _params[instance].function != AP_Relay_Params::FUNCTION::RELAY) {
+        return;
+    }
+    set(instance, true);
+    _off_at_ms[instance] = MAX(AP_HAL::millis() + timeout_ms, 1U);
+}
+
+void AP_Relay::update()
+{
+    const uint32_t now_ms = AP_HAL::millis();
+    for (uint8_t instance = 0; instance < ARRAY_SIZE(_off_at_ms); instance++) {
+        const uint32_t off_at_ms = _off_at_ms[instance];
+        if (off_at_ms != 0 && int32_t(now_ms - off_at_ms) >= 0) {
+            _off_at_ms[instance] = 0;
+            set(instance, false);
+        }
+    }
+}
+#endif  // AP_RELAY_TIMEOUT_ENABLED
 
 void AP_Relay::toggle(uint8_t instance)
 {
