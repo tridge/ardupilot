@@ -173,6 +173,7 @@ jobs:
             CubeOrange-EKF2,
             mavlink-deprecations,
             no-lto,
+            stack-analysis,
             SOHW,
             Pixhawk6X-PPPGW,
             new-check,
