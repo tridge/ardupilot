@@ -108,6 +108,7 @@ private:
     // true if the gimbal itself holds the gimbal manager's primary control
     bool gimbal_has_control() const;
     void end_survey();
+    void send_gimbal_manager_status();
     uint32_t _survey_lease_ms;      // time the gimbal last renewed its control lease
     MAV_MOUNT_MODE _mode_before_survey;
     MountTargetType _target_before_survey;

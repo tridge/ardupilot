@@ -38,7 +38,7 @@ void AP_Mount_MAVLink::update()
         _survey_leased = false;
         if (gimbal_has_control()) {
             mavlink_control_id = {};
-            GCS_SEND_MESSAGE(MSG_GIMBAL_MANAGER_STATUS);
+            send_gimbal_manager_status();
         }
         _last_target_msgid = 0;
         GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Mount%u: gimbal control ended", _instance + 1);
@@ -49,6 +49,15 @@ void AP_Mount_MAVLink::update()
         return;
     }
     send_target_to_gimbal();
+}
+
+// GCS_SEND_MESSAGE skips unicast links, so also send to the gimbal's link
+void AP_Mount_MAVLink::send_gimbal_manager_status()
+{
+    GCS_SEND_MESSAGE(MSG_GIMBAL_MANAGER_STATUS);
+    if (_link != nullptr) {
+        _link->send_message(MSG_GIMBAL_MANAGER_STATUS);
+    }
 }
 
 // resume the mode and target from before the gimbal's lease
@@ -116,7 +125,7 @@ MAV_RESULT AP_Mount_MAVLink::handle_command_do_gimbal_manager_configure(
         }
         _survey_lease_ms = AP_HAL::millis();
         // Renewal is also confirmation, even when the owner did not change.
-        GCS_SEND_MESSAGE(MSG_GIMBAL_MANAGER_STATUS);
+        send_gimbal_manager_status();
     }
     return result;
 }
