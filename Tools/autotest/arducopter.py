@@ -7671,6 +7671,58 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
         if not messages[-1].flags & mavutil.mavlink.GIMBAL_DEVICE_FLAGS_RETRACT:
             raise NotAchievedException("Lease ending after ROI_NONE did not use the default mode")
 
+    def MountMAVLinkUnicastLease(self):
+        '''a gimbal on a unicast link is told when it takes control'''
+        self.set_parameters({"MNT1_TYPE": 6, "MNT1_TARG_RATE": 10,
+                             "SERIAL1_PROTOCOL": 2, "SERIAL2_PROTOCOL": 2})
+        self.reboot_sitl()
+        # MAV3 is SERIAL2
+        self.set_parameter("MAV3_OPTIONS", 16)
+        self.reboot_sitl()
+        gimbal_compid = mavutil.mavlink.MAV_COMP_ID_GIMBAL
+        saved_mavfile_global = mavutil.mavfile_global
+        gimbal = mavutil.mavlink_connection(
+            self.sitl_serial_endpoint(2), source_system=self.sysid_thismav(),
+            source_component=gimbal_compid, robust_parsing=True)
+        mavutil.mavfile_global = saved_mavfile_global
+
+        def receive(want, timeout=1):
+            tstart = self.get_sim_time_cached()
+            while self.get_sim_time_cached() - tstart < timeout:
+                while (msg := gimbal.recv_match()) is not None:
+                    if want(msg):
+                        return msg
+                self.mav.select(0.01)
+                self.drain_mav()
+            return None
+
+        try:
+            tstart = self.get_sim_time()
+            while True:
+                if self.get_sim_time_cached() - tstart > 30:
+                    raise NotAchievedException("Unicast gimbal was not discovered")
+                gimbal.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GIMBAL, 0, 0, 0, 0)
+                gimbal.mav.gimbal_device_information_send(
+                    0, b"ArduPilot", b"LeaseTest", b"", 1, 1, 1, 0, 0,
+                    -math.pi, math.pi, -math.pi / 2, math.pi / 2, -math.pi, math.pi)
+                if receive(lambda m: m.get_type() == 'GIMBAL_DEVICE_SET_ATTITUDE'):
+                    break
+
+            gimbal.mav.command_long_send(
+                self.sysid_thismav(), 1, mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_CONFIGURE,
+                0, -2, -1, 0, 0, 0, 0, 0)
+            ack = receive(lambda m: (m.get_type() == 'COMMAND_ACK' and
+                                     m.command == mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_CONFIGURE))
+            if ack is None or ack.result != mavutil.mavlink.MAV_RESULT_ACCEPTED:
+                raise NotAchievedException("Lease not accepted: %s" % ack)
+            status = receive(lambda m: (m.get_type() == 'GIMBAL_MANAGER_STATUS' and
+                                        m.primary_control_compid == gimbal_compid))
+            if status is None:
+                raise NotAchievedException("Unicast gimbal was not told it has control")
+        finally:
+            gimbal.close()
+            mavutil.mavfile_global = saved_mavfile_global
+
     def MAVLinkUnicast(self):
         '''unicast links forward addressed traffic but isolate broadcasts'''
         self.set_parameters({
@@ -19588,6 +19640,7 @@ return update, 1000
             self.MountMAVLinkROI,
             self.MountMAVLinkTargetRefresh,
             self.MountMAVLinkDeviceControl,
+            self.MountMAVLinkUnicastLease,
             self.MAVLinkCameraCaptureStatus,
             self.MAVLinkUnicast,
             self.MAVLinkCameraRelay,
