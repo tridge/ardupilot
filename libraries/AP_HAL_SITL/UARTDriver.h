@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <stdarg.h>
+#include <atomic>
 #include "AP_HAL_SITL_Namespace.h"
 #include <AP_HAL/utility/Socket_native.h>
 #include <AP_HAL/utility/RingBuffer.h>
@@ -33,6 +34,9 @@ public:
     ssize_t get_system_outqueue_length() const;
     ssize_t get_system_outqueue_limit() const;
 
+    // on reboot, just before exec(): get queued output to the peer
+    void drain_before_exec(uint32_t timeout_ms, uint64_t deadline_ms);
+
     bool tx_pending() override {
         return false;
     }
@@ -43,6 +47,7 @@ public:
     bool _unbuffered_writes;
 
     enum flow_control get_flow_control(void) override;
+    bool stop_transmit(bool stop) override;
 
     bool set_unbuffered_writes(bool on) override;
 
@@ -107,6 +112,7 @@ private:
     enum flow_control _flow_control = FLOW_CONTROL_DISABLE;
     uint32_t _auto_flow_start_ms;   // time AUTO mode first had pending data to write
     bool _auto_flow_detected;   // true once CTS confirmed active in AUTO mode
+    std::atomic<bool> _transmit_stopped;
 
     void _tcp_start_connection(uint16_t port, bool wait_for_connection);
     void _unix_start_connection(const char *path, bool wait_for_connection);
@@ -171,7 +177,7 @@ protected:
 #endif
 
 private:
-    void handle_writing_from_writebuffer_to_device();
+    void handle_writing_from_writebuffer_to_device(bool ignore_baudlimit=false);
     void handle_reading_from_device_to_readbuffer();
 
     // statistics

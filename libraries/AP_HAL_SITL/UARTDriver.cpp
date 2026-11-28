@@ -276,6 +276,13 @@ enum AP_HAL::UARTDriver::flow_control UARTDriver::get_flow_control(void)
     return FLOW_CONTROL_ENABLE;
 }
 
+bool UARTDriver::stop_transmit(bool stop)
+{
+    WITH_SEMAPHORE(write_mtx);
+    _transmit_stopped.store(stop, std::memory_order_relaxed);
+    return true;
+}
+
 ssize_t UARTDriver::_read(uint8_t *buffer, uint16_t count)
 {
     const ssize_t ret = _readbuffer.read(buffer, count);
@@ -289,38 +296,39 @@ bool UARTDriver::_discard_input(void)
     return true;
 }
 
+/*
+  start sending what is queued and return, without waiting for the
+  peer to take it.
+
+  This is what flush() means on ChibiOS, where it wakes the UART thread
+  and returns. Waiting here could never work on the main thread: nothing
+  advances simulated time until we return, so the baud-rate limit
+  releases no bytes and any timeout measured on that clock never
+  expires.
+
+  A writer pass sends at most the contiguous part of the ring buffer, so
+  repeat it while it moves bytes and stop as soon as one sends nothing
+  (peer not reading, baud limit reached). A caller that changes baud
+  rate straight after flush(), as CRSF does, then loses nothing that the
+  peer could accept.
+ */
 void UARTDriver::_flush(void)
 {
-#if HAL_SITL_WASM_ENABLED
-    if (_wasm) {
-        return;
-    }
-#endif
-
-    // flush the write buffer - but don't fail and don't
-    // infinitely-loop.  This is not a good definition of "flush", but
-    // it was judged that we had to return from this function even if
-    // we hadn't actually done our job.
-    uint32_t start_ms = AP_HAL::millis();
-    while (AP_HAL::millis() - start_ms < 1000) {
-        if (_writebuffer.available() == 0) {
+    uint32_t pending = _writebuffer.available();
+    while (pending > 0) {
+        handle_writing_from_writebuffer_to_device();
+        const uint32_t now_pending = _writebuffer.available();
+        if (now_pending >= pending) {
             break;
         }
-        _timer_tick();
-    }
-
-    // ensure that the outbound TCP queue is also empty...
-    start_ms = AP_HAL::millis();
-    while (AP_HAL::millis() - start_ms < 1000) {
-        if (((HALSITL::UARTDriver*)hal.serial(0))->get_system_outqueue_length() == 0) {
-            break;
-        }
-        usleep(1000);
+        pending = now_pending;
     }
 }
 
 size_t UARTDriver::_write(const uint8_t *buffer, size_t size)
 {
+    // so the write buffer can not be cleared on reconnection mid-write
+    WITH_SEMAPHORE(write_mtx);
     const auto _txspace = txspace();
     if (_txspace < size) {
         size = _txspace;
@@ -329,24 +337,39 @@ size_t UARTDriver::_write(const uint8_t *buffer, size_t size)
         return 0;
     }
 
-        /*
-          simulate byte loss at the link layer
-         */
-        uint8_t lost_byte = 0;
+    /*
+      simulate byte loss at the link layer
+     */
+    uint8_t lost_byte = 0;
+    bool interior_loss = false;
 #if !defined(HAL_BUILD_AP_PERIPH)
-        SITL::SIM *_sitl = AP::sitl();
+    SITL::SIM *_sitl = AP::sitl();
 
-        if (_sitl && _sitl->uart_byte_loss_pct > 0) {
-            if (fabsf(rand_float()) < _sitl->uart_byte_loss_pct.get() * 0.01 * size) {
-                lost_byte = 1;
-            }
+    if (_sitl != nullptr) {
+        const int8_t loss_port = _sitl->uart_byte_loss_port.get();
+        const bool port_match = loss_port < 0 || loss_port == _portNumber;
+        const float loss_prob = _sitl->uart_byte_loss_pct.get() * 0.01 * size;
+        if (port_match && loss_prob > 0 && fabsf(rand_float()) < loss_prob) {
+            lost_byte = 1;
+            interior_loss = loss_port >= 0;
         }
+    }
 #endif // HAL_BUILD_AP_PERIPH
 
     // Include lost byte in tx count, we think we sent it even though it was never added to the write buffer
     _tx_stats_bytes += lost_byte;
 
-    const size_t ret = _writebuffer.write(buffer, size - lost_byte) + lost_byte;
+    size_t ret;
+    if (interior_loss) {
+        // Skip an interior byte so framed protocols see corrupted payload
+        // instead of potentially losing only a trailing frame delimiter.
+        const size_t loss_offset = size / 2;
+        ret = _writebuffer.write(buffer, loss_offset);
+        ret += _writebuffer.write(&buffer[loss_offset + 1], size - loss_offset - 1);
+        ret += lost_byte;
+    } else {
+        ret = _writebuffer.write(buffer, size - lost_byte) + lost_byte;
+    }
     if (_unbuffered_writes) {
         handle_writing_from_writebuffer_to_device();
     }
@@ -872,6 +895,14 @@ void UARTDriver::_check_connection(void)
                 _fd = -1;
                 return;
             }
+            {
+                // a new client must not receive the backlog queued for the
+                // previous one. While we are disconnected txspace() returns
+                // 0, so new writes are refused, and the code that writes
+                // to or sends from the buffer holds write_mtx
+                WITH_SEMAPHORE(write_mtx);
+                _writebuffer.clear();
+            }
             _connected = true;
             fprintf(stdout, "New connection on SERIAL%u\n", _portNumber);
         }
@@ -1023,7 +1054,7 @@ uint16_t UARTDriver::read_from_async_csv(uint8_t *buffer, uint16_t space)
     return i;
 }
 
-void UARTDriver::handle_writing_from_writebuffer_to_device()
+void UARTDriver::handle_writing_from_writebuffer_to_device(bool ignore_baudlimit)
 {
 #if HAL_SITL_WASM_ENABLED
     if (_wasm) {
@@ -1036,11 +1067,15 @@ void UARTDriver::handle_writing_from_writebuffer_to_device()
         _check_reconnect();
         return;
     }
+    if (_transmit_stopped.load(std::memory_order_relaxed)) {
+        return;
+    }
+
     ssize_t nwritten = 0;
     uint32_t max_bytes = 10000;
 #if !defined(HAL_BUILD_AP_PERIPH)
     SITL::SIM *_sitl = AP::sitl();
-    if (_sitl && _sitl->telem_baudlimit_enable) {
+    if (_sitl && _sitl->telem_baudlimit_enable && !ignore_baudlimit) {
         // limit byte rate to configured baudrate
         // Byte rate is bit rate divided by 10. 8 bits of data + start/stop bits
         max_bytes = baud_limits.write.max_bytes(float(_uart_baudrate) * 0.1);
@@ -1277,6 +1312,66 @@ ssize_t UARTDriver::get_system_outqueue_length() const
 #endif
 }
 
+/*
+  called by HAL_SITL::actually_reboot() just before exec(). exec()
+  closes every socket, so anything still in our write buffer is lost,
+  and if unread input is waiting when a TCP socket closes the kernel
+  sends a reset and discards what it had queued for the peer, such as
+  the COMMAND_ACK for the reboot.
+
+  Push the write buffer out ignoring the baud-rate limit, read and drop
+  any input, and wait for the socket queue to empty. Simulated time is
+  irrelevant now, so wait in wall-clock time, and give up once nothing
+  has moved for timeout_ms (a peer that has stopped reading), or at
+  deadline_ms (SITL_State_Common::wall_millis()) whatever happens
+ */
+void UARTDriver::drain_before_exec(uint32_t timeout_ms, uint64_t deadline_ms)
+{
+#if HAL_SITL_WASM_ENABLED
+    if (_wasm) {
+        return;
+    }
+#endif
+    uint64_t last_progress_ms = SITL_State_Common::wall_millis();
+    uint32_t last_buffered = UINT32_MAX;
+    ssize_t last_queued = SSIZE_MAX;
+    bool peer_closed = false;
+    while (_connected) {
+        handle_writing_from_writebuffer_to_device(true);
+        if (_use_send_recv && !_is_udp && _fd != -1 && !peer_closed) {
+            // capped, as a peer sending at full rate may never let recv()
+            // run dry
+            uint8_t discard[512];
+            ssize_t n = -1;
+            for (uint8_t i = 0; i < 64 && (n = recv(_fd, discard, sizeof(discard), MSG_DONTWAIT)) > 0; i++) {
+            }
+            // the peer has closed its side but may still read: stop
+            // reading, keep sending until done or timed out
+            peer_closed = (n == 0);
+        }
+        const uint32_t buffered = _writebuffer.available();
+        const ssize_t queued = get_system_outqueue_length();
+        if (buffered == 0 && queued == 0) {
+            return;
+        }
+        // a fall in either counts as progress: on a Unix socket TIOCOUTQ
+        // counts the kernel's allocation per write, so it can rise while
+        // data is moving
+        const uint64_t now_ms = SITL_State_Common::wall_millis();
+        if (now_ms >= deadline_ms) {
+            return;
+        }
+        if (buffered < last_buffered || queued < last_queued) {
+            last_progress_ms = now_ms;
+        } else if (now_ms - last_progress_ms >= timeout_ms) {
+            return;
+        }
+        last_buffered = buffered;
+        last_queued = queued;
+        usleep(1000);
+    }
+}
+
 ssize_t UARTDriver::get_system_outqueue_limit() const
 {
     // AF_UNIX TIOCOUTQ includes per-write kernel accounting and data already
@@ -1312,12 +1407,18 @@ size_t UARTDriver::wasm_write(const uint8_t *buf, size_t len)
 
 size_t UARTDriver::wasm_read(uint8_t *buf, size_t max_len)
 {
-    return _wasm ? _writebuffer.read(buf, max_len) : 0;
+    if (!_wasm || _transmit_stopped.load(std::memory_order_relaxed)) {
+        return 0;
+    }
+    return _writebuffer.read(buf, max_len);
 }
 
 size_t UARTDriver::wasm_read_available() const
 {
-    return _wasm ? _writebuffer.available() : 0;
+    if (!_wasm || _transmit_stopped.load(std::memory_order_relaxed)) {
+        return 0;
+    }
+    return _writebuffer.available();
 }
 
 static UARTDriver *wasm_serial(uint32_t serial_num)

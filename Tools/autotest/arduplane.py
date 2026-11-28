@@ -2593,6 +2593,42 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         if not self.current_onboard_log_contains_message("RFND"):
             raise NotAchievedException("No RFND messages in log")
 
+    def TerrainEstimatorWithoutFlowSensor(self):
+        '''Check EKF3's terrain estimator fuses no flow when no flow sensor is fitted'''
+        # with EK3_FLOW_USE at terrain, Plane's default, the estimator also runs on range finder
+        # samples alone, and must not treat the missing flow sample as a measured zero
+        self.set_parameter("EK3_FLOW_USE", 2)
+        self.set_analog_rangefinder_parameters()
+        self.reboot_sitl()
+
+        # the RangeFinder test's mission, flown at 10 m within the range finder's range
+        self.load_mission_from_filepath(
+            os.path.join(testdir, "ArduPlane_Tests", "RangeFinder", "plane-gripper-mission.txt"))
+        self.set_parameter("RTL_AUTOLAND", 1)
+        self.set_current_waypoint(1)
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.wait_statustext("Auto disarmed", timeout=120)
+
+        # AFI is the terrain estimator's flow innovation, set whenever it tests a flow sample.
+        # RI, its range innovation, is set only when it runs on a range finder sample, so
+        # rows with it show the estimator was running and found no flow to test
+        dfreader = self.dfreader_for_current_onboard_log()
+        ranged = 0
+        while True:
+            m = dfreader.recv_match(type='XKF5')
+            if m is None:
+                break
+            if m.AFI != 0:
+                raise NotAchievedException(
+                    "terrain estimator tested flow with no flow sensor (XKF5.AFI=%d at %u us)" % (m.AFI, m.TimeUS))
+            if m.RI != 0:
+                ranged += 1
+        if ranged == 0:
+            raise NotAchievedException("terrain estimator never ran on a range finder sample (XKF5.RI)")
+        self.progress("%u XKF5 rows with a range innovation, no flow tested" % ranged)
+
     def TemperatureSensorRangefinder(self):
         '''Test that AP_TemperatureSensor can push temperature into a rangefinder'''
         self.progress("Configure rangefinder and temperature sensor")
@@ -8465,6 +8501,97 @@ return update()
             raise NotAchievedException("Not all servos have moved within the test frame")
 
         self.disarm_vehicle()
+
+    def WaypointPassBy(self):
+        '''test NAV_WAYPOINT param3 (pass-by distance) and its interaction with param2'''
+        # Fly a rectangle where each corner is a waypoint with a
+        # different combination of param2 (acceptance radius) and
+        # param3 (pass-by distance).  For each corner record where the
+        # vehicle is when the waypoint completes, measured along the
+        # inbound leg from the corner (positive is beyond the corner).
+        #
+        # Expected behaviour:
+        #  - p3=0: normal early turn, completes before the corner
+        #  - p3=60: target moves 60m beyond the corner along the
+        #    inbound leg and the acceptance distance becomes zero, so
+        #    the waypoint completes on the finish line 60m beyond it
+        #  - p3=60, p2=80: the 80m acceptance radius applies around
+        #    the moved target, so the waypoint completes about 20m
+        #    before the corner
+        corners = {
+            # seq: (north, east, p2, p3, inbound unit vector (n, e), min along, max along, completion text)
+            3: (800, 0, 0, 0, (1, 0), -200, 0, "Reached"),
+            4: (800, 700, 0, 60, (0, 1), 45, 75, "Passed"),
+            5: (100, 700, 80, 60, (-1, 0), -40, -5, "Reached"),
+        }
+
+        items = self.create_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, 0, 100),  # 2, start of the first leg
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 800, 0, 100),  # 3
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 800, 700, 100),  # 4
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, 700, 100),  # 5
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 100, 0, 100),  # 6
+        ])
+        for seq, (north, east, p2, p3, inbound, along_min, along_max, text) in corners.items():
+            items[seq].param2 = p2
+            items[seq].param3 = p3
+        self.check_mission_upload_download(items)
+
+        home = self.home_position_as_location()
+        completions = {}
+        last_position = {}
+
+        def record_completions(mav, m):
+            t = m.get_type()
+            if t == 'GLOBAL_POSITION_INT':
+                last_position['loc'] = (m.lat * 1e-7, m.lon * 1e-7)
+            elif t == 'STATUSTEXT':
+                match = re.match(r"(Reached|Passed) waypoint #(\d+)", m.text)
+                if match is not None and 'loc' in last_position:
+                    completions[int(match.group(2))] = (match.group(1), last_position['loc'])
+
+        self.context_push()
+        self.install_message_hook_context(record_completions)
+
+        self.change_mode('AUTO')
+        self.wait_ready_to_arm()
+        self.arm_vehicle()
+        self.wait_current_waypoint(6, timeout=300)
+
+        # "Reached waypoint #5" can arrive after MISSION_CURRENT has
+        # moved on, so keep processing messages until every corner is
+        # recorded
+        tstart = self.get_sim_time()
+        while not all(seq in completions for seq in corners):
+            if self.get_sim_time_cached() - tstart > 10:
+                raise NotAchievedException("Missing completion message(s) for waypoint(s) %s" %
+                                           [seq for seq in corners if seq not in completions])
+            self.mav.recv_match(blocking=True, timeout=1)
+
+        self.context_pop()
+
+        for seq, (north, east, p2, p3, inbound, along_min, along_max, text) in corners.items():
+            if seq not in completions:
+                raise NotAchievedException("No completion message for waypoint #%u" % seq)
+            (got_text, (lat, lng)) = completions[seq]
+            corner = self.offset_location_ne(home, north, east)
+            offset_n = (lat - corner.lat) * 111319.5
+            offset_e = (lng - corner.lng) * 111319.5 * math.cos(math.radians(corner.lat))
+            along = offset_n * inbound[0] + offset_e * inbound[1]
+            cross = offset_e * inbound[0] - offset_n * inbound[1]
+            self.progress("waypoint #%u p2=%u p3=%u: %s, %.1fm along the inbound leg from the corner, %.1fm across" %
+                          (seq, p2, p3, got_text, along, cross))
+            if got_text != text:
+                raise NotAchievedException("Expected '%s waypoint #%u', got '%s'" % (text, seq, got_text))
+            if along < along_min or along > along_max:
+                raise NotAchievedException(
+                    "waypoint #%u completed %.1fm along the inbound leg, expected %d to %d" %
+                    (seq, along, along_min, along_max))
+            if abs(cross) > 25:
+                raise NotAchievedException("waypoint #%u completed %.1fm off the inbound leg" % (seq, cross))
+
+        self.fly_home_land_and_disarm()
 
     def InteractTest(self):
         '''just takeoff'''
@@ -15657,6 +15784,52 @@ return update, 200
 
         self.fly_home_land_and_disarm()
 
+    def ReturnPathTrack(self):
+        '''RTL rejoins a return path at the closest point and then follows the track'''
+        self.set_parameter("RTL_AUTOLAND", 4)
+        self.context_set_message_rate_hz('LOCAL_POSITION_NED', 10)
+
+        # the leg from item 4 to item 5 runs south along the north axis
+        self.start_flying_simple_relhome_mission([
+            (mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 50),        # 1
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 400, 400, 100),  # 2
+            self.create_MISSION_ITEM_INT(mavutil.mavlink.MAV_CMD_DO_RETURN_PATH_START),  # 3
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 2000, 0, 100),   # 4
+            (mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 200, 0, 100),    # 5
+        ])
+        self.wait_current_waypoint(2, timeout=120)
+
+        # beside the middle of the leg from item 4 to item 5:
+        self.change_mode('GUIDED')
+        loc = self.offset_location_ne(self.home_position_as_location(), 1100, 400)
+        loc.set_alt_m(100, AltFrame.ABOVE_HOME)
+        self.send_do_reposition(loc)
+        self.wait_location(loc, accuracy=200, height_accuracy=None, timeout=120)
+
+        self.change_mode('RTL')
+        self.wait_mode('AUTO')
+        # the rejoin point part way along the leg carries the leg start index
+        self.assert_current_waypoint(4)
+
+        # flying straight to item 5 would be about 200m east of the track
+        # at 700m north, so any east offset there is a cross track error
+        max_cross_track = 0
+        tstart = self.get_sim_time()
+        while True:
+            if self.get_sim_time_cached() - tstart > 180:
+                raise NotAchievedException("Did not fly the return path")
+            m = self.assert_receive_message('LOCAL_POSITION_NED')
+            if m.x < 300:
+                break
+            if m.x < 700:
+                max_cross_track = max(max_cross_track, abs(m.y))
+        self.progress(f"maximum cross track error {max_cross_track:.1f}m")
+        if max_cross_track > 20:
+            raise NotAchievedException(f"Did not follow the return path track (cross track {max_cross_track:.1f}m)")
+        self.assert_current_waypoint(5)
+
+        self.fly_home_land_and_disarm()
+
     def MAV_CMD_SET_HAGL(self):
         '''test height above ground from MAV_CMD_SET_HAGL is used for the landing flare'''
         self.start_flying_simple_relhome_mission([
@@ -16099,6 +16272,7 @@ return update, 200
             self.TestGripperMission,
             self.AIRSPEED_AUTOCAL,
             self.RangeFinder,
+            self.TerrainEstimatorWithoutFlowSensor,
             self.FenceRTLRally,
             self.FenceMinAltEnableAutoland,
             self.FenceAutoEnableDisableSwitch,
@@ -16245,6 +16419,7 @@ return update, 200
             self.RudderArmedTakeoffRequiresNeutralThrottle,
             self.MAV_CMD_DO_AUTOTUNE_ENABLE,
             self.MAV_CMD_NAV_ALTITUDE_WAIT,
+            self.WaypointPassBy,
             self.InteractTest,
             self.MAV_CMD_MISSION_START,
             self.TerrainRally,
@@ -16326,6 +16501,7 @@ return update, 200
             self.SET_POSITION_TARGET_LOCAL_NED,
             self.GuidedOnlyOffboardControl,
             self.MAV_CMD_DO_RETURN_PATH_START,
+            self.ReturnPathTrack,
             self.MAV_CMD_SET_HAGL,
             self.MAV_CMD_DO_PARACHUTE_actions,
             self.MAV_CMD_DO_SET_MISSION_CURRENT,
@@ -16438,6 +16614,10 @@ return update, 200
         # has no log and the scan below silently reads the previous
         # boot's log
         self.set_parameter("LOG_DISARMED", 1)
+        # the recalibration before the reset takes a single baro
+        # sample, whose SIM_BARO_RND noise (0.2 m by default) would
+        # otherwise decide whether we pass the 0.1 m limit below
+        self.set_parameter("SIM_BARO_RND", 0)
         self.wait_ready_to_arm()
 
         # suspend periodic resets so baro drift can accumulate
@@ -16452,6 +16632,9 @@ return update, 200
         self.set_parameter("SIM_BARO_DRIFT", 0.5)
         self.delay_sim_time(4, reason="baro buffer to fill with drift")
         self.set_parameter("SIM_BARO_DRIFT", 0)
+        # the accumulated drift remains; let the EKF settle on it, or
+        # its catching up with the end of the ramp adds to the transient
+        self.delay_sim_time(5, reason="EKF to settle after drift")
 
         # re-enable periodic resets; the next 5 s tick fires
         # update_home -> resetHeightDatum
@@ -16509,6 +16692,46 @@ return update, 200
         # just reboot.
         self.reboot_sitl()
 
+    def PPPPeriphNoSoftFlow(self):
+        '''verify the original PPP path with software flow control disabled'''
+        self.context_collect('STATUSTEXT')
+
+        self.set_parameters({
+            "NET_ENABLE": 1,
+            "SERIAL5_PROTOCOL": 48,
+            "SERIAL5_BAUD": 921,
+            "CAN_P1_DRIVER": 1,
+            "SIM_BAUDLIMIT_EN": 1,
+        })
+        self.restart_SITL_frame(
+            'quadplane-PPP-no-flow',
+            # lockstep: the periph's PPP endpoint must not fall behind
+            # simulation time when the runner is loaded
+            customisations=['--serial5=tcp:{port}', '--sim-periph-lockstep'],
+        )
+        self.wait_statustext("PPP[0]: started", check_context=True, timeout=30,
+                             wallclock_timeout=True)
+        m = self.wait_statustext(r"NET: IP\s+10\.\d+\.\d+\.\d+",
+                                 check_context=True, regex=True, timeout=30,
+                                 wallclock_timeout=True)
+        self.progress("PPP link established without software flow: %s" %
+                      m.text.strip())
+        self.wait_statustext(
+            r"Discard server (?!0\.000)\d+\.\d+ kbyte/sec",
+            check_context=True,
+            regex=True,
+            timeout=30,
+        )
+
+        self.assert_parameter_value("NET_OPTIONS", 0)
+
+        # A peer without the software-flow option sends ordinary PPP bytes;
+        # this path must not emit a negotiation warning or use the parser.
+        if self.statustext_in_collections(
+                "peer software flow unavailable") is not None:
+            raise NotAchievedException(
+                "Software flow-control callback used while option was disabled")
+
     def PPPPeriph(self):
         '''verify PPP-over-TCP link to an AP_Periph (sitl_periph_PPP) companion'''
         self.context_collect('STATUSTEXT')
@@ -16524,7 +16747,9 @@ return update, 200
         self.set_parameters({
             "NET_ENABLE": 1,
             "SERIAL5_PROTOCOL": 48,
+            "SERIAL5_BAUD": 921,
             "CAN_P1_DRIVER": 1,
+            "SIM_BAUDLIMIT_EN": 1,
         })
         self.restart_SITL_frame(
             'quadplane-PPP',
@@ -16555,6 +16780,82 @@ return update, 200
                                  check_context=True, regex=True, timeout=30,
                                  wallclock_timeout=True)
         self.progress("PPP link established: %s" % m.text.strip())
+
+        # AP_Periph's TCP discard client now sends continuously to the
+        # discard server on Plane. Verify traffic is crossing PPP before
+        # stalling Plane's PPP consumer.
+        self.wait_statustext(
+            r"Discard server (?!0\.000)\d+\.\d+ kbyte/sec",
+            check_context=True,
+            regex=True,
+            timeout=30,
+        )
+        self.context_clear_collection('STATUSTEXT')
+
+        # Stall Plane's network stack for longer than the LCP echo limit
+        # (LCP_MAXECHOFAILS echoes at one second intervals). Plane must
+        # stop the peer, and the paused link must stay up.
+        self.set_parameter("SIM_PPP_STALL_P", 5)
+        self.delay_sim_time(2, reason="deliver data already received")
+        discard_reports = self.statustext_count_in_collections("Discard server")
+        self.delay_sim_time(6, reason="hold the peer stopped")
+        if self.statustext_count_in_collections("Discard server") != discard_reports:
+            raise NotAchievedException("PPP traffic was not stalled")
+        if self.statustext_in_collections("PPP[0]: reconnecting") is not None:
+            raise NotAchievedException(
+                "PPP restarted while software flow control was active")
+
+        # Plane counts the bytes that arrive while it holds the peer
+        # stopped, and warns if the peer carried on sending
+        if self.statustext_in_collections(
+                "peer ignoring flow control") is not None:
+            raise NotAchievedException("AP_Periph did not honour STOP")
+
+        # Once the stall ends, START should release the peer and TCP
+        # throughput should continue without a fresh PPP negotiation.
+        self.set_parameter("SIM_PPP_STALL_P", -1)
+        self.context_clear_collection('STATUSTEXT')
+        self.wait_statustext(
+            r"Discard server (?!0\.000)\d+\.\d+ kbyte/sec",
+            check_context=True,
+            regex=True,
+            timeout=30,
+        )
+        if self.statustext_in_collections("PPP[0]: reconnecting") is not None:
+            raise NotAchievedException(
+                "PPP restarted after releasing the software flow-control stall")
+
+        # The bounded peer client now closes, leaving no TCP state to mask the
+        # independent PPP lifecycle test below.
+        self.wait_statustext("Discard server: disconnected",
+                             check_context=True, timeout=30)
+
+        # Drop an interior byte from every write on the PPP UART only. This
+        # models a burst of receive overruns at AP_Periph on a link without
+        # hardware flow control, while leaving SERIAL0 intact to observe it.
+        self.set_parameters({
+            "SIM_UART_LOSS": 0,
+            "SIM_UART_LOSS_P": 5,
+        })
+        self.context_clear_collection('STATUSTEXT')
+        loss_start = self.get_sim_time()
+        self.set_parameter("SIM_UART_LOSS", 100)
+        self.wait_statustext("PPP[0]: reconnecting",
+                             check_context=True, timeout=30)
+        restart_time = self.get_sim_time()
+        self.progress("PPP restart after %.2f seconds of byte loss" %
+                      (restart_time - loss_start))
+
+        # Restore the serial stream and verify that IPCP establishes the link
+        # again.  The repeated NET address announcement comes from the PPP
+        # status callback, so it proves that this is a fresh negotiation.
+        self.set_parameter("SIM_UART_LOSS", 0)
+        self.context_clear_collection('STATUSTEXT')
+        m = self.wait_statustext(r"NET: IP\s+10\.\d+\.\d+\.\d+",
+                                 check_context=True, regex=True, timeout=75)
+        recovery_time = self.get_sim_time()
+        self.progress("PPP link recovered after %.2f seconds: %s" %
+                      (recovery_time - loss_start, m.text.strip()))
 
     def tests1c(self):
         '''return list of all tests'''
@@ -16628,7 +16929,8 @@ return update, 200
             self.PreflightRebootComponent,
             self.UTMGlobalPosition,
             self.UTMGlobalPositionWaypoint,
-            self.PPPPeriph,
+            Test(self.PPPPeriphNoSoftFlow, speedup=1),
+            Test(self.PPPPeriph, speedup=1),
             self.steplessAHRSSwitch,
             self.DO_REPOSITION_mode_change_refused,
             self.JSONAirData,
